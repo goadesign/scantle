@@ -154,7 +154,7 @@ func (m *meter) record(resp *model.Response, err error) {
 		observed = model.UsageFromError(err)
 	case resp.HasObservedUsage():
 		observed = &resp.Usage
-		complete = resp.HasUsage() && !resp.UsageIncomplete
+		complete = resp.HasCompleteUsage()
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
