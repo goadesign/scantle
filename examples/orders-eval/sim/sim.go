@@ -13,10 +13,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -56,9 +54,6 @@ type (
 		stopping chan struct{}
 		// stopped is closed once every accepted request finished.
 		stopped chan struct{}
-		// active records each request a handler is still serving, so a stop
-		// that times out can name what is still running.
-		active map[*http.Request]time.Time
 		// hold, when set, receives the order ID of the next new refund after
 		// it is recorded; the simulator then withholds that response until
 		// the caller disconnects or the simulator stops. It is disarmed after one use.
@@ -153,7 +148,7 @@ func (s *Sim) Serve(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("listen: %w", err)
 	}
-	srv := &http.Server{Handler: s.track(mux), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	s.mu.Lock()
 	s.srv = srv
 	s.stopping = make(chan struct{})
@@ -178,43 +173,8 @@ func (s *Sim) Stop(ctx context.Context) error {
 	case <-s.stopped:
 		return nil
 	case <-ctx.Done():
-		return fmt.Errorf("stop simulator: accepted requests still running (%s): %w", s.describeActive(), ctx.Err())
+		return fmt.Errorf("stop simulator: accepted requests still running: %w", ctx.Err())
 	}
-}
-
-// track records every request while its handler runs.
-func (s *Sim) track(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.mu.Lock()
-		if s.active == nil {
-			s.active = map[*http.Request]time.Time{}
-		}
-		s.active[r] = time.Now()
-		s.mu.Unlock()
-		defer func() {
-			s.mu.Lock()
-			delete(s.active, r)
-			s.mu.Unlock()
-		}()
-		next.ServeHTTP(w, r)
-	})
-}
-
-// describeActive lists the requests still being served, with how long each
-// has run and whether its caller is gone.
-func (s *Sim) describeActive() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if len(s.active) == 0 {
-		return "no handler running; a connection is still open"
-	}
-	var parts []string
-	for r, since := range s.active {
-		parts = append(parts, fmt.Sprintf("%s %s for %s, caller context err=%v",
-			r.Method, r.URL.Path, time.Since(since).Round(time.Millisecond), r.Context().Err()))
-	}
-	slices.Sort(parts)
-	return strings.Join(parts, "; ")
 }
 
 // beginShutdown starts the one graceful shutdown, which closes stopped once
