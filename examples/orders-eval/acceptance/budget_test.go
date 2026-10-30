@@ -30,7 +30,7 @@ func TestJudgeBudget(t *testing.T) {
 			scriptedmodel.ModelID: {Input: 60, CacheRead: 41},
 		}}, nil, false},
 		{"no call reached the gateway", harness.Usage{}, nil, false},
-		{"a call did not report usage", harness.Usage{Calls: 2, Unreported: 1, ByModel: usage(1, 1).ByModel}, nil, false},
+		{"a call did not report complete usage", harness.Usage{Calls: 2, Unreported: 1, ByModel: usage(1, 1).ByModel}, nil, false},
 		{"model without a price", harness.Usage{Calls: 1, ByModel: map[string]harness.Tokens{"unknown": {Input: 1}}}, nil, false},
 		{"usage not final", harness.Usage{}, errors.New("not final"), false},
 	}
@@ -48,4 +48,12 @@ func TestJudgeBudget(t *testing.T) {
 		}}, nil, budget{inputTokens: 100, outputTokens: 10, costNanoUSD: 300_000})
 		assert.False(t, got.Passed, got.Diagnostic)
 	})
+}
+
+func TestJudgeBudgetReportsObservedTotalsOfIncompleteUsage(t *testing.T) {
+	got := judgeBudget(harness.Usage{Calls: 3, Unreported: 1, ByModel: map[string]harness.Tokens{
+		scriptedmodel.ModelID: {Input: 40, Output: 4},
+	}}, nil, budget{inputTokens: 100, outputTokens: 10, costNanoUSD: 1_000_000})
+	assert.False(t, got.Passed, "totals within budget still fail when a call's usage is incomplete")
+	assert.Contains(t, got.Diagnostic, "observed at least 40 input tokens")
 }

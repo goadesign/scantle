@@ -21,12 +21,13 @@ type (
 	Usage struct {
 		// Calls counts completed model calls, successful or not.
 		Calls int
-		// Unreported counts calls whose usage the provider did not report,
-		// so the totals cannot be proven complete.
+		// Unreported counts calls whose usage is not known to be complete, so
+		// the totals are only a lower bound.
 		Unreported int
-		// ByModel sums the reported usage per provider-reported model, which
-		// is what prices apply to. Usage reported without a model is keyed by
-		// the empty string.
+		// ByModel sums every observed token count per provider-reported
+		// model, which is what prices apply to, including the partial counts
+		// of unreported calls. Usage without a model is keyed by the empty
+		// string.
 		ByModel map[string]Tokens
 	}
 
@@ -139,32 +140,40 @@ func (m *meter) stream(next gateway.StreamHandler) gateway.StreamHandler {
 	}
 }
 
-// record adds one finished call. Only a successful call whose provider
-// explicitly reported complete usage adds tokens. Every other call is counted
-// as unreported, never as zero or as an undercount: a call without usage, a
-// call with partial usage, and any failed call, because the usage an error
-// carries does not say whether it is complete.
+// record adds one finished call. Every token count the call observed is
+// added once, whether it comes from a response or from a failed call's error.
+// Separately, a call counts as unreported unless it succeeded and its provider
+// explicitly reported complete usage: a call without usage, with partial
+// usage, or that failed (an error's usage does not say whether it is complete)
+// leaves the totals unproven, so they are a lower bound.
 func (m *meter) record(resp *model.Response, err error) {
-	var usage *model.TokenUsage
-	if err == nil && resp.HasUsage() && !resp.UsageIncomplete {
-		usage = &resp.Usage
+	var observed *model.TokenUsage
+	complete := false
+	switch {
+	case err != nil:
+		observed = model.UsageFromError(err)
+	case resp.HasObservedUsage():
+		observed = &resp.Usage
+		complete = resp.HasUsage() && !resp.UsageIncomplete
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.usage.Calls++
-	if usage == nil {
+	if !complete {
 		m.usage.Unreported++
+	}
+	if observed == nil {
 		return
 	}
 	if m.usage.ByModel == nil {
 		m.usage.ByModel = map[string]Tokens{}
 	}
-	t := m.usage.ByModel[usage.Model]
-	t.Input += usage.InputTokens
-	t.Output += usage.OutputTokens
-	t.CacheRead += usage.CacheReadTokens
-	t.CacheWrite += usage.CacheWriteTokens
-	m.usage.ByModel[usage.Model] = t
+	t := m.usage.ByModel[observed.Model]
+	t.Input += observed.InputTokens
+	t.Output += observed.OutputTokens
+	t.CacheRead += observed.CacheReadTokens
+	t.CacheWrite += observed.CacheWriteTokens
+	m.usage.ByModel[observed.Model] = t
 }
 
 // total returns a copy of the usage recorded so far.

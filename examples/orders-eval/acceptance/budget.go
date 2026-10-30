@@ -76,9 +76,6 @@ func judgeBudget(usage harness.Usage, err error, b budget) eval.Check {
 	if usage.Calls == 0 {
 		return check(name, false, "the candidate made no model call through the evaluator's gateway")
 	}
-	if usage.Unreported > 0 {
-		return check(name, false, "%d of %d model calls did not report usage", usage.Unreported, usage.Calls)
-	}
 	var in, out int
 	var cost int64
 	for _, model := range slices.Sorted(maps.Keys(usage.ByModel)) {
@@ -91,6 +88,11 @@ func judgeBudget(usage harness.Usage, err error, b budget) eval.Check {
 		out += t.Output
 		cost += int64(t.Input)*pr.input + int64(t.Output)*pr.output +
 			int64(t.CacheRead)*pr.cacheRead + int64(t.CacheWrite)*pr.cacheWrite
+	}
+	if usage.Unreported > 0 {
+		return check(name, false, "%d of %d model calls did not report complete usage; observed at least "+
+			"%d input tokens (budget %d), %d output tokens (budget %d), $%.6f (budget $%.6f)",
+			usage.Unreported, usage.Calls, in, b.inputTokens, out, b.outputTokens, dollars(cost), dollars(b.costNanoUSD))
 	}
 	return check(name, in <= b.inputTokens && out <= b.outputTokens && cost <= b.costNanoUSD,
 		"%d calls used %d input tokens (budget %d), %d output tokens (budget %d), $%.6f (budget $%.6f)",

@@ -48,7 +48,10 @@ func TestMeterRecordsEveryCallWithoutDoubleCounting(t *testing.T) {
 	got := m.total()
 	assert.Equal(t, 6, got.Calls)
 	assert.Equal(t, 4, got.Unreported, "missing usage, partial usage and failed calls are unreported, never zero or an undercount")
-	assert.Equal(t, Tokens{Input: 17, Output: 3}, got.ByModel["m"], "stream chunk usage is not added to the final total")
+	// 10+7 complete, plus the observed but unflagged 99, the partial 5 and the
+	// error's retained 20: every observed count once.
+	assert.Equal(t, Tokens{Input: 141, Output: 3}, got.ByModel["m"],
+		"observed counts are kept once and stream chunk usage is not added to the final total")
 }
 
 func TestPlatformUsageIsAnErrorUntilClosed(t *testing.T) {
