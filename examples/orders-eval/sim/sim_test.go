@@ -102,4 +102,3 @@ func ids(orders []*gencommerce.Order) []string {
 	}
 	return out
 }
-
