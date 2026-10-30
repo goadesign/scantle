@@ -47,6 +47,7 @@ func TestRunVerifiesTheOrdersReference(t *testing.T) {
 	assert.Len(t, report.Binding.Artifacts, 2)
 	assert.FileExists(t, filepath.Join(work, "reports", report.Digest+".json"))
 	require.NoError(t, Approve(report.Binding, report))
-	view := report.BuilderView()
-	assert.Nil(t, view.Scenarios[4].Detail, "the holdout's detail is hidden from builders")
+	view := report.ForBuilders()
+	assert.Equal(t, "holdout-1", view.Scenarios[4].ID, "the holdout's name is hidden from builders")
+	assert.Empty(t, view.Scenarios[4].Checks, "the holdout's checks are hidden from builders")
 }

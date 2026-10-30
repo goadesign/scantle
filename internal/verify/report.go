@@ -11,6 +11,7 @@
 package verify
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -194,19 +195,57 @@ func Assemble(binding Binding, suite Suite, evidence eval.Report, suiteExit int)
 	return r, nil
 }
 
-// BuilderView returns the report as builders may see it: holdout scenarios keep
-// their identity and outcome but lose every detail.
-func (r Report) BuilderView() Report {
-	view := r
-	view.Scenarios = make([]ScenarioResult, len(r.Scenarios))
-	for i, s := range r.Scenarios {
+// BuilderReport is the only verification result builders receive. It carries
+// counts, the verdict and, for repair scenarios only, their checks and
+// diagnostics. Holdout scenarios appear only as anonymous outcomes; their
+// names, declarations, evidence and artifacts never leave the evaluator.
+type BuilderReport struct {
+	// ReportDigest identifies the full report this view was derived from.
+	ReportDigest string `json:"report_digest"`
+	// Counts covers every declared scenario.
+	Counts Counts `json:"counts"`
+	// Passed is the report's verdict.
+	Passed bool `json:"passed"`
+	// SuiteFailed reports that the evaluation run itself failed or ended
+	// abnormally, without its details.
+	SuiteFailed bool `json:"suite_failed"`
+	// Scenarios lists every declared scenario in declaration order.
+	Scenarios []BuilderScenario `json:"scenarios"`
+}
+
+// BuilderScenario is one scenario in the builder view.
+type BuilderScenario struct {
+	// ID is the scenario name for repair scenarios and "holdout-<n>" for
+	// holdouts.
+	ID string `json:"id"`
+	// Outcome is how the scenario ended.
+	Outcome Outcome `json:"outcome"`
+	// Checks are the repair scenario's checks with their diagnostics; empty
+	// for holdouts.
+	Checks []eval.Check `json:"checks,omitempty"`
+	// Error is the repair scenario's environment error; empty for holdouts.
+	Error string `json:"error,omitempty"`
+}
+
+// ForBuilders returns the builder view of the report.
+func (r Report) ForBuilders() BuilderReport {
+	b := BuilderReport{ReportDigest: r.Digest, Counts: r.Counts, Passed: r.Passed,
+		SuiteFailed: r.SuiteError != "" || r.SuiteExit != 0}
+	holdouts := 0
+	for _, s := range r.Scenarios {
+		bs := BuilderScenario{ID: s.ID, Outcome: s.Outcome}
 		if s.Holdout {
-			s.ID = fmt.Sprintf("holdout-%d", i+1)
-			s.Detail = nil
+			holdouts++
+			bs.ID = fmt.Sprintf("holdout-%d", holdouts)
+		} else if s.Detail != nil {
+			bs.Error = s.Detail.Error
+			if s.Detail.Result != nil {
+				bs.Checks = s.Detail.Result.Checks
+			}
 		}
-		view.Scenarios[i] = s
+		b.Scenarios = append(b.Scenarios, bs)
 	}
-	return view
+	return b
 }
 
 // Approve checks, at promotion time, that report still describes current. It
@@ -221,7 +260,15 @@ func Approve(current Binding, report Report) error {
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrStaleReport, err)
 	}
-	if rebuilt.Digest != report.Digest {
+	supplied, err := json.Marshal(report)
+	if err != nil {
+		return fmt.Errorf("encode report: %w", err)
+	}
+	derived, err := json.Marshal(rebuilt)
+	if err != nil {
+		return fmt.Errorf("encode report: %w", err)
+	}
+	if !bytes.Equal(supplied, derived) {
 		return fmt.Errorf("%w: report content does not match what its evidence derives", ErrStaleReport)
 	}
 	if !rebuilt.Passed {

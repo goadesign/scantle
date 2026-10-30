@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -79,19 +80,23 @@ func TestAssembleRejectsMalformedInput(t *testing.T) {
 	}
 }
 
-func TestBuilderViewRedactsHoldouts(t *testing.T) {
+func TestForBuildersExposesNoHoldoutDetail(t *testing.T) {
 	both := testBinding().Artifacts
 	r, err := Assemble(testBinding(), testSuite(), eval.Report{SuiteID: "orders_acceptance", Scenarios: []eval.ScenarioReport{
-		scenario("a", true, both), scenario("b", true, both), scenario("h", false, both),
+		scenario("a", true, both), scenario("b", true, both), holdoutResult(),
 	}}, 0)
 	require.NoError(t, err)
-	view := r.BuilderView()
-	holdout := view.Scenarios[2]
-	assert.Equal(t, "holdout-3", holdout.ID, "the holdout's name is hidden")
-	assert.Nil(t, holdout.Detail, "the holdout's checks and diagnostics are hidden")
-	assert.Equal(t, OutcomeFailed, holdout.Outcome, "builders still learn that a holdout failed")
-	assert.Equal(t, r.Counts, view.Counts)
-	assert.NotNil(t, r.Scenarios[2].Detail, "the operator report keeps the detail")
+	view := r.ForBuilders()
+	assert.Equal(t, []BuilderScenario{
+		{ID: "a", Outcome: OutcomePassed, Checks: []eval.Check{{Name: "check", Passed: true}}},
+		{ID: "b", Outcome: OutcomePassed, Checks: []eval.Check{{Name: "check", Passed: true}}},
+		{ID: "holdout-1", Outcome: OutcomeFailed},
+	}, view.Scenarios)
+	serialized, err := json.Marshal(view)
+	require.NoError(t, err)
+	for _, secret := range []string{`"h"`, "secret_holdout_check", "holdout diagnostic", "d1", "d2", "candidate:"} {
+		assert.NotContains(t, string(serialized), secret, "the serialized builder response must not reveal %s", secret)
+	}
 }
 
 func TestApproveRefusesAStaleOrInconsistentReport(t *testing.T) {
@@ -141,9 +146,23 @@ func TestApproveRefusesAStaleOrInconsistentReport(t *testing.T) {
 		assert.False(t, crashed.Passed)
 		assert.ErrorIs(t, Approve(testBinding(), crashed), ErrStaleReport)
 	})
+	t.Run("contradicted verdict with the original digest kept", func(t *testing.T) {
+		contradicted := failing
+		contradicted.Passed = true
+		contradicted.Counts = Counts{Required: 3, Passed: 3}
+		assert.ErrorIs(t, Approve(testBinding(), contradicted), ErrStaleReport)
+	})
 	t.Run("failed report", func(t *testing.T) {
 		assert.ErrorIs(t, Approve(testBinding(), failing), ErrStaleReport)
 	})
+}
+
+// holdoutResult is a failed holdout scenario whose name, checks and
+// diagnostics must stay inside the evaluator.
+func holdoutResult() eval.ScenarioReport {
+	s := scenario("h", false, testBinding().Artifacts)
+	s.Result.Checks = []eval.Check{{Name: "secret_holdout_check", Passed: false, Diagnostic: "holdout diagnostic"}}
+	return s
 }
 
 // testBinding returns a binding for two candidate binaries.

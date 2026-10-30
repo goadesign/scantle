@@ -81,6 +81,8 @@ const (
 	// suiteStopGrace is how long the suite's process group gets to clean up
 	// after SIGTERM before it is killed.
 	suiteStopGrace = 30 * time.Second
+	// groupStopTimeout bounds waiting for a killed process group to empty.
+	groupStopTimeout = 30 * time.Second
 )
 
 // Run clones the candidate at its exact commit and builds its binaries, then
@@ -210,9 +212,12 @@ func (r *runner) describe(ctx context.Context, suiteBin string) (Suite, error) {
 
 // runSuite runs the suite in its own process group and returns its eval.Report
 // and exit status. Cancellation sends SIGTERM to the whole group, so the
-// suite's candidate and Temporal processes stop with it, and kills the group
-// after a grace period. A report is decoded whatever the exit status; only a
-// missing or undecodable report is an error.
+// suite's candidate and Temporal processes stop with it. After the suite
+// process ends, every process left in its group is killed and runSuite waits
+// until the group is empty before returning; a group that does not empty in
+// time is an error and its state is not released. A report is decoded
+// whatever the outcome; a canceled or abnormal end gets exit status -1 and
+// never passes. Only a missing or undecodable report is an error.
 func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []string) (eval.Report, int, error) {
 	stdout, stderr, err := r.outputs("suite")
 	if err != nil {
@@ -227,9 +232,12 @@ func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []
 	cmd.WaitDelay = suiteStopGrace
 	runErr := cmd.Run()
 	if cmd.Process != nil {
-		// Reap anything the suite left in its group, whatever its exit.
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if err := stopGroup(cmd.Process.Pid); err != nil {
+			return eval.Report{}, 0, err
+		}
 	}
+	var report eval.Report
+	decodeErr := decodeFile(filepath.Join(r.evidenceDir, "suite.stdout"), &report)
 	exit := 0
 	var exitErr *exec.ExitError
 	switch {
@@ -237,13 +245,36 @@ func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []
 	case errors.As(runErr, &exitErr):
 		exit = exitErr.ExitCode()
 	default:
-		return eval.Report{}, 0, fmt.Errorf("run suite: %w%s", runErr, r.excerpt("suite"))
+		// Canceled or otherwise not a clean exit: whatever the suite reported
+		// is kept, and the verification can never pass.
+		exit = -1
 	}
-	var report eval.Report
-	if err := decodeFile(filepath.Join(r.evidenceDir, "suite.stdout"), &report); err != nil {
-		return eval.Report{}, 0, fmt.Errorf("suite exited %d without a decodable report: %w%s", exit, err, r.excerpt("suite"))
+	if decodeErr != nil {
+		return eval.Report{}, 0, fmt.Errorf("suite ended (%v) without a decodable report: %w%s", runErr, decodeErr, r.excerpt("suite"))
 	}
 	return report, exit, nil
+}
+
+// stopGroup kills every process remaining in the process group and waits, up
+// to groupStopTimeout, until the group no longer exists.
+func stopGroup(pgid int) error {
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+		return fmt.Errorf("kill suite process group: %w", err)
+	}
+	deadline := time.Now().Add(groupStopTimeout)
+	for {
+		err := syscall.Kill(-pgid, 0)
+		if errors.Is(err, syscall.ESRCH) {
+			return nil
+		}
+		if err != nil && !errors.Is(err, syscall.EPERM) {
+			return fmt.Errorf("check suite process group: %w", err)
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("suite process group %d still has processes after %s", pgid, groupStopTimeout)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // run runs one command with its stdout and stderr in evidence files named by
