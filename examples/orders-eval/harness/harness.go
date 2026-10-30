@@ -18,9 +18,9 @@ package harness
 import (
 	"bytes"
 	"context"
-	"errors"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
