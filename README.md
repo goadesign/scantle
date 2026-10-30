@@ -74,6 +74,7 @@ One-click replay of your examples (runs a fresh isolated sandbox execution):
 Or type any prompt to poke the agent live...        [+ Make This an Example] [⚡ Draft Tweak]
 ```
 - **Switch roles in one click (via the service's public API):** Test a `\$54` refund as the **Customer**, then switch to **Approving Manager** (using evaluator-issued `sim` principals or scoped `staging` principals) to call the service's authenticated approval endpoint (`PrepareContinuation` / `Continue`)—including verifying that a `Customer` principal cannot self-approve.
+- **Preview your agent's UI live (`ToolUI` MCP Apps + optional OpenUI starter):** If your tools ship `ui://` MCP App UIs—including an optional, replaceable **OpenUI** ([`thesysdev/openui`](https://github.com/thesysdev/openui)) viewer starter with typed Goa data/action bindings—`CP3` renders them live in the sandbox right beside the raw `Result`/`ServerData` JSON inspector, with zero UI framework lock-in in `goa-ai` or `scantle` core.
 - **Turn any live turn into a permanent test:** Spot a weird edge case while chatting? Click **`[+ Make This an Example]`**, confirm what *should* have happened, and Scantle's isolated evaluator adds it to your regression suite.
 - **Iterate in seconds with Draft Mode (`⚡ Draft Tweak`):** Tweak prompt wording (0s reload via `prompt.Store`, bound by version reference at promotion) or a threshold (fast single-service `go build` + instant re-run of your `CP1` examples, badged `Draft Experiment`), then promote all your tweaks through one full `CP4`/`CP5` verification run.
 
