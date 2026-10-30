@@ -50,7 +50,7 @@ When configured with provider profiles (`-swarm-profiles`) and explicit builder 
 ### 4. Fast draft overrides and live role-switched testing
 Instead of reading a 2,000-line diff blindly, Scantle separates fast prompt tuning from compiled business rules and ships stateful dependency simulators in [`examples/orders-eval`](examples/orders-eval/):
 - **Test across real auth boundaries:** In the reference platform, trigger a `\$54.00` refund as a **Customer**, verify that customer credentials cannot approve it (`403 Forbidden`), and switch to **Approving Manager** to approve or decline the paused workflow through the real HTTP API.
-- **Iterate on prompts in 0 seconds:** Use `draft_override` (`POST /sandbox/draft`) to hot-reload prompt wording on a bound target's `prompt.Store` in **0 seconds**—while Scantle refuses any attempt to override compiled Go business rules (`target_kind: "compiled_rule"`, `requires_rebuild: true`). *(The `ui://scantle/checkpoint` MCP Apps resource currently serves the baseline HTML host shell; interactive role-switcher, replay, and OpenUI controls in the checkpoint web view are described in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md#checkpoint-3-cp3-poke-the-live-sandbox-switch-roles--iterate-in-0s).)*
+- **Iterate on prompts in 0 seconds:** When a host binds `Options.TargetUpdater`, `draft_override` (`POST /sandbox/draft`) hot-reloads prompt wording on the target's `prompt.Store` in **0 seconds**—while Scantle refuses any attempt to override compiled Go business rules (`target_kind: "compiled_rule"`, `requires_rebuild: true`; standalone `scantle serve` binds no `TargetUpdater`, so `prompt_template` overrides are rejected unless embedded). *(The `ui://scantle/checkpoint` MCP Apps resource currently serves the baseline HTML host shell; interactive role-switcher, replay, and OpenUI controls in the checkpoint web view are described in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough).)*
 
 > **Why the name "Scantle"?** A *scantle* is a slater’s gauge rod, notched once so every slate on a roof is measured against the same hard edge. In Scantle, `design/*.go` is that gauge rod—one compiled contract every builder works to, and an independent verifier measures against.
 
@@ -75,7 +75,7 @@ Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (
 
 > *"Using Scantle, propose a change to `examples/orders` so VIP customers get instant store-credit refunds up to \$150, then preview the compiled C4 architecture and Chorus swarm plan for builder scope `orders` (`internal/**`)."*
 
-Your agent will create and confirm the Change Card (`propose_change` → `confirm_intent`), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and Chorus build roster (pass `-swarm-profiles <path.json>` on `scantle serve` to populate cross-family model assignments).
+Your agent will create the Change Card (`propose_change`, calling `confirm_intent` only if open ambiguity questions yield `status: "needs_confirmation"`), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and Chorus build roster (pass `-swarm-profiles <path.json>` on `scantle serve` to populate cross-family model assignments).
 
 ---
 

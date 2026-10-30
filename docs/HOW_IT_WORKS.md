@@ -82,7 +82,7 @@ When coding-agent provider profiles are configured on the server (`Options.Swarm
 
 At `CP3`, Scantle separates 0-second prompt tuning from compiled business rules and pairs the candidate service with stateful dependency simulators (`examples/orders-eval/sim`).
 
-> **Current implementation vs. target CP3 UI:** Today, `internal/controlplane` serves the `draft_override` MCP tool (`POST /sandbox/draft`) and the baseline `ui://scantle/checkpoint` MCP Apps HTML host (`GET /ui/checkpoint`), while role-switched Customer vs. Approving Manager flows run directly against the candidate HTTP API in `examples/orders` and `examples/orders-eval`. The interactive role-switcher dropdown, one-click scenario replay buttons, `+ Make This an Example` capture, and `openui.v1` action dispatch shown below represent the target CP3 checkpoint web UI design (`PROPOSAL.md` §5.3).
+> **Current implementation vs. target CP3 UI:** Today, `internal/controlplane` serves the `draft_override` MCP tool (`POST /sandbox/draft`, which applies `prompt_template` hot reloads when the host binds `Options.TargetUpdater` and rejects them on standalone `scantle serve` where `TargetUpdater` is unset) and the baseline `ui://scantle/checkpoint` MCP Apps HTML host (`GET /ui/checkpoint`), while role-switched Customer vs. Approving Manager flows run directly against the candidate HTTP API in `examples/orders` and `examples/orders-eval`. The interactive role-switcher dropdown, one-click scenario replay buttons, `+ Make This an Example` capture, and `openui.v1` action dispatch shown below represent the target CP3 checkpoint web UI design (`PROPOSAL.md` §5.3).
 
 ```text
 Scantle Sandbox · Candidate 3a506f6 · [ENV: SIMULATED PAYMENTS — NO REAL MONEY MOVES]
@@ -98,7 +98,7 @@ Or type any prompt to poke the agent live...        [+ Make This an Example] [�
 - **Role Switching Against Real Auth Boundaries**: Trigger a `\$54.00` refund as a **Customer**, verify that a `Customer` bearer token receives `403 Forbidden` if it calls the manager approval endpoint (`POST /orders/runs/{run_id}/approval`), and switch to **Approving Manager** to approve or decline the paused workflow run via the public API.
 - **MCP Apps & Optional OpenUI Previews**: Tools that declare `ToolUI("ui://...")` pair structured `Result` and `ServerData` payloads with MCP Apps views (`ui://scantle/checkpoint`).
 - **Fast Draft Mode (`draft_override`)**:
-  - Editing a **prompt template** (`target_kind: "prompt_template"`) invokes the bound `TargetPromptUpdater` to update the target platform's `prompt.Store` in **0 seconds** and returns the new `prompt_version` digest.
+  - Editing a **prompt template** (`target_kind: "prompt_template"`) invokes `Options.TargetUpdater` (when bound by an embedding host; rejected on standalone `scantle serve`) to update the target platform's `prompt.Store` in **0 seconds** and returns the new `prompt_version` digest.
   - Attempting to override a **compiled business rule** (`target_kind: "compiled_rule"`, such as the `\$50.00` limit) is rejected (`requires_rebuild: true`) so hard domain invariants never drift into unverified prompt text.
 
 ---
