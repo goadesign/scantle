@@ -532,8 +532,9 @@ func newStubModelClient(t *testing.T, responseJSON string) model.Client {
 // TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter runs the CP1
 // analyzer through the real Anthropic adapter configured as NewFromAPIKey
 // configures it (default model only, no client-wide MaxTokens). The request
-// must carry cp1AnalysisMaxOutputTokens, and a response cut off at that
-// allowance must fail without storing a Change Card.
+// must carry cp1AnalysisMaxOutputTokens, and a response stopped at that
+// allowance must fail without storing a Change Card, whether or not its JSON
+// happens to parse.
 func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
 	analysis, err := json.Marshal(CP1SemanticAnalysis{
 		Summary:            "Give VIP customers instant store credit up to $150.",
@@ -553,7 +554,8 @@ func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
 		wantErr    bool
 	}{
 		{name: "complete response", stopReason: "end_turn", text: string(analysis)},
-		{name: "response cut off at the allowance", stopReason: "max_tokens", text: string(analysis[:len(analysis)/2]), wantErr: true},
+		{name: "malformed response cut off at the allowance", stopReason: "max_tokens", text: string(analysis[:len(analysis)/2]), wantErr: true},
+		{name: "valid JSON stopped at the allowance", stopReason: "max_tokens", text: string(analysis), wantErr: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

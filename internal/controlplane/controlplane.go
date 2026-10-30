@@ -188,8 +188,9 @@ const (
 	// cp1AnalysisMaxOutputTokens is the output allowance for the one CP1
 	// inference that writes the structured Change Card analysis. It caps that
 	// response only, not the cost of a whole change. Providers such as
-	// Anthropic require a positive allowance on every request. A response that
-	// runs out of allowance fails Analyze, so no partial card is ever stored.
+	// Anthropic require a positive allowance on every request. A response the
+	// provider marks OutputLimited fails Analyze even when its JSON parses, so
+	// no card is stored from an analysis that may be incomplete.
 	cp1AnalysisMaxOutputTokens = 4096
 	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML document host.
 	checkpointUIHTML = `<!doctype html>
@@ -413,6 +414,9 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 	resp, err := a.client.Complete(ctx, req)
 	if err != nil {
 		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model completion: %w", err)
+	}
+	if resp.OutputLimited {
+		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model analysis stopped at its %d-token output allowance before finishing", cp1AnalysisMaxOutputTokens)
 	}
 	raw := extractAssistantText(resp)
 	if raw == "" {
