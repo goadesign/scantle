@@ -25,6 +25,10 @@ var _ = Suite("orders_acceptance", func() {
 		Description("Killing the refund worker right after the payment provider accepted a refund still yields exactly one refund and a completed run.")
 		Tags("repair")
 	})
+	Scenario("pending_approval_survives_api_restart", func() {
+		Description("A refund waiting for a manager survives killing and restarting the orders API process; the manager's approval afterwards still yields exactly one card refund.")
+		Tags("repair")
+	})
 	Scenario("other_customers_order_refused", func() {
 		Description("A customer asking to refund another customer's order gets no refund.")
 		Tags("holdout")

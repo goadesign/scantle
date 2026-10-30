@@ -25,6 +25,8 @@ type (
 		CardRefundNeedsManager(context.Context) (eval.Result, error)
 		// RefundSurvivesWorkerCrash executes the refund_survives_worker_crash scenario.
 		RefundSurvivesWorkerCrash(context.Context) (eval.Result, error)
+		// PendingApprovalSurvivesAPIRestart executes the pending_approval_survives_api_restart scenario.
+		PendingApprovalSurvivesAPIRestart(context.Context) (eval.Result, error)
 		// OtherCustomersOrderRefused executes the other_customers_order_refused scenario.
 		OtherCustomersOrderRefused(context.Context) (eval.Result, error)
 	}
@@ -68,6 +70,15 @@ func New(hooks Hooks, inputs Inputs) (eval.Suite, error) {
 				Timeout:     time.Duration(180000000000),
 				Run: func(ctx context.Context) (eval.Result, error) {
 					return hooks.RefundSurvivesWorkerCrash(ctx)
+				},
+			},
+			{
+				ID:          "pending_approval_survives_api_restart",
+				Description: "A refund waiting for a manager survives killing and restarting the orders API process; the manager's approval afterwards still yields exactly one card refund.",
+				Tags:        []string{"repair"},
+				Timeout:     time.Duration(180000000000),
+				Run: func(ctx context.Context) (eval.Result, error) {
+					return hooks.PendingApprovalSurvivesAPIRestart(ctx)
 				},
 			},
 			{

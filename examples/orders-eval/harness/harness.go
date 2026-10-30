@@ -67,6 +67,9 @@ type (
 		env *Env
 		// workerSpec restarts the refund worker with the same configuration.
 		workerSpec candidate.Spec
+		// apiSpec restarts the orders API with the same configuration and
+		// state directory.
+		apiSpec candidate.Spec
 		// worker is the current refund worker process.
 		worker *candidate.Process
 		// api is the orders API process.
@@ -163,7 +166,7 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 		return err
 	}
 	addr := "127.0.0.1:" + strconv.Itoa(apiPort)
-	p.api, err = p.exec(ctx, e.Orders, candidate.Spec{
+	p.apiSpec = candidate.Spec{
 		Args: []string{"--env", "sim", "--commerce-url", depsURL, "--temporal", temporalAddr,
 			"--listen", addr, "--model-provider", "scripted", "--state-dir", apiState},
 		Env:          []string{"ORDERS_JWT_KEY=" + e.signingKey},
@@ -171,8 +174,8 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 		ConnectPorts: []int{temporalPort, depsPort},
 		ListenPort:   apiPort,
 		LogFile:      filepath.Join(p.logDir, "orders.log"),
-	})
-	if err != nil {
+	}
+	if p.api, err = p.exec(ctx, e.Orders, p.apiSpec); err != nil {
 		return fmt.Errorf("start orders API: %w", err)
 	}
 	waitCtx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -218,6 +221,29 @@ func (p *Platform) RestartWorker(ctx context.Context) error {
 		return fmt.Errorf("restart refund worker: %w", err)
 	}
 	p.worker = w
+	return nil
+}
+
+// RestartAPI kills the orders API with SIGKILL and starts a replacement on
+// the same port and state directory, so the replacement must recover runs and
+// pending approvals from the durable store. It waits until the replacement
+// accepts connections.
+func (p *Platform) RestartAPI(ctx context.Context) error {
+	if err := p.api.Kill(); err != nil {
+		return err
+	}
+	spec := p.apiSpec
+	spec.LogFile = filepath.Join(p.logDir, "orders-restarted.log")
+	api, err := p.exec(ctx, p.env.Orders, spec)
+	if err != nil {
+		return fmt.Errorf("restart orders API: %w", err)
+	}
+	p.api = api
+	waitCtx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	if err := WaitListening(waitCtx, "127.0.0.1:"+strconv.Itoa(spec.ListenPort)); err != nil {
+		return fmt.Errorf("restarted orders API never listened: %w\n%s", err, excerpt("orders", p.api))
+	}
 	return nil
 }
 

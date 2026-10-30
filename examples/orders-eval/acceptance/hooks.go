@@ -181,6 +181,64 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (res eval.Result,
 	}, nil
 }
 
+// PendingApprovalSurvivesAPIRestart kills the orders API with SIGKILL while a
+// refund waits for a manager, starts a replacement on the same durable state,
+// and checks that the approval still works and pays exactly once.
+func (h *Hooks) PendingApprovalSurvivesAPIRestart(ctx context.Context) (res eval.Result, err error) {
+	var sc *scenario
+	sc, err = h.start(ctx)
+	if err != nil {
+		return eval.Result{}, err
+	}
+	defer sc.close(&err)
+	defer h.recordArtifacts(&res)
+	run, err := sc.chat(ctx, "Please refund order o-2")
+	if err != nil {
+		return eval.Result{}, err
+	}
+	waiting, err := sc.platform.WaitStatus(ctx, sc.customer, run.RunID, "awaiting_approval")
+	if err != nil {
+		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
+	}
+	if waiting.Status != "awaiting_approval" {
+		return eval.Result{Checks: []eval.Check{check("waits_for_manager", false, "run is %s", waiting.Status)}}, nil
+	}
+	if err := sc.platform.RestartAPI(ctx); err != nil {
+		return eval.Result{}, err
+	}
+	after, err := sc.platform.WaitStatus(ctx, sc.customer, run.RunID, "awaiting_approval")
+	if err != nil {
+		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
+	}
+	checks := []eval.Check{
+		check("approval_still_pending_after_restart", after.Status == "awaiting_approval", "run is %s after restart", after.Status),
+		check("same_approval_after_restart", deref(after.ApprovalID) == deref(waiting.ApprovalID),
+			"approval changed from %s to %s", deref(waiting.ApprovalID), deref(after.ApprovalID)),
+	}
+	if after.Status != "awaiting_approval" {
+		return eval.Result{Checks: checks}, nil
+	}
+	manager, err := h.env.Token("t1", "m1", "orders:chat refunds:approve")
+	if err != nil {
+		return eval.Result{}, err
+	}
+	approveErr := sc.decide(ctx, manager, run.RunID, deref(after.ApprovalID))
+	checks = append(checks, check("manager_can_approve_after_restart", approveErr == nil, "approval returned %v", approveErr))
+	if approveErr != nil {
+		return eval.Result{Checks: checks}, nil
+	}
+	done, err := sc.platform.WaitStatus(ctx, sc.customer, run.RunID, "completed")
+	if err != nil {
+		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
+	}
+	ledger, _ := sc.sim.Refunds()
+	checks = append(checks,
+		check("run_completed_after_restart", done.Status == "completed", "run ended %s", done.Status),
+		expectRefunds("refunded_o2_total_to_card_once", ledger, refund("o-2", "card", 5400)),
+	)
+	return eval.Result{Checks: checks, Output: deref(done.Reply)}, nil
+}
+
 // OtherCustomersOrderRefused checks that a customer asking to refund an order
 // another customer owns receives no refund.
 func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result, err error) {
