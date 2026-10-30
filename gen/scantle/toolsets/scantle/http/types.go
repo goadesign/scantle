@@ -15,8 +15,8 @@ type (
 	ConfirmIntentPayloadTransport struct {
 		// Change identifier.
 		ChangeID *string `json:"change_id"`
-		// Authenticated operator identity.
-		Operator *string `json:"operator"`
+		// Reviewed CP1 request_revision digest being confirmed.
+		RequestRevision *string `json:"request_revision"`
 		// Selected resolution per ambiguity question ID.
 		Answers map[string]string `json:"answers"`
 		// Confirmed example table.
@@ -31,15 +31,21 @@ type (
 		ChangeID *string `json:"change_id"`
 		// Checkpoint status (needs_confirmation or confirmed).
 		Status *string `json:"status"`
+		// Original operator feature request.
+		Prompt *string `json:"prompt"`
 		// Plain-English summary of requested behavior.
 		Summary *string `json:"summary"`
-		// Unresolved domain questions, empty when clear.
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
 		Ambiguities []*AmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string `json:"answers,omitempty"`
 		// Concrete examples mapped to evaluator checks.
 		Examples []*ExampleItemTransport `json:"examples"`
 		// Existing contract invariants preserved by this change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
-		// SHA-256 digest of the confirmed Change Card.
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string `json:"confirmed_by,omitempty"`
+		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision *string `json:"request_revision"`
 	}
 	// DiffPayloadTransport is the internal JSON transport type for DiffPayload.
@@ -61,13 +67,16 @@ type (
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	DiffResultTransport struct {
-		// True when any declaration or module pin changed.
+		// True when any declaration, evaluated contract schema, or module directive
+		// changed.
 		HasChanges *bool `json:"has_changes"`
-		// Added services, methods, agents, or tools.
+		// Added scoped declarations.
 		AddedDeclarations []string `json:"added_declarations"`
-		// Removed services, methods, agents, or tools.
+		// Removed scoped declarations.
 		RemovedDeclarations []string `json:"removed_declarations"`
-		// Changed module dependency pins.
+		// Declarations whose evaluated schema, route, or policy changed.
+		ModifiedDeclarations []string `json:"modified_declarations"`
+		// Changed module require, replace, or exclude directives.
 		VersionDeltas []string `json:"version_deltas"`
 		// Human-readable structural diff summary.
 		Summary *string `json:"summary"`
@@ -89,21 +98,57 @@ type (
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	DraftOverrideResultTransport struct {
-		// True when updated in prompt.Store for 0s reload.
+		// True when updated in the target platform's prompt.Store for 0s reload.
 		AppliedInStore *bool `json:"applied_in_store"`
 		// True when the change modifies a compiled Go business rule.
 		RequiresRebuild *bool `json:"requires_rebuild"`
-		// New prompt version digest when applied in prompt.Store.
+		// New prompt version digest returned by the target platform.
 		PromptVersion *string `json:"prompt_version,omitempty"`
 		// Operator-facing status explanation.
 		Message *string `json:"message"`
+	}
+	// PreviewArchitecturePayloadTransport is the internal JSON transport type for PreviewArchitecturePayload.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	PreviewArchitecturePayloadTransport struct {
+		// Confirmed Change Card identifier.
+		ChangeID *string `json:"change_id"`
+		// Expected CP1 request_revision digest.
+		RequestRevision *string `json:"request_revision"`
+		// Candidate Goa and Goa-AI design source to evaluate.
+		DesignSource *string `json:"design_source"`
+	}
+	// PreviewArchitectureResultTransport is the internal JSON transport type for PreviewArchitectureResult.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	PreviewArchitectureResultTransport struct {
+		// Bound Change Card identifier.
+		ChangeID *string `json:"change_id"`
+		// Bound CP1 request_revision digest.
+		RequestRevision *string `json:"request_revision"`
+		// SHA-256 digest of the evaluated Goa design source.
+		DesignDigest *string `json:"design_digest"`
+		// API or primary service name declared in the design.
+		SystemName *string `json:"system_name"`
+		// Derived C4 containers.
+		Containers []*C4ContainerItemTransport `json:"containers"`
+		// Validated directed edges between declared containers.
+		Edges []*C4EdgeItemTransport `json:"edges"`
+		// Evaluated Goa-AI runtime policies per declared agent.
+		AgentPolicies []*AgentPolicyItemTransport `json:"agent_policies"`
+		// Evaluated Goa-AI tool contracts.
+		Tools []*ToolContractItemTransport `json:"tools"`
+		// Plain-English summary of topology and guardrails.
+		Banner *string `json:"banner"`
 	}
 	// ProposeChangePayloadTransport is the internal JSON transport type for ProposeChangePayload.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	ProposeChangePayloadTransport struct {
-		// Client-supplied or generated change identifier.
+		// Unique change identifier.
 		ChangeID *string `json:"change_id"`
 		// Operator feature request.
 		Prompt *string `json:"prompt"`
@@ -119,16 +164,44 @@ type (
 		ChangeID *string `json:"change_id"`
 		// Checkpoint status (needs_confirmation or confirmed).
 		Status *string `json:"status"`
+		// Original operator feature request.
+		Prompt *string `json:"prompt"`
 		// Plain-English summary of requested behavior.
 		Summary *string `json:"summary"`
-		// Unresolved domain questions, empty when clear.
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
 		Ambiguities []*AmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string `json:"answers,omitempty"`
 		// Concrete examples mapped to evaluator checks.
 		Examples []*ExampleItemTransport `json:"examples"`
 		// Existing contract invariants preserved by this change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
-		// SHA-256 digest of the confirmed Change Card.
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string `json:"confirmed_by,omitempty"`
+		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision *string `json:"request_revision"`
+	}
+	// AgentPolicyItemTransport is the internal JSON transport type for AgentPolicyItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	AgentPolicyItemTransport struct {
+		// Scoped agent container identifier.
+		AgentID *string `json:"agent_id"`
+		// Per-run execution time budget in seconds.
+		MaxExecutionSeconds *int `json:"max_execution_seconds"`
+		// Per-run retrieval tool-call budget.
+		MaxToolCalls *int `json:"max_tool_calls"`
+		// Maximum consecutive recovery turns after validation failure.
+		MaxRecoveryTurns *int `json:"max_recovery_turns"`
+		// Turn threshold for history compression.
+		CompressAtTurns *int `json:"compress_at_turns"`
+		// Recent turns retained uncompressed.
+		KeepRecentTurns *int `json:"keep_recent_turns"`
+		// True when prompt caching places a checkpoint after system prompts.
+		CacheAfterSystem *bool `json:"cache_after_system"`
+		// True when prompt caching places a checkpoint after tool definitions.
+		CacheAfterTools *bool `json:"cache_after_tools"`
 	}
 	// AmbiguityQuestionTransport is the internal JSON transport type for AmbiguityQuestionTransport.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -142,12 +215,38 @@ type (
 		// Concrete resolution choices.
 		Options []string `json:"options"`
 	}
+	// C4ContainerItemTransport is the internal JSON transport type for C4ContainerItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	C4ContainerItemTransport struct {
+		// Stable container identifier.
+		ID *string `json:"id"`
+		// Human-readable container name.
+		Name *string `json:"name"`
+		// Container role (service, agent, or toolset).
+		Kind *string `json:"kind"`
+		// Summary of the container's responsibility.
+		Description *string `json:"description"`
+	}
+	// C4EdgeItemTransport is the internal JSON transport type for C4EdgeItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	C4EdgeItemTransport struct {
+		// Source container ID.
+		FromID *string `json:"from_id"`
+		// Target container ID.
+		ToID *string `json:"to_id"`
+		// Contract or transport relationship.
+		Protocol *string `json:"protocol"`
+	}
 	// ExampleItemTransport is the internal JSON transport type for ExampleItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	ExampleItemTransport struct {
-		// Stable example identifier.
+		// Code-assigned stable example identifier.
 		ID *string `json:"id"`
 		// Plain-English scenario description.
 		Scenario *string `json:"scenario"`
@@ -157,5 +256,29 @@ type (
 		ExpectedOutcome *string `json:"expected_outcome"`
 		// Evaluator check classification (deterministic or model_judged).
 		VerificationKind *string `json:"verification_kind"`
+	}
+	// ToolContractItemTransport is the internal JSON transport type for ToolContractItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	ToolContractItemTransport struct {
+		// Scoped tool identifier (<toolset>.<tool>).
+		ID *string `json:"id"`
+		// Owning toolset name.
+		Toolset *string `json:"toolset"`
+		// Tool name.
+		Name *string `json:"name"`
+		// Tool description.
+		Description *string `json:"description"`
+		// Canonical evaluated argument schema summary.
+		ArgsSchema *string `json:"args_schema"`
+		// Canonical evaluated return schema summary.
+		ReturnSchema *string `json:"return_schema"`
+		// Server-supplied InjectedFields hidden from the model.
+		InjectedFields []string `json:"injected_fields"`
+		// True when the tool declares a design-time Confirmation gate.
+		RequiresConfirmation *bool `json:"requires_confirmation"`
+		// True when the tool declares a BoundedResult cursor/truncation contract.
+		BoundedResult *bool `json:"bounded_result"`
 	}
 )

@@ -18,12 +18,13 @@ import (
 
 // Server lists the scantle service endpoint HTTP handlers.
 type Server struct {
-	Mounts        []*MountPoint
-	CheckpointUI  http.Handler
-	ProposeChange http.Handler
-	ConfirmIntent http.Handler
-	DraftOverride http.Handler
-	Diff          http.Handler
+	Mounts              []*MountPoint
+	CheckpointUI        http.Handler
+	ProposeChange       http.Handler
+	ConfirmIntent       http.Handler
+	PreviewArchitecture http.Handler
+	DraftOverride       http.Handler
+	Diff                http.Handler
 }
 
 // MountPoint holds information about the mounted endpoints.
@@ -56,14 +57,16 @@ func New(
 			{"CheckpointUI", "GET", "/ui/checkpoint"},
 			{"ProposeChange", "POST", "/changes/propose"},
 			{"ConfirmIntent", "POST", "/changes/confirm"},
+			{"PreviewArchitecture", "POST", "/changes/preview"},
 			{"DraftOverride", "POST", "/sandbox/draft"},
 			{"Diff", "POST", "/diff"},
 		},
-		CheckpointUI:  NewCheckpointUIHandler(e.CheckpointUI, mux, decoder, encoder, errhandler, formatter),
-		ProposeChange: NewProposeChangeHandler(e.ProposeChange, mux, decoder, encoder, errhandler, formatter),
-		ConfirmIntent: NewConfirmIntentHandler(e.ConfirmIntent, mux, decoder, encoder, errhandler, formatter),
-		DraftOverride: NewDraftOverrideHandler(e.DraftOverride, mux, decoder, encoder, errhandler, formatter),
-		Diff:          NewDiffHandler(e.Diff, mux, decoder, encoder, errhandler, formatter),
+		CheckpointUI:        NewCheckpointUIHandler(e.CheckpointUI, mux, decoder, encoder, errhandler, formatter),
+		ProposeChange:       NewProposeChangeHandler(e.ProposeChange, mux, decoder, encoder, errhandler, formatter),
+		ConfirmIntent:       NewConfirmIntentHandler(e.ConfirmIntent, mux, decoder, encoder, errhandler, formatter),
+		PreviewArchitecture: NewPreviewArchitectureHandler(e.PreviewArchitecture, mux, decoder, encoder, errhandler, formatter),
+		DraftOverride:       NewDraftOverrideHandler(e.DraftOverride, mux, decoder, encoder, errhandler, formatter),
+		Diff:                NewDiffHandler(e.Diff, mux, decoder, encoder, errhandler, formatter),
 	}
 }
 
@@ -75,6 +78,7 @@ func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.CheckpointUI = m(s.CheckpointUI)
 	s.ProposeChange = m(s.ProposeChange)
 	s.ConfirmIntent = m(s.ConfirmIntent)
+	s.PreviewArchitecture = m(s.PreviewArchitecture)
 	s.DraftOverride = m(s.DraftOverride)
 	s.Diff = m(s.Diff)
 }
@@ -87,6 +91,7 @@ func Mount(mux goahttp.Muxer, h *Server) {
 	MountCheckpointUIHandler(mux, h.CheckpointUI)
 	MountProposeChangeHandler(mux, h.ProposeChange)
 	MountConfirmIntentHandler(mux, h.ConfirmIntent)
+	MountPreviewArchitectureHandler(mux, h.PreviewArchitecture)
 	MountDraftOverrideHandler(mux, h.DraftOverride)
 	MountDiffHandler(mux, h.Diff)
 }
@@ -225,6 +230,59 @@ func NewConfirmIntentHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "confirm_intent")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountPreviewArchitectureHandler configures the mux to serve the "scantle"
+// service "preview_architecture" endpoint.
+func MountPreviewArchitectureHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("POST", "/changes/preview", f)
+}
+
+// NewPreviewArchitectureHandler creates a HTTP handler which loads the HTTP
+// request and calls the "scantle" service "preview_architecture" endpoint.
+func NewPreviewArchitectureHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodePreviewArchitectureRequest(mux, decoder)
+		encodeResponse = EncodePreviewArchitectureResponse(encoder)
+		encodeError    = goahttp.ErrorEncoder(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "preview_architecture")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 		payload, err := decodeRequest(r)
 		if err != nil {

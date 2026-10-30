@@ -17,6 +17,7 @@ import (
 	strconv "strconv"
 	utf8 "unicode/utf8"
 
+	rawjson "goa.design/goa-ai/runtime/agent/rawjson"
 	goa "goa.design/goa/v3/pkg"
 )
 
@@ -29,11 +30,15 @@ type Service interface {
 	ProposeChange(context.Context, *ProposeChangePayload) (res *ChangeCardResult, err error)
 	// Confirm Checkpoint 1 answers and examples to freeze the Change Card.
 	ConfirmIntent(context.Context, *ConfirmIntentPayload) (res *ChangeCardResult, err error)
-	// Apply a Fast Draft Mode prompt override in prompt.Store or reject a
+	// Extract and validate the Checkpoint 2 C4 container topology, tool contracts,
+	// and Goa-AI guardrails from a candidate Goa design bound to a confirmed
+	// Change Card.
+	PreviewArchitecture(context.Context, *PreviewArchitecturePayload) (res *ArchitecturePreviewResult, err error)
+	// Apply a Fast Draft Mode prompt override on the bound target or reject a
 	// compiled-rule prompt hack.
 	DraftOverride(context.Context, *DraftOverridePayload) (res *DraftOverrideResult, err error)
-	// Compare Goa design ASTs and go.mod versions without emitting a blanket
-	// compatibility verdict.
+	// Compare evaluated Goa designs and go.mod directives without emitting a
+	// blanket compatibility verdict.
 	Diff(context.Context, *DiffPayload) (res *DiffResult, err error)
 }
 
@@ -51,7 +56,27 @@ const ServiceName = "scantle"
 // MethodNames lists the service method names as defined in the design. These
 // are the same values that are set in the endpoint request contexts under the
 // MethodKey key.
-var MethodNames = [5]string{"checkpoint_ui", "propose_change", "confirm_intent", "draft_override", "diff"}
+var MethodNames = [6]string{"checkpoint_ui", "propose_change", "confirm_intent", "preview_architecture", "draft_override", "diff"}
+
+// Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.
+type AgentPolicyItem struct {
+	// Scoped agent container identifier.
+	AgentID string
+	// Per-run execution time budget in seconds.
+	MaxExecutionSeconds int
+	// Per-run retrieval tool-call budget.
+	MaxToolCalls int
+	// Maximum consecutive recovery turns after validation failure.
+	MaxRecoveryTurns int
+	// Turn threshold for history compression.
+	CompressAtTurns int
+	// Recent turns retained uncompressed.
+	KeepRecentTurns int
+	// True when prompt caching places a checkpoint after system prompts.
+	CacheAfterSystem bool
+	// True when prompt caching places a checkpoint after tool definitions.
+	CacheAfterTools bool
+}
 
 // Domain ambiguity surfaced with concrete examples at Checkpoint 1.
 type AmbiguityQuestion struct {
@@ -63,6 +88,51 @@ type AmbiguityQuestion struct {
 	Options []string
 }
 
+// ArchitecturePreviewResult is the result type of the scantle service
+// preview_architecture method.
+type ArchitecturePreviewResult struct {
+	// Bound Change Card identifier.
+	ChangeID string
+	// Bound CP1 request_revision digest.
+	RequestRevision string
+	// SHA-256 digest of the evaluated Goa design source.
+	DesignDigest string
+	// API or primary service name declared in the design.
+	SystemName string
+	// Derived C4 containers.
+	Containers []*C4ContainerItem
+	// Validated directed edges between declared containers.
+	Edges []*C4EdgeItem
+	// Evaluated Goa-AI runtime policies per declared agent.
+	AgentPolicies []*AgentPolicyItem
+	// Evaluated Goa-AI tool contracts.
+	Tools []*ToolContractItem
+	// Plain-English summary of topology and guardrails.
+	Banner string
+}
+
+// C4 container derived from the evaluated target Goa/Goa-AI design.
+type C4ContainerItem struct {
+	// Stable container identifier.
+	ID string
+	// Human-readable container name.
+	Name string
+	// Container role (service, agent, or toolset).
+	Kind string
+	// Summary of the container's responsibility.
+	Description string
+}
+
+// Directed contract relationship between two C4 containers.
+type C4EdgeItem struct {
+	// Source container ID.
+	FromID string
+	// Target container ID.
+	ToID string
+	// Contract or transport relationship.
+	Protocol string
+}
+
 // ChangeCardResult is the result type of the scantle service propose_change
 // method.
 type ChangeCardResult struct {
@@ -70,15 +140,21 @@ type ChangeCardResult struct {
 	ChangeID string
 	// Checkpoint status (needs_confirmation or confirmed).
 	Status string
+	// Original operator feature request.
+	Prompt string
 	// Plain-English summary of requested behavior.
 	Summary string
-	// Unresolved domain questions, empty when clear.
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
 	Ambiguities []*AmbiguityQuestion
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string
 	// Concrete examples mapped to evaluator checks.
 	Examples []*ExampleItem
 	// Existing contract invariants preserved by this change.
 	PreservedBehaviors []string
-	// SHA-256 digest of the confirmed Change Card.
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string
+	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string
 }
 
@@ -87,8 +163,8 @@ type ChangeCardResult struct {
 type ConfirmIntentPayload struct {
 	// Change identifier.
 	ChangeID string
-	// Authenticated operator identity.
-	Operator string
+	// Reviewed CP1 request_revision digest being confirmed.
+	RequestRevision string
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string
 	// Confirmed example table.
@@ -109,13 +185,16 @@ type DiffPayload struct {
 
 // DiffResult is the result type of the scantle service diff method.
 type DiffResult struct {
-	// True when any declaration or module pin changed.
+	// True when any declaration, evaluated contract schema, or module directive
+	// changed.
 	HasChanges bool
-	// Added services, methods, agents, or tools.
+	// Added scoped declarations.
 	AddedDeclarations []string
-	// Removed services, methods, agents, or tools.
+	// Removed scoped declarations.
 	RemovedDeclarations []string
-	// Changed module dependency pins.
+	// Declarations whose evaluated schema, route, or policy changed.
+	ModifiedDeclarations []string
+	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string
 	// Human-readable structural diff summary.
 	Summary string
@@ -135,11 +214,11 @@ type DraftOverridePayload struct {
 // DraftOverrideResult is the result type of the scantle service draft_override
 // method.
 type DraftOverrideResult struct {
-	// True when updated in prompt.Store for 0s reload.
+	// True when updated in the target platform's prompt.Store for 0s reload.
 	AppliedInStore bool
 	// True when the change modifies a compiled Go business rule.
 	RequiresRebuild bool
-	// New prompt version digest when applied in prompt.Store.
+	// New prompt version digest returned by the target platform.
 	PromptVersion *string
 	// Operator-facing status explanation.
 	Message string
@@ -147,7 +226,7 @@ type DraftOverrideResult struct {
 
 // Concrete input and expected outcome confirmed at Checkpoint 1.
 type ExampleItem struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID string
 	// Plain-English scenario description.
 	Scenario string
@@ -159,15 +238,120 @@ type ExampleItem struct {
 	VerificationKind string
 }
 
+// PreviewArchitecturePayload is the payload type of the scantle service
+// preview_architecture method.
+type PreviewArchitecturePayload struct {
+	// Confirmed Change Card identifier.
+	ChangeID string
+	// Expected CP1 request_revision digest.
+	RequestRevision string
+	// Candidate Goa and Goa-AI design source to evaluate.
+	DesignSource string
+}
+
 // ProposeChangePayload is the payload type of the scantle service
 // propose_change method.
 type ProposeChangePayload struct {
-	// Client-supplied or generated change identifier.
+	// Unique change identifier.
 	ChangeID string
 	// Operator feature request.
 	Prompt string
 	// Current target Goa design source inspected by the CP1 model.
 	DesignSource *string
+}
+
+// Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.
+type ToolContractItem struct {
+	// Scoped tool identifier (<toolset>.<tool>).
+	ID string
+	// Owning toolset name.
+	Toolset string
+	// Tool name.
+	Name string
+	// Tool description.
+	Description string
+	// Canonical evaluated argument schema summary.
+	ArgsSchema string
+	// Canonical evaluated return schema summary.
+	ReturnSchema string
+	// Server-supplied InjectedFields hidden from the model.
+	InjectedFields []string
+	// True when the tool declares a design-time Confirmation gate.
+	RequiresConfirmation bool
+	// True when the tool declares a BoundedResult cursor/truncation contract.
+	BoundedResult bool
+}
+
+// agentPolicyItemIntTransport stores JSON fields until they have been validated.
+type agentPolicyItemIntTransport int
+
+// UnmarshalJSON reads an exact whole JSON number and stores it within this type's
+// declared range. Decimal and exponent spellings do not change its value.
+func (value *agentPolicyItemIntTransport) UnmarshalJSON(data []byte) error {
+	number, err := rawjson.DecodeInteger[int](data)
+	if err != nil {
+		return fmt.Errorf("decode agentPolicyItemIntTransport integer: %w", err)
+	}
+	*value = agentPolicyItemIntTransport(number)
+	return nil
+}
+
+// ValidateagentPolicyItemIntTransport checks decoded JSON before it becomes a service value.
+func ValidateagentPolicyItemIntTransport(value agentPolicyItemIntTransport) (err error) {
+
+	return err
+}
+
+// jsonAgentPolicyItemTransport stores JSON fields until they have been validated.
+type jsonAgentPolicyItemTransport struct {
+	// Scoped agent container identifier.
+	AgentID *string `json:"agent_id"`
+	// Per-run execution time budget in seconds.
+	MaxExecutionSeconds *agentPolicyItemIntTransport `json:"max_execution_seconds"`
+	// Per-run retrieval tool-call budget.
+	MaxToolCalls *agentPolicyItemIntTransport `json:"max_tool_calls"`
+	// Maximum consecutive recovery turns after validation failure.
+	MaxRecoveryTurns *agentPolicyItemIntTransport `json:"max_recovery_turns"`
+	// Turn threshold for history compression.
+	CompressAtTurns *agentPolicyItemIntTransport `json:"compress_at_turns"`
+	// Recent turns retained uncompressed.
+	KeepRecentTurns *agentPolicyItemIntTransport `json:"keep_recent_turns"`
+	// True when prompt caching places a checkpoint after system prompts.
+	CacheAfterSystem *bool `json:"cache_after_system"`
+	// True when prompt caching places a checkpoint after tool definitions.
+	CacheAfterTools *bool `json:"cache_after_tools"`
+}
+
+// validatejsonAgentPolicyItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonAgentPolicyItemTransport(value *jsonAgentPolicyItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.AgentID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_id", "body"))
+	}
+	if value.MaxExecutionSeconds == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	}
+	if value.MaxToolCalls == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if value.MaxRecoveryTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_recovery_turns", "body"))
+	}
+	if value.CompressAtTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	}
+	if value.KeepRecentTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	}
+	if value.CacheAfterSystem == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_system", "body"))
+	}
+	if value.CacheAfterTools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_tools", "body"))
+	}
+	return err
 }
 
 // jsonAmbiguityQuestionTransport stores JSON fields until they have been validated.
@@ -197,21 +381,176 @@ func validatejsonAmbiguityQuestionTransport(value *jsonAmbiguityQuestionTranspor
 	return err
 }
 
+// jsonArchitecturePreviewResultTransport stores JSON fields until they have been validated.
+type jsonArchitecturePreviewResultTransport struct {
+	// Bound Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Bound CP1 request_revision digest.
+	RequestRevision *string `json:"request_revision"`
+	// SHA-256 digest of the evaluated Goa design source.
+	DesignDigest *string `json:"design_digest"`
+	// API or primary service name declared in the design.
+	SystemName *string `json:"system_name"`
+	// Derived C4 containers.
+	Containers []*jsonC4ContainerItemTransport `json:"containers"`
+	// Validated directed edges between declared containers.
+	Edges []*jsonC4EdgeItemTransport `json:"edges"`
+	// Evaluated Goa-AI runtime policies per declared agent.
+	AgentPolicies []*jsonAgentPolicyItemTransport `json:"agent_policies"`
+	// Evaluated Goa-AI tool contracts.
+	Tools []*jsonToolContractItemTransport `json:"tools"`
+	// Plain-English summary of topology and guardrails.
+	Banner *string `json:"banner"`
+}
+
+// validatejsonArchitecturePreviewResultTransport checks decoded JSON before it becomes a service value.
+func validatejsonArchitecturePreviewResultTransport(value *jsonArchitecturePreviewResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.DesignDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_digest", "body"))
+	}
+	if value.SystemName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("system_name", "body"))
+	}
+	if value.Containers == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("containers", "body"))
+	}
+	if value.Edges == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
+	}
+	if value.AgentPolicies == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_policies", "body"))
+	}
+	if value.Tools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
+	}
+	if value.Banner == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
+	}
+	for _, e := range value.Containers {
+		if e != nil {
+			if err2 := validatejsonC4ContainerItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Edges {
+		if e != nil {
+			if err2 := validatejsonC4EdgeItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.AgentPolicies {
+		if e != nil {
+			if err2 := validatejsonAgentPolicyItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Tools {
+		if e != nil {
+			if err2 := validatejsonToolContractItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// jsonC4ContainerItemTransport stores JSON fields until they have been validated.
+type jsonC4ContainerItemTransport struct {
+	// Stable container identifier.
+	ID *string `json:"id"`
+	// Human-readable container name.
+	Name *string `json:"name"`
+	// Container role (service, agent, or toolset).
+	Kind *string `json:"kind"`
+	// Summary of the container's responsibility.
+	Description *string `json:"description"`
+}
+
+// validatejsonC4ContainerItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonC4ContainerItemTransport(value *jsonC4ContainerItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if value.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if value.Kind != nil {
+		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset"}))
+		}
+	}
+	return err
+}
+
+// jsonC4EdgeItemTransport stores JSON fields until they have been validated.
+type jsonC4EdgeItemTransport struct {
+	// Source container ID.
+	FromID *string `json:"from_id"`
+	// Target container ID.
+	ToID *string `json:"to_id"`
+	// Contract or transport relationship.
+	Protocol *string `json:"protocol"`
+}
+
+// validatejsonC4EdgeItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonC4EdgeItemTransport(value *jsonC4EdgeItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.FromID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("from_id", "body"))
+	}
+	if value.ToID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("to_id", "body"))
+	}
+	if value.Protocol == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("protocol", "body"))
+	}
+	return err
+}
+
 // jsonChangeCardResultTransport stores JSON fields until they have been validated.
 type jsonChangeCardResultTransport struct {
 	// Change identifier.
 	ChangeID *string `json:"change_id"`
 	// Checkpoint status (needs_confirmation or confirmed).
 	Status *string `json:"status"`
+	// Original operator feature request.
+	Prompt *string `json:"prompt"`
 	// Plain-English summary of requested behavior.
 	Summary *string `json:"summary"`
-	// Unresolved domain questions, empty when clear.
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
 	Ambiguities []*jsonAmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `json:"answers,omitempty"`
 	// Concrete examples mapped to evaluator checks.
 	Examples []*jsonExampleItemTransport `json:"examples"`
 	// Existing contract invariants preserved by this change.
 	PreservedBehaviors []string `json:"preserved_behaviors"`
-	// SHA-256 digest of the confirmed Change Card.
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `json:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
 }
 
@@ -225,6 +564,9 @@ func validatejsonChangeCardResultTransport(value *jsonChangeCardResultTransport)
 	}
 	if value.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if value.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if value.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -264,8 +606,8 @@ func validatejsonChangeCardResultTransport(value *jsonChangeCardResultTransport)
 type jsonConfirmIntentPayloadTransport struct {
 	// Change identifier.
 	ChangeID *string `json:"change_id"`
-	// Authenticated operator identity.
-	Operator *string `json:"operator"`
+	// Reviewed CP1 request_revision digest being confirmed.
+	RequestRevision *string `json:"request_revision"`
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string `json:"answers"`
 	// Confirmed example table.
@@ -280,8 +622,8 @@ func validatejsonConfirmIntentPayloadTransport(value *jsonConfirmIntentPayloadTr
 	if value.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}
-	if value.Operator == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("operator", "body"))
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
 	}
 	if value.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
@@ -333,13 +675,16 @@ func validatejsonDiffPayloadTransport(value *jsonDiffPayloadTransport) (err erro
 
 // jsonDiffResultTransport stores JSON fields until they have been validated.
 type jsonDiffResultTransport struct {
-	// True when any declaration or module pin changed.
+	// True when any declaration, evaluated contract schema, or module directive
+	// changed.
 	HasChanges *bool `json:"has_changes"`
-	// Added services, methods, agents, or tools.
+	// Added scoped declarations.
 	AddedDeclarations []string `json:"added_declarations"`
-	// Removed services, methods, agents, or tools.
+	// Removed scoped declarations.
 	RemovedDeclarations []string `json:"removed_declarations"`
-	// Changed module dependency pins.
+	// Declarations whose evaluated schema, route, or policy changed.
+	ModifiedDeclarations []string `json:"modified_declarations"`
+	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string `json:"version_deltas"`
 	// Human-readable structural diff summary.
 	Summary *string `json:"summary"`
@@ -358,6 +703,9 @@ func validatejsonDiffResultTransport(value *jsonDiffResultTransport) (err error)
 	}
 	if value.RemovedDeclarations == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("removed_declarations", "body"))
+	}
+	if value.ModifiedDeclarations == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("modified_declarations", "body"))
 	}
 	if value.VersionDeltas == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("version_deltas", "body"))
@@ -399,11 +747,11 @@ func validatejsonDraftOverridePayloadTransport(value *jsonDraftOverridePayloadTr
 
 // jsonDraftOverrideResultTransport stores JSON fields until they have been validated.
 type jsonDraftOverrideResultTransport struct {
-	// True when updated in prompt.Store for 0s reload.
+	// True when updated in the target platform's prompt.Store for 0s reload.
 	AppliedInStore *bool `json:"applied_in_store"`
 	// True when the change modifies a compiled Go business rule.
 	RequiresRebuild *bool `json:"requires_rebuild"`
-	// New prompt version digest when applied in prompt.Store.
+	// New prompt version digest returned by the target platform.
 	PromptVersion *string `json:"prompt_version,omitempty"`
 	// Operator-facing status explanation.
 	Message *string `json:"message"`
@@ -428,7 +776,7 @@ func validatejsonDraftOverrideResultTransport(value *jsonDraftOverrideResultTran
 
 // jsonExampleItemTransport stores JSON fields until they have been validated.
 type jsonExampleItemTransport struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID *string `json:"id"`
 	// Plain-English scenario description.
 	Scenario *string `json:"scenario"`
@@ -468,9 +816,36 @@ func validatejsonExampleItemTransport(value *jsonExampleItemTransport) (err erro
 	return err
 }
 
+// jsonPreviewArchitecturePayloadTransport stores JSON fields until they have been validated.
+type jsonPreviewArchitecturePayloadTransport struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Expected CP1 request_revision digest.
+	RequestRevision *string `json:"request_revision"`
+	// Candidate Goa and Goa-AI design source to evaluate.
+	DesignSource *string `json:"design_source"`
+}
+
+// validatejsonPreviewArchitecturePayloadTransport checks decoded JSON before it becomes a service value.
+func validatejsonPreviewArchitecturePayloadTransport(value *jsonPreviewArchitecturePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.DesignSource == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
+	}
+	return err
+}
+
 // jsonProposeChangePayloadTransport stores JSON fields until they have been validated.
 type jsonProposeChangePayloadTransport struct {
-	// Client-supplied or generated change identifier.
+	// Unique change identifier.
 	ChangeID *string `json:"change_id"`
 	// Operator feature request.
 	Prompt *string `json:"prompt"`
@@ -492,10 +867,114 @@ func validatejsonProposeChangePayloadTransport(value *jsonProposeChangePayloadTr
 	return err
 }
 
+// jsonToolContractItemTransport stores JSON fields until they have been validated.
+type jsonToolContractItemTransport struct {
+	// Scoped tool identifier (<toolset>.<tool>).
+	ID *string `json:"id"`
+	// Owning toolset name.
+	Toolset *string `json:"toolset"`
+	// Tool name.
+	Name *string `json:"name"`
+	// Tool description.
+	Description *string `json:"description"`
+	// Canonical evaluated argument schema summary.
+	ArgsSchema *string `json:"args_schema"`
+	// Canonical evaluated return schema summary.
+	ReturnSchema *string `json:"return_schema"`
+	// Server-supplied InjectedFields hidden from the model.
+	InjectedFields []string `json:"injected_fields"`
+	// True when the tool declares a design-time Confirmation gate.
+	RequiresConfirmation *bool `json:"requires_confirmation"`
+	// True when the tool declares a BoundedResult cursor/truncation contract.
+	BoundedResult *bool `json:"bounded_result"`
+}
+
+// validatejsonToolContractItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonToolContractItemTransport(value *jsonToolContractItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Toolset == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("toolset", "body"))
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if value.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if value.ReturnSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("return_schema", "body"))
+	}
+	if value.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	if value.RequiresConfirmation == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
+	}
+	if value.BoundedResult == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
+	}
+	return err
+}
+
 // validateAmbiguityQuestionOriginal checks the original typed value before JSON conversion.
 func validateAmbiguityQuestionOriginal(value *AmbiguityQuestion) (err error) {
 	if value.Options == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("options", "value"))
+	}
+	return err
+}
+
+// validateArchitecturePreviewResultOriginal checks the original typed value before JSON conversion.
+func validateArchitecturePreviewResultOriginal(value *ArchitecturePreviewResult) (err error) {
+	if value.Containers == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("containers", "value"))
+	}
+	if value.Edges == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "value"))
+	}
+	if value.AgentPolicies == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_policies", "value"))
+	}
+	if value.Tools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "value"))
+	}
+	for _, e := range value.Containers {
+		if e != nil {
+			if err2 := validateC4ContainerItemOriginal(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Tools {
+		if e != nil {
+			if err2 := validateToolContractItemOriginal(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// validateC4ContainerItemOriginal checks the original typed value before JSON conversion.
+func validateC4ContainerItemOriginal(value *C4ContainerItem) (err error) {
+	if !(value.Kind == "service" || value.Kind == "agent" || value.Kind == "toolset") {
+		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.kind", value.Kind, []any{"service", "agent", "toolset"}))
+	}
+	return err
+}
+
+// validateToolContractItemOriginal checks the original typed value before JSON conversion.
+func validateToolContractItemOriginal(value *ToolContractItem) (err error) {
+	if value.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "value"))
 	}
 	return err
 }
@@ -562,6 +1041,9 @@ func validateDiffResultOriginal(value *DiffResult) (err error) {
 	if value.RemovedDeclarations == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("removed_declarations", "value"))
 	}
+	if value.ModifiedDeclarations == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("modified_declarations", "value"))
+	}
 	if value.VersionDeltas == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("version_deltas", "value"))
 	}
@@ -574,6 +1056,114 @@ func validateDraftOverridePayloadOriginal(value *DraftOverridePayload) (err erro
 		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.target_kind", value.TargetKind, []any{"prompt_template", "compiled_rule"}))
 	}
 	return err
+}
+
+// EncodeAgentPolicyItem turns a service value into JSON using the field names in the Goa design.
+func EncodeAgentPolicyItem(in *AgentPolicyItem) ([]byte, error) {
+	if err := checkAgentPolicyItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode AgentPolicyItem JSON: %w", err)
+	}
+	var body *jsonAgentPolicyItemTransport
+	{
+		body = &jsonAgentPolicyItemTransport{
+			AgentID:          &in.AgentID,
+			CacheAfterSystem: &in.CacheAfterSystem,
+			CacheAfterTools:  &in.CacheAfterTools,
+		}
+		maxExecutionSeconds := agentPolicyItemIntTransport(in.MaxExecutionSeconds)
+		body.MaxExecutionSeconds = &maxExecutionSeconds
+		maxToolCalls := agentPolicyItemIntTransport(in.MaxToolCalls)
+		body.MaxToolCalls = &maxToolCalls
+		maxRecoveryTurns := agentPolicyItemIntTransport(in.MaxRecoveryTurns)
+		body.MaxRecoveryTurns = &maxRecoveryTurns
+		compressAtTurns := agentPolicyItemIntTransport(in.CompressAtTurns)
+		body.CompressAtTurns = &compressAtTurns
+		keepRecentTurns := agentPolicyItemIntTransport(in.KeepRecentTurns)
+		body.KeepRecentTurns = &keepRecentTurns
+	}
+	if err := validatejsonAgentPolicyItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate AgentPolicyItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode AgentPolicyItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateAgentPolicyItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateAgentPolicyItemValue(in *AgentPolicyItem) error {
+	if err := checkAgentPolicyItemValue(in); err != nil {
+		return fmt.Errorf("validate AgentPolicyItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "AgentPolicyItem")
+	}
+
+	var body *jsonAgentPolicyItemTransport
+	{
+		body = &jsonAgentPolicyItemTransport{
+			AgentID:          &in.AgentID,
+			CacheAfterSystem: &in.CacheAfterSystem,
+			CacheAfterTools:  &in.CacheAfterTools,
+		}
+		maxExecutionSeconds := agentPolicyItemIntTransport(in.MaxExecutionSeconds)
+		body.MaxExecutionSeconds = &maxExecutionSeconds
+		maxToolCalls := agentPolicyItemIntTransport(in.MaxToolCalls)
+		body.MaxToolCalls = &maxToolCalls
+		maxRecoveryTurns := agentPolicyItemIntTransport(in.MaxRecoveryTurns)
+		body.MaxRecoveryTurns = &maxRecoveryTurns
+		compressAtTurns := agentPolicyItemIntTransport(in.CompressAtTurns)
+		body.CompressAtTurns = &compressAtTurns
+		keepRecentTurns := agentPolicyItemIntTransport(in.KeepRecentTurns)
+		body.KeepRecentTurns = &keepRecentTurns
+	}
+	if err := validatejsonAgentPolicyItemTransport(body); err != nil {
+		return fmt.Errorf("validate AgentPolicyItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeAgentPolicyItem checks JSON field names from the Goa design and returns a service value.
+func DecodeAgentPolicyItem(data []byte) (out *AgentPolicyItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode AgentPolicyItem JSON: %w", err)
+	}
+	if err := validateAgentPolicyItemJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode AgentPolicyItem JSON: %w", err)
+	}
+	var body *jsonAgentPolicyItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode AgentPolicyItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode AgentPolicyItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode AgentPolicyItem JSON after first value: %w", err)
+	}
+	if err := validatejsonAgentPolicyItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate AgentPolicyItem JSON: %w", err)
+	}
+	{
+		out = &AgentPolicyItem{
+			AgentID:             *body.AgentID,
+			MaxExecutionSeconds: int(*body.MaxExecutionSeconds),
+			MaxToolCalls:        int(*body.MaxToolCalls),
+			MaxRecoveryTurns:    int(*body.MaxRecoveryTurns),
+			CompressAtTurns:     int(*body.CompressAtTurns),
+			KeepRecentTurns:     int(*body.KeepRecentTurns),
+			CacheAfterSystem:    *body.CacheAfterSystem,
+			CacheAfterTools:     *body.CacheAfterTools,
+		}
+	}
+	return out, nil
 }
 
 // EncodeAmbiguityQuestion turns a service value into JSON using the field names in the Goa design.
@@ -674,6 +1264,372 @@ func DecodeAmbiguityQuestion(data []byte) (out *AmbiguityQuestion, err error) {
 	return out, nil
 }
 
+// EncodeArchitecturePreviewResult turns a service value into JSON using the field names in the Goa design.
+func EncodeArchitecturePreviewResult(in *ArchitecturePreviewResult) ([]byte, error) {
+	if err := checkArchitecturePreviewResultValue(in); err != nil {
+		return nil, fmt.Errorf("encode ArchitecturePreviewResult JSON: %w", err)
+	}
+	if err := validateArchitecturePreviewResultOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate ArchitecturePreviewResult value: %w", err)
+	}
+	var body *jsonArchitecturePreviewResultTransport
+	{
+		body = &jsonArchitecturePreviewResultTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			DesignDigest:    &in.DesignDigest,
+			SystemName:      &in.SystemName,
+			Banner:          &in.Banner,
+		}
+		body.Containers = make([]*jsonC4ContainerItemTransport, len(in.Containers))
+		for i, val := range in.Containers {
+			if val == nil {
+				body.Containers[i] = nil
+				continue
+			}
+			body.Containers[i] = encodeC4ContainerItemToC4ContainerItemTransport(val)
+		}
+		body.Edges = make([]*jsonC4EdgeItemTransport, len(in.Edges))
+		for i, val := range in.Edges {
+			if val == nil {
+				body.Edges[i] = nil
+				continue
+			}
+			body.Edges[i] = encodeC4EdgeItemToC4EdgeItemTransport(val)
+		}
+		body.AgentPolicies = make([]*jsonAgentPolicyItemTransport, len(in.AgentPolicies))
+		for i, val := range in.AgentPolicies {
+			if val == nil {
+				body.AgentPolicies[i] = nil
+				continue
+			}
+			body.AgentPolicies[i] = encodeAgentPolicyItemToAgentPolicyItemTransport(val)
+		}
+		body.Tools = make([]*jsonToolContractItemTransport, len(in.Tools))
+		for i, val := range in.Tools {
+			if val == nil {
+				body.Tools[i] = nil
+				continue
+			}
+			body.Tools[i] = encodeToolContractItemToToolContractItemTransport(val)
+		}
+	}
+	if err := validatejsonArchitecturePreviewResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate ArchitecturePreviewResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode ArchitecturePreviewResult JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateArchitecturePreviewResultValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateArchitecturePreviewResultValue(in *ArchitecturePreviewResult) error {
+	if err := checkArchitecturePreviewResultValue(in); err != nil {
+		return fmt.Errorf("validate ArchitecturePreviewResult value: %w", err)
+	}
+	if err := validateArchitecturePreviewResultOriginal(in); err != nil {
+		return fmt.Errorf("validate ArchitecturePreviewResult value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "ArchitecturePreviewResult")
+	}
+
+	var body *jsonArchitecturePreviewResultTransport
+	{
+		body = &jsonArchitecturePreviewResultTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			DesignDigest:    &in.DesignDigest,
+			SystemName:      &in.SystemName,
+			Banner:          &in.Banner,
+		}
+		body.Containers = make([]*jsonC4ContainerItemTransport, len(in.Containers))
+		for i, val := range in.Containers {
+			if val == nil {
+				body.Containers[i] = nil
+				continue
+			}
+			body.Containers[i] = encodeC4ContainerItemToC4ContainerItemTransport(val)
+		}
+		body.Edges = make([]*jsonC4EdgeItemTransport, len(in.Edges))
+		for i, val := range in.Edges {
+			if val == nil {
+				body.Edges[i] = nil
+				continue
+			}
+			body.Edges[i] = encodeC4EdgeItemToC4EdgeItemTransport(val)
+		}
+		body.AgentPolicies = make([]*jsonAgentPolicyItemTransport, len(in.AgentPolicies))
+		for i, val := range in.AgentPolicies {
+			if val == nil {
+				body.AgentPolicies[i] = nil
+				continue
+			}
+			body.AgentPolicies[i] = encodeAgentPolicyItemToAgentPolicyItemTransport(val)
+		}
+		body.Tools = make([]*jsonToolContractItemTransport, len(in.Tools))
+		for i, val := range in.Tools {
+			if val == nil {
+				body.Tools[i] = nil
+				continue
+			}
+			body.Tools[i] = encodeToolContractItemToToolContractItemTransport(val)
+		}
+	}
+	if err := validatejsonArchitecturePreviewResultTransport(body); err != nil {
+		return fmt.Errorf("validate ArchitecturePreviewResult value: %w", err)
+	}
+	return nil
+}
+
+// DecodeArchitecturePreviewResult checks JSON field names from the Goa design and returns a service value.
+func DecodeArchitecturePreviewResult(data []byte) (out *ArchitecturePreviewResult, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode ArchitecturePreviewResult JSON: %w", err)
+	}
+	if err := validateArchitecturePreviewResultJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode ArchitecturePreviewResult JSON: %w", err)
+	}
+	var body *jsonArchitecturePreviewResultTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode ArchitecturePreviewResult JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode ArchitecturePreviewResult JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode ArchitecturePreviewResult JSON after first value: %w", err)
+	}
+	if err := validatejsonArchitecturePreviewResultTransport(body); err != nil {
+		return out, fmt.Errorf("validate ArchitecturePreviewResult JSON: %w", err)
+	}
+	{
+		out = &ArchitecturePreviewResult{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			DesignDigest:    *body.DesignDigest,
+			SystemName:      *body.SystemName,
+			Banner:          *body.Banner,
+		}
+		out.Containers = make([]*C4ContainerItem, len(body.Containers))
+		for i, val := range body.Containers {
+			if val == nil {
+				out.Containers[i] = nil
+				continue
+			}
+			out.Containers[i] = decodeC4ContainerItemTransportToC4ContainerItem(val)
+		}
+		out.Edges = make([]*C4EdgeItem, len(body.Edges))
+		for i, val := range body.Edges {
+			if val == nil {
+				out.Edges[i] = nil
+				continue
+			}
+			out.Edges[i] = decodeC4EdgeItemTransportToC4EdgeItem(val)
+		}
+		out.AgentPolicies = make([]*AgentPolicyItem, len(body.AgentPolicies))
+		for i, val := range body.AgentPolicies {
+			if val == nil {
+				out.AgentPolicies[i] = nil
+				continue
+			}
+			out.AgentPolicies[i] = decodeAgentPolicyItemTransportToAgentPolicyItem(val)
+		}
+		out.Tools = make([]*ToolContractItem, len(body.Tools))
+		for i, val := range body.Tools {
+			if val == nil {
+				out.Tools[i] = nil
+				continue
+			}
+			out.Tools[i] = decodeToolContractItemTransportToToolContractItem(val)
+		}
+	}
+	return out, nil
+}
+
+// EncodeC4ContainerItem turns a service value into JSON using the field names in the Goa design.
+func EncodeC4ContainerItem(in *C4ContainerItem) ([]byte, error) {
+	if err := checkC4ContainerItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode C4ContainerItem JSON: %w", err)
+	}
+	if err := validateC4ContainerItemOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate C4ContainerItem value: %w", err)
+	}
+	var body *jsonC4ContainerItemTransport
+	{
+		body = &jsonC4ContainerItemTransport{
+			ID:          &in.ID,
+			Name:        &in.Name,
+			Kind:        &in.Kind,
+			Description: &in.Description,
+		}
+	}
+	if err := validatejsonC4ContainerItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate C4ContainerItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode C4ContainerItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateC4ContainerItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateC4ContainerItemValue(in *C4ContainerItem) error {
+	if err := checkC4ContainerItemValue(in); err != nil {
+		return fmt.Errorf("validate C4ContainerItem value: %w", err)
+	}
+	if err := validateC4ContainerItemOriginal(in); err != nil {
+		return fmt.Errorf("validate C4ContainerItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "C4ContainerItem")
+	}
+
+	var body *jsonC4ContainerItemTransport
+	{
+		body = &jsonC4ContainerItemTransport{
+			ID:          &in.ID,
+			Name:        &in.Name,
+			Kind:        &in.Kind,
+			Description: &in.Description,
+		}
+	}
+	if err := validatejsonC4ContainerItemTransport(body); err != nil {
+		return fmt.Errorf("validate C4ContainerItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeC4ContainerItem checks JSON field names from the Goa design and returns a service value.
+func DecodeC4ContainerItem(data []byte) (out *C4ContainerItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode C4ContainerItem JSON: %w", err)
+	}
+	if err := validateArchitecturePreviewResultJSONValue4("", root, ""); err != nil {
+		return out, fmt.Errorf("decode C4ContainerItem JSON: %w", err)
+	}
+	var body *jsonC4ContainerItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode C4ContainerItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode C4ContainerItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode C4ContainerItem JSON after first value: %w", err)
+	}
+	if err := validatejsonC4ContainerItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate C4ContainerItem JSON: %w", err)
+	}
+	{
+		out = &C4ContainerItem{
+			ID:          *body.ID,
+			Name:        *body.Name,
+			Kind:        *body.Kind,
+			Description: *body.Description,
+		}
+	}
+	return out, nil
+}
+
+// EncodeC4EdgeItem turns a service value into JSON using the field names in the Goa design.
+func EncodeC4EdgeItem(in *C4EdgeItem) ([]byte, error) {
+	if err := checkC4EdgeItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode C4EdgeItem JSON: %w", err)
+	}
+	var body *jsonC4EdgeItemTransport
+	{
+		body = &jsonC4EdgeItemTransport{
+			FromID:   &in.FromID,
+			ToID:     &in.ToID,
+			Protocol: &in.Protocol,
+		}
+	}
+	if err := validatejsonC4EdgeItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate C4EdgeItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode C4EdgeItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateC4EdgeItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateC4EdgeItemValue(in *C4EdgeItem) error {
+	if err := checkC4EdgeItemValue(in); err != nil {
+		return fmt.Errorf("validate C4EdgeItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "C4EdgeItem")
+	}
+
+	var body *jsonC4EdgeItemTransport
+	{
+		body = &jsonC4EdgeItemTransport{
+			FromID:   &in.FromID,
+			ToID:     &in.ToID,
+			Protocol: &in.Protocol,
+		}
+	}
+	if err := validatejsonC4EdgeItemTransport(body); err != nil {
+		return fmt.Errorf("validate C4EdgeItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeC4EdgeItem checks JSON field names from the Goa design and returns a service value.
+func DecodeC4EdgeItem(data []byte) (out *C4EdgeItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode C4EdgeItem JSON: %w", err)
+	}
+	if err := validateArchitecturePreviewResultJSONValue6("", root, ""); err != nil {
+		return out, fmt.Errorf("decode C4EdgeItem JSON: %w", err)
+	}
+	var body *jsonC4EdgeItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode C4EdgeItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode C4EdgeItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode C4EdgeItem JSON after first value: %w", err)
+	}
+	if err := validatejsonC4EdgeItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate C4EdgeItem JSON: %w", err)
+	}
+	{
+		out = &C4EdgeItem{
+			FromID:   *body.FromID,
+			ToID:     *body.ToID,
+			Protocol: *body.Protocol,
+		}
+	}
+	return out, nil
+}
+
 // EncodeChangeCardResult turns a service value into JSON using the field names in the Goa design.
 func EncodeChangeCardResult(in *ChangeCardResult) ([]byte, error) {
 	if err := checkChangeCardResultValue(in); err != nil {
@@ -687,7 +1643,9 @@ func EncodeChangeCardResult(in *ChangeCardResult) ([]byte, error) {
 		body = &jsonChangeCardResultTransport{
 			ChangeID:        &in.ChangeID,
 			Status:          &in.Status,
+			Prompt:          &in.Prompt,
 			Summary:         &in.Summary,
+			ConfirmedBy:     in.ConfirmedBy,
 			RequestRevision: &in.RequestRevision,
 		}
 		if in.Ambiguities != nil {
@@ -698,6 +1656,14 @@ func EncodeChangeCardResult(in *ChangeCardResult) ([]byte, error) {
 					continue
 				}
 				body.Ambiguities[i] = encodeAmbiguityQuestionToAmbiguityQuestionTransport(val)
+			}
+		}
+		if in.Answers != nil {
+			body.Answers = make(map[string]string, len(in.Answers))
+			for key, val := range in.Answers {
+				tk := key
+				tv := val
+				body.Answers[tk] = tv
 			}
 		}
 		body.Examples = make([]*jsonExampleItemTransport, len(in.Examples))
@@ -743,7 +1709,9 @@ func ValidateChangeCardResultValue(in *ChangeCardResult) error {
 		body = &jsonChangeCardResultTransport{
 			ChangeID:        &in.ChangeID,
 			Status:          &in.Status,
+			Prompt:          &in.Prompt,
 			Summary:         &in.Summary,
+			ConfirmedBy:     in.ConfirmedBy,
 			RequestRevision: &in.RequestRevision,
 		}
 		if in.Ambiguities != nil {
@@ -754,6 +1722,14 @@ func ValidateChangeCardResultValue(in *ChangeCardResult) error {
 					continue
 				}
 				body.Ambiguities[i] = encodeAmbiguityQuestionToAmbiguityQuestionTransport(val)
+			}
+		}
+		if in.Answers != nil {
+			body.Answers = make(map[string]string, len(in.Answers))
+			for key, val := range in.Answers {
+				tk := key
+				tv := val
+				body.Answers[tk] = tv
 			}
 		}
 		body.Examples = make([]*jsonExampleItemTransport, len(in.Examples))
@@ -803,7 +1779,9 @@ func DecodeChangeCardResult(data []byte) (out *ChangeCardResult, err error) {
 		out = &ChangeCardResult{
 			ChangeID:        *body.ChangeID,
 			Status:          *body.Status,
+			Prompt:          *body.Prompt,
 			Summary:         *body.Summary,
+			ConfirmedBy:     body.ConfirmedBy,
 			RequestRevision: *body.RequestRevision,
 		}
 		if body.Ambiguities != nil {
@@ -814,6 +1792,14 @@ func DecodeChangeCardResult(data []byte) (out *ChangeCardResult, err error) {
 					continue
 				}
 				out.Ambiguities[i] = decodeAmbiguityQuestionTransportToAmbiguityQuestion(val)
+			}
+		}
+		if body.Answers != nil {
+			out.Answers = make(map[string]string, len(body.Answers))
+			for key, val := range body.Answers {
+				tk := key
+				tv := val
+				out.Answers[tk] = tv
 			}
 		}
 		out.Examples = make([]*ExampleItem, len(body.Examples))
@@ -843,8 +1829,8 @@ func EncodeConfirmIntentPayload(in *ConfirmIntentPayload) ([]byte, error) {
 	var body *jsonConfirmIntentPayloadTransport
 	{
 		body = &jsonConfirmIntentPayloadTransport{
-			ChangeID: &in.ChangeID,
-			Operator: &in.Operator,
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
 		}
 		body.Answers = make(map[string]string, len(in.Answers))
 		for key, val := range in.Answers {
@@ -889,8 +1875,8 @@ func ValidateConfirmIntentPayloadValue(in *ConfirmIntentPayload) error {
 	var body *jsonConfirmIntentPayloadTransport
 	{
 		body = &jsonConfirmIntentPayloadTransport{
-			ChangeID: &in.ChangeID,
-			Operator: &in.Operator,
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
 		}
 		body.Answers = make(map[string]string, len(in.Answers))
 		for key, val := range in.Answers {
@@ -939,8 +1925,8 @@ func DecodeConfirmIntentPayload(data []byte) (out *ConfirmIntentPayload, err err
 	}
 	{
 		out = &ConfirmIntentPayload{
-			ChangeID: *body.ChangeID,
-			Operator: *body.Operator,
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
 		}
 		out.Answers = make(map[string]string, len(body.Answers))
 		for key, val := range body.Answers {
@@ -1068,6 +2054,10 @@ func EncodeDiffResult(in *DiffResult) ([]byte, error) {
 		for i, val := range in.RemovedDeclarations {
 			body.RemovedDeclarations[i] = val
 		}
+		body.ModifiedDeclarations = make([]string, len(in.ModifiedDeclarations))
+		for i, val := range in.ModifiedDeclarations {
+			body.ModifiedDeclarations[i] = val
+		}
 		body.VersionDeltas = make([]string, len(in.VersionDeltas))
 		for i, val := range in.VersionDeltas {
 			body.VersionDeltas[i] = val
@@ -1111,6 +2101,10 @@ func ValidateDiffResultValue(in *DiffResult) error {
 		body.RemovedDeclarations = make([]string, len(in.RemovedDeclarations))
 		for i, val := range in.RemovedDeclarations {
 			body.RemovedDeclarations[i] = val
+		}
+		body.ModifiedDeclarations = make([]string, len(in.ModifiedDeclarations))
+		for i, val := range in.ModifiedDeclarations {
+			body.ModifiedDeclarations[i] = val
 		}
 		body.VersionDeltas = make([]string, len(in.VersionDeltas))
 		for i, val := range in.VersionDeltas {
@@ -1159,6 +2153,10 @@ func DecodeDiffResult(data []byte) (out *DiffResult, err error) {
 		out.RemovedDeclarations = make([]string, len(body.RemovedDeclarations))
 		for i, val := range body.RemovedDeclarations {
 			out.RemovedDeclarations[i] = val
+		}
+		out.ModifiedDeclarations = make([]string, len(body.ModifiedDeclarations))
+		for i, val := range body.ModifiedDeclarations {
+			out.ModifiedDeclarations[i] = val
 		}
 		out.VersionDeltas = make([]string, len(body.VersionDeltas))
 		for i, val := range body.VersionDeltas {
@@ -1408,7 +2406,7 @@ func DecodeExampleItem(data []byte) (out *ExampleItem, err error) {
 	if err != nil {
 		return out, fmt.Errorf("decode ExampleItem JSON: %w", err)
 	}
-	if err := validateChangeCardResultJSONValue4("", root, ""); err != nil {
+	if err := validateChangeCardResultJSONValue5("", root, ""); err != nil {
 		return out, fmt.Errorf("decode ExampleItem JSON: %w", err)
 	}
 	var body *jsonExampleItemTransport
@@ -1433,6 +2431,89 @@ func DecodeExampleItem(data []byte) (out *ExampleItem, err error) {
 			InputSummary:     *body.InputSummary,
 			ExpectedOutcome:  *body.ExpectedOutcome,
 			VerificationKind: *body.VerificationKind,
+		}
+	}
+	return out, nil
+}
+
+// EncodePreviewArchitecturePayload turns a service value into JSON using the field names in the Goa design.
+func EncodePreviewArchitecturePayload(in *PreviewArchitecturePayload) ([]byte, error) {
+	if err := checkPreviewArchitecturePayloadValue(in); err != nil {
+		return nil, fmt.Errorf("encode PreviewArchitecturePayload JSON: %w", err)
+	}
+	var body *jsonPreviewArchitecturePayloadTransport
+	{
+		body = &jsonPreviewArchitecturePayloadTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			DesignSource:    &in.DesignSource,
+		}
+	}
+	if err := validatejsonPreviewArchitecturePayloadTransport(body); err != nil {
+		return nil, fmt.Errorf("validate PreviewArchitecturePayload JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode PreviewArchitecturePayload JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidatePreviewArchitecturePayloadValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidatePreviewArchitecturePayloadValue(in *PreviewArchitecturePayload) error {
+	if err := checkPreviewArchitecturePayloadValue(in); err != nil {
+		return fmt.Errorf("validate PreviewArchitecturePayload value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "PreviewArchitecturePayload")
+	}
+
+	var body *jsonPreviewArchitecturePayloadTransport
+	{
+		body = &jsonPreviewArchitecturePayloadTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			DesignSource:    &in.DesignSource,
+		}
+	}
+	if err := validatejsonPreviewArchitecturePayloadTransport(body); err != nil {
+		return fmt.Errorf("validate PreviewArchitecturePayload value: %w", err)
+	}
+	return nil
+}
+
+// DecodePreviewArchitecturePayload checks JSON field names from the Goa design and returns a service value.
+func DecodePreviewArchitecturePayload(data []byte) (out *PreviewArchitecturePayload, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode PreviewArchitecturePayload JSON: %w", err)
+	}
+	if err := validatePreviewArchitecturePayloadJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode PreviewArchitecturePayload JSON: %w", err)
+	}
+	var body *jsonPreviewArchitecturePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode PreviewArchitecturePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode PreviewArchitecturePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode PreviewArchitecturePayload JSON after first value: %w", err)
+	}
+	if err := validatejsonPreviewArchitecturePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate PreviewArchitecturePayload JSON: %w", err)
+	}
+	{
+		out = &PreviewArchitecturePayload{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			DesignSource:    *body.DesignSource,
 		}
 	}
 	return out, nil
@@ -1521,6 +2602,137 @@ func DecodeProposeChangePayload(data []byte) (out *ProposeChangePayload, err err
 	return out, nil
 }
 
+// EncodeToolContractItem turns a service value into JSON using the field names in the Goa design.
+func EncodeToolContractItem(in *ToolContractItem) ([]byte, error) {
+	if err := checkToolContractItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode ToolContractItem JSON: %w", err)
+	}
+	if err := validateToolContractItemOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate ToolContractItem value: %w", err)
+	}
+	var body *jsonToolContractItemTransport
+	{
+		body = &jsonToolContractItemTransport{
+			ID:                   &in.ID,
+			Toolset:              &in.Toolset,
+			Name:                 &in.Name,
+			Description:          &in.Description,
+			ArgsSchema:           &in.ArgsSchema,
+			ReturnSchema:         &in.ReturnSchema,
+			RequiresConfirmation: &in.RequiresConfirmation,
+			BoundedResult:        &in.BoundedResult,
+		}
+		body.InjectedFields = make([]string, len(in.InjectedFields))
+		for i, val := range in.InjectedFields {
+			body.InjectedFields[i] = val
+		}
+	}
+	if err := validatejsonToolContractItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate ToolContractItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode ToolContractItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateToolContractItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateToolContractItemValue(in *ToolContractItem) error {
+	if err := checkToolContractItemValue(in); err != nil {
+		return fmt.Errorf("validate ToolContractItem value: %w", err)
+	}
+	if err := validateToolContractItemOriginal(in); err != nil {
+		return fmt.Errorf("validate ToolContractItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "ToolContractItem")
+	}
+
+	var body *jsonToolContractItemTransport
+	{
+		body = &jsonToolContractItemTransport{
+			ID:                   &in.ID,
+			Toolset:              &in.Toolset,
+			Name:                 &in.Name,
+			Description:          &in.Description,
+			ArgsSchema:           &in.ArgsSchema,
+			ReturnSchema:         &in.ReturnSchema,
+			RequiresConfirmation: &in.RequiresConfirmation,
+			BoundedResult:        &in.BoundedResult,
+		}
+		body.InjectedFields = make([]string, len(in.InjectedFields))
+		for i, val := range in.InjectedFields {
+			body.InjectedFields[i] = val
+		}
+	}
+	if err := validatejsonToolContractItemTransport(body); err != nil {
+		return fmt.Errorf("validate ToolContractItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeToolContractItem checks JSON field names from the Goa design and returns a service value.
+func DecodeToolContractItem(data []byte) (out *ToolContractItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode ToolContractItem JSON: %w", err)
+	}
+	if err := validateArchitecturePreviewResultJSONValue8("", root, ""); err != nil {
+		return out, fmt.Errorf("decode ToolContractItem JSON: %w", err)
+	}
+	var body *jsonToolContractItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode ToolContractItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode ToolContractItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode ToolContractItem JSON after first value: %w", err)
+	}
+	if err := validatejsonToolContractItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate ToolContractItem JSON: %w", err)
+	}
+	{
+		out = &ToolContractItem{
+			ID:                   *body.ID,
+			Toolset:              *body.Toolset,
+			Name:                 *body.Name,
+			Description:          *body.Description,
+			ArgsSchema:           *body.ArgsSchema,
+			ReturnSchema:         *body.ReturnSchema,
+			RequiresConfirmation: *body.RequiresConfirmation,
+			BoundedResult:        *body.BoundedResult,
+		}
+		out.InjectedFields = make([]string, len(body.InjectedFields))
+		for i, val := range body.InjectedFields {
+			out.InjectedFields[i] = val
+		}
+	}
+	return out, nil
+}
+
+func decodeAgentPolicyItemTransportToAgentPolicyItem(v *jsonAgentPolicyItemTransport) *AgentPolicyItem {
+	res := &AgentPolicyItem{
+		AgentID:             *v.AgentID,
+		MaxExecutionSeconds: int(*v.MaxExecutionSeconds),
+		MaxToolCalls:        int(*v.MaxToolCalls),
+		MaxRecoveryTurns:    int(*v.MaxRecoveryTurns),
+		CompressAtTurns:     int(*v.CompressAtTurns),
+		KeepRecentTurns:     int(*v.KeepRecentTurns),
+		CacheAfterSystem:    *v.CacheAfterSystem,
+		CacheAfterTools:     *v.CacheAfterTools,
+	}
+
+	return res
+}
+
 func decodeAmbiguityQuestionTransportToAmbiguityQuestion(v *jsonAmbiguityQuestionTransport) *AmbiguityQuestion {
 	res := &AmbiguityQuestion{
 		ID:       *v.ID,
@@ -1529,6 +2741,27 @@ func decodeAmbiguityQuestionTransportToAmbiguityQuestion(v *jsonAmbiguityQuestio
 	res.Options = make([]string, len(v.Options))
 	for i, val := range v.Options {
 		res.Options[i] = val
+	}
+
+	return res
+}
+
+func decodeC4ContainerItemTransportToC4ContainerItem(v *jsonC4ContainerItemTransport) *C4ContainerItem {
+	res := &C4ContainerItem{
+		ID:          *v.ID,
+		Name:        *v.Name,
+		Kind:        *v.Kind,
+		Description: *v.Description,
+	}
+
+	return res
+}
+
+func decodeC4EdgeItemTransportToC4EdgeItem(v *jsonC4EdgeItemTransport) *C4EdgeItem {
+	res := &C4EdgeItem{
+		FromID:   *v.FromID,
+		ToID:     *v.ToID,
+		Protocol: *v.Protocol,
 	}
 
 	return res
@@ -1546,6 +2779,45 @@ func decodeExampleItemTransportToExampleItem(v *jsonExampleItemTransport) *Examp
 	return res
 }
 
+func decodeToolContractItemTransportToToolContractItem(v *jsonToolContractItemTransport) *ToolContractItem {
+	res := &ToolContractItem{
+		ID:                   *v.ID,
+		Toolset:              *v.Toolset,
+		Name:                 *v.Name,
+		Description:          *v.Description,
+		ArgsSchema:           *v.ArgsSchema,
+		ReturnSchema:         *v.ReturnSchema,
+		RequiresConfirmation: *v.RequiresConfirmation,
+		BoundedResult:        *v.BoundedResult,
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func encodeAgentPolicyItemToAgentPolicyItemTransport(v *AgentPolicyItem) *jsonAgentPolicyItemTransport {
+	res := &jsonAgentPolicyItemTransport{
+		AgentID:          &v.AgentID,
+		CacheAfterSystem: &v.CacheAfterSystem,
+		CacheAfterTools:  &v.CacheAfterTools,
+	}
+	maxExecutionSeconds := agentPolicyItemIntTransport(v.MaxExecutionSeconds)
+	res.MaxExecutionSeconds = &maxExecutionSeconds
+	maxToolCalls := agentPolicyItemIntTransport(v.MaxToolCalls)
+	res.MaxToolCalls = &maxToolCalls
+	maxRecoveryTurns := agentPolicyItemIntTransport(v.MaxRecoveryTurns)
+	res.MaxRecoveryTurns = &maxRecoveryTurns
+	compressAtTurns := agentPolicyItemIntTransport(v.CompressAtTurns)
+	res.CompressAtTurns = &compressAtTurns
+	keepRecentTurns := agentPolicyItemIntTransport(v.KeepRecentTurns)
+	res.KeepRecentTurns = &keepRecentTurns
+
+	return res
+}
+
 func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *jsonAmbiguityQuestionTransport {
 	res := &jsonAmbiguityQuestionTransport{
 		ID:       &v.ID,
@@ -1554,6 +2826,27 @@ func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *
 	res.Options = make([]string, len(v.Options))
 	for i, val := range v.Options {
 		res.Options[i] = val
+	}
+
+	return res
+}
+
+func encodeC4ContainerItemToC4ContainerItemTransport(v *C4ContainerItem) *jsonC4ContainerItemTransport {
+	res := &jsonC4ContainerItemTransport{
+		ID:          &v.ID,
+		Name:        &v.Name,
+		Kind:        &v.Kind,
+		Description: &v.Description,
+	}
+
+	return res
+}
+
+func encodeC4EdgeItemToC4EdgeItemTransport(v *C4EdgeItem) *jsonC4EdgeItemTransport {
+	res := &jsonC4EdgeItemTransport{
+		FromID:   &v.FromID,
+		ToID:     &v.ToID,
+		Protocol: &v.Protocol,
 	}
 
 	return res
@@ -1569,6 +2862,165 @@ func encodeExampleItemToExampleItemTransport(v *ExampleItem) *jsonExampleItemTra
 	}
 
 	return res
+}
+
+func encodeToolContractItemToToolContractItemTransport(v *ToolContractItem) *jsonToolContractItemTransport {
+	res := &jsonToolContractItemTransport{
+		ID:                   &v.ID,
+		Toolset:              &v.Toolset,
+		Name:                 &v.Name,
+		Description:          &v.Description,
+		ArgsSchema:           &v.ArgsSchema,
+		ReturnSchema:         &v.ReturnSchema,
+		RequiresConfirmation: &v.RequiresConfirmation,
+		BoundedResult:        &v.BoundedResult,
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+// validateAgentPolicyItemJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateAgentPolicyItemJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "agent_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scoped agent container identifier.",
+			); err != nil {
+				return err
+			}
+		case "cache_after_system":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when prompt caching places a checkpoint after system prompts.",
+			); err != nil {
+				return err
+			}
+		case "cache_after_tools":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when prompt caching places a checkpoint after tool definitions.",
+			); err != nil {
+				return err
+			}
+		case "compress_at_turns":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Turn threshold for history compression.",
+			); err != nil {
+				return err
+			}
+		case "keep_recent_turns":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Recent turns retained uncompressed.",
+			); err != nil {
+				return err
+			}
+		case "max_execution_seconds":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Per-run execution time budget in seconds.",
+			); err != nil {
+				return err
+			}
+		case "max_recovery_turns":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Maximum consecutive recovery turns after validation failure.",
+			); err != nil {
+				return err
+			}
+		case "max_tool_calls":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Per-run retrieval tool-call budget.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"agent_id",
+				"cache_after_system",
+				"cache_after_tools",
+				"compress_at_turns",
+				"keep_recent_turns",
+				"max_execution_seconds",
+				"max_recovery_turns",
+				"max_tool_calls",
+			})
+		}
+	}
+	return nil
+}
+
+// validateAgentPolicyItemJSONValue2 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateAgentPolicyItemJSONValue2(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "string", "null", description)
+	}
+	_, ok := value.(string)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "string", decodedJSONType(value), description)
+	}
+	return nil
+}
+
+// validateAgentPolicyItemJSONValue3 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateAgentPolicyItemJSONValue3(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "boolean", "null", description)
+	}
+	_, ok := value.(bool)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "boolean", decodedJSONType(value), description)
+	}
+	return nil
+}
+
+// validateAgentPolicyItemJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateAgentPolicyItemJSONValue4(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "integer", "null", description)
+	}
+	_, ok := value.(json.Number)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "integer", decodedJSONType(value), description)
+	}
+	return nil
 }
 
 // validateAmbiguityQuestionJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
@@ -1592,21 +3044,21 @@ func validateAmbiguityQuestionJSONValue(path string, value any, description stri
 	for _, key := range keys {
 		switch key {
 		case "id":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Stable question identifier.",
 			); err != nil {
 				return err
 			}
 		case "options":
-			if err := validateAmbiguityQuestionJSONValue3(
+			if err := validateAmbiguityQuestionJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Concrete resolution choices.",
 			); err != nil {
 				return err
 			}
 		case "question":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Plain-English question for the operator.",
 			); err != nil {
@@ -1630,17 +3082,125 @@ func validateAmbiguityQuestionJSONValue2(path string, value any, description str
 		field = "$payload"
 	}
 	if value == nil {
-		return invalidGeneratedFieldTypeError(field, "string", "null", description)
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
 	}
-	_, ok := value.(string)
+	typed, ok := value.([]any)
 	if !ok {
-		return invalidGeneratedFieldTypeError(field, "string", decodedJSONType(value), description)
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validateAgentPolicyItemJSONValue2(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// validateAmbiguityQuestionJSONValue3 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateAmbiguityQuestionJSONValue3(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "agent_policies":
+			if err := validateArchitecturePreviewResultJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluated Goa-AI runtime policies per declared agent.",
+			); err != nil {
+				return err
+			}
+		case "banner":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Plain-English summary of topology and guardrails.",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Bound Change Card identifier.",
+			); err != nil {
+				return err
+			}
+		case "containers":
+			if err := validateArchitecturePreviewResultJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Derived C4 containers.",
+			); err != nil {
+				return err
+			}
+		case "design_digest":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the evaluated Goa design source.",
+			); err != nil {
+				return err
+			}
+		case "edges":
+			if err := validateArchitecturePreviewResultJSONValue5(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Validated directed edges between declared containers.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Bound CP1 request_revision digest.",
+			); err != nil {
+				return err
+			}
+		case "system_name":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "API or primary service name declared in the design.",
+			); err != nil {
+				return err
+			}
+		case "tools":
+			if err := validateArchitecturePreviewResultJSONValue7(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluated Goa-AI tool contracts.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"agent_policies",
+				"banner",
+				"change_id",
+				"containers",
+				"design_digest",
+				"edges",
+				"request_revision",
+				"system_name",
+				"tools",
+			})
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue2 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue2(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -1653,7 +3213,327 @@ func validateAmbiguityQuestionJSONValue3(path string, value any, description str
 		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
 	}
 	for index, item := range typed {
-		if err := validateAmbiguityQuestionJSONValue2(
+		if item == nil {
+			continue
+		}
+		if err := validateAgentPolicyItemJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue3 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue3(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if item == nil {
+			continue
+		}
+		if err := validateArchitecturePreviewResultJSONValue4(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue4(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "description":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Summary of the container's responsibility.",
+			); err != nil {
+				return err
+			}
+		case "id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Stable container identifier.",
+			); err != nil {
+				return err
+			}
+		case "kind":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Container role (service, agent, or toolset).",
+			); err != nil {
+				return err
+			}
+		case "name":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Human-readable container name.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"description",
+				"id",
+				"kind",
+				"name",
+			})
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue5 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue5(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if item == nil {
+			continue
+		}
+		if err := validateArchitecturePreviewResultJSONValue6(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue6 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue6(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "from_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Source container ID.",
+			); err != nil {
+				return err
+			}
+		case "protocol":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Contract or transport relationship.",
+			); err != nil {
+				return err
+			}
+		case "to_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Target container ID.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"from_id",
+				"protocol",
+				"to_id",
+			})
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue7 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue7(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if item == nil {
+			continue
+		}
+		if err := validateArchitecturePreviewResultJSONValue8(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue8 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue8(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "args_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Canonical evaluated argument schema summary.",
+			); err != nil {
+				return err
+			}
+		case "bounded_result":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when the tool declares a BoundedResult cursor/truncation contract.",
+			); err != nil {
+				return err
+			}
+		case "description":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Tool description.",
+			); err != nil {
+				return err
+			}
+		case "id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scoped tool identifier (<toolset>.<tool>).",
+			); err != nil {
+				return err
+			}
+		case "injected_fields":
+			if err := validateArchitecturePreviewResultJSONValue9(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Server-supplied InjectedFields hidden from the model.",
+			); err != nil {
+				return err
+			}
+		case "name":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Tool name.",
+			); err != nil {
+				return err
+			}
+		case "requires_confirmation":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when the tool declares a design-time Confirmation gate.",
+			); err != nil {
+				return err
+			}
+		case "return_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Canonical evaluated return schema summary.",
+			); err != nil {
+				return err
+			}
+		case "toolset":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Owning toolset name.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"args_schema",
+				"bounded_result",
+				"description",
+				"id",
+				"injected_fields",
+				"name",
+				"requires_confirmation",
+				"return_schema",
+				"toolset",
+			})
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue9 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue9(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validateAgentPolicyItemJSONValue2(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -1686,47 +3566,68 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 		case "ambiguities":
 			if err := validateChangeCardResultJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Unresolved domain questions, empty when clear.",
+				typed[key], "Domain questions surfaced at CP1, retained for audit after confirmation.",
+			); err != nil {
+				return err
+			}
+		case "answers":
+			if err := validateChangeCardResultJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Confirmed resolution per ambiguity question ID.",
 			); err != nil {
 				return err
 			}
 		case "change_id":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Change identifier.",
 			); err != nil {
 				return err
 			}
+		case "confirmed_by":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Authenticated principal that confirmed the Change Card.",
+			); err != nil {
+				return err
+			}
 		case "examples":
-			if err := validateChangeCardResultJSONValue3(
+			if err := validateChangeCardResultJSONValue4(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Concrete examples mapped to evaluator checks.",
 			); err != nil {
 				return err
 			}
 		case "preserved_behaviors":
-			if err := validateChangeCardResultJSONValue5(
+			if err := validateChangeCardResultJSONValue6(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Existing contract invariants preserved by this change.",
 			); err != nil {
 				return err
 			}
-		case "request_revision":
-			if err := validateAmbiguityQuestionJSONValue2(
+		case "prompt":
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "SHA-256 digest of the confirmed Change Card.",
+				typed[key], "Original operator feature request.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the canonical versioned Change Card.",
 			); err != nil {
 				return err
 			}
 		case "status":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Checkpoint status (needs_confirmation or confirmed).",
 			); err != nil {
 				return err
 			}
 		case "summary":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Plain-English summary of requested behavior.",
 			); err != nil {
@@ -1735,9 +3636,12 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"ambiguities",
+				"answers",
 				"change_id",
+				"confirmed_by",
 				"examples",
 				"preserved_behaviors",
+				"prompt",
 				"request_revision",
 				"status",
 				"summary",
@@ -1781,6 +3685,35 @@ func validateChangeCardResultJSONValue3(path string, value any, description stri
 		field = "$payload"
 	}
 	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if err := validateAgentPolicyItemJSONValue2(
+			generatedJSONChildPath(path, key, true),
+			typed[key], description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateChangeCardResultJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateChangeCardResultJSONValue4(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
 		return invalidGeneratedFieldTypeError(field, "array", "null", description)
 	}
 	typed, ok := value.([]any)
@@ -1791,7 +3724,7 @@ func validateChangeCardResultJSONValue3(path string, value any, description stri
 		if item == nil {
 			continue
 		}
-		if err := validateChangeCardResultJSONValue4(
+		if err := validateChangeCardResultJSONValue5(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -1801,8 +3734,8 @@ func validateChangeCardResultJSONValue3(path string, value any, description stri
 	return nil
 }
 
-// validateChangeCardResultJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateChangeCardResultJSONValue4(path string, value any, description string) error {
+// validateChangeCardResultJSONValue5 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateChangeCardResultJSONValue5(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -1822,35 +3755,35 @@ func validateChangeCardResultJSONValue4(path string, value any, description stri
 	for _, key := range keys {
 		switch key {
 		case "expected_outcome":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Expected side effect and response behavior.",
 			); err != nil {
 				return err
 			}
 		case "id":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Stable example identifier.",
+				typed[key], "Code-assigned stable example identifier.",
 			); err != nil {
 				return err
 			}
 		case "input_summary":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Representative user request and domain fixture state.",
 			); err != nil {
 				return err
 			}
 		case "scenario":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Plain-English scenario description.",
 			); err != nil {
 				return err
 			}
 		case "verification_kind":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Evaluator check classification (deterministic or model_judged).",
 			); err != nil {
@@ -1869,8 +3802,8 @@ func validateChangeCardResultJSONValue4(path string, value any, description stri
 	return nil
 }
 
-// validateChangeCardResultJSONValue5 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateChangeCardResultJSONValue5(path string, value any, description string) error {
+// validateChangeCardResultJSONValue6 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateChangeCardResultJSONValue6(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -1883,7 +3816,7 @@ func validateChangeCardResultJSONValue5(path string, value any, description stri
 		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
 	}
 	for index, item := range typed {
-		if err := validateAmbiguityQuestionJSONValue2(
+		if err := validateAgentPolicyItemJSONValue2(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -1921,7 +3854,7 @@ func validateConfirmIntentPayloadJSONValue(path string, value any, description s
 				return err
 			}
 		case "change_id":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Change identifier.",
 			); err != nil {
@@ -1934,10 +3867,10 @@ func validateConfirmIntentPayloadJSONValue(path string, value any, description s
 			); err != nil {
 				return err
 			}
-		case "operator":
-			if err := validateAmbiguityQuestionJSONValue2(
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Authenticated operator identity.",
+				typed[key], "Reviewed CP1 request_revision digest being confirmed.",
 			); err != nil {
 				return err
 			}
@@ -1946,7 +3879,7 @@ func validateConfirmIntentPayloadJSONValue(path string, value any, description s
 				"answers",
 				"change_id",
 				"examples",
-				"operator",
+				"request_revision",
 			})
 		}
 	}
@@ -1972,7 +3905,7 @@ func validateConfirmIntentPayloadJSONValue2(path string, value any, description 
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		if err := validateAmbiguityQuestionJSONValue2(
+		if err := validateAgentPolicyItemJSONValue2(
 			generatedJSONChildPath(path, key, true),
 			typed[key], description,
 		); err != nil {
@@ -1999,7 +3932,7 @@ func validateConfirmIntentPayloadJSONValue3(path string, value any, description 
 		if item == nil {
 			continue
 		}
-		if err := validateChangeCardResultJSONValue4(
+		if err := validateChangeCardResultJSONValue5(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -2030,28 +3963,28 @@ func validateDiffPayloadJSONValue(path string, value any, description string) er
 	for _, key := range keys {
 		switch key {
 		case "new_design":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Candidate Go/Goa design source.",
 			); err != nil {
 				return err
 			}
 		case "new_gomod":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Candidate go.mod file contents.",
 			); err != nil {
 				return err
 			}
 		case "old_design":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Previous Go/Goa design source.",
 			); err != nil {
 				return err
 			}
 		case "old_gomod":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Previous go.mod file contents.",
 			); err != nil {
@@ -2092,26 +4025,33 @@ func validateDiffResultJSONValue(path string, value any, description string) err
 		case "added_declarations":
 			if err := validateDiffResultJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Added services, methods, agents, or tools.",
+				typed[key], "Added scoped declarations.",
 			); err != nil {
 				return err
 			}
 		case "has_changes":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when any declaration, evaluated contract schema, or module directive changed.",
+			); err != nil {
+				return err
+			}
+		case "modified_declarations":
 			if err := validateDiffResultJSONValue3(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "True when any declaration or module pin changed.",
+				typed[key], "Declarations whose evaluated schema, route, or policy changed.",
 			); err != nil {
 				return err
 			}
 		case "removed_declarations":
 			if err := validateDiffResultJSONValue4(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Removed services, methods, agents, or tools.",
+				typed[key], "Removed scoped declarations.",
 			); err != nil {
 				return err
 			}
 		case "summary":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Human-readable structural diff summary.",
 			); err != nil {
@@ -2120,7 +4060,7 @@ func validateDiffResultJSONValue(path string, value any, description string) err
 		case "version_deltas":
 			if err := validateDiffResultJSONValue5(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Changed module dependency pins.",
+				typed[key], "Changed module require, replace, or exclude directives.",
 			); err != nil {
 				return err
 			}
@@ -2128,6 +4068,7 @@ func validateDiffResultJSONValue(path string, value any, description string) err
 			return unknownJSONFieldError(path, key, []string{
 				"added_declarations",
 				"has_changes",
+				"modified_declarations",
 				"removed_declarations",
 				"summary",
 				"version_deltas",
@@ -2151,7 +4092,7 @@ func validateDiffResultJSONValue2(path string, value any, description string) er
 		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
 	}
 	for index, item := range typed {
-		if err := validateAmbiguityQuestionJSONValue2(
+		if err := validateAgentPolicyItemJSONValue2(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -2168,11 +4109,19 @@ func validateDiffResultJSONValue3(path string, value any, description string) er
 		field = "$payload"
 	}
 	if value == nil {
-		return invalidGeneratedFieldTypeError(field, "boolean", "null", description)
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
 	}
-	_, ok := value.(bool)
+	typed, ok := value.([]any)
 	if !ok {
-		return invalidGeneratedFieldTypeError(field, "boolean", decodedJSONType(value), description)
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validateAgentPolicyItemJSONValue2(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -2191,7 +4140,7 @@ func validateDiffResultJSONValue4(path string, value any, description string) er
 		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
 	}
 	for index, item := range typed {
-		if err := validateAmbiguityQuestionJSONValue2(
+		if err := validateAgentPolicyItemJSONValue2(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -2215,7 +4164,7 @@ func validateDiffResultJSONValue5(path string, value any, description string) er
 		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
 	}
 	for index, item := range typed {
-		if err := validateAmbiguityQuestionJSONValue2(
+		if err := validateAgentPolicyItemJSONValue2(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -2246,21 +4195,21 @@ func validateDraftOverridePayloadJSONValue(path string, value any, description s
 	for _, key := range keys {
 		switch key {
 		case "new_content":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Updated prompt template text or rule expression.",
 			); err != nil {
 				return err
 			}
 		case "prompt_id":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Registered prompt identifier when target_kind is prompt_template.",
 			); err != nil {
 				return err
 			}
 		case "target_kind":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Override target kind (prompt_template or compiled_rule).",
 			); err != nil {
@@ -2298,28 +4247,28 @@ func validateDraftOverrideResultJSONValue(path string, value any, description st
 	for _, key := range keys {
 		switch key {
 		case "applied_in_store":
-			if err := validateDiffResultJSONValue3(
+			if err := validateAgentPolicyItemJSONValue3(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "True when updated in prompt.Store for 0s reload.",
+				typed[key], "True when updated in the target platform's prompt.Store for 0s reload.",
 			); err != nil {
 				return err
 			}
 		case "message":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Operator-facing status explanation.",
 			); err != nil {
 				return err
 			}
 		case "prompt_version":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "New prompt version digest when applied in prompt.Store.",
+				typed[key], "New prompt version digest returned by the target platform.",
 			); err != nil {
 				return err
 			}
 		case "requires_rebuild":
-			if err := validateDiffResultJSONValue3(
+			if err := validateAgentPolicyItemJSONValue3(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "True when the change modifies a compiled Go business rule.",
 			); err != nil {
@@ -2331,6 +4280,58 @@ func validateDraftOverrideResultJSONValue(path string, value any, description st
 				"message",
 				"prompt_version",
 				"requires_rebuild",
+			})
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitecturePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitecturePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "change_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Confirmed Change Card identifier.",
+			); err != nil {
+				return err
+			}
+		case "design_source":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Candidate Goa and Goa-AI design source to evaluate.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Expected CP1 request_revision digest.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"change_id",
+				"design_source",
+				"request_revision",
 			})
 		}
 	}
@@ -2358,21 +4359,21 @@ func validateProposeChangePayloadJSONValue(path string, value any, description s
 	for _, key := range keys {
 		switch key {
 		case "change_id":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Client-supplied or generated change identifier.",
+				typed[key], "Unique change identifier.",
 			); err != nil {
 				return err
 			}
 		case "design_source":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Current target Goa design source inspected by the CP1 model.",
 			); err != nil {
 				return err
 			}
 		case "prompt":
-			if err := validateAmbiguityQuestionJSONValue2(
+			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Operator feature request.",
 			); err != nil {
@@ -2546,6 +4547,36 @@ func generatedJSONChildPath(path, key string, _ bool) string {
 	return path + "[" + strconv.Quote(key) + "]"
 }
 
+// checkAgentPolicyItemValue checks text and cycles before conversion.
+func checkAgentPolicyItemValue(in *AgentPolicyItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkAgentPolicyItemAgentPolicyItemValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkAgentPolicyItemAgentPolicyItemValue checks one generated value on the active path.
+func checkAgentPolicyItemAgentPolicyItemValue(in *AgentPolicyItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.AgentID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "agent_id", false))
+		}
+	}
+	return nil
+}
+
 // checkAmbiguityQuestionValue checks text and cycles before conversion.
 func checkAmbiguityQuestionValue(in *AmbiguityQuestion) error {
 	if in == nil {
@@ -2586,6 +4617,191 @@ func checkAmbiguityQuestionAmbiguityQuestionValue(in *AmbiguityQuestion, field s
 	return nil
 }
 
+// checkArchitecturePreviewResultValue checks text and cycles before conversion.
+func checkArchitecturePreviewResultValue(in *ArchitecturePreviewResult) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkArchitecturePreviewResultArchitecturePreviewResultValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkArchitecturePreviewResultArchitecturePreviewResultValue checks one generated value on the active path.
+func checkArchitecturePreviewResultArchitecturePreviewResultValue(in *ArchitecturePreviewResult, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ChangeID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
+		}
+		if !utf8.ValidString(string(in.RequestRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
+		}
+		if !utf8.ValidString(string(in.DesignDigest)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "design_digest", false))
+		}
+		if !utf8.ValidString(string(in.SystemName)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "system_name", false))
+		}
+		for index1, item1 := range in.Containers {
+			_ = index1
+			_ = item1
+			if err := checkArchitecturePreviewResultC4ContainerItemValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "containers", false), strconv.Itoa(index1), true), active); err != nil {
+				return err
+			}
+		}
+		for index1, item1 := range in.Edges {
+			_ = index1
+			_ = item1
+			if err := checkArchitecturePreviewResultC4EdgeItemValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "edges", false), strconv.Itoa(index1), true), active); err != nil {
+				return err
+			}
+		}
+		for index1, item1 := range in.AgentPolicies {
+			_ = index1
+			_ = item1
+			if err := checkAgentPolicyItemAgentPolicyItemValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "agent_policies", false), strconv.Itoa(index1), true), active); err != nil {
+				return err
+			}
+		}
+		for index1, item1 := range in.Tools {
+			_ = index1
+			_ = item1
+			if err := checkArchitecturePreviewResultToolContractItemValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "tools", false), strconv.Itoa(index1), true), active); err != nil {
+				return err
+			}
+		}
+		if !utf8.ValidString(string(in.Banner)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "banner", false))
+		}
+	}
+	return nil
+}
+
+// checkArchitecturePreviewResultC4ContainerItemValue checks one generated value on the active path.
+func checkArchitecturePreviewResultC4ContainerItemValue(in *C4ContainerItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "id", false))
+		}
+		if !utf8.ValidString(string(in.Name)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "name", false))
+		}
+		if !utf8.ValidString(string(in.Kind)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "kind", false))
+		}
+		if !utf8.ValidString(string(in.Description)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "description", false))
+		}
+	}
+	return nil
+}
+
+// checkArchitecturePreviewResultC4EdgeItemValue checks one generated value on the active path.
+func checkArchitecturePreviewResultC4EdgeItemValue(in *C4EdgeItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.FromID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "from_id", false))
+		}
+		if !utf8.ValidString(string(in.ToID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "to_id", false))
+		}
+		if !utf8.ValidString(string(in.Protocol)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "protocol", false))
+		}
+	}
+	return nil
+}
+
+// checkArchitecturePreviewResultToolContractItemValue checks one generated value on the active path.
+func checkArchitecturePreviewResultToolContractItemValue(in *ToolContractItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "id", false))
+		}
+		if !utf8.ValidString(string(in.Toolset)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "toolset", false))
+		}
+		if !utf8.ValidString(string(in.Name)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "name", false))
+		}
+		if !utf8.ValidString(string(in.Description)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "description", false))
+		}
+		if !utf8.ValidString(string(in.ArgsSchema)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "args_schema", false))
+		}
+		if !utf8.ValidString(string(in.ReturnSchema)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "return_schema", false))
+		}
+		for index1, item1 := range in.InjectedFields {
+			_ = index1
+			_ = item1
+			if !utf8.ValidString(string(item1)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "injected_fields", false), strconv.Itoa(index1), true))
+			}
+		}
+	}
+	return nil
+}
+
+// checkC4ContainerItemValue checks text and cycles before conversion.
+func checkC4ContainerItemValue(in *C4ContainerItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkArchitecturePreviewResultC4ContainerItemValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkC4EdgeItemValue checks text and cycles before conversion.
+func checkC4EdgeItemValue(in *C4EdgeItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkArchitecturePreviewResultC4EdgeItemValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
 // checkChangeCardResultValue checks text and cycles before conversion.
 func checkChangeCardResultValue(in *ChangeCardResult) error {
 	if in == nil {
@@ -2615,6 +4831,9 @@ func checkChangeCardResultChangeCardResultValue(in *ChangeCardResult, field stri
 		if !utf8.ValidString(string(in.Status)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "status", false))
 		}
+		if !utf8.ValidString(string(in.Prompt)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "prompt", false))
+		}
 		if !utf8.ValidString(string(in.Summary)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "summary", false))
 		}
@@ -2623,6 +4842,15 @@ func checkChangeCardResultChangeCardResultValue(in *ChangeCardResult, field stri
 			_ = item1
 			if err := checkAmbiguityQuestionAmbiguityQuestionValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "ambiguities", false), strconv.Itoa(index1), true), active); err != nil {
 				return err
+			}
+		}
+		for key1, item1 := range in.Answers {
+			_ = item1
+			if !utf8.ValidString(string(key1)) {
+				return fmt.Errorf("%s: invalid UTF-8 map key", generatedJSONChildPath(field, "answers", false))
+			}
+			if !utf8.ValidString(string(item1)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "answers", false), string(key1), true))
 			}
 		}
 		for index1, item1 := range in.Examples {
@@ -2637,6 +4865,11 @@ func checkChangeCardResultChangeCardResultValue(in *ChangeCardResult, field stri
 			_ = item1
 			if !utf8.ValidString(string(item1)) {
 				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "preserved_behaviors", false), strconv.Itoa(index1), true))
+			}
+		}
+		if in.ConfirmedBy != nil {
+			if !utf8.ValidString(string(*in.ConfirmedBy)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "confirmed_by", false))
 			}
 		}
 		if !utf8.ValidString(string(in.RequestRevision)) {
@@ -2702,8 +4935,8 @@ func checkConfirmIntentPayloadConfirmIntentPayloadValue(in *ConfirmIntentPayload
 		if !utf8.ValidString(string(in.ChangeID)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
 		}
-		if !utf8.ValidString(string(in.Operator)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "operator", false))
+		if !utf8.ValidString(string(in.RequestRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
 		}
 		for key1, item1 := range in.Answers {
 			_ = item1
@@ -2799,6 +5032,13 @@ func checkDiffResultDiffResultValue(in *DiffResult, field string, active map[any
 			_ = item1
 			if !utf8.ValidString(string(item1)) {
 				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "removed_declarations", false), strconv.Itoa(index1), true))
+			}
+		}
+		for index1, item1 := range in.ModifiedDeclarations {
+			_ = index1
+			_ = item1
+			if !utf8.ValidString(string(item1)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "modified_declarations", false), strconv.Itoa(index1), true))
 			}
 		}
 		for index1, item1 := range in.VersionDeltas {
@@ -2900,6 +5140,42 @@ func checkExampleItemValue(in *ExampleItem) error {
 	return nil
 }
 
+// checkPreviewArchitecturePayloadValue checks text and cycles before conversion.
+func checkPreviewArchitecturePayloadValue(in *PreviewArchitecturePayload) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkPreviewArchitecturePayloadPreviewArchitecturePayloadValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkPreviewArchitecturePayloadPreviewArchitecturePayloadValue checks one generated value on the active path.
+func checkPreviewArchitecturePayloadPreviewArchitecturePayloadValue(in *PreviewArchitecturePayload, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ChangeID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
+		}
+		if !utf8.ValidString(string(in.RequestRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
+		}
+		if !utf8.ValidString(string(in.DesignSource)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "design_source", false))
+		}
+	}
+	return nil
+}
+
 // checkProposeChangePayloadValue checks text and cycles before conversion.
 func checkProposeChangePayloadValue(in *ProposeChangePayload) error {
 	if in == nil {
@@ -2934,6 +5210,18 @@ func checkProposeChangePayloadProposeChangePayloadValue(in *ProposeChangePayload
 				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "design_source", false))
 			}
 		}
+	}
+	return nil
+}
+
+// checkToolContractItemValue checks text and cycles before conversion.
+func checkToolContractItemValue(in *ToolContractItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkArchitecturePreviewResultToolContractItemValue(in, "$", active); err != nil {
+		return err
 	}
 	return nil
 }

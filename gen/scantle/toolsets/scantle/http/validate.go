@@ -14,8 +14,8 @@ func ValidateConfirmIntentPayloadTransport(body *ConfirmIntentPayloadTransport) 
 	if body.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}
-	if body.Operator == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("operator", "body"))
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
 	}
 	if body.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
@@ -40,6 +40,9 @@ func ValidateConfirmIntentResultTransport(body *ConfirmIntentResultTransport) (e
 	}
 	if body.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if body.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -103,6 +106,9 @@ func ValidateDiffResultTransport(body *DiffResultTransport) (err error) {
 	if body.RemovedDeclarations == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("removed_declarations", "body"))
 	}
+	if body.ModifiedDeclarations == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("modified_declarations", "body"))
+	}
 	if body.VersionDeltas == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("version_deltas", "body"))
 	}
@@ -142,6 +148,80 @@ func ValidateDraftOverrideResultTransport(body *DraftOverrideResultTransport) (e
 	return
 }
 
+// ValidatePreviewArchitecturePayloadTransport runs the validations defined on PreviewArchitecturePayloadTransport.
+func ValidatePreviewArchitecturePayloadTransport(body *PreviewArchitecturePayloadTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.DesignSource == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
+	}
+	return
+}
+
+// ValidatePreviewArchitectureResultTransport runs the validations defined on PreviewArchitectureResultTransport.
+func ValidatePreviewArchitectureResultTransport(body *PreviewArchitectureResultTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.DesignDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_digest", "body"))
+	}
+	if body.SystemName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("system_name", "body"))
+	}
+	if body.Containers == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("containers", "body"))
+	}
+	if body.Edges == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
+	}
+	if body.AgentPolicies == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_policies", "body"))
+	}
+	if body.Tools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
+	}
+	if body.Banner == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
+	}
+	for _, e := range body.Containers {
+		if e != nil {
+			if err2 := ValidateC4ContainerItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Edges {
+		if e != nil {
+			if err2 := ValidateC4EdgeItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.AgentPolicies {
+		if e != nil {
+			if err2 := ValidateAgentPolicyItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Tools {
+		if e != nil {
+			if err2 := ValidateToolContractItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return
+}
+
 // ValidateProposeChangePayloadTransport runs the validations defined on ProposeChangePayloadTransport.
 func ValidateProposeChangePayloadTransport(body *ProposeChangePayloadTransport) (err error) {
 	if body.ChangeID == nil {
@@ -160,6 +240,9 @@ func ValidateProposeChangeResultTransport(body *ProposeChangeResultTransport) (e
 	}
 	if body.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if body.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -195,6 +278,35 @@ func ValidateProposeChangeResultTransport(body *ProposeChangeResultTransport) (e
 	return
 }
 
+// ValidateAgentPolicyItemTransport runs the validations defined on AgentPolicyItemTransport.
+func ValidateAgentPolicyItemTransport(body *AgentPolicyItemTransport) (err error) {
+	if body.AgentID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_id", "body"))
+	}
+	if body.MaxExecutionSeconds == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	}
+	if body.MaxToolCalls == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if body.MaxRecoveryTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_recovery_turns", "body"))
+	}
+	if body.CompressAtTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	}
+	if body.KeepRecentTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	}
+	if body.CacheAfterSystem == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_system", "body"))
+	}
+	if body.CacheAfterTools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_tools", "body"))
+	}
+	return
+}
+
 // ValidateAmbiguityQuestionTransport runs the validations defined on AmbiguityQuestionTransport.
 func ValidateAmbiguityQuestionTransport(body *AmbiguityQuestionTransport) (err error) {
 	if body.ID == nil {
@@ -205,6 +317,42 @@ func ValidateAmbiguityQuestionTransport(body *AmbiguityQuestionTransport) (err e
 	}
 	if body.Options == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("options", "body"))
+	}
+	return
+}
+
+// ValidateC4ContainerItemTransport runs the validations defined on C4ContainerItemTransport.
+func ValidateC4ContainerItemTransport(body *C4ContainerItemTransport) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if body.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if body.Kind != nil {
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset"}))
+		}
+	}
+	return
+}
+
+// ValidateC4EdgeItemTransport runs the validations defined on C4EdgeItemTransport.
+func ValidateC4EdgeItemTransport(body *C4EdgeItemTransport) (err error) {
+	if body.FromID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("from_id", "body"))
+	}
+	if body.ToID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("to_id", "body"))
+	}
+	if body.Protocol == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("protocol", "body"))
 	}
 	return
 }
@@ -230,6 +378,38 @@ func ValidateExampleItemTransport(body *ExampleItemTransport) (err error) {
 		if !(*body.VerificationKind == "deterministic" || *body.VerificationKind == "model_judged") {
 			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.verification_kind", *body.VerificationKind, []any{"deterministic", "model_judged"}))
 		}
+	}
+	return
+}
+
+// ValidateToolContractItemTransport runs the validations defined on ToolContractItemTransport.
+func ValidateToolContractItemTransport(body *ToolContractItemTransport) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Toolset == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("toolset", "body"))
+	}
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if body.ReturnSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("return_schema", "body"))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	if body.RequiresConfirmation == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
+	}
+	if body.BoundedResult == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
 	}
 	return
 }

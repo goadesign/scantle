@@ -1,36 +1,48 @@
 // Package controlplane implements the Scantle MCP software factory control
-// plane across Checkpoints 1 through 3 (CP1–CP3): intent & ambiguity
-// resolution, C4 architecture & cost/safety guardrail preview, interactive
-// sandbox role-switching, Fast Draft Mode prompt overrides, run-log example
-// promotion, and ToolUI/OpenUI completed-composition gating.
+// plane across Checkpoints 1 through 3 (CP1–CP3): authenticated intent &
+// ambiguity resolution, evaluated C4 architecture & cost/safety guardrail
+// preview, and target-bound Fast Draft Mode prompt overrides.
 package controlplane
 
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	genscantlehttp "github.com/goadesign/scantle/gen/http/scantle/server"
 	genmcpscantle "github.com/goadesign/scantle/gen/jsonrpc/mcp_scantle/server"
 	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
 	genscantle "github.com/goadesign/scantle/gen/scantle"
+	"github.com/goadesign/scantle/internal/designeval"
 	"github.com/goadesign/scantle/internal/diff"
 	"goa.design/goa-ai/runtime/agent/model"
-	"goa.design/goa-ai/runtime/agent/prompt"
-	"goa.design/goa-ai/runtime/agent/storage"
-	"goa.design/goa-ai/runtime/agent/transcript"
 	goahttp "goa.design/goa/v3/http"
 )
 
 type (
+	// Principal identifies the authenticated operator invoking the Scantle control plane.
+	Principal struct {
+		// ID is the stable authenticated operator identifier (for example, "alice@example.com").
+		ID string
+	}
+
+	// RequestAuthenticator verifies an incoming HTTP request and returns the
+	// authenticated Principal.
+	RequestAuthenticator func(r *http.Request) (Principal, error)
+
+	// principalContextKey is the context key storing the authenticated Principal.
+	principalContextKey struct{}
+
 	// CP1Analyzer performs semantic Checkpoint 1 analysis of an operator feature
 	// request against the current Goa design source.
 	CP1Analyzer interface {
@@ -40,195 +52,120 @@ type (
 		Analyze(ctx context.Context, promptText, designSource string) (CP1SemanticAnalysis, error)
 	}
 
+	// CP1ModelAmbiguity is an open domain question returned by a CP1Analyzer
+	// model call before Scantle assigns its mechanical question ID.
+	CP1ModelAmbiguity struct {
+		// Question is the plain-English ambiguity question.
+		Question string `json:"question"`
+		// Options lists the candidate answers (at least 2 distinct options).
+		Options []string `json:"options"`
+	}
+
+	// CP1ModelExample is a concrete input/outcome example returned by a
+	// CP1Analyzer model call before Scantle assigns its mechanical check ID.
+	CP1ModelExample struct {
+		// Scenario is the plain-English scenario description.
+		Scenario string `json:"scenario"`
+		// InputSummary describes the representative user request and fixture state.
+		InputSummary string `json:"input_summary"`
+		// ExpectedOutcome describes the expected side effect and response behavior.
+		ExpectedOutcome string `json:"expected_outcome"`
+		// VerificationKind classifies the check ("deterministic" or "model_judged").
+		VerificationKind string `json:"verification_kind"`
+	}
+
 	// CP1SemanticAnalysis is the structured semantic output returned by a
 	// CP1Analyzer model call.
 	CP1SemanticAnalysis struct {
 		// Summary is the plain-English description of the requested behavior.
 		Summary string `json:"summary"`
 		// Ambiguities lists genuine domain questions that require human confirmation.
-		Ambiguities []*genscantle.AmbiguityQuestion `json:"ambiguities"`
+		Ambiguities []CP1ModelAmbiguity `json:"ambiguities"`
 		// Examples lists concrete input/outcome examples for the Change Card.
-		Examples []*genscantle.ExampleItem `json:"examples"`
+		Examples []CP1ModelExample `json:"examples"`
 		// PreservedBehaviors lists existing contract invariants preserved by the change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
 	}
 
-	// ModelCompleter is the subset of goa-ai model.Client required by
-	// ModelCP1Analyzer. Every goa-ai model.Client satisfies this interface.
-	ModelCompleter interface {
-		// Complete executes a single model request and returns its response.
-		Complete(ctx context.Context, req *model.Request) (*model.Response, error)
-	}
-
 	// ModelCP1Analyzer implements CP1Analyzer using a Goa-AI model.Client with
-	// structured JSON output.
+	// schema-validated structured JSON output.
 	ModelCP1Analyzer struct {
-		// client is the underlying Goa-AI model completer.
-		client ModelCompleter
+		// client is the underlying Goa-AI model.Client.
+		client model.Client
 	}
 
-	// TokenSource issues scoped bearer tokens for Checkpoint 3 Role Switcher
-	// requests in sim or staging environments without giving the control plane a
-	// production signing key.
-	TokenSource interface {
-		// IssueToken returns a bearer token for the given environment ("sim" or
-		// "staging") and role (for example, "customer" or "manager").
-		IssueToken(ctx context.Context, environment, role string) (string, error)
-	}
-
-	// C4Container describes one runtime container in a Checkpoint 2 C4 preview.
-	C4Container struct {
-		// ID is the stable container identifier.
-		ID string
-		// Name is the human-readable container name.
-		Name string
-		// Kind identifies the container role (service, worker, store, or external_api).
-		Kind string
-		// Description summarizes the container's responsibility.
-		Description string
-	}
-
-	// C4Edge describes a directed dependency between two C4 containers.
-	C4Edge struct {
-		// FromID is the caller container ID.
-		FromID string
-		// ToID is the callee container ID.
-		ToID string
-		// Protocol describes the transport or contract boundary.
-		Protocol string
-	}
-
-	// GuardrailSummary reports the active Goa-AI cost and safety guardrails
-	// displayed at Checkpoint 2.
-	GuardrailSummary struct {
-		// MaxExecutionTime is the hard per-run wall-clock timeout.
-		MaxExecutionTime time.Duration
-		// MaxToolCalls is the retrieval tool-call budget per run.
-		MaxToolCalls int
-		// CompressThreshold is the context-window token threshold for history compression.
-		CompressThreshold int
-		// RetainRecentTurns is the number of recent turns preserved uncompressed.
-		RetainRecentTurns int
-	}
-
-	// ArchitectureSpec supplies the container topology and runtime policy for
-	// Checkpoint 2 preview generation.
-	ArchitectureSpec struct {
-		// SystemName is the target platform name.
-		SystemName string
-		// Containers lists the C4 containers in the target topology.
-		Containers []C4Container
-		// Edges lists the directed relationships between containers.
-		Edges []C4Edge
-		// Guardrails holds the active Goa-AI cost and safety budgets.
-		Guardrails GuardrailSummary
-	}
-
-	// ArchitecturePreview is the Checkpoint 2 output rendered before sandbox
-	// startup.
-	ArchitecturePreview struct {
-		// SystemName is the target platform name.
-		SystemName string
-		// Containers is the validated C4 container list.
-		Containers []C4Container
-		// Edges is the validated C4 relationship list.
-		Edges []C4Edge
-		// Guardrails is the active cost/safety guardrail configuration.
-		Guardrails GuardrailSummary
-		// Banner summarizes the topology and guardrail budgets in plain English.
-		Banner string
-	}
-
-	// SandboxEnvironment identifies the isolated Checkpoint 3 execution target
-	// and its expected candidate binary digest.
-	SandboxEnvironment struct {
-		// Profile is the environment profile ("sim" or "staging").
-		Profile string
-		// ExpectedBinaryDigest is the SHA-256 hex digest of the built candidate binary.
-		ExpectedBinaryDigest string
-	}
-
-	// PromotedExample is a canonical regression test case created from a real
-	// Checkpoint 3 run via `[+ Make This an Example]`.
-	PromotedExample struct {
-		// ScenarioID is the stable evaluator scenario identifier.
-		ScenarioID string
-		// RunID is the source run identifier in the canonical run log.
-		RunID string
-		// InputSummary describes the user request and fixture state.
-		InputSummary string
-		// ExpectedOutcome is the human-confirmed expected outcome (never self-graded).
-		ExpectedOutcome string
-		// VerificationKind is "deterministic" or "model_judged".
-		VerificationKind string
-		// Transcript is the canonical provider-ready message trajectory replayed from runlog.
-		Transcript []*model.Message
-	}
-
-	// ToolUIAction describes one interactive button or action inside a
-	// completed OpenUI/ToolUI composition.
-	ToolUIAction struct {
-		// ID is the stable action identifier.
-		ID string `json:"id"`
-		// Label is the human-readable button label.
-		Label string `json:"label"`
-	}
-
-	// ToolUIComposition is the completed JSON payload validated before an MCP
-	// Apps (`ui://`) host enables interactive action dispatch.
-	ToolUIComposition struct {
-		// Schema identifies the UI composition schema ("openui.v1").
-		Schema string `json:"schema"`
-		// Component names the root UI widget to render.
-		Component string `json:"component"`
-		// Props holds the structured properties passed to Component.
-		Props map[string]any `json:"props"`
-		// Actions lists the interactive actions exposed by the widget.
-		Actions []ToolUIAction `json:"actions"`
-	}
-
-	// ToolUIValidationResult reports whether a ToolUI/OpenUI composition passed
-	// completed-JSON validation while always preserving the ordinary text result.
-	ToolUIValidationResult struct {
-		// Valid is true when the JSON composition conforms to openui.v1.
-		Valid bool
-		// ActionDispatchEnabled is true only when Valid is true.
-		ActionDispatchEnabled bool
-		// Composition is the parsed composition when Valid is true.
-		Composition *ToolUIComposition
-		// FallbackText is the ordinary text result preserved whether or not UI validation succeeds.
-		FallbackText string
-		// ValidationError records why ActionDispatchEnabled was blocked when Valid is false.
-		ValidationError string
+	// TargetPromptUpdater applies a Checkpoint 3 Fast Draft Mode prompt template
+	// override to the bound target platform's runtime prompt store.
+	TargetPromptUpdater interface {
+		// ApplyPromptOverride updates promptID with newContent on the bound target
+		// platform and returns the resulting prompt version identifier.
+		ApplyPromptOverride(ctx context.Context, promptID, newContent string) (version string, err error)
 	}
 
 	// Options configures a ControlPlane instance.
 	Options struct {
 		// Analyzer performs CP1 semantic analysis via a model call.
 		Analyzer CP1Analyzer
-		// PromptStore persists CP3 Fast Draft Mode prompt overrides.
-		PromptStore prompt.Store
-		// TokenSource issues CP3 Role Switcher bearer tokens for sim or staging.
-		TokenSource TokenSource
-		// HTTPClient dispatches CP3 Role Switcher HTTP requests against the candidate.
-		HTTPClient *http.Client
+		// TargetUpdater applies CP3 Fast Draft Mode prompt overrides to the bound target platform.
+		TargetUpdater TargetPromptUpdater
 	}
 
-	// ControlPlane implements genscantle.Service and the CP1–CP3 control-plane
-	// workflows.
+	// storedChangeCard holds a versioned Change Card alongside its authenticated
+	// owner principal and original design source snapshot.
+	storedChangeCard struct {
+		// card is the latest versioned ChangeCardResult.
+		card *genscantle.ChangeCardResult
+		// owner is the authenticated Principal.ID that created the card.
+		owner string
+		// designSource is the Goa design source snapshot inspected at CP1.
+		designSource string
+	}
+
+	// canonicalAnswerPair is a deterministic key/value entry for JSON hashing.
+	canonicalAnswerPair struct {
+		// ID is the ambiguity question ID.
+		ID string `json:"id"`
+		// Answer is the selected option value.
+		Answer string `json:"answer"`
+	}
+
+	// canonicalCardRevision is the canonical JSON structure hashed to produce
+	// RequestRevision without delimiter ambiguity.
+	canonicalCardRevision struct {
+		// ChangeID is the Change Card identifier.
+		ChangeID string `json:"change_id"`
+		// Owner is the authenticated creator principal ID.
+		Owner string `json:"owner"`
+		// Status is the Change Card status.
+		Status string `json:"status"`
+		// Prompt is the original operator feature request.
+		Prompt string `json:"prompt"`
+		// DesignSource is the Goa design source inspected at CP1.
+		DesignSource string `json:"design_source"`
+		// Summary is the plain-English summary.
+		Summary string `json:"summary"`
+		// Ambiguities is the ordered slice of surfaced domain questions.
+		Ambiguities []*genscantle.AmbiguityQuestion `json:"ambiguities"`
+		// Answers is the key-sorted slice of confirmed ambiguity answers.
+		Answers []canonicalAnswerPair `json:"answers"`
+		// Examples is the ordered slice of confirmed example checks.
+		Examples []*genscantle.ExampleItem `json:"examples"`
+		// PreservedBehaviors is the ordered slice of preserved contract invariants.
+		PreservedBehaviors []string `json:"preserved_behaviors"`
+		// ConfirmedBy is the authenticated principal ID that confirmed the card.
+		ConfirmedBy string `json:"confirmed_by"`
+	}
+
+	// ControlPlane implements genscantle.Service for Checkpoints 1 through 3.
 	ControlPlane struct {
 		// mu guards cards.
 		mu sync.RWMutex
 		// cards stores pending and confirmed CP1 Change Cards by change_id.
-		cards map[string]*genscantle.ChangeCardResult
+		cards map[string]storedChangeCard
 		// analyzer performs semantic CP1 analysis.
 		analyzer CP1Analyzer
-		// promptStore backs CP3 Fast Draft Mode 0-second prompt hot reloads.
-		promptStore prompt.Store
-		// tokenSource issues CP3 Role Switcher tokens for sim or staging.
-		tokenSource TokenSource
-		// httpClient executes CP3 Role Switcher requests against the candidate API.
-		httpClient *http.Client
+		// targetUpdater applies CP3 Fast Draft Mode prompt overrides to the target platform.
+		targetUpdater TargetPromptUpdater
 	}
 )
 
@@ -237,12 +174,10 @@ const (
 	StatusNeedsConfirmation = "needs_confirmation"
 	// StatusConfirmed indicates CP1 is locked and ready for codegen/verification.
 	StatusConfirmed = "confirmed"
-	// TargetKindPromptTemplate identifies a 0-second prompt.Store override in CP3.
+	// TargetKindPromptTemplate identifies a 0-second target prompt override in CP3.
 	TargetKindPromptTemplate = "prompt_template"
-	// TargetKindCompiledRule identifies a compiled Go business rule that cannot be overridden via prompt.Store.
+	// TargetKindCompiledRule identifies a compiled Go business rule that cannot be overridden via prompt store.
 	TargetKindCompiledRule = "compiled_rule"
-	// OpenUISchemaV1 is the required schema identifier for completed ToolUI/OpenUI compositions.
-	OpenUISchemaV1 = "openui.v1"
 	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML resource shell.
 	checkpointUIHTML = `<!doctype html>
 <html lang="en">
@@ -251,36 +186,143 @@ const (
   <title>Scantle Checkpoint Host</title>
 </head>
 <body>
-  <main id="scantle-checkpoint-root" data-profile="mcp-app" data-schema="openui.v1">
+  <main id="scantle-checkpoint-root" data-profile="mcp-app">
     <h1>Scantle Interactive Checkpoint</h1>
-    <p>Renders validated CP1 Change Cards and CP3 Sandbox controls while preserving ordinary text fallback.</p>
+    <p>Renders validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Sandbox controls while preserving ordinary text fallback.</p>
   </main>
 </body>
 </html>`
 )
 
+var (
+	// cp1AnalysisJSONSchema is the canonical JSON Schema (Draft 2020-12) enforced
+	// at the goa-ai model.Client boundary for CP1 semantic analysis.
+	cp1AnalysisJSONSchema = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "ambiguities", "examples", "preserved_behaviors"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "options"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario", "input_summary", "expected_outcome", "verification_kind"],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input_summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_outcome": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verification_kind": {
+            "type": "string",
+            "enum": ["deterministic", "model_judged"]
+          }
+        }
+      }
+    },
+    "preserved_behaviors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}`)
+)
+
+// WithPrincipal returns a child context carrying the authenticated Principal.
+func WithPrincipal(ctx context.Context, p Principal) context.Context {
+	return context.WithValue(ctx, principalContextKey{}, p)
+}
+
+// PrincipalFromContext extracts the authenticated Principal from ctx.
+func PrincipalFromContext(ctx context.Context) (Principal, bool) {
+	if ctx == nil {
+		return Principal{}, false
+	}
+	p, ok := ctx.Value(principalContextKey{}).(Principal)
+	if !ok || strings.TrimSpace(p.ID) == "" {
+		return Principal{}, false
+	}
+	return Principal{ID: strings.TrimSpace(p.ID)}, true
+}
+
+// NewTokenAuthenticator returns a RequestAuthenticator that validates
+// `Authorization: Bearer <token>` headers in constant time against the
+// configured token-to-principal map.
+func NewTokenAuthenticator(tokens map[string]Principal) RequestAuthenticator {
+	cloned := maps.Clone(tokens)
+	return func(r *http.Request) (Principal, error) {
+		if r == nil {
+			return Principal{}, errors.New("missing http request")
+		}
+		raw := strings.TrimSpace(r.Header.Get("Authorization"))
+		token, ok := strings.CutPrefix(raw, "Bearer ")
+		if !ok || strings.TrimSpace(token) == "" {
+			return Principal{}, errors.New("missing bearer token")
+		}
+		token = strings.TrimSpace(token)
+		for expected, principal := range cloned {
+			if subtle.ConstantTimeCompare([]byte(token), []byte(expected)) == 1 {
+				if strings.TrimSpace(principal.ID) == "" {
+					return Principal{}, errors.New("empty principal configured for token")
+				}
+				return Principal{ID: strings.TrimSpace(principal.ID)}, nil
+			}
+		}
+		return Principal{}, errors.New("invalid bearer token")
+	}
+}
+
 // New constructs a ControlPlane with the provided Options.
 func New(opts Options) *ControlPlane {
-	store := opts.PromptStore
-	if store == nil {
-		store = prompt.NewInMemoryStore()
-	}
-	httpClient := opts.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 10 * time.Second}
-	}
 	return &ControlPlane{
-		cards:       make(map[string]*genscantle.ChangeCardResult),
-		analyzer:    opts.Analyzer,
-		promptStore: store,
-		tokenSource: opts.TokenSource,
-		httpClient:  httpClient,
+		cards:         make(map[string]storedChangeCard),
+		analyzer:      opts.Analyzer,
+		targetUpdater: opts.TargetUpdater,
 	}
 }
 
 // NewHTTPHandler mounts both the Goa HTTP endpoints and the MCP JSON-RPC
-// server (`/mcp`) for svc onto a single HTTP handler.
-func NewHTTPHandler(svc genscantle.Service) http.Handler {
+// server (`/mcp`) for svc onto a single HTTP handler protected by auth.
+func NewHTTPHandler(svc genscantle.Service, auth RequestAuthenticator) http.Handler {
 	mux := goahttp.NewMuxer()
 	endpoints := genscantle.NewEndpoints(svc)
 	httpServer := genscantlehttp.New(
@@ -303,16 +345,28 @@ func NewHTTPHandler(svc genscantle.Service) http.Handler {
 		nil,
 	)
 	genmcpscantle.Mount(mux, mcpServer)
-	return mux
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if auth != nil {
+			principal, err := auth(r)
+			if err != nil {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			r = r.WithContext(WithPrincipal(r.Context(), principal))
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 // NewModelCP1Analyzer constructs a CP1Analyzer backed by a Goa-AI model.Client.
-func NewModelCP1Analyzer(client ModelCompleter) *ModelCP1Analyzer {
+func NewModelCP1Analyzer(client model.Client) *ModelCP1Analyzer {
 	return &ModelCP1Analyzer{client: client}
 }
 
-// Analyze invokes the underlying model.Client with the operator request and Goa
-// design source and decodes the structured CP1SemanticAnalysis JSON response.
+// Analyze invokes the underlying Goa-AI model.Client with a JSON Schema
+// StructuredOutput contract for CP1 semantic analysis and strictly decodes the
+// validated CP1SemanticAnalysis response.
 func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource string) (CP1SemanticAnalysis, error) {
 	if a == nil || a.client == nil {
 		return CP1SemanticAnalysis{}, errors.New("cp1 model client is required")
@@ -323,7 +377,7 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 				Role: model.ConversationRoleSystem,
 				Parts: []model.Part{
 					model.TextPart{
-						Text: "Analyze the operator feature request against the Goa design source. Return JSON with fields: summary, ambiguities, examples, preserved_behaviors.",
+						Text: "Analyze the operator feature request against the Goa design source. Return structured JSON matching the cp1_change_card_analysis schema.",
 					},
 				},
 			},
@@ -336,18 +390,27 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 				},
 			},
 		},
+		StructuredOutput: &model.StructuredOutput{
+			Name:   "cp1_change_card_analysis",
+			Schema: cp1AnalysisJSONSchema,
+		},
 	}
 	resp, err := a.client.Complete(ctx, req)
 	if err != nil {
 		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model completion: %w", err)
 	}
 	raw := extractAssistantText(resp)
-	if strings.TrimSpace(raw) == "" {
+	if raw == "" {
 		return CP1SemanticAnalysis{}, errors.New("cp1 model returned empty analysis")
 	}
 	var parsed CP1SemanticAnalysis
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&parsed); err != nil {
 		return CP1SemanticAnalysis{}, fmt.Errorf("decode cp1 model analysis: %w", err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return CP1SemanticAnalysis{}, errors.New("cp1 model analysis contains trailing JSON tokens")
 	}
 	return parsed, nil
 }
@@ -358,10 +421,15 @@ func (c *ControlPlane) CheckpointUI(_ context.Context) (string, error) {
 }
 
 // ProposeChange evaluates a feature request at Checkpoint 1 (CP1) via the
-// configured CP1Analyzer model call, assigns mechanical check IDs and request
-// revision digests, and stops for human confirmation only when genuine domain
-// ambiguities are returned.
+// configured CP1Analyzer model call, validates all model-emitted fields
+// strictly, assigns code-owned ambiguity and example IDs, binds ownership to
+// the authenticated principal, and stops for human confirmation only when
+// genuine domain ambiguities are present.
 func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeChangePayload) (*genscantle.ChangeCardResult, error) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return nil, errors.New("authenticated principal is required")
+	}
 	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.Prompt) == "" {
 		return nil, errors.New("change_id and prompt are required")
 	}
@@ -373,94 +441,202 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 		designSrc = *p.DesignSource
 	}
 
+	c.mu.RLock()
+	_, alreadyExists := c.cards[p.ChangeID]
+	c.mu.RUnlock()
+	if alreadyExists {
+		return nil, fmt.Errorf("change_id %q already exists", p.ChangeID)
+	}
+
 	analysis, err := c.analyzer.Analyze(ctx, p.Prompt, designSrc)
 	if err != nil {
 		return nil, err
 	}
 
-	examples := normalizeExamples(p.ChangeID, analysis.Examples)
-	preserved := slices.Clone(analysis.PreservedBehaviors)
-	if preserved == nil {
-		preserved = []string{}
+	summary, ambiguities, examples, preserved, err := validateCP1Analysis(p.ChangeID, analysis)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cp1 analysis: %w", err)
 	}
-	ambiguities := cloneAmbiguities(analysis.Ambiguities)
 
 	status := StatusConfirmed
+	var confirmedBy *string
 	if len(ambiguities) > 0 {
 		status = StatusNeedsConfirmation
-	}
-	summary := strings.TrimSpace(analysis.Summary)
-	if summary == "" {
-		summary = p.Prompt
+	} else {
+		ownerCopy := principal.ID
+		confirmedBy = &ownerCopy
 	}
 
 	card := &genscantle.ChangeCardResult{
 		ChangeID:           p.ChangeID,
 		Status:             status,
+		Prompt:             p.Prompt,
 		Summary:            summary,
 		Ambiguities:        ambiguities,
 		Examples:           examples,
 		PreservedBehaviors: preserved,
+		ConfirmedBy:        confirmedBy,
 	}
-	card.RequestRevision = computeChangeCardRevision(card, nil, "")
+	rev, err := computeCanonicalRevision(card, principal.ID, designSrc)
+	if err != nil {
+		return nil, err
+	}
+	card.RequestRevision = rev
 
 	c.mu.Lock()
-	c.cards[p.ChangeID] = cloneChangeCard(card)
+	if _, exists := c.cards[p.ChangeID]; exists {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("change_id %q already exists", p.ChangeID)
+	}
+	c.cards[p.ChangeID] = storedChangeCard{
+		card:         card,
+		owner:        principal.ID,
+		designSource: designSrc,
+	}
 	c.mu.Unlock()
 
 	return card, nil
 }
 
-// ConfirmIntent resolves all open Checkpoint 1 ambiguity questions, records the
-// operator's confirmed example table, and freezes the Change Card revision.
-func (c *ControlPlane) ConfirmIntent(_ context.Context, p *genscantle.ConfirmIntentPayload) (*genscantle.ChangeCardResult, error) {
-	if p == nil || strings.TrimSpace(p.ChangeID) == "" {
-		return nil, errors.New("change_id is required")
+// ConfirmIntent verifies the authenticated owner and reviewed request_revision,
+// resolves all open Checkpoint 1 ambiguity questions, records the confirmed
+// example table and answers, and freezes the Change Card revision.
+func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmIntentPayload) (*genscantle.ChangeCardResult, error) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return nil, errors.New("authenticated principal is required")
 	}
-	if strings.TrimSpace(p.Operator) == "" {
-		return nil, errors.New("authenticated operator is required")
+	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.RequestRevision) == "" {
+		return nil, errors.New("change_id and request_revision are required")
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	existing, ok := c.cards[p.ChangeID]
+	record, ok := c.cards[p.ChangeID]
 	if !ok {
 		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
 	}
-
-	for _, q := range existing.Ambiguities {
-		if q == nil {
-			continue
-		}
-		ans, has := p.Answers[q.ID]
-		if !has || strings.TrimSpace(ans) == "" {
-			return nil, fmt.Errorf("missing confirmation answer for ambiguity %q", q.ID)
-		}
+	if record.owner != principal.ID {
+		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	existing := record.card
+	if existing.Status != StatusNeedsConfirmation {
+		return nil, fmt.Errorf("change_id %q does not require confirmation (status %q)", p.ChangeID, existing.Status)
+	}
+	if existing.RequestRevision != p.RequestRevision {
+		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, existing.RequestRevision)
 	}
 
-	examples := normalizeExamples(p.ChangeID, p.Examples)
-	if len(examples) == 0 {
-		examples = cloneExamples(existing.Examples)
+	if err := validateAmbiguityAnswers(existing.Ambiguities, p.Answers); err != nil {
+		return nil, err
+	}
+	examples, err := validateConfirmedExamples(p.Examples)
+	if err != nil {
+		return nil, fmt.Errorf("invalid confirmed examples: %w", err)
 	}
 
+	confirmedBy := principal.ID
 	confirmed := &genscantle.ChangeCardResult{
 		ChangeID:           existing.ChangeID,
 		Status:             StatusConfirmed,
+		Prompt:             existing.Prompt,
 		Summary:            existing.Summary,
-		Ambiguities:        nil,
+		Ambiguities:        existing.Ambiguities,
+		Answers:            maps.Clone(p.Answers),
 		Examples:           examples,
 		PreservedBehaviors: slices.Clone(existing.PreservedBehaviors),
+		ConfirmedBy:        &confirmedBy,
 	}
-	confirmed.RequestRevision = computeChangeCardRevision(confirmed, p.Answers, p.Operator)
-	c.cards[p.ChangeID] = cloneChangeCard(confirmed)
+	rev, err := computeCanonicalRevision(confirmed, record.owner, record.designSource)
+	if err != nil {
+		return nil, err
+	}
+	confirmed.RequestRevision = rev
+	c.cards[p.ChangeID] = storedChangeCard{
+		card:         confirmed,
+		owner:        record.owner,
+		designSource: record.designSource,
+	}
 	return confirmed, nil
 }
 
-// DraftOverride applies a 0-second prompt override in prompt.Store when
-// target_kind is "prompt_template", or refuses to mask a compiled Go business
-// rule when target_kind is "compiled_rule".
+// PreviewArchitecture evaluates the candidate Goa/Goa-AI design source via the
+// real Goa evaluation engine (`designeval.Evaluate`) bound to a confirmed CP1
+// Change Card and returns the validated C4 topology, directed edges, per-agent
+// runtime policies, and tool contracts.
+func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.PreviewArchitecturePayload) (*genscantle.ArchitecturePreviewResult, error) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return nil, errors.New("authenticated principal is required")
+	}
+	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.RequestRevision) == "" {
+		return nil, errors.New("change_id and request_revision are required")
+	}
+	if strings.TrimSpace(p.DesignSource) == "" {
+		return nil, errors.New("design_source is required")
+	}
+
+	c.mu.RLock()
+	record, exists := c.cards[p.ChangeID]
+	c.mu.RUnlock()
+	if !exists {
+		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	}
+	if record.owner != principal.ID {
+		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	if record.card.Status != StatusConfirmed {
+		return nil, fmt.Errorf("change_id %q must be confirmed before architecture preview (status %q)", p.ChangeID, record.card.Status)
+	}
+	if record.card.RequestRevision != p.RequestRevision {
+		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
+	}
+
+	evaluated, err := designeval.Evaluate(ctx, p.DesignSource)
+	if err != nil {
+		return nil, err
+	}
+	if evaluated.SystemName == "" || len(evaluated.Containers) == 0 {
+		return nil, errors.New("design_source must declare at least one Goa API or Service container")
+	}
+	for _, pol := range evaluated.AgentPolicies {
+		if pol.MaxExecutionSeconds <= 0 || pol.MaxToolCalls <= 0 {
+			return nil, fmt.Errorf("agent %q must declare positive TimeBudget and DefaultCaps(MaxToolCalls) in RunPolicy", pol.AgentID)
+		}
+	}
+
+	sum := sha256.Sum256([]byte(p.DesignSource))
+	designDigest := hex.EncodeToString(sum[:])
+	banner := fmt.Sprintf(
+		"%s: %d container(s), %d boundary edge(s), %d agent policy(s), %d tool contract(s)",
+		evaluated.SystemName,
+		len(evaluated.Containers),
+		len(evaluated.Edges),
+		len(evaluated.AgentPolicies),
+		len(evaluated.Tools),
+	)
+
+	return &genscantle.ArchitecturePreviewResult{
+		ChangeID:        p.ChangeID,
+		RequestRevision: p.RequestRevision,
+		DesignDigest:    designDigest,
+		SystemName:      evaluated.SystemName,
+		Containers:      evaluated.Containers,
+		Edges:           evaluated.Edges,
+		AgentPolicies:   evaluated.AgentPolicies,
+		Tools:           evaluated.Tools,
+		Banner:          banner,
+	}, nil
+}
+
+// DraftOverride applies a 0-second prompt override on the bound target platform
+// via TargetPromptUpdater when target_kind is "prompt_template", or refuses to
+// mask a compiled Go business rule when target_kind is "compiled_rule".
 func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOverridePayload) (*genscantle.DraftOverrideResult, error) {
+	if _, ok := PrincipalFromContext(ctx); !ok {
+		return nil, errors.New("authenticated principal is required")
+	}
 	if p == nil {
 		return nil, errors.New("draft override payload is required")
 	}
@@ -475,23 +651,25 @@ func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOve
 		if p.PromptID == nil || strings.TrimSpace(*p.PromptID) == "" {
 			return nil, errors.New("prompt_id is required when target_kind is prompt_template")
 		}
-		id := prompt.Ident(strings.TrimSpace(*p.PromptID))
-		if err := c.promptStore.Set(ctx, id, prompt.Scope{}, p.NewContent, map[string]string{"source": "cp3_fast_draft"}); err != nil {
-			return nil, fmt.Errorf("persist prompt override: %w", err)
+		if strings.TrimSpace(p.NewContent) == "" {
+			return nil, errors.New("new_content is required when target_kind is prompt_template")
 		}
-		override, err := c.promptStore.Resolve(ctx, id, prompt.Scope{})
+		if c.targetUpdater == nil {
+			return nil, errors.New("no target prompt updater is bound to this control plane")
+		}
+		id := strings.TrimSpace(*p.PromptID)
+		version, err := c.targetUpdater.ApplyPromptOverride(ctx, id, p.NewContent)
 		if err != nil {
-			return nil, fmt.Errorf("resolve updated prompt override: %w", err)
+			return nil, fmt.Errorf("apply target prompt override: %w", err)
 		}
-		var version string
-		if override != nil {
-			version = override.Version
+		if strings.TrimSpace(version) == "" {
+			return nil, errors.New("target prompt updater returned an empty version")
 		}
 		return &genscantle.DraftOverrideResult{
 			AppliedInStore:  true,
 			RequiresRebuild: false,
 			PromptVersion:   &version,
-			Message:         fmt.Sprintf("Updated prompt %q in prompt.Store (version %s) for 0s hot reload.", id, version),
+			Message:         fmt.Sprintf("Updated prompt %q on target platform (version %s) for 0s hot reload.", id, version),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported target_kind %q", p.TargetKind)
@@ -500,172 +678,165 @@ func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOve
 
 // Diff compares two Goa design sources and go.mod snapshots and returns the
 // structural diff without emitting a blanket compatibility verdict.
-func (c *ControlPlane) Diff(_ context.Context, p *genscantle.DiffPayload) (*genscantle.DiffResult, error) {
+func (c *ControlPlane) Diff(ctx context.Context, p *genscantle.DiffPayload) (*genscantle.DiffResult, error) {
 	if p == nil {
 		return nil, errors.New("diff payload is required")
 	}
-	rep, err := diff.Compare(p.OldDesign, p.NewDesign, p.OldGomod, p.NewGomod)
+	rep, err := diff.Compare(ctx, p.OldDesign, p.NewDesign, p.OldGomod, p.NewGomod)
 	if err != nil {
 		return nil, err
 	}
 	return &genscantle.DiffResult{
-		HasChanges:          rep.HasChanges,
-		AddedDeclarations:   rep.AddedDeclarations,
-		RemovedDeclarations: rep.RemovedDeclarations,
-		VersionDeltas:       rep.VersionDeltas,
-		Summary:             rep.Summary,
+		HasChanges:           rep.HasChanges,
+		AddedDeclarations:    rep.AddedDeclarations,
+		RemovedDeclarations:  rep.RemovedDeclarations,
+		ModifiedDeclarations: rep.ModifiedDeclarations,
+		VersionDeltas:        rep.VersionDeltas,
+		Summary:              rep.Summary,
 	}, nil
 }
 
-// BuildArchitecturePreview constructs the Checkpoint 2 C4 container topology
-// and active Goa-AI cost/safety guardrail summary.
-func (c *ControlPlane) BuildArchitecturePreview(spec ArchitectureSpec) (ArchitecturePreview, error) {
-	if strings.TrimSpace(spec.SystemName) == "" {
-		return ArchitecturePreview{}, errors.New("system name is required")
+// validateCP1Analysis validates all model-returned CP1 fields strictly without
+// silent coercion and assigns code-owned mechanical ambiguity and check IDs.
+func validateCP1Analysis(
+	changeID string,
+	in CP1SemanticAnalysis,
+) (string, []*genscantle.AmbiguityQuestion, []*genscantle.ExampleItem, []string, error) {
+	if strings.TrimSpace(in.Summary) == "" {
+		return "", nil, nil, nil, errors.New("summary is required")
 	}
-	if len(spec.Containers) == 0 {
-		return ArchitecturePreview{}, errors.New("at least one C4 container is required")
+	ambiguities, err := validateAmbiguities(changeID, in.Ambiguities)
+	if err != nil {
+		return "", nil, nil, nil, err
 	}
-	if spec.Guardrails.MaxExecutionTime <= 0 || spec.Guardrails.MaxToolCalls <= 0 {
-		return ArchitecturePreview{}, errors.New("positive MaxExecutionTime and MaxToolCalls guardrails are required")
+	if len(in.Examples) == 0 {
+		return "", nil, nil, nil, errors.New("at least one example is required")
 	}
-	banner := fmt.Sprintf(
-		"%s: %d container(s), %d boundary edge(s) | Guardrails: MaxExecutionTime=%s, MaxToolCalls=%d, CompressThreshold=%d tokens (retain %d recent turns)",
-		spec.SystemName,
-		len(spec.Containers),
-		len(spec.Edges),
-		spec.Guardrails.MaxExecutionTime,
-		spec.Guardrails.MaxToolCalls,
-		spec.Guardrails.CompressThreshold,
-		spec.Guardrails.RetainRecentTurns,
-	)
-	return ArchitecturePreview{
-		SystemName: spec.SystemName,
-		Containers: slices.Clone(spec.Containers),
-		Edges:      slices.Clone(spec.Edges),
-		Guardrails: spec.Guardrails,
-		Banner:     banner,
-	}, nil
+	examples := make([]*genscantle.ExampleItem, 0, len(in.Examples))
+	for i, item := range in.Examples {
+		if strings.TrimSpace(item.Scenario) == "" ||
+			strings.TrimSpace(item.InputSummary) == "" ||
+			strings.TrimSpace(item.ExpectedOutcome) == "" {
+			return "", nil, nil, nil, fmt.Errorf("examples[%d] requires non-empty scenario, input_summary, and expected_outcome", i)
+		}
+		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
+			return "", nil, nil, nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
+		}
+		examples = append(examples, &genscantle.ExampleItem{
+			ID:               fmt.Sprintf("%s-check-%02d", changeID, i+1),
+			Scenario:         item.Scenario,
+			InputSummary:     item.InputSummary,
+			ExpectedOutcome:  item.ExpectedOutcome,
+			VerificationKind: item.VerificationKind,
+		})
+	}
+	preserved := make([]string, 0, len(in.PreservedBehaviors))
+	for i, item := range in.PreservedBehaviors {
+		if strings.TrimSpace(item) == "" {
+			return "", nil, nil, nil, fmt.Errorf("preserved_behaviors[%d] is empty", i)
+		}
+		preserved = append(preserved, item)
+	}
+	return in.Summary, ambiguities, examples, preserved, nil
 }
 
-// VerifySandboxEnvironment validates that the Checkpoint 3 sandbox declares a
-// supported non-production profile ("sim" or "staging") and that the running
-// candidate binary matches ExpectedBinaryDigest.
-func (c *ControlPlane) VerifySandboxEnvironment(env SandboxEnvironment, actualBinaryDigest string) error {
-	if env.Profile != "sim" && env.Profile != "staging" {
-		return fmt.Errorf("sandbox profile must be \"sim\" or \"staging\", got %q", env.Profile)
+// validateAmbiguities validates that every ambiguity question has a non-empty
+// question and at least two distinct non-empty options, and assigns a
+// code-owned question ID (`<changeID>-ambiguity-NN`).
+func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle.AmbiguityQuestion, error) {
+	if len(in) == 0 {
+		return nil, nil
 	}
-	if strings.TrimSpace(env.ExpectedBinaryDigest) == "" {
-		return errors.New("expected candidate binary digest is required")
+	out := make([]*genscantle.AmbiguityQuestion, 0, len(in))
+	for i, q := range in {
+		id := fmt.Sprintf("%s-ambiguity-%02d", changeID, i+1)
+		if strings.TrimSpace(q.Question) == "" {
+			return nil, fmt.Errorf("ambiguities[%d] requires non-empty question", i)
+		}
+		if len(q.Options) < 2 {
+			return nil, fmt.Errorf("ambiguity %q requires at least 2 options", id)
+		}
+		seenOpts := make(map[string]bool, len(q.Options)*2)
+		opts := make([]string, 0, len(q.Options))
+		for _, opt := range q.Options {
+			trimmed := strings.TrimSpace(opt)
+			if trimmed == "" {
+				return nil, fmt.Errorf("ambiguity %q has an empty option", id)
+			}
+			if seenOpts[opt] || seenOpts[trimmed] {
+				return nil, fmt.Errorf("ambiguity %q has duplicate option %q", id, opt)
+			}
+			seenOpts[opt] = true
+			seenOpts[trimmed] = true
+			opts = append(opts, opt)
+		}
+		out = append(out, &genscantle.AmbiguityQuestion{
+			ID:       id,
+			Question: q.Question,
+			Options:  opts,
+		})
 	}
-	if actualBinaryDigest != env.ExpectedBinaryDigest {
-		return fmt.Errorf("candidate binary digest mismatch: running %q, expected %q", actualBinaryDigest, env.ExpectedBinaryDigest)
+	return out, nil
+}
+
+// validateAmbiguityAnswers verifies exact 1-to-1 resolution of open ambiguity
+// questions against their declared options.
+func validateAmbiguityAnswers(questions []*genscantle.AmbiguityQuestion, answers map[string]string) error {
+	allowedByID := make(map[string][]string, len(questions))
+	for _, q := range questions {
+		allowedByID[q.ID] = q.Options
+		ans, has := answers[q.ID]
+		if !has || strings.TrimSpace(ans) == "" {
+			return fmt.Errorf("missing confirmation answer for ambiguity %q", q.ID)
+		}
+		if !slices.Contains(q.Options, ans) {
+			return fmt.Errorf("answer %q for ambiguity %q is not in allowed options %v", ans, q.ID, q.Options)
+		}
+	}
+	for id := range answers {
+		if _, ok := allowedByID[id]; !ok {
+			return fmt.Errorf("unexpected confirmation answer for unknown ambiguity %q", id)
+		}
 	}
 	return nil
 }
 
-// SwitchRoleAndInvoke obtains a scoped bearer token for role in env.Profile
-// from the external TokenSource and executes req against the candidate's real
-// public HTTP endpoint.
-func (c *ControlPlane) SwitchRoleAndInvoke(ctx context.Context, env SandboxEnvironment, role string, req *http.Request) (*http.Response, error) {
-	if env.Profile != "sim" && env.Profile != "staging" {
-		return nil, fmt.Errorf("role switcher only supports sim or staging, got %q", env.Profile)
+// validateConfirmedExamples validates that every confirmed ExampleItem has a
+// unique non-empty ID and valid fields.
+func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.ExampleItem, error) {
+	if len(in) == 0 {
+		return nil, errors.New("at least one example is required")
 	}
-	if c.tokenSource == nil {
-		return nil, errors.New("external token source is required for role switching")
-	}
-	if req == nil {
-		return nil, errors.New("http request is required")
-	}
-	token, err := c.tokenSource.IssueToken(ctx, env.Profile, role)
-	if err != nil {
-		return nil, fmt.Errorf("issue %s token for role %q: %w", env.Profile, role, err)
-	}
-	cloned := req.Clone(ctx)
-	cloned.Header.Set("Authorization", "Bearer "+token)
-	cloned.Header.Set("X-Scantle-Environment", env.Profile)
-	return c.httpClient.Do(cloned)
-}
-
-// PromoteRunToExample reconstructs the canonical message trajectory of runID
-// from store using transcript.BuildMessagesFromRunLog and pairs it with the
-// operator's explicitly confirmed expected outcome.
-func (c *ControlPlane) PromoteRunToExample(
-	ctx context.Context,
-	store storage.Store,
-	runID string,
-	scenarioID string,
-	inputSummary string,
-	humanConfirmedOutcome string,
-	verificationKind string,
-) (PromotedExample, error) {
-	if strings.TrimSpace(humanConfirmedOutcome) == "" {
-		return PromotedExample{}, errors.New("human-confirmed expected outcome is required to promote a run to an example")
-	}
-	if verificationKind != "deterministic" && verificationKind != "model_judged" {
-		return PromotedExample{}, fmt.Errorf("invalid verification_kind %q", verificationKind)
-	}
-	msgs, err := transcript.BuildMessagesFromRunLog(ctx, store, runID)
-	if err != nil {
-		return PromotedExample{}, fmt.Errorf("replay canonical runlog transcript for %q: %w", runID, err)
-	}
-	if len(msgs) == 0 {
-		return PromotedExample{}, fmt.Errorf("run %q has an empty canonical transcript", runID)
-	}
-	return PromotedExample{
-		ScenarioID:       scenarioID,
-		RunID:            runID,
-		InputSummary:     inputSummary,
-		ExpectedOutcome:  humanConfirmedOutcome,
-		VerificationKind: verificationKind,
-		Transcript:       msgs,
-	}, nil
-}
-
-// ValidateToolUIComposition validates a completed OpenUI/ToolUI JSON payload
-// before enabling interactive action dispatch, while always preserving the
-// ordinary fallbackText for non-UI or failed-UI hosts.
-func (c *ControlPlane) ValidateToolUIComposition(rawJSON []byte, fallbackText string) ToolUIValidationResult {
-	res := ToolUIValidationResult{
-		FallbackText: fallbackText,
-	}
-	if len(bytesTrimSpace(rawJSON)) == 0 {
-		res.ValidationError = "empty ToolUI composition JSON"
-		return res
-	}
-	var comp ToolUIComposition
-	dec := json.NewDecoder(strings.NewReader(string(rawJSON)))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&comp); err != nil {
-		res.ValidationError = fmt.Sprintf("invalid ToolUI composition JSON: %v", err)
-		return res
-	}
-	if comp.Schema != OpenUISchemaV1 {
-		res.ValidationError = fmt.Sprintf("unsupported ToolUI schema %q (want %q)", comp.Schema, OpenUISchemaV1)
-		return res
-	}
-	if strings.TrimSpace(comp.Component) == "" {
-		res.ValidationError = "ToolUI composition requires a non-empty component name"
-		return res
-	}
-	if comp.Props == nil {
-		res.ValidationError = "ToolUI composition requires a props object"
-		return res
-	}
-	if len(comp.Actions) == 0 {
-		res.ValidationError = "ToolUI composition requires at least one interactive action"
-		return res
-	}
-	for i, act := range comp.Actions {
-		if strings.TrimSpace(act.ID) == "" || strings.TrimSpace(act.Label) == "" {
-			res.ValidationError = fmt.Sprintf("ToolUI action[%d] requires non-empty id and label", i)
-			return res
+	seenIDs := make(map[string]bool, len(in)*2)
+	out := make([]*genscantle.ExampleItem, 0, len(in))
+	for i, item := range in {
+		if item == nil {
+			return nil, fmt.Errorf("examples[%d] is nil", i)
 		}
+		trimmedID := strings.TrimSpace(item.ID)
+		if trimmedID == "" ||
+			strings.TrimSpace(item.Scenario) == "" ||
+			strings.TrimSpace(item.InputSummary) == "" ||
+			strings.TrimSpace(item.ExpectedOutcome) == "" {
+			return nil, fmt.Errorf("examples[%d] requires non-empty id, scenario, input_summary, and expected_outcome", i)
+		}
+		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
+			return nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
+		}
+		if seenIDs[item.ID] || seenIDs[trimmedID] {
+			return nil, fmt.Errorf("duplicate example id %q", item.ID)
+		}
+		seenIDs[item.ID] = true
+		seenIDs[trimmedID] = true
+		out = append(out, &genscantle.ExampleItem{
+			ID:               item.ID,
+			Scenario:         item.Scenario,
+			InputSummary:     item.InputSummary,
+			ExpectedOutcome:  item.ExpectedOutcome,
+			VerificationKind: item.VerificationKind,
+		})
 	}
-	res.Valid = true
-	res.ActionDispatchEnabled = true
-	res.Composition = &comp
-	return res
+	return out, nil
 }
 
 // extractAssistantText concatenates TextPart payloads from a model.Response.
@@ -684,100 +855,43 @@ func extractAssistantText(resp *model.Response) string {
 	return b.String()
 }
 
-// normalizeExamples assigns deterministic check IDs when absent and clones the
-// slice.
-func normalizeExamples(changeID string, in []*genscantle.ExampleItem) []*genscantle.ExampleItem {
-	out := make([]*genscantle.ExampleItem, 0, len(in))
-	for i, item := range in {
-		if item == nil {
-			continue
-		}
-		cloned := *item
-		if strings.TrimSpace(cloned.ID) == "" {
-			cloned.ID = fmt.Sprintf("%s-check-%02d", changeID, i+1)
-		}
-		if cloned.VerificationKind != "deterministic" && cloned.VerificationKind != "model_judged" {
-			cloned.VerificationKind = "deterministic"
-		}
-		out = append(out, &cloned)
-	}
-	return out
-}
-
-// cloneAmbiguities returns a deep copy of an AmbiguityQuestion slice.
-func cloneAmbiguities(in []*genscantle.AmbiguityQuestion) []*genscantle.AmbiguityQuestion {
-	if len(in) == 0 {
-		return nil
-	}
-	out := make([]*genscantle.AmbiguityQuestion, 0, len(in))
-	for _, q := range in {
-		if q == nil {
-			continue
-		}
-		out = append(out, &genscantle.AmbiguityQuestion{
-			ID:       q.ID,
-			Question: q.Question,
-			Options:  slices.Clone(q.Options),
-		})
-	}
-	return out
-}
-
-// cloneExamples returns a deep copy of an ExampleItem slice.
-func cloneExamples(in []*genscantle.ExampleItem) []*genscantle.ExampleItem {
-	out := make([]*genscantle.ExampleItem, 0, len(in))
-	for _, item := range in {
-		if item == nil {
-			continue
-		}
-		cp := *item
-		out = append(out, &cp)
-	}
-	return out
-}
-
-// cloneChangeCard returns a deep copy of a ChangeCardResult.
-func cloneChangeCard(in *genscantle.ChangeCardResult) *genscantle.ChangeCardResult {
-	if in == nil {
-		return nil
-	}
-	return &genscantle.ChangeCardResult{
-		ChangeID:           in.ChangeID,
-		Status:             in.Status,
-		Summary:            in.Summary,
-		Ambiguities:        cloneAmbiguities(in.Ambiguities),
-		Examples:           cloneExamples(in.Examples),
-		PreservedBehaviors: slices.Clone(in.PreservedBehaviors),
-		RequestRevision:    in.RequestRevision,
-	}
-}
-
-// computeChangeCardRevision computes a deterministic SHA-256 hex digest over
-// the ChangeCardResult, sorted answers, and confirming operator.
-func computeChangeCardRevision(card *genscantle.ChangeCardResult, answers map[string]string, operator string) string {
-	h := sha256.New()
-	_, _ = fmt.Fprintf(h, "change:%s\nstatus:%s\nsummary:%s\noperator:%s\n", card.ChangeID, card.Status, card.Summary, operator)
-	for _, ex := range card.Examples {
-		if ex == nil {
-			continue
-		}
-		_, _ = fmt.Fprintf(h, "ex:%s|%s|%s|%s|%s\n", ex.ID, ex.Scenario, ex.InputSummary, ex.ExpectedOutcome, ex.VerificationKind)
-	}
-	for _, pb := range card.PreservedBehaviors {
-		_, _ = fmt.Fprintf(h, "preserved:%s\n", pb)
-	}
-	keys := make([]string, 0, len(answers))
-	for k := range answers {
+// computeCanonicalRevision computes a collision-free SHA-256 hex digest over
+// the canonical JSON encoding of the ChangeCardResult, its owner principal, and
+// its inspected design source.
+func computeCanonicalRevision(card *genscantle.ChangeCardResult, owner, designSource string) (string, error) {
+	keys := make([]string, 0, len(card.Answers))
+	for k := range card.Answers {
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
+	answers := make([]canonicalAnswerPair, 0, len(keys))
 	for _, k := range keys {
-		_, _ = fmt.Fprintf(h, "ans:%s=%s\n", k, answers[k])
+		answers = append(answers, canonicalAnswerPair{
+			ID:     k,
+			Answer: card.Answers[k],
+		})
 	}
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-// bytesTrimSpace trims ASCII whitespace from a byte slice without allocating.
-func bytesTrimSpace(b []byte) []byte {
-	return []byte(strings.TrimSpace(string(b)))
+	var confirmedBy string
+	if card.ConfirmedBy != nil {
+		confirmedBy = *card.ConfirmedBy
+	}
+	payload := canonicalCardRevision{
+		ChangeID:           card.ChangeID,
+		Owner:              owner,
+		Status:             card.Status,
+		Prompt:             card.Prompt,
+		DesignSource:       designSource,
+		Summary:            card.Summary,
+		Ambiguities:        card.Ambiguities,
+		Answers:            answers,
+		Examples:           card.Examples,
+		PreservedBehaviors: card.PreservedBehaviors,
+		ConfirmedBy:        confirmedBy,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal canonical change card revision: %w", err)
+	}
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
 }

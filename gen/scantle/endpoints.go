@@ -15,21 +15,23 @@ import (
 
 // Endpoints wraps the "scantle" service endpoints.
 type Endpoints struct {
-	CheckpointUI  goa.Endpoint
-	ProposeChange goa.Endpoint
-	ConfirmIntent goa.Endpoint
-	DraftOverride goa.Endpoint
-	Diff          goa.Endpoint
+	CheckpointUI        goa.Endpoint
+	ProposeChange       goa.Endpoint
+	ConfirmIntent       goa.Endpoint
+	PreviewArchitecture goa.Endpoint
+	DraftOverride       goa.Endpoint
+	Diff                goa.Endpoint
 }
 
 // NewEndpoints wraps the methods of the "scantle" service with endpoints.
 func NewEndpoints(s Service) *Endpoints {
 	return &Endpoints{
-		CheckpointUI:  NewCheckpointUIEndpoint(s),
-		ProposeChange: NewProposeChangeEndpoint(s),
-		ConfirmIntent: NewConfirmIntentEndpoint(s),
-		DraftOverride: NewDraftOverrideEndpoint(s),
-		Diff:          NewDiffEndpoint(s),
+		CheckpointUI:        NewCheckpointUIEndpoint(s),
+		ProposeChange:       NewProposeChangeEndpoint(s),
+		ConfirmIntent:       NewConfirmIntentEndpoint(s),
+		PreviewArchitecture: NewPreviewArchitectureEndpoint(s),
+		DraftOverride:       NewDraftOverrideEndpoint(s),
+		Diff:                NewDiffEndpoint(s),
 	}
 }
 
@@ -38,6 +40,7 @@ func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 	e.CheckpointUI = m(e.CheckpointUI)
 	e.ProposeChange = m(e.ProposeChange)
 	e.ConfirmIntent = m(e.ConfirmIntent)
+	e.PreviewArchitecture = m(e.PreviewArchitecture)
 	e.DraftOverride = m(e.DraftOverride)
 	e.Diff = m(e.Diff)
 }
@@ -65,6 +68,15 @@ func NewConfirmIntentEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
 		p := req.(*ConfirmIntentPayload)
 		return s.ConfirmIntent(ctx, p)
+	}
+}
+
+// NewPreviewArchitectureEndpoint returns an endpoint function that calls the
+// method "preview_architecture" of service "scantle".
+func NewPreviewArchitectureEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		p := req.(*PreviewArchitecturePayload)
+		return s.PreviewArchitecture(ctx, p)
 	}
 }
 

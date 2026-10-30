@@ -12,8 +12,8 @@ type (
 	ConfirmIntentPayload = struct {
 		// Change identifier.
 		ChangeID string
-		// Authenticated operator identity.
-		Operator string
+		// Reviewed CP1 request_revision digest being confirmed.
+		RequestRevision string
 		// Selected resolution per ambiguity question ID.
 		Answers map[string]string
 		// Confirmed example table.
@@ -25,15 +25,21 @@ type (
 		ChangeID string
 		// Checkpoint status (needs_confirmation or confirmed).
 		Status string
+		// Original operator feature request.
+		Prompt string
 		// Plain-English summary of requested behavior.
 		Summary string
-		// Unresolved domain questions, empty when clear.
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
 		Ambiguities []*AmbiguityQuestion
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string
 		// Concrete examples mapped to evaluator checks.
 		Examples []*ExampleItem
 		// Existing contract invariants preserved by this change.
 		PreservedBehaviors []string
-		// SHA-256 digest of the confirmed Change Card.
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string
+		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision string
 	}
 	// DiffPayload defines the JSON payload for the scantle.diff tool.
@@ -49,13 +55,16 @@ type (
 	}
 	// DiffResult defines the JSON result for the scantle.diff tool.
 	DiffResult = struct {
-		// True when any declaration or module pin changed.
+		// True when any declaration, evaluated contract schema, or module directive
+		// changed.
 		HasChanges bool
-		// Added services, methods, agents, or tools.
+		// Added scoped declarations.
 		AddedDeclarations []string
-		// Removed services, methods, agents, or tools.
+		// Removed scoped declarations.
 		RemovedDeclarations []string
-		// Changed module dependency pins.
+		// Declarations whose evaluated schema, route, or policy changed.
+		ModifiedDeclarations []string
+		// Changed module require, replace, or exclude directives.
 		VersionDeltas []string
 		// Human-readable structural diff summary.
 		Summary string
@@ -71,18 +80,48 @@ type (
 	}
 	// DraftOverrideResult defines the JSON result for the scantle.draft_override tool.
 	DraftOverrideResult = struct {
-		// True when updated in prompt.Store for 0s reload.
+		// True when updated in the target platform's prompt.Store for 0s reload.
 		AppliedInStore bool
 		// True when the change modifies a compiled Go business rule.
 		RequiresRebuild bool
-		// New prompt version digest when applied in prompt.Store.
+		// New prompt version digest returned by the target platform.
 		PromptVersion *string
 		// Operator-facing status explanation.
 		Message string
 	}
+	// PreviewArchitecturePayload defines the JSON payload for the scantle.preview_architecture tool.
+	PreviewArchitecturePayload = struct {
+		// Confirmed Change Card identifier.
+		ChangeID string
+		// Expected CP1 request_revision digest.
+		RequestRevision string
+		// Candidate Goa and Goa-AI design source to evaluate.
+		DesignSource string
+	}
+	// PreviewArchitectureResult defines the JSON result for the scantle.preview_architecture tool.
+	PreviewArchitectureResult = struct {
+		// Bound Change Card identifier.
+		ChangeID string
+		// Bound CP1 request_revision digest.
+		RequestRevision string
+		// SHA-256 digest of the evaluated Goa design source.
+		DesignDigest string
+		// API or primary service name declared in the design.
+		SystemName string
+		// Derived C4 containers.
+		Containers []*C4ContainerItem
+		// Validated directed edges between declared containers.
+		Edges []*C4EdgeItem
+		// Evaluated Goa-AI runtime policies per declared agent.
+		AgentPolicies []*AgentPolicyItem
+		// Evaluated Goa-AI tool contracts.
+		Tools []*ToolContractItem
+		// Plain-English summary of topology and guardrails.
+		Banner string
+	}
 	// ProposeChangePayload defines the JSON payload for the scantle.propose_change tool.
 	ProposeChangePayload = struct {
-		// Client-supplied or generated change identifier.
+		// Unique change identifier.
 		ChangeID string
 		// Operator feature request.
 		Prompt string
@@ -95,16 +134,41 @@ type (
 		ChangeID string
 		// Checkpoint status (needs_confirmation or confirmed).
 		Status string
+		// Original operator feature request.
+		Prompt string
 		// Plain-English summary of requested behavior.
 		Summary string
-		// Unresolved domain questions, empty when clear.
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
 		Ambiguities []*AmbiguityQuestion
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string
 		// Concrete examples mapped to evaluator checks.
 		Examples []*ExampleItem
 		// Existing contract invariants preserved by this change.
 		PreservedBehaviors []string
-		// SHA-256 digest of the confirmed Change Card.
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string
+		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision string
+	}
+	// AgentPolicyItem is a nested type used by the generated JSON contract.
+	AgentPolicyItem = struct {
+		// Scoped agent container identifier.
+		AgentID string
+		// Per-run execution time budget in seconds.
+		MaxExecutionSeconds int
+		// Per-run retrieval tool-call budget.
+		MaxToolCalls int
+		// Maximum consecutive recovery turns after validation failure.
+		MaxRecoveryTurns int
+		// Turn threshold for history compression.
+		CompressAtTurns int
+		// Recent turns retained uncompressed.
+		KeepRecentTurns int
+		// True when prompt caching places a checkpoint after system prompts.
+		CacheAfterSystem bool
+		// True when prompt caching places a checkpoint after tool definitions.
+		CacheAfterTools bool
 	}
 	// AmbiguityQuestion is a nested type used by the generated JSON contract.
 	AmbiguityQuestion = struct {
@@ -115,9 +179,29 @@ type (
 		// Concrete resolution choices.
 		Options []string
 	}
+	// C4ContainerItem is a nested type used by the generated JSON contract.
+	C4ContainerItem = struct {
+		// Stable container identifier.
+		ID string
+		// Human-readable container name.
+		Name string
+		// Container role (service, agent, or toolset).
+		Kind string
+		// Summary of the container's responsibility.
+		Description string
+	}
+	// C4EdgeItem is a nested type used by the generated JSON contract.
+	C4EdgeItem = struct {
+		// Source container ID.
+		FromID string
+		// Target container ID.
+		ToID string
+		// Contract or transport relationship.
+		Protocol string
+	}
 	// ExampleItem is a nested type used by the generated JSON contract.
 	ExampleItem = struct {
-		// Stable example identifier.
+		// Code-assigned stable example identifier.
 		ID string
 		// Plain-English scenario description.
 		Scenario string
@@ -127,5 +211,26 @@ type (
 		ExpectedOutcome string
 		// Evaluator check classification (deterministic or model_judged).
 		VerificationKind string
+	}
+	// ToolContractItem is a nested type used by the generated JSON contract.
+	ToolContractItem = struct {
+		// Scoped tool identifier (<toolset>.<tool>).
+		ID string
+		// Owning toolset name.
+		Toolset string
+		// Tool name.
+		Name string
+		// Tool description.
+		Description string
+		// Canonical evaluated argument schema summary.
+		ArgsSchema string
+		// Canonical evaluated return schema summary.
+		ReturnSchema string
+		// Server-supplied InjectedFields hidden from the model.
+		InjectedFields []string
+		// True when the tool declares a design-time Confirmation gate.
+		RequiresConfirmation bool
+		// True when the tool declares a BoundedResult cursor/truncation contract.
+		BoundedResult bool
 	}
 )

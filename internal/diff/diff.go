@@ -1,154 +1,123 @@
-// Package diff computes structural AST and module dependency diffs for Goa
-// designs and go.mod files without emitting a blanket compatibility verdict.
+// Package diff computes structural contract and module dependency diffs for
+// evaluated Goa/Goa-AI designs and go.mod files without emitting a blanket
+// compatibility verdict.
 package diff
 
 import (
+	"context"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"slices"
 	"strings"
+
+	"github.com/goadesign/scantle/internal/designeval"
+	"golang.org/x/mod/modfile"
 )
 
 type (
-	// Report summarizes the structural Goa design declarations and go.mod
-	// dependency pins that changed between two snapshots.
+	// Report summarizes the evaluated Goa/Goa-AI design declarations and go.mod
+	// directives that changed between two snapshots.
 	Report struct {
-		// HasChanges is true when at least one declaration or module version changed.
+		// HasChanges is true when at least one declaration, evaluated contract schema, or module directive changed.
 		HasChanges bool
-		// AddedDeclarations lists newly introduced Goa design declarations.
+		// AddedDeclarations lists newly introduced scoped Goa/Goa-AI declarations.
 		AddedDeclarations []string
-		// RemovedDeclarations lists deleted Goa design declarations.
+		// RemovedDeclarations lists deleted scoped Goa/Goa-AI declarations.
 		RemovedDeclarations []string
-		// VersionDeltas lists changed, added, or removed go.mod dependency pins.
+		// ModifiedDeclarations lists scoped Goa/Goa-AI declarations whose evaluated contract changed.
+		ModifiedDeclarations []string
+		// VersionDeltas lists changed, added, or removed go.mod require, replace, or exclude directives.
 		VersionDeltas []string
 		// Summary is a factual human-readable summary of the structural changes.
 		Summary string
 	}
 )
 
-var (
-	// dslCalls lists the Goa and Goa-AI DSL call names tracked in structural diffs.
-	dslCalls = map[string]bool{
-		"API":      true,
-		"Service":  true,
-		"Method":   true,
-		"Agent":    true,
-		"Toolset":  true,
-		"Tool":     true,
-		"Resource": true,
-		"MCP":      true,
-		"Suite":    true,
-		"Scenario": true,
-		"Type":     true,
-	}
-)
-
-// Compare parses old and new Go/Goa design sources and go.mod files and returns
-// a factual structural diff Report.
-func Compare(oldDesign, newDesign, oldGoMod, newGoMod string) (Report, error) {
-	oldDecls, err := parseDeclarations(oldDesign)
+// Compare evaluates old and new Go/Goa design sources via the real Goa/Goa-AI
+// DSL evaluator against their respective go.mod directives, parses old and new
+// go.mod files via golang.org/x/mod/modfile, and returns a factual structural
+// diff Report.
+func Compare(ctx context.Context, oldDesign, newDesign, oldGoMod, newGoMod string) (Report, error) {
+	oldEval, err := designeval.EvaluateModule(ctx, oldDesign, oldGoMod)
 	if err != nil {
-		return Report{}, fmt.Errorf("parse old design: %w", err)
+		return Report{}, fmt.Errorf("evaluate old design: %w", err)
 	}
-	newDecls, err := parseDeclarations(newDesign)
+	newEval, err := designeval.EvaluateModule(ctx, newDesign, newGoMod)
 	if err != nil {
-		return Report{}, fmt.Errorf("parse new design: %w", err)
+		return Report{}, fmt.Errorf("evaluate new design: %w", err)
+	}
+	deltas, err := compareGoMod(oldGoMod, newGoMod)
+	if err != nil {
+		return Report{}, err
 	}
 
-	added := setDifference(newDecls, oldDecls)
-	removed := setDifference(oldDecls, newDecls)
-	deltas := compareGoMod(oldGoMod, newGoMod)
-	hasChanges := len(added) > 0 || len(removed) > 0 || len(deltas) > 0
+	added, removed, modified := diffDeclarations(oldEval.Declarations, newEval.Declarations)
+	hasChanges := len(added) > 0 || len(removed) > 0 || len(modified) > 0 || len(deltas) > 0
 
 	summary := "No structural design or module dependency changes."
 	if hasChanges {
-		parts := make([]string, 0, 3)
+		parts := make([]string, 0, 4)
 		if len(added) > 0 {
 			parts = append(parts, fmt.Sprintf("added %d declaration(s) (%s)", len(added), strings.Join(added, ", ")))
 		}
 		if len(removed) > 0 {
 			parts = append(parts, fmt.Sprintf("removed %d declaration(s) (%s)", len(removed), strings.Join(removed, ", ")))
 		}
+		if len(modified) > 0 {
+			parts = append(parts, fmt.Sprintf("modified %d declaration(s) (%s)", len(modified), strings.Join(modified, ", ")))
+		}
 		if len(deltas) > 0 {
-			parts = append(parts, fmt.Sprintf("updated %d module pin(s) (%s)", len(deltas), strings.Join(deltas, ", ")))
+			parts = append(parts, fmt.Sprintf("updated %d module directive(s) (%s)", len(deltas), strings.Join(deltas, ", ")))
 		}
 		summary = "Structural diff: " + strings.Join(parts, "; ") + "."
 	}
 
 	return Report{
-		HasChanges:          hasChanges,
-		AddedDeclarations:   added,
-		RemovedDeclarations: removed,
-		VersionDeltas:       deltas,
-		Summary:             summary,
+		HasChanges:           hasChanges,
+		AddedDeclarations:    added,
+		RemovedDeclarations:  removed,
+		ModifiedDeclarations: modified,
+		VersionDeltas:        deltas,
+		Summary:              summary,
 	}, nil
 }
 
-// parseDeclarations extracts sorted `<Kind>:<Name>` identifiers from a Go/Goa
-// design source string.
-func parseDeclarations(src string) (map[string]bool, error) {
-	decls := make(map[string]bool)
-	if strings.TrimSpace(src) == "" {
-		return decls, nil
+// diffDeclarations partitions old and new evaluated declaration maps into
+// sorted added, removed, and modified declaration slices.
+func diffDeclarations(oldDecls, newDecls map[string]string) (added, removed, modified []string) {
+	added = make([]string, 0)
+	removed = make([]string, 0)
+	modified = make([]string, 0)
+	for k, newSig := range newDecls {
+		oldSig, hadOld := oldDecls[k]
+		if !hadOld {
+			added = append(added, k)
+		} else if oldSig != newSig {
+			modified = append(modified, k)
+		}
 	}
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "design.go", src, parser.SkipObjectResolution)
+	for k := range oldDecls {
+		if _, hasNew := newDecls[k]; !hasNew {
+			removed = append(removed, k)
+		}
+	}
+	slices.Sort(added)
+	slices.Sort(removed)
+	slices.Sort(modified)
+	return added, removed, modified
+}
+
+// compareGoMod parses two go.mod files using golang.org/x/mod/modfile and
+// returns sorted human-readable deltas across require, replace, and exclude
+// directives.
+func compareGoMod(oldMod, newMod string) ([]string, error) {
+	oldPins, err := parseGoModDirectives(oldMod)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse old go.mod: %w", err)
 	}
-	ast.Inspect(file, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok || len(call.Args) == 0 {
-			return true
-		}
-		name := callIdent(call.Fun)
-		if !dslCalls[name] {
-			return true
-		}
-		lit, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
-			return true
-		}
-		label := strings.Trim(lit.Value, "\"`")
-		if label != "" {
-			decls[name+":"+label] = true
-		}
-		return true
-	})
-	return decls, nil
-}
-
-// callIdent returns the unqualified function name for an AST call expression.
-func callIdent(expr ast.Expr) string {
-	switch v := expr.(type) {
-	case *ast.Ident:
-		return v.Name
-	case *ast.SelectorExpr:
-		return v.Sel.Name
-	default:
-		return ""
+	newPins, err := parseGoModDirectives(newMod)
+	if err != nil {
+		return nil, fmt.Errorf("parse new go.mod: %w", err)
 	}
-}
-
-// setDifference returns the sorted keys present in left but absent in right.
-func setDifference(left, right map[string]bool) []string {
-	out := make([]string, 0)
-	for k := range left {
-		if !right[k] {
-			out = append(out, k)
-		}
-	}
-	slices.Sort(out)
-	return out
-}
-
-// compareGoMod extracts `module version` pins from two go.mod contents and
-// returns sorted human-readable deltas.
-func compareGoMod(oldMod, newMod string) []string {
-	oldPins := parseGoModPins(oldMod)
-	newPins := parseGoModPins(newMod)
 	seen := make(map[string]bool, len(oldPins)+len(newPins))
 	for k := range oldPins {
 		seen[k] = true
@@ -163,54 +132,57 @@ func compareGoMod(oldMod, newMod string) []string {
 	slices.Sort(keys)
 
 	deltas := make([]string, 0)
-	for _, mod := range keys {
-		oldVer, hadOld := oldPins[mod]
-		newVer, hasNew := newPins[mod]
+	for _, key := range keys {
+		oldVer, hadOld := oldPins[key]
+		newVer, hasNew := newPins[key]
 		switch {
 		case !hadOld && hasNew:
-			deltas = append(deltas, fmt.Sprintf("%s: added %s", mod, newVer))
+			deltas = append(deltas, fmt.Sprintf("%s: added %s", key, newVer))
 		case hadOld && !hasNew:
-			deltas = append(deltas, fmt.Sprintf("%s: removed %s", mod, oldVer))
+			deltas = append(deltas, fmt.Sprintf("%s: removed %s", key, oldVer))
 		case oldVer != newVer:
-			deltas = append(deltas, fmt.Sprintf("%s: %s -> %s", mod, oldVer, newVer))
+			deltas = append(deltas, fmt.Sprintf("%s: %s -> %s", key, oldVer, newVer))
 		}
 	}
-	return deltas
+	return deltas, nil
 }
 
-// parseGoModPins parses module requirement lines from a go.mod file.
-func parseGoModPins(raw string) map[string]string {
+// parseGoModDirectives parses require, replace, and version-qualified exclude
+// directives from a go.mod file string using golang.org/x/mod/modfile.
+func parseGoModDirectives(raw string) (map[string]string, error) {
 	pins := make(map[string]string)
-	inRequireBlock := false
-	for _, line := range strings.Split(raw, "\n") {
-		if idx := strings.Index(line, "//"); idx >= 0 {
-			line = line[:idx]
-		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		if strings.HasPrefix(trimmed, "require (") {
-			inRequireBlock = true
-			continue
-		}
-		if inRequireBlock && trimmed == ")" {
-			inRequireBlock = false
-			continue
-		}
-		if strings.HasPrefix(trimmed, "require ") {
-			fields := strings.Fields(strings.TrimPrefix(trimmed, "require "))
-			if len(fields) >= 2 {
-				pins[fields[0]] = fields[1]
-			}
-			continue
-		}
-		if inRequireBlock {
-			fields := strings.Fields(trimmed)
-			if len(fields) >= 2 {
-				pins[fields[0]] = fields[1]
-			}
-		}
+	if strings.TrimSpace(raw) == "" {
+		return pins, nil
 	}
-	return pins
+	parsed, err := modfile.Parse("go.mod", []byte(raw), nil)
+	if err != nil {
+		return nil, err
+	}
+	for _, req := range parsed.Require {
+		if req == nil {
+			continue
+		}
+		pins[req.Mod.Path] = req.Mod.Version
+	}
+	for _, rep := range parsed.Replace {
+		if rep == nil {
+			continue
+		}
+		oldKey := "replace " + rep.Old.Path
+		if rep.Old.Version != "" {
+			oldKey += "@" + rep.Old.Version
+		}
+		target := rep.New.Path
+		if rep.New.Version != "" {
+			target += " " + rep.New.Version
+		}
+		pins[oldKey] = target
+	}
+	for _, exc := range parsed.Exclude {
+		if exc == nil {
+			continue
+		}
+		pins["exclude "+exc.Mod.Path+"@"+exc.Mod.Version] = "excluded"
+	}
+	return pins, nil
 }

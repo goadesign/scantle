@@ -114,6 +114,48 @@ func DecodeConfirmIntentRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 	}
 }
 
+// EncodePreviewArchitectureResponse returns an encoder for responses returned
+// by the scantle preview_architecture endpoint.
+func EncodePreviewArchitectureResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*scantle.ArchitecturePreviewResult)
+		enc := encoder(ctx, w)
+		body := NewPreviewArchitectureResponseBody(res)
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
+// DecodePreviewArchitectureRequest returns a decoder for requests sent to the
+// scantle preview_architecture endpoint.
+func DecodePreviewArchitectureRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*scantle.PreviewArchitecturePayload, error) {
+	return func(r *http.Request) (*scantle.PreviewArchitecturePayload, error) {
+		var payload *scantle.PreviewArchitecturePayload
+		var (
+			body PreviewArchitectureRequestBody
+			err  error
+		)
+		err = decoder(r).Decode(&body)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return payload, goa.MissingPayloadError()
+			}
+			var gerr *goa.ServiceError
+			if errors.As(err, &gerr) {
+				return payload, gerr
+			}
+			return payload, goa.DecodePayloadError(err.Error())
+		}
+		err = ValidatePreviewArchitectureRequestBody(&body)
+		if err != nil {
+			return payload, err
+		}
+		payload = NewPreviewArchitecturePayload(&body)
+
+		return payload, nil
+	}
+}
+
 // EncodeDraftOverrideResponse returns an encoder for responses returned by the
 // scantle draft_override endpoint.
 func EncodeDraftOverrideResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
@@ -241,6 +283,76 @@ func unmarshalExampleItemRequestBodyToScantleExampleItem(v *ExampleItemRequestBo
 		InputSummary:     *v.InputSummary,
 		ExpectedOutcome:  *v.ExpectedOutcome,
 		VerificationKind: *v.VerificationKind,
+	}
+
+	return res
+}
+
+// marshalScantleC4ContainerItemToC4ContainerItemResponseBody builds a value of
+// type *C4ContainerItemResponseBody from a value of type
+// *scantle.C4ContainerItem.
+func marshalScantleC4ContainerItemToC4ContainerItemResponseBody(v *scantle.C4ContainerItem) *C4ContainerItemResponseBody {
+	res := &C4ContainerItemResponseBody{
+		ID:          v.ID,
+		Name:        v.Name,
+		Kind:        v.Kind,
+		Description: v.Description,
+	}
+
+	return res
+}
+
+// marshalScantleC4EdgeItemToC4EdgeItemResponseBody builds a value of type
+// *C4EdgeItemResponseBody from a value of type *scantle.C4EdgeItem.
+func marshalScantleC4EdgeItemToC4EdgeItemResponseBody(v *scantle.C4EdgeItem) *C4EdgeItemResponseBody {
+	res := &C4EdgeItemResponseBody{
+		FromID:   v.FromID,
+		ToID:     v.ToID,
+		Protocol: v.Protocol,
+	}
+
+	return res
+}
+
+// marshalScantleAgentPolicyItemToAgentPolicyItemResponseBody builds a value of
+// type *AgentPolicyItemResponseBody from a value of type
+// *scantle.AgentPolicyItem.
+func marshalScantleAgentPolicyItemToAgentPolicyItemResponseBody(v *scantle.AgentPolicyItem) *AgentPolicyItemResponseBody {
+	res := &AgentPolicyItemResponseBody{
+		AgentID:             v.AgentID,
+		MaxExecutionSeconds: v.MaxExecutionSeconds,
+		MaxToolCalls:        v.MaxToolCalls,
+		MaxRecoveryTurns:    v.MaxRecoveryTurns,
+		CompressAtTurns:     v.CompressAtTurns,
+		KeepRecentTurns:     v.KeepRecentTurns,
+		CacheAfterSystem:    v.CacheAfterSystem,
+		CacheAfterTools:     v.CacheAfterTools,
+	}
+
+	return res
+}
+
+// marshalScantleToolContractItemToToolContractItemResponseBody builds a value
+// of type *ToolContractItemResponseBody from a value of type
+// *scantle.ToolContractItem.
+func marshalScantleToolContractItemToToolContractItemResponseBody(v *scantle.ToolContractItem) *ToolContractItemResponseBody {
+	res := &ToolContractItemResponseBody{
+		ID:                   v.ID,
+		Toolset:              v.Toolset,
+		Name:                 v.Name,
+		Description:          v.Description,
+		ArgsSchema:           v.ArgsSchema,
+		ReturnSchema:         v.ReturnSchema,
+		RequiresConfirmation: v.RequiresConfirmation,
+		BoundedResult:        v.BoundedResult,
+	}
+	if v.InjectedFields != nil {
+		res.InjectedFields = make([]string, len(v.InjectedFields))
+		for i, val := range v.InjectedFields {
+			res.InjectedFields[i] = val
+		}
+	} else {
+		res.InjectedFields = []string{}
 	}
 
 	return res

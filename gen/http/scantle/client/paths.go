@@ -22,6 +22,11 @@ func ConfirmIntentScantlePath() string {
 	return "/changes/confirm"
 }
 
+// PreviewArchitectureScantlePath returns the URL path to the scantle service preview_architecture HTTP endpoint.
+func PreviewArchitectureScantlePath() string {
+	return "/changes/preview"
+}
+
 // DraftOverrideScantlePath returns the URL path to the scantle service draft_override HTTP endpoint.
 func DraftOverrideScantlePath() string {
 	return "/sandbox/draft"

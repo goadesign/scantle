@@ -15,21 +15,23 @@ import (
 
 // Client is the "scantle" service client.
 type Client struct {
-	CheckpointUIEndpoint  goa.Endpoint
-	ProposeChangeEndpoint goa.Endpoint
-	ConfirmIntentEndpoint goa.Endpoint
-	DraftOverrideEndpoint goa.Endpoint
-	DiffEndpoint          goa.Endpoint
+	CheckpointUIEndpoint        goa.Endpoint
+	ProposeChangeEndpoint       goa.Endpoint
+	ConfirmIntentEndpoint       goa.Endpoint
+	PreviewArchitectureEndpoint goa.Endpoint
+	DraftOverrideEndpoint       goa.Endpoint
+	DiffEndpoint                goa.Endpoint
 }
 
 // NewClient initializes a "scantle" service client given the endpoints.
-func NewClient(checkpointUI, proposeChange, confirmIntent, draftOverride, diff goa.Endpoint) *Client {
+func NewClient(checkpointUI, proposeChange, confirmIntent, previewArchitecture, draftOverride, diff goa.Endpoint) *Client {
 	return &Client{
-		CheckpointUIEndpoint:  checkpointUI,
-		ProposeChangeEndpoint: proposeChange,
-		ConfirmIntentEndpoint: confirmIntent,
-		DraftOverrideEndpoint: draftOverride,
-		DiffEndpoint:          diff,
+		CheckpointUIEndpoint:        checkpointUI,
+		ProposeChangeEndpoint:       proposeChange,
+		ConfirmIntentEndpoint:       confirmIntent,
+		PreviewArchitectureEndpoint: previewArchitecture,
+		DraftOverrideEndpoint:       draftOverride,
+		DiffEndpoint:                diff,
 	}
 }
 
@@ -61,6 +63,17 @@ func (c *Client) ConfirmIntent(ctx context.Context, p *ConfirmIntentPayload) (re
 		return
 	}
 	return ires.(*ChangeCardResult), nil
+}
+
+// PreviewArchitecture calls the "preview_architecture" endpoint of the
+// "scantle" service.
+func (c *Client) PreviewArchitecture(ctx context.Context, p *PreviewArchitecturePayload) (res *ArchitecturePreviewResult, err error) {
+	var ires any
+	ires, err = c.PreviewArchitectureEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*ArchitecturePreviewResult), nil
 }
 
 // DraftOverride calls the "draft_override" endpoint of the "scantle" service.
