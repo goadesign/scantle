@@ -1,6 +1,8 @@
 package designeval
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -40,6 +42,29 @@ func TestEvaluateRefusesToUpgradeTheTargetsGenerator(t *testing.T) {
 
 func TestEvaluateUsesTheTargetsOwnGeneratorVersion(t *testing.T) {
 	res, err := Evaluate(t.Context(), testmodule.Snapshot(t, "", minimalDesign))
+	require.NoError(t, err)
+	assert.Contains(t, res.Declarations, "Service:orders/Method:get_order")
+}
+
+func TestEvaluateUsesTheBuildToolchainToResolveModules(t *testing.T) {
+	// Module resolution must run with the toolchain the sandboxed build
+	// compiles with, never whatever go is first on PATH: a design may require
+	// that toolchain's exact Go version while PATH holds an older go.
+	tc, err := resolveToolchainEnv()
+	require.NoError(t, err)
+	raw, err := os.ReadFile(filepath.Join(tc.goroot, "VERSION"))
+	require.NoError(t, err)
+	version := strings.TrimPrefix(strings.SplitN(string(raw), "\n", 2)[0], "go")
+	files := testmodule.Snapshot(t, "", minimalDesign)
+	files["go.mod"] = strings.Replace(files["go.mod"], "go 1.24", "go "+version, 1)
+	require.Contains(t, files["go.mod"], "go "+version)
+
+	fakeBin := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(fakeBin, "go"),
+		[]byte("#!/bin/sh\necho 'go on PATH must not be used' >&2\nexit 1\n"), 0o700))
+	t.Setenv("PATH", fakeBin+":/usr/bin:/bin")
+
+	res, err := Evaluate(t.Context(), files)
 	require.NoError(t, err)
 	assert.Contains(t, res.Declarations, "Service:orders/Method:get_order")
 }

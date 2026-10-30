@@ -129,7 +129,8 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	if err := os.WriteFile(filepath.Join(buildDir, "main.go"), []byte(harnessMain), 0o600); err != nil {
 		return Result{}, fmt.Errorf("write evaluator main.go: %w", err)
 	}
-	if err := prepareHarnessModule(ctx, buildDir, target, evalMod, logDir); err != nil {
+	gocmd := goCommand{bin: filepath.Join(tc.goroot, "bin", "go")}
+	if err := prepareHarnessModule(ctx, gocmd, buildDir, target, evalMod, logDir); err != nil {
 		return Result{}, err
 	}
 
