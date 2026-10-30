@@ -46,11 +46,9 @@ When a platform needs custom generated files or wants to tailor artifacts produc
 
 ## How the Goa Design Suite Fits Together
 
-| Project | Role in a Scantle Platform |
-| :--- | :--- |
-| **[Goa](https://github.com/goadesign/goa)** | Compiles `design/*.go` into HTTP, gRPC, OpenAPI, CLI, and validation packages (`goa gen`)—plus in-memory `codegen.SourceArtifacts` for sandboxed design evaluation—at **0 LLM tokens**. |
-| **[Goa-AI](https://github.com/goadesign/goa-ai)** | Adds `Agent`, `Toolset`, `MCP`, durable Temporal workflows, `eval` suites, gRPC model gateways, and runtime token controls (`Inject`, `BindField`, `BoundedResult`, `ServerData`, `Cache`, `Compress`). |
-| **[Pulse](https://github.com/goadesign/pulse)** | Streams live agent events (`pulse/streaming`) and coordinates distributed rate limits and replicated state maps (`pulse/rmap`) over Redis. |
-| **[Clue](https://github.com/goadesign/clue)** | Emits OpenTelemetry `gen_ai.*` spans, structured logs, and health checks across services and model gateways. |
-| **[Model](https://github.com/goadesign/model)** | Declares C4 architecture models (`SoftwareSystem`, `Container`, `Views`) alongside `design/*.go` and renders Structurizr JSON (`gen/structurizr/model.json`). |
-| **[Chorus](https://github.com/goadesign/chorus)** | Coordinates multi-model coding and review agents (`@architect`, `@builder-<scope>`, `@eval-author`, `@reviewer`) in real time with `0`-token background waiting (`chorus watch`). |
+- **[Goa](https://github.com/goadesign/goa)** — Compiles `design/*.go` into HTTP, gRPC, OpenAPI, CLI, and validation packages (`goa gen`)—plus in-memory `codegen.SourceArtifacts` for sandboxed design evaluation—at **0 LLM tokens**.
+- **[Goa-AI](https://github.com/goadesign/goa-ai)** — Adds `Agent`, `Toolset`, `MCP`, durable Temporal workflows, `eval` suites, gRPC model gateways, and runtime token controls (`Inject`, `BindField`, `BoundedResult`, `ServerData`, `Cache`, `Compress`).
+- **[Pulse](https://github.com/goadesign/pulse)** — Streams live agent events (`pulse/streaming`) and coordinates distributed rate limits and replicated state maps (`pulse/rmap`) over Redis.
+- **[Clue](https://github.com/goadesign/clue)** — Emits OpenTelemetry `gen_ai.*` spans, structured logs, and health checks across services and model gateways.
+- **[Model](https://github.com/goadesign/model)** — Declares C4 architecture models (`SoftwareSystem`, `Container`, `Views`) alongside `design/*.go` and renders Structurizr JSON (`gen/structurizr/model.json`).
+- **[Chorus](https://github.com/goadesign/chorus)** — Coordinates multi-model coding and review agents (`@architect`, `@builder-<scope>`, `@eval-author`, `@reviewer`) in real time with `0`-token background waiting (`chorus watch`).

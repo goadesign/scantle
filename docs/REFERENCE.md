@@ -44,29 +44,43 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 
 ### MCP Tools
 
-| Tool | HTTP Route | Input Payload | Output Result | Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| `propose_change` | `POST /changes/propose` | `change_id`, `prompt`, `design_source?` | `ChangeCardResult` | Analyze a feature request at `CP1` using the embedded Golden Path prompt, returning concrete `examples`, `ambiguities`, `preserved_behaviors`, and a `request_revision` digest. |
-| `confirm_intent` | `POST /changes/confirm` | `change_id`, `request_revision`, `answers`, `examples` | `ChangeCardResult` | Lock the operator's ambiguity `answers` and confirmed `examples` at `CP1`, transitioning the Change Card to `confirmed`. |
-| `preview_architecture` | `POST /changes/preview` | `change_id`, `request_revision`, `design`, `builders?` | `ArchitecturePreviewResult` | Evaluate a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed Chorus `swarm` plan. |
-| `draft_override` | `POST /sandbox/draft` | `target_kind` (`prompt_template` \| `compiled_rule`), `prompt_id?`, `new_content` | `DraftOverrideResult` | Hot-reload a `prompt_template` in `0s` on the bound `CP3` sandbox target or reject a `compiled_rule` override that requires a full Go rebuild. |
-| `diff` | `POST /diff` | `old` (`DesignSnapshot`), `new` (`DesignSnapshot`) | `DiffResult` | Compare two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives. |
+- **`propose_change`** (`POST /changes/propose`)
+  - **Input:** `change_id`, `prompt`, `design_source?` → **Output:** `ChangeCardResult`
+  - Analyzes a feature request at `CP1` using the embedded Golden Path prompt, returning concrete `examples`, `ambiguities`, `preserved_behaviors`, and a canonical `request_revision` digest.
+- **`confirm_intent`** (`POST /changes/confirm`)
+  - **Input:** `change_id`, `request_revision`, `answers`, `examples` → **Output:** `ChangeCardResult`
+  - Locks the operator's ambiguity `answers` and confirmed `examples` at `CP1`, transitioning the Change Card to `confirmed`.
+- **`preview_architecture`** (`POST /changes/preview`)
+  - **Input:** `change_id`, `request_revision`, `design`, `builders?` → **Output:** `ArchitecturePreviewResult`
+  - Evaluates a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed Chorus `swarm` plan.
+- **`draft_override`** (`POST /sandbox/draft`)
+  - **Input:** `target_kind` (`prompt_template` \| `compiled_rule`), `prompt_id?`, `new_content` → **Output:** `DraftOverrideResult`
+  - Hot-reloads a `prompt_template` in `0s` on the bound `CP3` sandbox target or rejects a `compiled_rule` override that requires a full Go rebuild.
+- **`diff`** (`POST /diff`)
+  - **Input:** `old` (`DesignSnapshot`), `new` (`DesignSnapshot`) → **Output:** `DiffResult`
+  - Compares two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives.
 
 ### MCP Resources
 
-| Resource URI | HTTP Route | MIME Type | Purpose |
-| :--- | :--- | :--- | :--- |
-| `scantle://golden-path` | `GET /golden-path` | `text/markdown` | Embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms. |
-| `ui://scantle/checkpoint` | `GET /ui/checkpoint` | `text/html;profile=mcp-app` | Interactive MCP Apps HTML host for `CP1`–`CP3` checkpoints and sandboxed `openui.v1` action dispatch. |
+- **`scantle://golden-path`** (`GET /golden-path`, `text/markdown`)
+  - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
+- **`ui://scantle/checkpoint`** (`GET /ui/checkpoint`, `text/html;profile=mcp-app`)
+  - Serves the interactive MCP Apps HTML host for `CP1`–`CP3` checkpoints and sandboxed `openui.v1` action dispatch.
 
 ---
 
 ## CLI Reference
 
-| Command | Flags | Description |
-| :--- | :--- | :--- |
-| `scantle serve` *(default)* | `-addr 127.0.0.1:8090`<br/>`-principal <id>` *(required)*<br/>`-auth-token <token>` *(or `$SCANTLE_AUTH_TOKEN`, required)* | Start the Scantle HTTP and MCP JSON-RPC control-plane server protected by bearer-token authentication. |
-| `scantle diff` | `--old-dir <path>` *(required)*<br/>`--new-dir <path>` *(required)* | Read two Go design modules into symlink-safe snapshots, evaluate both inside the sandboxed Goa/Goa-AI compiler, and print the JSON `DiffResult` to `stdout`. |
+### `scantle serve` *(default)*
+Starts the Scantle HTTP and MCP JSON-RPC control-plane server protected by bearer-token authentication.
+- `-addr <host:port>` — Listen address (default `127.0.0.1:8090`).
+- `-principal <id>` — Authenticated operator principal ID *(required)*.
+- `-auth-token <token>` — Bearer token required on HTTP and MCP requests (or `$SCANTLE_AUTH_TOKEN`, *required*).
+
+### `scantle diff`
+Reads two Go design modules into symlink-safe snapshots, evaluates both inside the sandboxed Goa/Goa-AI compiler at their own `go.mod` dependency versions, and prints the JSON `DiffResult` to `stdout`.
+- `--old-dir <path>` — Root directory of the previous design module *(required)*.
+- `--new-dir <path>` — Root directory of the candidate design module *(required)*.
 
 ---
 

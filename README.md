@@ -93,15 +93,13 @@ To connect **Claude Code, Codex, Gemini, or Cursor** to the running server, add 
 
 ## Documentation
 
-Scantle’s documentation is organized so you can dive as deep as you need:
+Dive deeper into the parts of Scantle you care about:
 
-| Guide | What You’ll Learn |
-| :--- | :--- |
-| **[How Scantle Works (`docs/HOW_IT_WORKS.md`)](docs/HOW_IT_WORKS.md)** | The 5 checkpoints (`CP1`–`CP5`), cross-family Chorus swarm routing, the live role-switching sandbox, and how OS-isolated verification prevents reward hacking. |
-| **[Golden Path Architecture (`docs/ARCHITECTURE_PLAYBOOK.md`)](docs/ARCHITECTURE_PLAYBOOK.md)** | The production architecture Scantle builds (`scantle://golden-path`): edge vs. gRPC services, central model gateways, server-injected auth, durable Temporal workflows, and the Goa Design suite. |
-| **[CLI, MCP & Repo Reference (`docs/REFERENCE.md`)](docs/REFERENCE.md)** | `.mcp.json` setup, MCP tools and resources, `scantle` CLI flags, the `examples/orders` reference platform, and the repository layout. |
-| **[Architecture Proposal (`PROPOSAL.md`)](PROPOSAL.md)** | Full system specification, threat model, and verification invariants. |
-| **[Working Backwards Press Release (`PRESS_RELEASE.md`)](PRESS_RELEASE.md)** | The operator narrative and product vision behind Scantle. |
+- **[How Scantle Works (`docs/HOW_IT_WORKS.md`)](docs/HOW_IT_WORKS.md)** — Walk through the 5 checkpoints (`CP1`–`CP5`), cross-family Chorus swarm routing, the live role-switching sandbox, and how OS-isolated verification prevents reward hacking.
+- **[Golden Path Architecture (`docs/ARCHITECTURE_PLAYBOOK.md`)](docs/ARCHITECTURE_PLAYBOOK.md)** — Explore the production architecture Scantle builds (`scantle://golden-path`): edge vs. gRPC services, central model gateways, server-injected auth, durable Temporal workflows, and the Goa Design suite.
+- **[CLI, MCP & Repo Reference (`docs/REFERENCE.md`)](docs/REFERENCE.md)** — Copy `.mcp.json` configuration, browse the MCP tools and resources, check `scantle` CLI flags, and inspect the `examples/orders` reference platform.
+- **[Architecture Proposal (`PROPOSAL.md`)](PROPOSAL.md)** — Read the full system specification, threat model, and verification invariants.
+- **[Working Backwards Press Release (`PRESS_RELEASE.md`)](PRESS_RELEASE.md)** — Read the operator narrative and product vision behind Scantle.
 
 ## License
 

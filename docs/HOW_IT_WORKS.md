@@ -10,54 +10,23 @@ When your request is already unambiguous, Checkpoints 1 and 2 fold into a single
 
 ## Overview: Three Roles, Strict Separation of Powers
 
-<table>
-<thead>
-<tr>
-<th width="33%" align="left">📐 1. Architect &amp; Control Plane (<code>CP1</code> → <code>CP2</code>)<br/><sub>Intent Lock, Compiled Contract &amp; Swarm Plan</sub></th>
-<th width="34%" align="left">🛠️ 2. Scoped Builder Swarm (<code>CP2</code> → <code>CP3</code>)<br/><sub>Golden Path Implementation &amp; 0s Draft Mode</sub></th>
-<th width="33%" align="left">🛡️ 3. Isolated Evaluator &amp; Gate (<code>CP4</code> → <code>CP5</code>)<br/><sub>Sandboxed Verification, Crash &amp; Budget Proof</sub></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td valign="top">
+Scantle splits every change across three distinct roles so the agent that writes the code never defines the contract alone or grades its own output:
 
-**Lock Intent (`CP1`)**
-- Surfaces concrete input/outcome examples and hidden domain questions.
-- Freezes a SHA-256 `request_revision` digest once you confirm.
+```mermaid
+flowchart LR
+    A["1. Architect & Control Plane (CP1 → CP2)"] --> B["2. Scoped Builder Swarm (CP2 → CP3)"]
+    B --> C["3. Isolated Evaluator & Gate (CP4 → CP5)"]
+```
 
-**Compile & Plan (`CP2`)**
-- Evaluates `design/*.go` in a sandboxed subprocess at **0 LLM tokens**.
-- Extracts C4 topology, tool schemas, and security guardrails.
-- Assigns `@architect`, `@builder-<scope>`, `@eval-author`, and `@reviewer` across distinct model families.
-
-</td>
-<td valign="top">
-
-**Build to the Gauge Rod**
-- Builders read `scantle://golden-path` and generated `AGENTS_QUICKSTART.md`.
-- `goa gen` writes all HTTP/gRPC/MCP/OpenAPI plumbing; builders implement only domain and Temporal workflow packages within their owned paths.
-
-**Interactive Sandbox (`CP3`)**
-- Switch roles between **Customer** and **Approving Manager**.
-- Hot-reload prompt templates in **0 seconds** via `prompt.Store` while blocking prompt hacks to compiled business rules.
-
-</td>
-<td valign="top">
-
-**OS-Sandboxed Evaluation (`CP4`)**
-- Checks out exact `BaseCommit`, `CandidateCommit`, and `EvalCommit` SHAs.
-- Compiles and runs candidate binaries inside a macOS `sandbox-exec` jail.
-- Routes all candidate LLM calls through the evaluator's gRPC model gateway.
-
-**Cryptographic Merge Gate (`CP5`)**
-- Redacts unseen **holdout scenarios** from builder reports (`RedactForBuilder`).
-- Verifies binary digests, commit provenance, and token budgets in `verify.Approve`.
-
-</td>
-</tr>
-</tbody>
-</table>
+1. **📐 Architect & Control Plane (`CP1` → `CP2`) — Intent Lock, Compiled Contract & Swarm Plan**
+   - Surfaces concrete input/outcome examples and hidden domain questions at `CP1`, freezing a SHA-256 `request_revision` digest once you confirm.
+   - Evaluates `design/*.go` inside a sandboxed subprocess at `CP2` (`0` LLM tokens) to extract the C4 topology, tool schemas, and security guardrails, and assigns `@architect`, `@builder-<scope>`, `@eval-author`, and `@reviewer` across distinct model families.
+2. **🛠️ Scoped Builder Swarm (`CP2` → `CP3`) — Golden Path Implementation & `0s` Draft Mode**
+   - Builders read `scantle://golden-path` and generated `AGENTS_QUICKSTART.md`. Because `goa gen` writes all HTTP/gRPC/MCP/OpenAPI plumbing, builders implement only domain and Temporal workflow packages within their owned paths.
+   - In `CP3`, you can switch roles between **Customer** and **Approving Manager** against the live candidate API and hot-reload prompt templates in **0 seconds** via `prompt.Store` (while Scantle blocks any attempt to override compiled Go business rules via prompts).
+3. **🛡️ Isolated Evaluator & Gate (`CP4` → `CP5`) — Sandboxed Verification, Crash & Budget Proof**
+   - Checks out exact `BaseCommit`, `CandidateCommit`, and `EvalCommit` SHAs, compiles and runs candidate binaries inside a macOS `sandbox-exec` jail, and routes all candidate LLM calls through the evaluator's gRPC model gateway.
+   - Redacts unseen **holdout scenarios** from builder reports (`RedactForBuilder`) and verifies binary digests, commit provenance, and token budgets in `verify.Approve`.
 
 ---
 
