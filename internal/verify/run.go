@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -231,10 +232,39 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	return report, nil
 }
 
+// linksStayInside walks the checkout at dir, skipping .git, and fails when a
+// symbolic link does not resolve to an existing path inside dir. Builds follow
+// file and directory links, so a committed link to an outside file would
+// otherwise build bytes the checked-out commit does not contain. Links that
+// stay inside the checkout are allowed; dangling links are rejected because
+// their target could appear outside the checkout later.
+func linksStayInside(dir string) error {
+	return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && d.Name() == ".git" && filepath.Dir(path) == dir {
+			return filepath.SkipDir
+		}
+		if d.Type()&fs.ModeSymlink == 0 {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		if _, err := resolveInside(dir, rel); err != nil {
+			return fmt.Errorf("committed link %s: %w", filepath.ToSlash(rel), err)
+		}
+		return nil
+	})
+}
+
 // resolveInside resolves rel, a path relative to the directory root, following
-// every symbolic link in root and rel, and returns the resolved directory. It
-// fails unless that directory is root itself or inside it, so a committed link
-// cannot point a build at source outside the commit the report names.
+// every symbolic link in root and rel, and returns the resolved path. It fails
+// when the path does not exist or is not root itself or inside it, so a
+// committed link cannot point a build at source outside the commit the report
+// names.
 func resolveInside(root, rel string) (string, error) {
 	base, err := filepath.EvalSymlinks(root)
 	if err != nil {
@@ -300,6 +330,9 @@ func (r *runner) checkout(ctx context.Context, label, repo, commit, dir string) 
 	}
 	if got := strings.TrimSpace(string(head)); got != commit {
 		return fmt.Errorf("check out %s: HEAD is %s, want %s", label, got, commit)
+	}
+	if err := linksStayInside(dir); err != nil {
+		return fmt.Errorf("check out %s: %w", label, err)
 	}
 	return nil
 }
