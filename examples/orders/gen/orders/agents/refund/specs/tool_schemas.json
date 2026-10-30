@@ -1,7 +1,9 @@
 {
+  "agent_id": "orders.refund",
   "tools": [
     {
       "id": "orders.issue_store_credit",
+      "name": "issue_store_credit",
       "service": "orders",
       "toolset": "orders.orders",
       "title": "Issue Store Credit",
@@ -24,6 +26,10 @@
           "type": "object"
         }
       },
+      "hidden_fields": [
+        "tenant_id",
+        "customer_id"
+      ],
       "result": {
         "name": "IssueStoreCreditResult",
         "schema": {
@@ -67,10 +73,29 @@
           ],
           "type": "object"
         }
+      },
+      "text_only_payload": {
+        "name": "IssueStoreCreditPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "order_id": {
+              "description": "Order to refund.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "type": "object"
+        }
       }
     },
     {
       "id": "orders.list_orders",
+      "name": "list_orders",
       "service": "orders",
       "toolset": "orders.orders",
       "title": "List Orders",
@@ -83,6 +108,11 @@
           "type": "object"
         }
       },
+      "hidden_fields": [
+        "tenant_id",
+        "customer_id"
+      ],
+      "bounded_result": true,
       "result": {
         "name": "ListOrdersResult",
         "schema": {
@@ -173,10 +203,19 @@
           ],
           "type": "object"
         }
+      },
+      "text_only_payload": {
+        "name": "ListOrdersPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "type": "object"
+        }
       }
     },
     {
       "id": "orders.request_refund",
+      "name": "request_refund",
       "service": "orders",
       "toolset": "orders.orders",
       "title": "Request Refund",
@@ -204,6 +243,10 @@
           "type": "object"
         }
       },
+      "hidden_fields": [
+        "tenant_id",
+        "customer_id"
+      ],
       "result": {
         "name": "RequestRefundResult",
         "schema": {
