@@ -416,7 +416,7 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model completion: %w", err)
 	}
 	if resp.OutputLimited {
-		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model analysis is incomplete: provider reported an output limit (stop reason %q)", resp.StopReason)
+		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model analysis may be incomplete: provider reported an output limit (stop reason %q)", resp.StopReason)
 	}
 	raw := extractAssistantText(resp)
 	if raw == "" {
