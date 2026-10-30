@@ -50,17 +50,17 @@ type (
 	// evaluator's own generated suite, never from the candidate.
 	Suite struct {
 		// ID is the suite identifier.
-		ID string
+		ID string `json:"id"`
 		// Scenarios lists every declared scenario in declaration order.
-		Scenarios []Scenario
+		Scenarios []Scenario `json:"scenarios"`
 	}
 
 	// Scenario is one declared scenario.
 	Scenario struct {
 		// ID is the scenario identifier.
-		ID string
+		ID string `json:"id"`
 		// Holdout marks scenarios whose details builders must never see.
-		Holdout bool
+		Holdout bool `json:"holdout"`
 	}
 
 	// Outcome is the result of one required scenario.
@@ -93,10 +93,23 @@ type (
 		HarnessError int `json:"harness_error"`
 	}
 
-	// Report is the CP4 verification report.
+	// Report is the CP4 verification report. Suite and Evidence are the
+	// inputs it was derived from; every other field is recomputed from them
+	// whenever the report is checked, so a stored claim is never trusted.
 	Report struct {
 		// Binding is what was tested.
 		Binding Binding `json:"binding"`
+		// Suite is the evaluator's declaration the denominator comes from.
+		Suite Suite `json:"suite"`
+		// Evidence is the suite's original eval.Report, kept unchanged.
+		Evidence eval.Report `json:"evidence"`
+		// SuiteError is the suite-level error reported by the evaluation run,
+		// such as judge calibration failure or cancellation. A report with a
+		// suite error never passes.
+		SuiteError string `json:"suite_error,omitempty"`
+		// SuiteExit is the suite command's exit status: 0 passed, 1 ran and
+		// failed, anything else could not run cleanly. Only 0 can pass.
+		SuiteExit int `json:"suite_exit"`
 		// Counts covers every declared scenario.
 		Counts Counts `json:"counts"`
 		// Scenarios lists every declared scenario in declaration order.
@@ -130,21 +143,24 @@ const (
 // promoted.
 var ErrStaleReport = errors.New("verification report does not match the change being promoted")
 
-// Assemble builds the CP4 report for binding from the suite's eval.Report.
-// Each declared scenario counts once. A scenario passes only when the suite
-// says it passed and every candidate binary it reports having executed is one
-// of the binding's artifacts with the expected digest; a scenario that ran a
-// different binary, or reported no binary at all, is a harness error.
-func Assemble(binding Binding, suite Suite, evalReport eval.Report) (Report, error) {
-	if evalReport.SuiteID != suite.ID || binding.SuiteID != suite.ID {
-		return Report{}, fmt.Errorf("report suite %q, binding suite %q, declared suite %q differ",
-			evalReport.SuiteID, binding.SuiteID, suite.ID)
+// Assemble builds the CP4 report for binding from the evaluator's suite
+// declaration and the suite's original eval.Report, which it keeps as
+// evidence. Each declared scenario counts once. A scenario passes only when
+// the suite says it passed and it reports executing exactly the binding's
+// candidate binaries; a scenario that reports a missing, extra or different
+// binary is a harness error. A suite-level error fails the report while
+// keeping every scenario result. Malformed input (an empty suite, empty or
+// duplicate declared IDs, duplicate or undeclared result IDs) is rejected.
+func Assemble(binding Binding, suite Suite, evidence eval.Report, suiteExit int) (Report, error) {
+	if err := validate(binding, suite, evidence); err != nil {
+		return Report{}, err
 	}
-	byID := make(map[string]eval.ScenarioReport, len(evalReport.Scenarios))
-	for _, s := range evalReport.Scenarios {
+	byID := make(map[string]eval.ScenarioReport, len(evidence.Scenarios))
+	for _, s := range evidence.Scenarios {
 		byID[s.ID] = s
 	}
-	r := Report{Binding: binding, Counts: Counts{Required: len(suite.Scenarios)}}
+	r := Report{Binding: binding, Suite: suite, Evidence: evidence, SuiteError: evidence.Error,
+		SuiteExit: suiteExit, Counts: Counts{Required: len(suite.Scenarios)}}
 	for _, declared := range suite.Scenarios {
 		res := ScenarioResult{ID: declared.ID, Holdout: declared.Holdout}
 		s, ok := byID[declared.ID]
@@ -169,7 +185,7 @@ func Assemble(binding Binding, suite Suite, evalReport eval.Report) (Report, err
 		r.Counts.add(res.Outcome)
 		r.Scenarios = append(r.Scenarios, res)
 	}
-	r.Passed = r.Counts.Passed == r.Counts.Required
+	r.Passed = r.SuiteError == "" && r.SuiteExit == 0 && r.Counts.Passed == r.Counts.Required
 	digest, err := r.computeDigest()
 	if err != nil {
 		return Report{}, err
@@ -193,20 +209,22 @@ func (r Report) BuilderView() Report {
 	return view
 }
 
-// Approve checks, at promotion time, that report still describes current: the
-// report's digest must match its content, it must have passed, and every
+// Approve checks, at promotion time, that report still describes current. It
+// re-derives the whole report from its binding, suite declaration and
+// evidence, so a stored outcome, count or verdict that does not follow from
+// the evidence is rejected; the re-derived report must have passed; and every
 // binding field must equal the change being promoted. Any difference fails
 // with ErrStaleReport; the report stays readable but cannot authorize the
 // changed operation.
 func Approve(current Binding, report Report) error {
-	digest, err := report.computeDigest()
+	rebuilt, err := Assemble(report.Binding, report.Suite, report.Evidence, report.SuiteExit)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrStaleReport, err)
 	}
-	if digest != report.Digest {
-		return fmt.Errorf("%w: report content does not match its digest", ErrStaleReport)
+	if rebuilt.Digest != report.Digest {
+		return fmt.Errorf("%w: report content does not match what its evidence derives", ErrStaleReport)
 	}
-	if !report.Passed {
+	if !rebuilt.Passed {
 		return fmt.Errorf("%w: report did not pass", ErrStaleReport)
 	}
 	if diff := report.Binding.differences(current); len(diff) > 0 {
@@ -215,30 +233,72 @@ func Approve(current Binding, report Report) error {
 	return nil
 }
 
-// checkArtifacts requires the scenario to report the digest of at least one
-// candidate binary and every reported digest to match the binding.
+// checkArtifacts requires the scenario to report exactly the binding's
+// candidate binaries, each once, with the bound digests.
 func checkArtifacts(want map[string]string, reported []eval.Artifact) error {
-	seen := 0
+	got := map[string]string{}
 	for _, a := range reported {
 		name, ok := strings.CutPrefix(a.Name, artifactPrefix)
 		if !ok {
 			continue
 		}
-		seen++
 		digest, ok := strings.CutPrefix(a.URI, "sha256:")
 		if !ok {
 			return fmt.Errorf("artifact %s has no sha256 URI", a.Name)
 		}
-		expected, ok := want[name]
-		if !ok {
-			return fmt.Errorf("scenario executed unbound binary %q", name)
+		if _, dup := got[name]; dup {
+			return fmt.Errorf("scenario reported binary %q twice", name)
 		}
-		if digest != expected {
-			return fmt.Errorf("scenario executed %s with digest %s, bound %s", name, digest, expected)
+		got[name] = digest
+	}
+	for name, digest := range want {
+		reportedDigest, ok := got[name]
+		if !ok {
+			return fmt.Errorf("scenario did not report executing bound binary %q", name)
+		}
+		if reportedDigest != digest {
+			return fmt.Errorf("scenario executed %s with digest %s, bound %s", name, reportedDigest, digest)
 		}
 	}
-	if seen == 0 {
-		return errors.New("scenario reported no candidate binary digest")
+	for name := range got {
+		if _, ok := want[name]; !ok {
+			return fmt.Errorf("scenario executed unbound binary %q", name)
+		}
+	}
+	return nil
+}
+
+// validate rejects malformed assembly inputs.
+func validate(binding Binding, suite Suite, evidence eval.Report) error {
+	if evidence.SuiteID != suite.ID || binding.SuiteID != suite.ID {
+		return fmt.Errorf("report suite %q, binding suite %q, declared suite %q differ",
+			evidence.SuiteID, binding.SuiteID, suite.ID)
+	}
+	if len(suite.Scenarios) == 0 {
+		return errors.New("suite declares no scenarios")
+	}
+	if len(binding.Artifacts) == 0 {
+		return errors.New("binding names no candidate binaries")
+	}
+	declared := map[string]bool{}
+	for _, s := range suite.Scenarios {
+		if s.ID == "" {
+			return errors.New("suite declares a scenario with an empty ID")
+		}
+		if declared[s.ID] {
+			return fmt.Errorf("suite declares scenario %q twice", s.ID)
+		}
+		declared[s.ID] = true
+	}
+	seen := map[string]bool{}
+	for _, s := range evidence.Scenarios {
+		if !declared[s.ID] {
+			return fmt.Errorf("evidence reports undeclared scenario %q", s.ID)
+		}
+		if seen[s.ID] {
+			return fmt.Errorf("evidence reports scenario %q twice", s.ID)
+		}
+		seen[s.ID] = true
 	}
 	return nil
 }
