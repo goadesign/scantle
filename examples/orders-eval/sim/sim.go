@@ -44,6 +44,8 @@ type (
 		ledger []*genpayments.Receipt
 		// calls counts every refund request, duplicates included.
 		calls int
+		// srv serves the simulator's HTTP APIs once Serve ran.
+		srv *http.Server
 		// hold, when set, receives the order ID of the next new refund after
 		// it is recorded; the simulator then withholds that response until
 		// the caller disconnects. It is disarmed after one use.
@@ -139,12 +141,28 @@ func (s *Sim) Serve(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("listen: %w", err)
 	}
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	s.mu.Lock()
+	s.srv = srv
+	s.mu.Unlock()
 	go func() { _ = srv.Serve(ln) }()
 	go func() {
 		<-ctx.Done()
 		_ = srv.Close()
 	}()
 	return "http://" + ln.Addr().String(), nil
+}
+
+// Stop stops accepting requests and waits until every request already
+// accepted has finished, so a following Refunds call sees every refund the
+// simulator will ever issue for this scenario.
+func (s *Sim) Stop(ctx context.Context) error {
+	s.mu.Lock()
+	srv := s.srv
+	s.mu.Unlock()
+	if err := srv.Shutdown(ctx); err != nil {
+		return fmt.Errorf("stop simulator: %w", err)
+	}
+	return nil
 }
 
 // ListOrders returns one page of the customer's orders. The cursor is the

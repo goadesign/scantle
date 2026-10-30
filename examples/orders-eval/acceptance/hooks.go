@@ -39,9 +39,14 @@ type (
 	}
 )
 
-// crashWait bounds how long the crash scenario waits for the refund to reach
-// the payment provider.
-const crashWait = 60 * time.Second
+const (
+	// crashWait bounds how long the crash scenario waits for the refund to
+	// reach the payment provider.
+	crashWait = 60 * time.Second
+	// simStopTimeout bounds waiting for the simulator's in-flight requests
+	// after every candidate process exited.
+	simStopTimeout = 10 * time.Second
+)
 
 // New returns the acceptance hooks for an environment.
 func New(env *harness.Env) *Hooks {
@@ -66,7 +71,7 @@ func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (res eval.Result, er
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, _, err := sc.finalLedger()
+	ledger, _, err := sc.finalLedger(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
@@ -132,7 +137,7 @@ func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (res eval.Result, er
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	after, _, err := sc.finalLedger()
+	after, _, err := sc.finalLedger(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
@@ -176,7 +181,7 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (res eval.Result,
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, calls, err := sc.finalLedger()
+	ledger, calls, err := sc.finalLedger(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
@@ -240,7 +245,7 @@ func (h *Hooks) PendingApprovalSurvivesAPIRestart(ctx context.Context) (res eval
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, _, err := sc.finalLedger()
+	ledger, _, err := sc.finalLedger(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
@@ -269,7 +274,7 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, _, err := sc.finalLedger()
+	ledger, _, err := sc.finalLedger(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
@@ -293,12 +298,18 @@ func (h *Hooks) recordArtifacts(res *eval.Result) {
 	)
 }
 
-// finalLedger stops and awaits every candidate process before reading the
-// simulator ledger, so no candidate can issue a refund after the scenario's
-// verdict is taken. It returns the distinct refunds and the request count.
-func (sc *scenario) finalLedger() ([]genpayments.Receipt, int, error) {
+// finalLedger stops and awaits every candidate process, then stops the
+// simulator and waits for every request it already accepted, before reading
+// the ledger. No refund can be issued after the scenario's verdict is taken.
+// It returns the distinct refunds and the request count.
+func (sc *scenario) finalLedger(ctx context.Context) ([]genpayments.Receipt, int, error) {
 	if err := sc.platform.Close(); err != nil {
 		return nil, 0, fmt.Errorf("stop candidate before reading the ledger: %w", err)
+	}
+	stopCtx, cancel := context.WithTimeout(ctx, simStopTimeout)
+	defer cancel()
+	if err := sc.sim.Stop(stopCtx); err != nil {
+		return nil, 0, err
 	}
 	ledger, calls := sc.sim.Refunds()
 	return ledger, calls, nil
