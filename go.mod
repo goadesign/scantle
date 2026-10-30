@@ -83,6 +83,7 @@ require (
 	go.uber.org/atomic v1.12.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	goa.design/clue v1.3.0 // indirect
+	goa.design/model v1.16.11-0.20261015174523-13107c846b9b
 	goa.design/pulse v1.10.3-0.20261002205507-b34ad25e317d // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/image v0.46.0 // indirect

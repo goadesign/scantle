@@ -4,7 +4,10 @@ package diff
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -353,3 +356,208 @@ var _ = Service("orders", func() {
 		}
 	}
 }
+
+func TestCompareMultiFileDirectorySiblingPackagesModelPrimitivesLookupAndTotalRequired(t *testing.T) {
+	ctx := context.Background()
+
+	oldRoot := t.TempDir()
+	newRoot := t.TempDir()
+
+	writeModule := func(root string, maxLimit int, qtyType, authIn, promptMsg, lookupType string, methodReqTotal bool, sysDesc string) string {
+		goMod := "module github.com/acme/orders\n\ngo 1.26.2\n"
+		if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(goMod), 0o600); err != nil {
+			t.Fatalf("write go.mod: %v", err)
+		}
+		limitsDir := filepath.Join(root, "pkg", "limits")
+		if err := os.MkdirAll(limitsDir, 0o750); err != nil {
+			t.Fatalf("mkdir limits: %v", err)
+		}
+		limitsSrc := "package limits\n\nconst MaxItems = " + strconv.Itoa(maxLimit) + "\n"
+		if err := os.WriteFile(filepath.Join(limitsDir, "limits.go"), []byte(limitsSrc), 0o600); err != nil {
+			t.Fatalf("write limits.go: %v", err)
+		}
+		designDir := filepath.Join(root, "design")
+		if err := os.MkdirAll(designDir, 0o750); err != nil {
+			t.Fatalf("mkdir design: %v", err)
+		}
+		typesSrc := `package design
+
+import (
+	"github.com/acme/orders/pkg/limits"
+	. "goa.design/goa/v3/dsl"
+)
+
+var APIKeyAuth = APIKeySecurity("api_key", func() {
+	Description("API key auth")
+})
+
+var OrderQuery = Type("OrderQuery", func() {
+	APIKeyField(1, "api_key", "key", String)
+	Field(2, "tenant_id", Int)
+	Field(3, "qty", ` + qtyType + `, func() {
+		Maximum(limits.MaxItems)
+	})
+	Required("key", "tenant_id", "qty")
+})
+
+var MethodPageResult = Type("MethodPageResult", func() {
+	Field(1, "items", ArrayOf(String))
+	Field(2, "returned", Int)
+	Field(3, "total", Int)
+	Field(4, "truncated", Boolean)
+	Field(5, "refinement_hint", String)
+` + func() string {
+			if methodReqTotal {
+				return "\tRequired(\"items\", \"returned\", \"total\", \"truncated\")\n"
+			}
+			return "\tRequired(\"items\", \"returned\", \"truncated\")\n"
+		}() + `})
+
+var ToolPageReturn = Type("ToolPageReturn", func() {
+	Field(1, "items", ArrayOf(String))
+	Required("items")
+})
+`
+		if err := os.WriteFile(filepath.Join(designDir, "types.go"), []byte(typesSrc), 0o600); err != nil {
+			t.Fatalf("write types.go: %v", err)
+		}
+
+		svcSrc := `package design
+
+import (
+	. "goa.design/goa-ai/dsl"
+	. "goa.design/goa/v3/dsl"
+	m "goa.design/model/dsl"
+)
+
+var OrderTools = Toolset("order_tools", func() {
+	Tool("search_orders", "Search orders", func() {
+		BindTo("orders", "search_orders")
+		Args(OrderQuery)
+		Return(ToolPageReturn)
+		BoundedResult()
+	})
+})
+
+var _ = Service("orders", func() {
+	Security(APIKeyAuth)
+	JSONRPC(func() {
+		POST("/mcp")
+	})
+	MCP("orders_mcp", "1.0.0")
+	StaticPrompt("triage", "Triage prompt",
+		"user", ` + "`" + promptMsg + "`" + `,
+	)
+	Method("search_orders", func() {
+		Payload(OrderQuery)
+		Result(MethodPageResult)
+		HTTP(func() {
+			GET("/orders")
+			` + authIn + `("key:X-API-Key")
+			Response(StatusOK)
+		})
+		GRPC(func() {
+			Response(CodeOK)
+		})
+	})
+	Method("legacy_orders", func() {
+		NoSecurity()
+		HTTP(func() {
+			GET("/old-orders")
+			Redirect("/orders", StatusMovedPermanently)
+		})
+	})
+	Agent("lookup_agent", "Uses Lookup on BindField", func() {
+		Use(OrderTools, func() {
+			BindField("tenant_id", func() {
+				Lookup(` + lookupType + `)
+			})
+		})
+		RunPolicy(func() {
+			DefaultCaps(MaxToolCalls(4))
+			Timing(func() {
+				Budget("1m")
+				Plan("15s")
+				Tools("10s")
+			})
+			OnMissingFields("await_clarification")
+			History(func() {
+				CompressAtTurns(10)
+				KeepMaxTurns(4)
+			})
+		})
+	})
+})
+
+var _ = m.Design("Architecture", "Orders architecture", func() {
+	sys := m.SoftwareSystem("OrdersSystem", ` + "`" + sysDesc + "`" + `, func() {
+		m.Container("OrdersAPI", "Goa service", "Go", func() {})
+	})
+	m.Person("Operator", "System operator", func() {
+		m.Uses(sys, "Manages orders", "HTTPS", m.Synchronous)
+	})
+})
+`
+		if err := os.WriteFile(filepath.Join(designDir, "service.go"), []byte(svcSrc), 0o600); err != nil {
+			t.Fatalf("write service.go: %v", err)
+		}
+		return goMod
+	}
+
+	oldMod := writeModule(oldRoot, 10, "Int", "Header", "triage v1\npackage main\nfunc main() {}", "String", true, "Orders system v1")
+	newMod := writeModule(newRoot, 20, "UInt32", "Param", "triage v2\npackage main\nfunc main() {}", "String", false, "Orders system v2")
+
+	rep, err := Compare(ctx, filepath.Join(oldRoot, "design"), filepath.Join(newRoot, "design"), oldMod, newMod)
+	if err != nil {
+		t.Fatalf("Compare multi-file design directories failed: %v", err)
+	}
+	for _, wantMod := range []string{
+		"Type:OrderQuery",
+		"Service:orders/Method:search_orders",
+		"Service:orders/MCP:orders_mcp/Prompt:triage",
+		"Toolset:order_tools/Tool:search_orders",
+		"Model:System:OrdersSystem",
+	} {
+		if !slices.Contains(rep.ModifiedDeclarations, wantMod) {
+			t.Fatalf("expected ModifiedDeclarations to contain %q, got %v", wantMod, rep.ModifiedDeclarations)
+		}
+	}
+
+	evalOld, err := designeval.EvaluateModule(ctx, filepath.Join(oldRoot, "design"), oldMod)
+	if err != nil {
+		t.Fatalf("EvaluateModule old failed: %v", err)
+	}
+	evalNew, err := designeval.EvaluateModule(ctx, filepath.Join(newRoot, "design"), newMod)
+	if err != nil {
+		t.Fatalf("EvaluateModule new failed: %v", err)
+	}
+
+	// Verify BindField("tenant_id", Lookup(String)) keeps tenant_id in the model input schema
+	// with type "string" instead of hiding it or keeping integer.
+	var foundLookupCard bool
+	for _, tc := range evalOld.Tools {
+		if tc.ID == "Service:orders/Agent:lookup_agent/order_tools.search_orders" {
+			foundLookupCard = true
+			if !strings.Contains(tc.ArgsSchema, `"tenant_id":{"type":"string"}`) {
+				t.Fatalf("expected lookup_agent ArgsSchema to keep tenant_id as string lookup, got %s", tc.ArgsSchema)
+			}
+			// MethodPageResult required "total" in oldRoot even though ToolPageReturn did not.
+			if !strings.Contains(tc.ReturnSchema, `"required":["items","returned","total","truncated"]`) {
+				t.Fatalf("expected ReturnSchema to require total when Method.Result requires total, got %s", tc.ReturnSchema)
+			}
+		}
+	}
+	if !foundLookupCard {
+		t.Fatalf("expected per-consumer card Service:orders/Agent:lookup_agent/order_tools.search_orders in %v", evalOld.Tools)
+	}
+
+	for _, tc := range evalNew.Tools {
+		if tc.ID == "Service:orders/Agent:lookup_agent/order_tools.search_orders" {
+			// MethodPageResult did NOT require "total" in newRoot.
+			if strings.Contains(tc.ReturnSchema, `"required":["items","returned","total","truncated"]`) {
+				t.Fatalf("expected ReturnSchema not to require total when Method.Result does not require total, got %s", tc.ReturnSchema)
+			}
+		}
+	}
+}
+

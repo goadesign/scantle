@@ -1,5 +1,5 @@
-// Package designeval holds the standalone Goa/Goa-AI evaluator source template
-// compiled and executed inside verify/candidate.Exec's OS-enforced sandbox.
+// Package designeval holds the standalone Goa/Goa-AI/Model evaluator source
+// template compiled and executed inside verify/candidate.Exec's OS-enforced sandbox.
 package designeval
 
 const (
@@ -18,6 +18,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"strings"
 
 	_ {{DESIGN_IMPORT}}
 	agentcodegen "goa.design/goa-ai/codegen/agent"
@@ -27,6 +28,7 @@ import (
 	mcpexpr "goa.design/goa-ai/expr/mcp"
 	"goa.design/goa/v3/eval"
 	goaexpr "goa.design/goa/v3/expr"
+	modelexpr "goa.design/model/expr"
 )
 
 type (
@@ -44,14 +46,21 @@ type (
 	}
 
 	agentPolicy struct {
-		AgentID             string
-		MaxExecutionSeconds int
-		MaxToolCalls        int
-		MaxRecoveryTurns    int
-		CompressAtTurns     int
-		KeepRecentTurns     int
-		CacheAfterSystem    bool
-		CacheAfterTools     bool
+		AgentID                  string
+		MaxExecutionSeconds      int
+		TimeBudget               string ` + "`json:\"time_budget,omitempty\"`" + `
+		PlanTimeout              string ` + "`json:\"plan_timeout,omitempty\"`" + `
+		ToolTimeout              string ` + "`json:\"tool_timeout,omitempty\"`" + `
+		OnMissingFields          string ` + "`json:\"on_missing_fields,omitempty\"`" + `
+		HistoryMode              string ` + "`json:\"history_mode,omitempty\"`" + `
+		MaxToolCalls             int
+		MaxRecoveryTurns         int
+		CompressAtTurns          int
+		CompressAtMaxInputTokens int ` + "`json:\"compress_at_max_input_tokens,omitempty\"`" + `
+		KeepRecentTurns          int
+		KeepMaxInputTokens       int ` + "`json:\"keep_max_input_tokens,omitempty\"`" + `
+		CacheAfterSystem         bool
+		CacheAfterTools          bool
 	}
 
 	toolContract struct {
@@ -76,8 +85,10 @@ type (
 	}
 
 	schemaDecl struct {
-		Schema    json.RawMessage        ` + "`json:\"schema\"`" + `
-		FieldMeta map[string]metaDeclMap ` + "`json:\"field_meta,omitempty\"`" + `
+		Schema     json.RawMessage        ` + "`json:\"schema\"`" + `
+		GoaTypes   map[string]string      ` + "`json:\"goa_types,omitempty\"`" + `
+		ProtoTypes map[string]string      ` + "`json:\"proto_types,omitempty\"`" + `
+		FieldMeta  map[string]metaDeclMap ` + "`json:\"field_meta,omitempty\"`" + `
 	}
 
 	metaDeclMap map[string][]string
@@ -92,9 +103,33 @@ type (
 		Mappings []mappedElemDecl ` + "`json:\"mappings,omitempty\"`" + `
 	}
 
+	securityScopeDecl struct {
+		Name        string ` + "`json:\"name\"`" + `
+		Description string ` + "`json:\"description,omitempty\"`" + `
+	}
+
+	securityFlowDecl struct {
+		Kind             string ` + "`json:\"kind\"`" + `
+		AuthorizationURL string ` + "`json:\"authorization_url,omitempty\"`" + `
+		TokenURL         string ` + "`json:\"token_url,omitempty\"`" + `
+		RefreshURL       string ` + "`json:\"refresh_url,omitempty\"`" + `
+	}
+
+	securitySchemeDecl struct {
+		SchemeName   string              ` + "`json:\"scheme_name\"`" + `
+		Kind         string              ` + "`json:\"kind\"`" + `
+		Description  string              ` + "`json:\"description,omitempty\"`" + `
+		In           string              ` + "`json:\"in,omitempty\"`" + `
+		Name         string              ` + "`json:\"name,omitempty\"`" + `
+		BearerFormat string              ` + "`json:\"bearer_format,omitempty\"`" + `
+		Scopes       []securityScopeDecl ` + "`json:\"scopes,omitempty\"`" + `
+		Flows        []securityFlowDecl  ` + "`json:\"flows,omitempty\"`" + `
+	}
+
 	securityReqDecl struct {
-		Schemes []string ` + "`json:\"schemes\"`" + `
-		Scopes  []string ` + "`json:\"scopes,omitempty\"`" + `
+		Schemes       []string             ` + "`json:\"schemes\"`" + `
+		SchemeDetails []securitySchemeDecl ` + "`json:\"scheme_details,omitempty\"`" + `
+		Scopes        []string             ` + "`json:\"scopes,omitempty\"`" + `
 	}
 
 	errorDecl struct {
@@ -107,14 +142,15 @@ type (
 	}
 
 	apiDecl struct {
-		Name        string         ` + "`json:\"name\"`" + `
-		Title       string         ` + "`json:\"title,omitempty\"`" + `
-		Version     string         ` + "`json:\"version,omitempty\"`" + `
-		Description string         ` + "`json:\"description,omitempty\"`" + `
-		HTTPPrefix  string         ` + "`json:\"http_prefix,omitempty\"`" + `
-		HTTPParams  *mappedAttDecl ` + "`json:\"http_params,omitempty\"`" + `
-		HTTPHeaders *mappedAttDecl ` + "`json:\"http_headers,omitempty\"`" + `
-		HTTPCookies *mappedAttDecl ` + "`json:\"http_cookies,omitempty\"`" + `
+		Name        string               ` + "`json:\"name\"`" + `
+		Title       string               ` + "`json:\"title,omitempty\"`" + `
+		Version     string               ` + "`json:\"version,omitempty\"`" + `
+		Description string               ` + "`json:\"description,omitempty\"`" + `
+		HTTPPrefix  string               ` + "`json:\"http_prefix,omitempty\"`" + `
+		HTTPParams  *mappedAttDecl       ` + "`json:\"http_params,omitempty\"`" + `
+		HTTPHeaders *mappedAttDecl       ` + "`json:\"http_headers,omitempty\"`" + `
+		HTTPCookies *mappedAttDecl       ` + "`json:\"http_cookies,omitempty\"`" + `
+		Schemes     []securitySchemeDecl ` + "`json:\"schemes,omitempty\"`" + `
 	}
 
 	typeDecl struct {
@@ -123,15 +159,21 @@ type (
 		Schema      schemaDecl ` + "`json:\"schema\"`" + `
 	}
 
+	httpRedirectDecl struct {
+		URL        string ` + "`json:\"url\"`" + `
+		StatusCode int    ` + "`json:\"status_code\"`" + `
+	}
+
 	serviceDecl struct {
-		Name        string            ` + "`json:\"name\"`" + `
-		Description string            ` + "`json:\"description,omitempty\"`" + `
-		HTTPPaths   []string          ` + "`json:\"http_paths,omitempty\"`" + `
-		HTTPParams  *mappedAttDecl    ` + "`json:\"http_params,omitempty\"`" + `
-		HTTPHeaders *mappedAttDecl    ` + "`json:\"http_headers,omitempty\"`" + `
-		HTTPCookies *mappedAttDecl    ` + "`json:\"http_cookies,omitempty\"`" + `
-		Security    []securityReqDecl ` + "`json:\"security,omitempty\"`" + `
-		Errors      []errorDecl       ` + "`json:\"errors,omitempty\"`" + `
+		Name          string             ` + "`json:\"name\"`" + `
+		Description   string             ` + "`json:\"description,omitempty\"`" + `
+		HTTPPaths     []string           ` + "`json:\"http_paths,omitempty\"`" + `
+		HTTPParams    *mappedAttDecl     ` + "`json:\"http_params,omitempty\"`" + `
+		HTTPHeaders   *mappedAttDecl     ` + "`json:\"http_headers,omitempty\"`" + `
+		HTTPCookies   *mappedAttDecl     ` + "`json:\"http_cookies,omitempty\"`" + `
+		HTTPRedirects []httpRedirectDecl ` + "`json:\"http_redirects,omitempty\"`" + `
+		Security      []securityReqDecl  ` + "`json:\"security,omitempty\"`" + `
+		Errors        []errorDecl        ` + "`json:\"errors,omitempty\"`" + `
 	}
 
 	httpResponseDecl struct {
@@ -162,6 +204,8 @@ type (
 		FormRequest                  bool               ` + "`json:\"form_request,omitempty\"`" + `
 		SkipRequestBodyEncodeDecode  bool               ` + "`json:\"skip_request_body_encode_decode,omitempty\"`" + `
 		SkipResponseBodyEncodeDecode bool               ` + "`json:\"skip_response_body_encode_decode,omitempty\"`" + `
+		Redirect                     *httpRedirectDecl  ` + "`json:\"redirect,omitempty\"`" + `
+		Security                     []securityReqDecl  ` + "`json:\"security,omitempty\"`" + `
 		Responses                    []httpResponseDecl ` + "`json:\"responses,omitempty\"`" + `
 		Errors                       []httpErrorDecl    ` + "`json:\"errors,omitempty\"`" + `
 	}
@@ -233,15 +277,26 @@ type (
 		Method      string ` + "`json:\"method,omitempty\"`" + `
 	}
 
+	mcpMessageDecl struct {
+		Role    string ` + "`json:\"role\"`" + `
+		Content string ` + "`json:\"content\"`" + `
+	}
+
 	mcpPromptDecl struct {
-		Name        string ` + "`json:\"name\"`" + `
-		Description string ` + "`json:\"description,omitempty\"`" + `
-		Method      string ` + "`json:\"method,omitempty\"`" + `
+		Name        string           ` + "`json:\"name\"`" + `
+		Description string           ` + "`json:\"description,omitempty\"`" + `
+		Method      string           ` + "`json:\"method,omitempty\"`" + `
+		Messages    []mcpMessageDecl ` + "`json:\"messages,omitempty\"`" + `
 	}
 
 	inputBindingDecl struct {
 		Tool   string   ` + "`json:\"tool\"`" + `
 		Fields []string ` + "`json:\"fields\"`" + `
+	}
+
+	fieldBindingDecl struct {
+		Field  string      ` + "`json:\"field\"`" + `
+		Lookup *schemaDecl ` + "`json:\"lookup,omitempty\"`" + `
 	}
 
 	toolsetDecl struct {
@@ -250,7 +305,7 @@ type (
 		Deferred      bool               ` + "`json:\"deferred,omitempty\"`" + `
 		DeferredTools []string           ` + "`json:\"deferred_tools,omitempty\"`" + `
 		InputBindings []inputBindingDecl ` + "`json:\"input_bindings,omitempty\"`" + `
-		FieldBindings []string           ` + "`json:\"field_bindings,omitempty\"`" + `
+		FieldBindings []fieldBindingDecl ` + "`json:\"field_bindings,omitempty\"`" + `
 	}
 
 	toolConfirmDecl struct {
@@ -272,6 +327,7 @@ type (
 		ArgsSchema      json.RawMessage  ` + "`json:\"args_schema\"`" + `
 		ReturnSchema    json.RawMessage  ` + "`json:\"return_schema\"`" + `
 		HiddenFields    []string         ` + "`json:\"hidden_fields,omitempty\"`" + `
+		LookupFields    []string         ` + "`json:\"lookup_fields,omitempty\"`" + `
 		RequiresUI      bool             ` + "`json:\"requires_ui,omitempty\"`" + `
 		UIOnlyFields    []string         ` + "`json:\"ui_only_fields,omitempty\"`" + `
 		Confirmation    *toolConfirmDecl ` + "`json:\"confirmation,omitempty\"`" + `
@@ -298,6 +354,25 @@ type (
 		Description string     ` + "`json:\"description,omitempty\"`" + `
 		Tags        []string   ` + "`json:\"tags,omitempty\"`" + `
 		Input       schemaDecl ` + "`json:\"input\"`" + `
+	}
+
+	modelRelDecl struct {
+		Destination     string ` + "`json:\"destination\"`" + `
+		Description     string ` + "`json:\"description,omitempty\"`" + `
+		Technology      string ` + "`json:\"technology,omitempty\"`" + `
+		InteractionKind int    ` + "`json:\"interaction_kind,omitempty\"`" + `
+		Tags            string ` + "`json:\"tags,omitempty\"`" + `
+	}
+
+	modelElementDecl struct {
+		Kind          string            ` + "`json:\"kind\"`" + `
+		Name          string            ` + "`json:\"name\"`" + `
+		Description   string            ` + "`json:\"description,omitempty\"`" + `
+		Technology    string            ` + "`json:\"technology,omitempty\"`" + `
+		Tags          string            ` + "`json:\"tags,omitempty\"`" + `
+		URL           string            ` + "`json:\"url,omitempty\"`" + `
+		Properties    map[string]string ` + "`json:\"properties,omitempty\"`" + `
+		Relationships []modelRelDecl    ` + "`json:\"relationships,omitempty\"`" + `
 	}
 )
 
@@ -349,6 +424,11 @@ func main() {
 	}
 
 	api := goaexpr.Root.API
+	for _, sch := range goaexpr.Root.Schemes {
+		if sch != nil && sch.SchemeName != "" {
+			out.Declarations["SecurityScheme:"+sch.SchemeName] = mustJSON(describeSecurityScheme(sch))
+		}
+	}
 	if api != nil && api.Name != "" && api.Name != "api" {
 		out.SystemName = api.Name
 		decl := apiDecl{
@@ -356,6 +436,11 @@ func main() {
 			Title:       api.Title,
 			Version:     api.Version,
 			Description: api.Description,
+		}
+		for _, sch := range goaexpr.Root.Schemes {
+			if sch != nil {
+				decl.Schemes = append(decl.Schemes, describeSecurityScheme(sch))
+			}
 		}
 		if api.HTTP != nil {
 			decl.HTTPPrefix = api.HTTP.Path
@@ -421,6 +506,14 @@ func main() {
 			svcDecl.HTTPParams = describeMappedAtt(api, httpSvc.Params, "svc.http.params."+svc.Name)
 			svcDecl.HTTPHeaders = describeMappedAtt(api, httpSvc.Headers, "svc.http.headers."+svc.Name)
 			svcDecl.HTTPCookies = describeMappedAtt(api, httpSvc.Cookies, "svc.http.cookies."+svc.Name)
+			for _, fs := range httpSvc.FileServers {
+				if fs != nil && fs.Redirect != nil {
+					svcDecl.HTTPRedirects = append(svcDecl.HTTPRedirects, httpRedirectDecl{
+						URL:        fs.Redirect.URL,
+						StatusCode: fs.Redirect.StatusCode,
+					})
+				}
+			}
 		}
 		out.Declarations["Service:"+svc.Name] = mustJSON(svcDecl)
 
@@ -505,9 +598,19 @@ func main() {
 				}
 				for _, p := range mcp.Prompts {
 					if p != nil {
+						var msgs []mcpMessageDecl
+						for _, msg := range p.Messages {
+							if msg != nil {
+								msgs = append(msgs, mcpMessageDecl{
+									Role:    msg.Role,
+									Content: msg.Content,
+								})
+							}
+						}
 						out.Declarations[fmt.Sprintf("%s/Prompt:%s", mcpKey, p.Name)] = mustJSON(mcpPromptDecl{
 							Name:        p.Name,
 							Description: p.Description,
+							Messages:    msgs,
 						})
 					}
 				}
@@ -572,13 +675,20 @@ func main() {
 			}
 			return slices.Compare(a.Fields, b.Fields)
 		})
-		var fieldBinds []string
+		var fieldBinds []fieldBindingDecl
 		for _, fb := range ts.FieldBindings {
 			if fb != nil {
-				fieldBinds = append(fieldBinds, fb.Field)
+				item := fieldBindingDecl{Field: fb.Field}
+				if fb.Lookup != nil {
+					lk := describeSchema(api, fb.Lookup, "toolset.lookup."+origin.Name+"."+fb.Field)
+					item.Lookup = &lk
+				}
+				fieldBinds = append(fieldBinds, item)
 			}
 		}
-		slices.Sort(fieldBinds)
+		slices.SortFunc(fieldBinds, func(a, b fieldBindingDecl) int {
+			return strings.Compare(a.Field, b.Field)
+		})
 		deferredTools := slices.Clone(ts.DeferredTools)
 		slices.Sort(deferredTools)
 
@@ -595,10 +705,14 @@ func main() {
 			if t == nil {
 				continue
 			}
-			hidden := collectHiddenFields(t, ts, origin.Tools)
-			argsSig := buildModelArgsSchemaJSON(api, t.Args, hidden, "tool.args."+origin.Name+"."+t.Name)
+			hidden, lookups := collectHiddenAndLookupFields(t, ts, origin.Tools)
+			argsSig := buildModelArgsSchemaJSON(api, t.Args, hidden, lookups, "tool.args."+origin.Name+"."+t.Name)
 			retAtt := effectiveToolReturn(t)
-			retSig := buildToolReturnSchemaJSON(api, retAtt, t.Bounds, "tool.return."+origin.Name+"."+t.Name)
+			var methodResult *goaexpr.AttributeExpr
+			if t.Method != nil {
+				methodResult = t.Method.Result
+			}
+			retSig := buildToolReturnSchemaJSON(api, retAtt, methodResult, t.Bounds, "tool.return."+origin.Name+"."+t.Name)
 
 			var confirmDecl *toolConfirmDecl
 			if t.Confirmation != nil {
@@ -619,6 +733,11 @@ func main() {
 			}
 			uiOnly := slices.Clone(t.UIOnlyFields)
 			slices.Sort(uiOnly)
+			var lookupNames []string
+			for k := range lookups {
+				lookupNames = append(lookupNames, k)
+			}
+			slices.Sort(lookupNames)
 			toolKey := fmt.Sprintf("%s/Tool:%s", tsDeclKey, t.Name)
 			out.Declarations[toolKey] = mustJSON(toolDecl{
 				Name:            t.Name,
@@ -626,6 +745,7 @@ func main() {
 				ArgsSchema:      json.RawMessage(argsSig),
 				ReturnSchema:    json.RawMessage(retSig),
 				HiddenFields:    hidden,
+				LookupFields:    lookupNames,
 				RequiresUI:      t.RequiresUI,
 				UIOnlyFields:    uiOnly,
 				Confirmation:    confirmDecl,
@@ -636,8 +756,8 @@ func main() {
 			})
 
 			baseToolID := origin.Name + "." + t.Name
-			providerHidden := collectHiddenFields(t, origin, origin.Tools)
-			providerArgsSig := buildModelArgsSchemaJSON(api, t.Args, providerHidden, "tool.args."+origin.Name+"."+t.Name)
+			providerHidden, providerLookups := collectHiddenAndLookupFields(t, origin, origin.Tools)
+			providerArgsSig := buildModelArgsSchemaJSON(api, t.Args, providerHidden, providerLookups, "tool.args."+origin.Name+"."+t.Name)
 			addToolCard(toolContract{
 				ID:                   baseToolID,
 				Toolset:              origin.Name,
@@ -649,7 +769,7 @@ func main() {
 				RequiresConfirmation: confirmDecl != nil,
 				BoundedResult:        boundsDecl != nil,
 			})
-			if scopePrefix != "" && !slices.Equal(hidden, providerHidden) {
+			if scopePrefix != "" && (!slices.Equal(hidden, providerHidden) || argsSig != providerArgsSig) {
 				addToolCard(toolContract{
 					ID:                   scopePrefix + "/" + baseToolID,
 					Toolset:              scopePrefix + "/" + origin.Name,
@@ -715,25 +835,7 @@ func main() {
 				Protocol: "Goa-AI Agent Workflow",
 			})
 
-			pol := agentPolicy{AgentID: agID}
-			if ag.RunPolicy != nil {
-				pol.MaxExecutionSeconds = int(ag.RunPolicy.TimeBudget.Seconds())
-				if ag.RunPolicy.DefaultCaps != nil {
-					pol.MaxToolCalls = ag.RunPolicy.DefaultCaps.MaxToolCalls
-					pol.MaxRecoveryTurns = ag.RunPolicy.DefaultCaps.MaxRecoveryTurns
-				}
-				if ag.RunPolicy.History != nil {
-					pol.CompressAtTurns = ag.RunPolicy.History.CompressAtTurns
-					pol.KeepRecentTurns = ag.RunPolicy.History.KeepMaxTurns
-					if pol.KeepRecentTurns == 0 {
-						pol.KeepRecentTurns = ag.RunPolicy.History.KeepRecent
-					}
-				}
-				if ag.RunPolicy.Cache != nil {
-					pol.CacheAfterSystem = ag.RunPolicy.Cache.AfterSystem
-					pol.CacheAfterTools = ag.RunPolicy.Cache.AfterTools
-				}
-			}
+			pol := buildAgentPolicy(agID, ag.RunPolicy)
 			out.AgentPolicies = append(out.AgentPolicies, pol)
 
 			agDeclKey := fmt.Sprintf("Service:%s/Agent:%s", ag.Service.Name, ag.Name)
@@ -777,6 +879,8 @@ func main() {
 			}
 		}
 	}
+
+	recordModelRoot(&out, addContainer, addEdge)
 
 	if evalexpr.Root != nil {
 		for _, suite := range evalexpr.Root.Suites {

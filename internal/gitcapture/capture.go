@@ -69,6 +69,7 @@ func Capture(ctx context.Context, repoDir string, selectedPaths ...string) (Snap
 		"-c",
 		"diff.noprefix=false",
 		"diff",
+		"--no-color",
 		"--binary",
 		"--no-ext-diff",
 		"--no-textconv",
