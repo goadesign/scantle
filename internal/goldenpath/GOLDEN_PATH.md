@@ -65,7 +65,7 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Rule
 - Mark large, paged or truncated results with `BoundedResult()`. The service sets `Returned` and `Truncated` on every success, and sets `Total` only when it is known.
 - Keep `Return` to domain fields. Never add `returned`, `total`, `truncated` or `next_cursor` to it.
 - Prefer `BoundedResult(func() { ContinueWith("continue_x", "cursor"); NextCursor("next_cursor") })`. The runtime holds the cursor and the model calls the continuation with `{}`.
-- Keep domain facts in `Return`, including facts a UI also renders. Put only data the model does not need, such as large or presentation-only payloads, in `ServerData`.
+- Keep domain facts in `Return`, including facts a UI also renders. Put auxiliary or presentation data the model does not need in `ServerData`. Exception: `ServerData` declared with `NativeImage()` reaches the model as an image.
 - Declare `Confirmation(...)` on a tool when the domain requires a person to approve each call before it runs. Do not add it where the action is already authorized. Key the UI on the pending confirmation, never on a tool name.
 - Report expected tool failures as a classified `Failure` on the tool result (`RecoveryCorrectCall`, `RecoveryReplan` or `RecoveryFinish`), so the planner can recover. Return ordinary errors for unexpected failures; the runtime classifies them. Never panic.
 - Give every agent a `RunPolicy` with `DefaultCaps(MaxToolCalls(n), MaxRecoveryTurns(n))` and a `TimeBudget`, or a `Timing` block.
