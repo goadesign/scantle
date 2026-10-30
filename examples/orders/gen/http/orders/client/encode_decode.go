@@ -333,8 +333,7 @@ func DecodeRunStatusResponse(decoder func(*http.Response) goahttp.Decoder, resto
 // path set to call the "orders" service "approve_refund" endpoint
 func (c *Client) BuildApproveRefundRequest(ctx context.Context, v any) (*http.Request, error) {
 	var (
-		runID      string
-		approvalID string
+		runID string
 	)
 	{
 		p, ok := v.(*orders.ApproveRefundPayload)
@@ -342,11 +341,10 @@ func (c *Client) BuildApproveRefundRequest(ctx context.Context, v any) (*http.Re
 			return nil, goahttp.ErrInvalidType("orders", "approve_refund", "*orders.ApproveRefundPayload", v)
 		}
 		runID = p.RunID
-		approvalID = p.ApprovalID
 	}
 
-	rawPath := fmt.Sprintf("/runs/%v/approvals/%v", url.PathEscape(fmt.Sprint(runID)), url.PathEscape(fmt.Sprint(approvalID)))
-	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: ApproveRefundOrdersPath(runID, approvalID), RawPath: rawPath}
+	rawPath := fmt.Sprintf("/runs/%v/approval", url.PathEscape(fmt.Sprint(runID)))
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: ApproveRefundOrdersPath(runID), RawPath: rawPath}
 	req, err := http.NewRequest("POST", u.String(), nil)
 	if err != nil {
 		return nil, goahttp.ErrInvalidURL("orders", "approve_refund", u.String(), err)

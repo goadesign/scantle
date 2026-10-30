@@ -20,6 +20,6 @@ func RunStatusOrdersPath(runID string) string {
 }
 
 // ApproveRefundOrdersPath returns the URL path to the orders service approve_refund HTTP endpoint.
-func ApproveRefundOrdersPath(runID string, approvalID string) string {
-	return fmt.Sprintf("/runs/%v/approvals/%v", runID, approvalID)
+func ApproveRefundOrdersPath(runID string) string {
+	return fmt.Sprintf("/runs/%v/approval", runID)
 }

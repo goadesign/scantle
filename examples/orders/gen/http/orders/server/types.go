@@ -24,6 +24,8 @@ type ChatRequestBody struct {
 // ApproveRefundRequestBody is the type of the "orders" service
 // "approve_refund" endpoint HTTP request body.
 type ApproveRefundRequestBody struct {
+	// Approval being decided, as reported by run_status.
+	ApprovalID *string `form:"approval_id,omitempty" json:"approval_id,omitempty" xml:"approval_id,omitempty"`
 	// Whether the refund is approved.
 	Approved *bool `form:"approved,omitempty" json:"approved,omitempty" xml:"approved,omitempty"`
 }
@@ -517,12 +519,12 @@ func NewRunStatusPayload(runID string, token string) *orders.RunStatusPayload {
 
 // NewApproveRefundPayload builds a orders service approve_refund endpoint
 // payload.
-func NewApproveRefundPayload(body *ApproveRefundRequestBody, runID string, approvalID string, token string) *orders.ApproveRefundPayload {
+func NewApproveRefundPayload(body *ApproveRefundRequestBody, runID string, token string) *orders.ApproveRefundPayload {
 	v := &orders.ApproveRefundPayload{
-		Approved: *body.Approved,
+		ApprovalID: *body.ApprovalID,
+		Approved:   *body.Approved,
 	}
 	v.RunID = runID
-	v.ApprovalID = approvalID
 	v.Token = token
 
 	return v
@@ -544,8 +546,16 @@ func ValidateChatRequestBody(body *ChatRequestBody) (err error) {
 // ValidateApproveRefundRequestBody runs the validations defined on
 // ApproveRefundRequestBody
 func ValidateApproveRefundRequestBody(body *ApproveRefundRequestBody) (err error) {
+	if body.ApprovalID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approval_id", "body"))
+	}
 	if body.Approved == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("approved", "body"))
+	}
+	if body.ApprovalID != nil {
+		if utf8.RuneCountInString(*body.ApprovalID) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.approval_id", *body.ApprovalID, utf8.RuneCountInString(*body.ApprovalID), 1, true))
+		}
 	}
 	return
 }

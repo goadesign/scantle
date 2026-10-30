@@ -170,7 +170,7 @@ paths:
                 - http
             security:
                 - jwt_header_Authorization: []
-    /runs/{run_id}/approvals/{approval_id}:
+    /runs/{run_id}/approval:
         post:
             tags:
                 - orders
@@ -188,18 +188,13 @@ paths:
                   required: true
                   type: string
                   minLength: 1
-                - name: approval_id
-                  in: path
-                  description: Approval being decided.
-                  required: true
-                  type: string
-                  minLength: 1
                 - name: approve_refund_request_body
                   in: body
                   required: true
                   schema:
                     $ref: '#/definitions/OrdersApproveRefundRequestBody'
                     required:
+                        - approval_id
                         - approved
             responses:
                 "202":
@@ -703,13 +698,20 @@ definitions:
         title: OrdersApproveRefundRequestBody
         type: object
         properties:
+            approval_id:
+                type: string
+                description: Approval being decided, as reported by run_status.
+                example: 2lg
+                minLength: 1
             approved:
                 type: boolean
                 description: Whether the refund is approved.
                 example: true
         example:
+            approval_id: 2lg
             approved: true
         required:
+            - approval_id
             - approved
     OrdersApproveRefundUnauthorizedResponseBody:
         title: 'Mediatype identifier: application/vnd.goa.error; view=default'

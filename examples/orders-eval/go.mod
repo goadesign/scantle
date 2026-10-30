@@ -6,6 +6,7 @@ replace github.com/goadesign/scantle/examples/orders => ../orders
 
 require (
 	github.com/goadesign/scantle/examples/orders v0.0.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/stretchr/testify v1.12.1
 	goa.design/goa/v3 v3.35.1-0.20261023134129-12a5635f9dd0
 )

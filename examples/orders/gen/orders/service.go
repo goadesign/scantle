@@ -68,7 +68,7 @@ type ApproveRefundPayload struct {
 	Token string
 	// Run waiting for approval.
 	RunID string
-	// Approval being decided.
+	// Approval being decided, as reported by run_status.
 	ApprovalID string
 	// Whether the refund is approved.
 	Approved bool

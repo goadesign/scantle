@@ -35,14 +35,24 @@ type (
 		owners map[string]string
 		// totals maps tenant/order to the order total in cents.
 		totals map[string]int64
-		// receipts maps an idempotency key to the receipt it produced.
-		receipts map[string]*genpayments.Receipt
+		// receipts maps an idempotency key to the refund it was first used
+		// for and the receipt that refund produced.
+		receipts map[string]keyedRefund
 		// refunded maps tenant/order to the receipt of its refund.
 		refunded map[string]*genpayments.Receipt
 		// ledger lists distinct refunds in the order they were issued.
 		ledger []*genpayments.Receipt
 		// calls counts every refund request, duplicates included.
 		calls int
+	}
+
+	// keyedRefund is the refund command an idempotency key was first used
+	// with and its receipt.
+	keyedRefund struct {
+		// command is the original refund request with the key cleared.
+		command genpayments.RefundPayload
+		// receipt is the receipt returned for it.
+		receipt *genpayments.Receipt
 	}
 
 	// Fixture is one customer's orders loaded before a scenario.
@@ -63,14 +73,16 @@ func New() *Sim {
 	return s
 }
 
-// Reset replaces all state with the fixtures and an empty refund ledger.
+// Reset replaces all state with the fixtures and an empty refund ledger. One
+// Sim serves one scenario at a time; concurrent scenarios each use their own
+// Sim and URL.
 func (s *Sim) Reset(fixtures ...Fixture) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.orders = map[string][]*gencommerce.Order{}
 	s.owners = map[string]string{}
 	s.totals = map[string]int64{}
-	s.receipts = map[string]*genpayments.Receipt{}
+	s.receipts = map[string]keyedRefund{}
 	s.refunded = map[string]*genpayments.Receipt{}
 	s.ledger = nil
 	s.calls = 0
@@ -158,15 +170,21 @@ func (s *Sim) GetOrder(_ context.Context, p *gencommerce.GetOrderPayload) (*genc
 }
 
 // Refund issues a refund once per idempotency key, as the real provider does:
-// a repeated key returns the original receipt. A second refund of the same
+// a repeated key for the same refund returns the original receipt, and a key
+// reused for a different refund is refused. A second refund of the same
 // order under a different key, or a refund larger than the order total, is
 // refused.
 func (s *Sim) Refund(_ context.Context, p *genpayments.RefundPayload) (*genpayments.Receipt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls++
-	if r, ok := s.receipts[p.IdempotencyKey]; ok {
-		return r, nil
+	command := *p
+	command.IdempotencyKey = ""
+	if prior, ok := s.receipts[p.IdempotencyKey]; ok {
+		if prior.command != command {
+			return nil, fmt.Errorf("idempotency key %q was already used for a different refund", p.IdempotencyKey)
+		}
+		return prior.receipt, nil
 	}
 	orderKey := key(p.TenantID, p.OrderID)
 	if _, ok := s.owners[orderKey]; !ok {
@@ -184,7 +202,7 @@ func (s *Sim) Refund(_ context.Context, p *genpayments.RefundPayload) (*genpayme
 		AmountCents: p.AmountCents,
 		Method:      p.Method,
 	}
-	s.receipts[p.IdempotencyKey] = r
+	s.receipts[p.IdempotencyKey] = keyedRefund{command: command, receipt: r}
 	s.refunded[orderKey] = r
 	s.ledger = append(s.ledger, r)
 	return r, nil

@@ -84,7 +84,7 @@ func BuildRunStatusPayload(ordersRunStatusRunID *string, ordersRunStatusToken *s
 
 // BuildApproveRefundPayload builds the payload for the orders approve_refund
 // endpoint from CLI flags.
-func BuildApproveRefundPayload(ordersApproveRefundBody *string, ordersApproveRefundRunID *string, ordersApproveRefundApprovalID *string, ordersApproveRefundToken *string) (*orders.ApproveRefundPayload, error) {
+func BuildApproveRefundPayload(ordersApproveRefundBody *string, ordersApproveRefundRunID *string, ordersApproveRefundToken *string) (*orders.ApproveRefundPayload, error) {
 	var err error
 	var body ApproveRefundRequestBody
 	{
@@ -93,7 +93,13 @@ func BuildApproveRefundPayload(ordersApproveRefundBody *string, ordersApproveRef
 		}
 		err = json.Unmarshal([]byte(*ordersApproveRefundBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"approved\": true\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"approval_id\": \"2lg\",\n      \"approved\": true\n   }'")
+		}
+		if utf8.RuneCountInString(body.ApprovalID) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.approval_id", body.ApprovalID, utf8.RuneCountInString(body.ApprovalID), 1, true))
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 	var runID string
@@ -109,19 +115,6 @@ func BuildApproveRefundPayload(ordersApproveRefundBody *string, ordersApproveRef
 			return nil, err
 		}
 	}
-	var approvalID string
-	{
-		if ordersApproveRefundApprovalID == nil {
-			return nil, fmt.Errorf("missing required flag --approval-id")
-		}
-		approvalID = *ordersApproveRefundApprovalID
-		if utf8.RuneCountInString(approvalID) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("approval_id", approvalID, utf8.RuneCountInString(approvalID), 1, true))
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
 	var token string
 	{
 		if ordersApproveRefundToken == nil {
@@ -130,10 +123,10 @@ func BuildApproveRefundPayload(ordersApproveRefundBody *string, ordersApproveRef
 		token = *ordersApproveRefundToken
 	}
 	v := &orders.ApproveRefundPayload{
-		Approved: body.Approved,
+		ApprovalID: body.ApprovalID,
+		Approved:   body.Approved,
 	}
 	v.RunID = runID
-	v.ApprovalID = approvalID
 	v.Token = token
 
 	return v, nil

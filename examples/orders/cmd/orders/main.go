@@ -29,9 +29,11 @@ import (
 	"github.com/goadesign/scantle/examples/orders/internal/assistant"
 	"github.com/goadesign/scantle/examples/orders/internal/orders"
 	"github.com/goadesign/scantle/examples/orders/internal/refundflow"
+	"github.com/goadesign/scantle/examples/orders/internal/scriptedmodel"
 	"go.temporal.io/sdk/client"
 	"goa.design/goa-ai/features/model/anthropic"
 	temporalengine "goa.design/goa-ai/runtime/agent/engine/temporal"
+	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/runtime"
 	storageinmem "goa.design/goa-ai/runtime/agent/storage/inmem"
 	goahttp "goa.design/goa/v3/http"
@@ -51,6 +53,9 @@ type config struct {
 	agentQueue string
 	// refundQueue is the task queue the refund worker polls.
 	refundQueue string
+	// modelProvider selects the refund agent's model: "anthropic" or
+	// "scripted", the deterministic zero-key demo stand-in.
+	modelProvider string
 	// model is the Anthropic model the refund agent uses.
 	model string
 	// anthropicKey authenticates to Anthropic.
@@ -101,7 +106,7 @@ func run(ctx context.Context, cfg config) error {
 	if err := rt.PromptRegistry.Register(assistant.SystemPrompt()); err != nil {
 		return fmt.Errorf("register system prompt: %w", err)
 	}
-	mc, err := anthropic.NewFromAPIKey(cfg.anthropicKey, cfg.model)
+	mc, err := newModelClient(cfg)
 	if err != nil {
 		return fmt.Errorf("create model client: %w", err)
 	}
@@ -132,7 +137,7 @@ func run(ctx context.Context, cfg config) error {
 	srv := &http.Server{Addr: cfg.listen, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.ListenAndServe() }()
-	slog.Info("orders listening", "addr", cfg.listen, "env", cfg.env)
+	slog.Info("orders listening", "addr", cfg.listen, "env", cfg.env, "model_provider", cfg.modelProvider)
 
 	select {
 	case err := <-errc:
@@ -153,6 +158,7 @@ func parseConfig() (config, error) {
 	flag.StringVar(&cfg.temporalAddr, "temporal", "localhost:7233", "Temporal frontend address")
 	flag.StringVar(&cfg.agentQueue, "agent-queue", "orders.agents", "task queue of the refund agent")
 	flag.StringVar(&cfg.refundQueue, "refund-queue", "orders.refunds", "task queue of the refund worker")
+	flag.StringVar(&cfg.modelProvider, "model-provider", "anthropic", `refund agent model: "anthropic", or "scripted" for the zero-key demo`)
 	flag.StringVar(&cfg.model, "model", "claude-sonnet-5-5", "Anthropic model used by the refund agent")
 	flag.Parse()
 	if cfg.env != "sim" && cfg.env != "staging" {
@@ -161,15 +167,30 @@ func parseConfig() (config, error) {
 	if cfg.commerceURL == "" {
 		return config{}, errors.New("--commerce-url is required")
 	}
-	cfg.anthropicKey = os.Getenv("ANTHROPIC_API_KEY")
-	if cfg.anthropicKey == "" {
-		return config{}, errors.New("ANTHROPIC_API_KEY is required")
+	switch cfg.modelProvider {
+	case "anthropic":
+		cfg.anthropicKey = os.Getenv("ANTHROPIC_API_KEY")
+		if cfg.anthropicKey == "" {
+			return config{}, errors.New("ANTHROPIC_API_KEY is required with --model-provider=anthropic")
+		}
+	case "scripted":
+	default:
+		return config{}, errors.New(`--model-provider must be "anthropic" or "scripted"`)
 	}
 	cfg.signingKey = []byte(os.Getenv("ORDERS_JWT_KEY"))
 	if len(cfg.signingKey) == 0 {
 		return config{}, errors.New("ORDERS_JWT_KEY is required")
 	}
 	return cfg, nil
+}
+
+// newModelClient returns the refund agent's model client. The scripted client
+// is a deterministic demo stand-in, not a language model.
+func newModelClient(cfg config) (model.Client, error) {
+	if cfg.modelProvider == "scripted" {
+		return scriptedmodel.New()
+	}
+	return anthropic.NewFromAPIKey(cfg.anthropicKey, cfg.model)
 }
 
 // newCommerceClient returns the generated commerce client for baseURL.

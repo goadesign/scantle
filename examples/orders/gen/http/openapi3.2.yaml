@@ -176,7 +176,7 @@ paths:
                                 timeout: false
             security:
                 - jwt_header_Authorization: []
-    /runs/{run_id}/approvals/{approval_id}:
+    /runs/{run_id}/approval:
         post:
             tags:
                 - orders
@@ -194,16 +194,6 @@ paths:
                     example: mq8
                     minLength: 1
                   example: mq8
-                - name: approval_id
-                  in: path
-                  description: Approval being decided.
-                  required: true
-                  schema:
-                    type: string
-                    description: Approval being decided.
-                    example: xs
-                    minLength: 1
-                  example: xs
             requestBody:
                 description: Request body for approve_refund.
                 required: true
@@ -212,6 +202,7 @@ paths:
                         schema:
                             $ref: '#/components/schemas/ApproveRefundRequestBody'
                         example:
+                            approval_id: 2lg
                             approved: true
             responses:
                 "202":
@@ -486,14 +477,21 @@ components:
         ApproveRefundRequestBody:
             type: object
             properties:
+                approval_id:
+                    type: string
+                    description: Approval being decided, as reported by run_status.
+                    example: 2lg
+                    minLength: 1
                 approved:
                     type: boolean
                     description: Whether the refund is approved.
                     example: true
             description: Request body for approve_refund.
             example:
+                approval_id: 2lg
                 approved: true
             required:
+                - approval_id
                 - approved
         ChatRequestBody:
             type: object

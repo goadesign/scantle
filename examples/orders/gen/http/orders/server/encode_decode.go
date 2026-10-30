@@ -296,19 +296,14 @@ func DecodeApproveRefundRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 		}
 
 		var (
-			runID      string
-			approvalID string
-			token      string
+			runID string
+			token string
 
 			params = mux.Vars(r)
 		)
 		runID = params["run_id"]
 		if utf8.RuneCountInString(runID) < 1 {
 			err = goa.MergeErrors(err, goa.InvalidLengthError("run_id", runID, utf8.RuneCountInString(runID), 1, true))
-		}
-		approvalID = params["approval_id"]
-		if utf8.RuneCountInString(approvalID) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("approval_id", approvalID, utf8.RuneCountInString(approvalID), 1, true))
 		}
 		token = r.Header.Get("Authorization")
 		if token == "" {
@@ -317,7 +312,7 @@ func DecodeApproveRefundRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 		if err != nil {
 			return payload, err
 		}
-		payload = NewApproveRefundPayload(&body, runID, approvalID, token)
+		payload = NewApproveRefundPayload(&body, runID, token)
 		if index := strings.IndexByte(string(payload.Token), ' '); index >= 0 {
 			// Remove authorization scheme prefix (e.g. "Bearer")
 			payload.Token = payload.Token[index+1:]

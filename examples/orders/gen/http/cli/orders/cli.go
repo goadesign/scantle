@@ -98,11 +98,10 @@ func ParseEndpoint(
 		ordersRunStatusRunIDFlag = new(cliStringFlag)
 		ordersRunStatusTokenFlag = new(cliStringFlag)
 
-		ordersApproveRefundFlags          = flag.NewFlagSet("approve-refund", flag.ExitOnError)
-		ordersApproveRefundBodyFlag       = new(cliStringFlag)
-		ordersApproveRefundRunIDFlag      = new(cliStringFlag)
-		ordersApproveRefundApprovalIDFlag = new(cliStringFlag)
-		ordersApproveRefundTokenFlag      = new(cliStringFlag)
+		ordersApproveRefundFlags     = flag.NewFlagSet("approve-refund", flag.ExitOnError)
+		ordersApproveRefundBodyFlag  = new(cliStringFlag)
+		ordersApproveRefundRunIDFlag = new(cliStringFlag)
+		ordersApproveRefundTokenFlag = new(cliStringFlag)
 	)
 	commerceListOrdersFlags.Var(commerceListOrdersTenantIDFlag, "tenant-id", "Merchant tenant.")
 	commerceListOrdersFlags.Var(commerceListOrdersCustomerIDFlag, "customer-id", "Customer whose orders to list.")
@@ -119,7 +118,6 @@ func ParseEndpoint(
 	ordersRunStatusFlags.Var(ordersRunStatusTokenFlag, "token", "")
 	ordersApproveRefundFlags.Var(ordersApproveRefundBodyFlag, "body", "")
 	ordersApproveRefundFlags.Var(ordersApproveRefundRunIDFlag, "run-id", "Run waiting for approval.")
-	ordersApproveRefundFlags.Var(ordersApproveRefundApprovalIDFlag, "approval-id", "Approval being decided.")
 	ordersApproveRefundFlags.Var(ordersApproveRefundTokenFlag, "token", "")
 
 	commerceFlags.Usage = commerceUsage
@@ -248,7 +246,7 @@ func ParseEndpoint(
 				data, err = ordersc.BuildRunStatusPayload(ordersRunStatusRunIDFlag.value, ordersRunStatusTokenFlag.value)
 			case "approve-refund":
 				endpoint = c.ApproveRefund()
-				data, err = ordersc.BuildApproveRefundPayload(ordersApproveRefundBodyFlag.value, ordersApproveRefundRunIDFlag.value, ordersApproveRefundApprovalIDFlag.value, ordersApproveRefundTokenFlag.value)
+				data, err = ordersc.BuildApproveRefundPayload(ordersApproveRefundBodyFlag.value, ordersApproveRefundRunIDFlag.value, ordersApproveRefundTokenFlag.value)
 			}
 		}
 	}
@@ -405,7 +403,6 @@ func ordersApproveRefundUsage() {
 	fmt.Fprintf(os.Stderr, "%s [flags] orders approve-refund", os.Args[0])
 	fmt.Fprint(os.Stderr, " -body JSON")
 	fmt.Fprint(os.Stderr, " -run-id STRING")
-	fmt.Fprint(os.Stderr, " -approval-id STRING")
 	fmt.Fprint(os.Stderr, " -token STRING")
 	fmt.Fprintln(os.Stderr)
 
@@ -416,10 +413,9 @@ func ordersApproveRefundUsage() {
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)
 	fmt.Fprintln(os.Stderr, `    -run-id STRING: Run waiting for approval.`)
-	fmt.Fprintln(os.Stderr, `    -approval-id STRING: Approval being decided.`)
 	fmt.Fprintln(os.Stderr, `    -token STRING: `)
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "orders approve-refund --body '{\n      \"approved\": true\n   }' --run-id \"mq8\" --approval-id \"xs\" --token \"Quos esse.\"")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "orders approve-refund --body '{\n      \"approval_id\": \"2lg\",\n      \"approved\": true\n   }' --run-id \"mq8\" --token \"Quos esse.\"")
 }

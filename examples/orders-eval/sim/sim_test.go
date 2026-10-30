@@ -62,6 +62,13 @@ func TestSimulatorThroughGeneratedClients(t *testing.T) {
 		assert.Equal(t, 2, calls)
 	})
 
+	t.Run("key reused for a different refund is refused", func(t *testing.T) {
+		_, err := payments.Refund(ctx, &genpayments.RefundPayload{TenantID: "t1", OrderID: "o-1", AmountCents: 3850, Method: "store_credit", IdempotencyKey: "refund/t1/o-2"})
+		require.Error(t, err)
+		ledger, _ := s.Refunds()
+		assert.Len(t, ledger, 1, "the reused key must not return o-2's receipt or refund o-1")
+	})
+
 	t.Run("second key for a refunded order is refused", func(t *testing.T) {
 		_, err := payments.Refund(ctx, &genpayments.RefundPayload{TenantID: "t1", OrderID: "o-2", AmountCents: 5400, Method: "card", IdempotencyKey: "other"})
 		require.Error(t, err)

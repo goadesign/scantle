@@ -22,6 +22,8 @@ type ChatRequestBody struct {
 // ApproveRefundRequestBody is the type of the "orders" service
 // "approve_refund" endpoint HTTP request body.
 type ApproveRefundRequestBody struct {
+	// Approval being decided, as reported by run_status.
+	ApprovalID string `form:"approval_id" json:"approval_id" xml:"approval_id"`
 	// Whether the refund is approved.
 	Approved bool `form:"approved" json:"approved" xml:"approved"`
 }
@@ -300,7 +302,8 @@ func NewChatRequestBody(p *orders.ChatPayload) *ChatRequestBody {
 // the "approve_refund" endpoint of the "orders" service.
 func NewApproveRefundRequestBody(p *orders.ApproveRefundPayload) *ApproveRefundRequestBody {
 	body := &ApproveRefundRequestBody{
-		Approved: p.Approved,
+		ApprovalID: p.ApprovalID,
+		Approved:   p.Approved,
 	}
 	return body
 }

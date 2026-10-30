@@ -164,13 +164,13 @@ var _ = Service("orders", func() {
 		Payload(func() {
 			Token("token", String, "Manager bearer token.")
 			Attribute("run_id", String, "Run waiting for approval.", func() { MinLength(1) })
-			Attribute("approval_id", String, "Approval being decided.", func() { MinLength(1) })
+			Attribute("approval_id", String, "Approval being decided, as reported by run_status.", func() { MinLength(1) })
 			Attribute("approved", Boolean, "Whether the refund is approved.")
 			Required("token", "run_id", "approval_id", "approved")
 		})
 		Result(RunView)
 		HTTP(func() {
-			POST("/runs/{run_id}/approvals/{approval_id}")
+			POST("/runs/{run_id}/approval")
 			Response(StatusAccepted)
 		})
 	})

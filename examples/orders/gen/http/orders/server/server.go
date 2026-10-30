@@ -53,7 +53,7 @@ func New(
 		Mounts: []*MountPoint{
 			{"Chat", "POST", "/chat"},
 			{"RunStatus", "GET", "/runs/{run_id}"},
-			{"ApproveRefund", "POST", "/runs/{run_id}/approvals/{approval_id}"},
+			{"ApproveRefund", "POST", "/runs/{run_id}/approval"},
 		},
 		Chat:          NewChatHandler(e.Chat, mux, decoder, encoder, errhandler, formatter),
 		RunStatus:     NewRunStatusHandler(e.RunStatus, mux, decoder, encoder, errhandler, formatter),
@@ -201,7 +201,7 @@ func MountApproveRefundHandler(mux goahttp.Muxer, h http.Handler) {
 			h.ServeHTTP(w, r)
 		}
 	}
-	mux.Handle("POST", "/runs/{run_id}/approvals/{approval_id}", f)
+	mux.Handle("POST", "/runs/{run_id}/approval", f)
 }
 
 // NewApproveRefundHandler creates a HTTP handler which loads the HTTP request
