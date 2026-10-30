@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
@@ -45,8 +46,10 @@ type (
 		OrdersBin string
 		// WorkerBin is the candidate's refund worker binary.
 		WorkerBin string
-		// signingKey signs test bearer tokens and is given to the candidate.
-		signingKey []byte
+		// signingKey signs test bearer tokens and is given to the candidate as
+		// ORDERS_JWT_KEY. It is hex text so it is always a valid environment
+		// value; both sides use its bytes as the HS256 key.
+		signingKey string
 	}
 
 	// Platform is one running instance of the candidate.
@@ -81,7 +84,7 @@ func NewEnv(ordersBin, workerBin string) (*Env, error) {
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("generate test issuer key: %w", err)
 	}
-	return &Env{OrdersBin: ordersBin, WorkerBin: workerBin, signingKey: key}, nil
+	return &Env{OrdersBin: ordersBin, WorkerBin: workerBin, signingKey: hex.EncodeToString(key)}, nil
 }
 
 // Token signs a test bearer token for the tenant, subject and space-separated
@@ -89,7 +92,7 @@ func NewEnv(ordersBin, workerBin string) (*Env, error) {
 func (e *Env) Token(tenant, subject, scope string) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": subject, "tenant_id": tenant, "scope": scope, "exp": time.Now().Add(time.Hour).Unix(),
-	}).SignedString(e.signingKey)
+	}).SignedString([]byte(e.signingKey))
 }
 
 // Start launches a Temporal dev server, a candidate orders API and a refund
@@ -110,7 +113,7 @@ func (e *Env) Start(ctx context.Context, depsURL string) (*Platform, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.api, err = launch(ctx, e.OrdersBin, []string{"ORDERS_JWT_KEY=" + string(e.signingKey)},
+	p.api, err = launch(ctx, e.OrdersBin, []string{"ORDERS_JWT_KEY=" + e.signingKey},
 		"--env", "sim", "--commerce-url", depsURL, "--temporal", temporalAddr, "--listen", addr,
 		"--model-provider", "scripted")
 	if err != nil {
