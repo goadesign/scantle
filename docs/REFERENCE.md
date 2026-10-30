@@ -152,7 +152,7 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 - `-suite-module <dir>` — Suite Go module directory relative to `-suite-repo` *(required)*.
 - `-suite-command <package>` — Suite command package inside `-suite-module` *(required)*.
 - `-request-revision <digest>` — Confirmed `request_revision` digest bound into the verification report *(required)*.
-- `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must not be shared with or readable by builder agents *(required)*.
+- `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must be missing or empty at run start and must not be shared with or readable by builder agents *(required)*.
 - `-report-dir <path>` — Directory that receives the full canonical report as `<digest>.json`; must not be readable by builder agents when holdout privacy is required *(required)*.
 - `-builder-view` — Optional boolean flag; when set, `stdout` prints `Report.ForBuilders()`, which redacts `"holdout"` scenarios to `"id": "holdout-N"` with scenario names, inputs, declarations, checks, and failure logs stripped (the full unredacted report is still written to `-report-dir`).
 
