@@ -4,10 +4,16 @@
 //
 // The report is bound to the exact inputs that were tested: the candidate
 // commit and request revision, the evaluator suite and its commit, the digest
-// of every candidate binary the suite actually executed, the environment
-// profile, and the configuration digest. Every scenario the suite declares is
-// accounted for in the denominator, and holdout scenarios are reduced to counts
-// in the view returned to builders.
+// of every candidate binary the suite actually executed, and the environment
+// profile. Every scenario the suite declares is accounted for in the
+// denominator, and holdout scenarios are reduced to anonymous outcomes in the
+// view returned to builders.
+//
+// Precondition: the candidate's prompts and configuration are fixed by its
+// binaries and by the flags the evaluator suite passes. A candidate that loads
+// prompt overrides at runtime (a goa-ai prompt.Store) is not yet covered; the
+// prompt references its model calls actually used will be recorded once the
+// evaluator owns the model gateway.
 package verify
 
 import (
@@ -42,9 +48,6 @@ type (
 		Artifacts map[string]string `json:"artifacts"`
 		// Environment names the dependency profile, such as "sim".
 		Environment string `json:"environment"`
-		// ConfigDigest identifies the candidate's effective configuration,
-		// including resolved prompt versions.
-		ConfigDigest string `json:"config_digest"`
 	}
 
 	// Suite describes the scenarios the evaluator declares. It comes from the
@@ -392,9 +395,6 @@ func (b Binding) differences(other Binding) []string {
 	}
 	if b.Environment != other.Environment {
 		diff = append(diff, "environment")
-	}
-	if b.ConfigDigest != other.ConfigDigest {
-		diff = append(diff, "configuration")
 	}
 	return slices.Clip(diff)
 }

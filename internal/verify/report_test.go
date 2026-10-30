@@ -108,12 +108,11 @@ func TestApproveRefusesAStaleOrInconsistentReport(t *testing.T) {
 	require.NoError(t, Approve(testBinding(), r))
 
 	changes := map[string]func(*Binding){
-		"commit":        func(b *Binding) { b.CandidateCommit = "def" },
-		"request":       func(b *Binding) { b.RequestRevision = "rev-2" },
-		"suite":         func(b *Binding) { b.SuiteCommit = "suite-2" },
-		"binary":        func(b *Binding) { b.Artifacts = map[string]string{"orders": "rebuilt", "worker": "d2"} },
-		"environment":   func(b *Binding) { b.Environment = "staging" },
-		"configuration": func(b *Binding) { b.ConfigDigest = "prompt-v2" },
+		"commit":      func(b *Binding) { b.CandidateCommit = "def" },
+		"request":     func(b *Binding) { b.RequestRevision = "rev-2" },
+		"suite":       func(b *Binding) { b.SuiteCommit = "suite-2" },
+		"binary":      func(b *Binding) { b.Artifacts = map[string]string{"orders": "rebuilt", "worker": "d2"} },
+		"environment": func(b *Binding) { b.Environment = "staging" },
 	}
 	for name, change := range changes {
 		t.Run(name, func(t *testing.T) {
@@ -169,7 +168,7 @@ func holdoutResult() eval.ScenarioReport {
 func testBinding() Binding {
 	return Binding{
 		CandidateCommit: "abc", RequestRevision: "rev-1", SuiteID: "orders_acceptance", SuiteCommit: "suite-1",
-		Artifacts: map[string]string{"orders": "d1", "worker": "d2"}, Environment: "sim", ConfigDigest: "prompt-v1",
+		Artifacts: map[string]string{"orders": "d1", "worker": "d2"}, Environment: "sim",
 	}
 }
 

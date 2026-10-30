@@ -50,8 +50,6 @@ type (
 		RequestRevision string
 		// Environment names the dependency profile, such as "sim".
 		Environment string
-		// ConfigDigest identifies the candidate's effective configuration.
-		ConfigDigest string
 		// WorkDir is a private directory for clones, builds and evidence. It
 		// must not be shared with the candidate's builder.
 		WorkDir string
@@ -116,7 +114,6 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		SuiteCommit:     p.SuiteCommit,
 		Artifacts:       map[string]string{},
 		Environment:     p.Environment,
-		ConfigDigest:    p.ConfigDigest,
 	}
 
 	candidateDir := filepath.Join(p.WorkDir, "candidate")

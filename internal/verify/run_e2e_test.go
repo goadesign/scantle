@@ -37,7 +37,6 @@ func TestRunVerifiesTheOrdersReference(t *testing.T) {
 		SuiteCommand:    "./cmd/orders_acceptance-evals",
 		RequestRevision: "rev-test",
 		Environment:     "sim",
-		ConfigDigest:    "baseline",
 		WorkDir:         filepath.Join(work, "work"),
 		ReportDir:       filepath.Join(work, "reports"),
 	})
