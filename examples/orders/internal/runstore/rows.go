@@ -483,10 +483,10 @@ func (t *txn) insertRecord(record *runlog.Event) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encode record subject: %w", err)
 	}
-	if _, err := t.exec(`INSERT INTO records (run_id, seq, event_key, session_id, session_seq, subject, turn_id, type, payload, payload_bytes, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if _, err := t.exec(`INSERT INTO records (run_id, seq, event_key, session_id, session_seq, subject, turn_id, type, payload, timestamp)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.RunID, seq, record.EventKey, record.SessionID, sessionSeq, subject, record.TurnID,
-		string(record.Type), []byte(record.Payload), len(record.Payload), binaryTime(record.Timestamp)); err != nil {
+		string(record.Type), []byte(record.Payload), binaryTime(record.Timestamp)); err != nil {
 		return "", err
 	}
 	return strconv.FormatInt(seq, 10), nil

@@ -291,7 +291,7 @@ func (s *Store) ListRunTranscriptRecords(ctx context.Context, runID, throughReco
 				return invalid
 			}
 		}
-		// Choose the page from stored positions and payload lengths, then load
+		// Choose the page from positions and payload lengths, then load
 		// only the chosen payloads in this same snapshot.
 		pageLimit := min(limit, transcriptPageMaxRecords)
 		sizes, err := t.transcriptSizes(runID, after, end, pageLimit+1)
@@ -364,9 +364,10 @@ func (t *txn) committedPosition(runID, recordID string) (int64, runlog.Type, err
 }
 
 // transcriptSizes returns at most limit transcript record positions and
-// payload lengths in (after, end], without reading payloads.
+// payload lengths in (after, end]. SQLite computes length() of a BLOB from
+// its stored size without loading the value.
 func (t *txn) transcriptSizes(runID string, after, end int64, limit int) ([]recordSize, error) {
-	rows, err := t.tx.QueryContext(t.ctx, `SELECT seq, payload_bytes FROM records
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT seq, length(payload) FROM records
 		WHERE run_id = ? AND seq > ? AND seq <= ? AND type IN (?, ?) ORDER BY seq LIMIT ?`,
 		runID, after, end, string(transcript.RunLogMessagesSeeded), string(transcript.RunLogMessagesAppended), limit)
 	if err != nil {
