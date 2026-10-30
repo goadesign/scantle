@@ -30,8 +30,9 @@ type (
 	Plan struct {
 		// CandidateRepo is the git repository holding the candidate.
 		CandidateRepo string
-		// CandidateCommit is the full 40-hex SHA-1 of the commit to build.
-		// Branch names and other revision expressions are rejected.
+		// CandidateCommit is the full commit ID to build, in the repository's
+		// object format. Branch names and other revision expressions are
+		// rejected.
 		CandidateCommit string
 		// CandidateModule is the Go module directory inside the candidate
 		// repository that the binaries are built from.
@@ -41,7 +42,7 @@ type (
 		Binaries map[string]string
 		// SuiteRepo is the git repository holding the evaluator suite.
 		SuiteRepo string
-		// SuiteCommit is the full 40-hex SHA-1 of the suite commit to run.
+		// SuiteCommit is the full ID of the suite commit to run.
 		SuiteCommit string
 		// SuiteModule is the suite's Go module directory inside SuiteRepo.
 		SuiteModule string
@@ -73,9 +74,10 @@ type (
 	}
 )
 
-// commitID matches a full SHA-1 commit ID, the only revision form a binding
-// accepts.
-var commitID = regexp.MustCompile(`^[0-9a-f]{40}$`)
+// commitID matches a full commit ID in either Git object format: 40 hex digits
+// for SHA-1 repositories, 64 for SHA-256 ones. The checkout then requires HEAD
+// to equal it, which only the full ID in the repository's own format can.
+var commitID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 
 const (
 	// holdoutTag marks a scenario whose details builders must never see.
