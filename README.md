@@ -71,7 +71,7 @@ go run ./cmd/scantle serve \
   -model-name claude-opus-4-6
 ```
 
-Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` and `-swarm-profiles` setup](docs/REFERENCE.md#quickstart--mcp-configuration)) and prompt your agent:
+Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` setup](docs/REFERENCE.md#quickstart--mcp-configuration) and [`-swarm-profiles` configuration](docs/REFERENCE.md#configure-the-proposed-swarm-roster)) and prompt your agent:
 
 > *"Using Scantle, propose a change to `examples/orders` so VIP customers get instant store-credit refunds up to \$150, then preview the compiled C4 architecture and Chorus swarm plan for builder scope `orders` (`internal/**`)."*
 
