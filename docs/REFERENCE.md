@@ -146,11 +146,11 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 - `-candidate-repo <path|url>` — Git repository holding the candidate *(required)*.
 - `-candidate-commit <sha>` — Full commit ID of the candidate to build *(required)*.
 - `-candidate-module <dir>` — Candidate Go module directory relative to `-candidate-repo` *(required)*.
-- `-binary <name=package>` — Candidate binary artifact name and relative package path (`.` or `./...`) inside `-candidate-module` (repeatable, at least one *required*; `<name>` must be a single path element).
+- `-binary <name=package>` — Candidate binary artifact name and relative package path (`.` or a path beginning with `./`, such as `./cmd/orders`) inside `-candidate-module` (repeatable, at least one *required*; `<name>` must be a single path element).
 - `-suite-repo <path|url>` — Git repository holding the evaluator suite *(required)*.
 - `-suite-commit <sha>` — Full commit ID of the evaluator suite *(required)*.
 - `-suite-module <dir>` — Suite Go module directory relative to `-suite-repo` *(required)*.
-- `-suite-command <package>` — Suite command relative package path (`.` or `./...`) inside `-suite-module` *(required)*.
+- `-suite-command <package>` — Suite command relative package path (`.` or a path beginning with `./`, such as `./cmd/orders_acceptance-evals`) inside `-suite-module` *(required)*.
 - `-request-revision <digest>` — Confirmed `request_revision` digest bound into the verification report *(required)*.
 - `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must be missing or empty at run start and must not be shared with or readable by builder agents *(required)*.
 - `-report-dir <path>` — Directory that receives the full canonical report as `<digest>.json`; must not be readable by builder agents when holdout privacy is required *(required)*.
