@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/goadesign/scantle/verify/candidate"
 	"goa.design/goa-ai/eval"
 )
 
@@ -87,9 +88,10 @@ const (
 // against the built binaries, and returns the CP4 report bound to everything
 // that was tested. The report is also written to ReportDir as <digest>.json.
 //
-// The candidate is built before the suite is checked out, with cgo disabled
-// and a minimal environment, so building candidate source cannot read the
-// protected suite or verifier credentials. Every command's output goes to
+// The candidate is compiled only through candidate.Build: an OS sandbox in
+// which the build reads nothing but the candidate module, the toolchain and the
+// module cache, writes nothing but its private directories, and has no network.
+// The suite is checked out only after the candidate is built. Every command's output goes to
 // files under WorkDir/evidence; errors quote only a bounded excerpt.
 //
 // A suite that produces no decodable eval.Report is an error. Otherwise the
@@ -118,15 +120,19 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	if err := r.checkout(ctx, "candidate", p.CandidateRepo, p.CandidateCommit, candidateDir); err != nil {
 		return Report{}, err
 	}
-	buildEnv, err := candidateBuildEnv(p.WorkDir)
+	moduleDir := filepath.Join(candidateDir, p.CandidateModule)
+	toolchain, err := r.prepareBuild(ctx, moduleDir, p.WorkDir)
 	if err != nil {
 		return Report{}, err
 	}
 	var artifactFlags []string
 	for _, name := range slices.Sorted(maps.Keys(p.Binaries)) {
 		out := filepath.Join(binDir, name)
-		if err := r.run(ctx, "build-"+name, filepath.Join(candidateDir, p.CandidateModule), buildEnv,
-			"go", "build", "-trimpath", "-o", out, p.Binaries[name]); err != nil {
+		if err := candidate.Build(ctx, candidate.BuildSpec{
+			ModuleDir: moduleDir, Package: p.Binaries[name], Out: out,
+			GOROOT: toolchain.goroot, ModCache: toolchain.modCache, WorkDir: toolchain.workDir,
+			LogFile: filepath.Join(r.evidenceDir, "build-"+name+".log"),
+		}); err != nil {
 			return Report{}, fmt.Errorf("build candidate %s: %w", name, err)
 		}
 		digest, err := sha256File(out)
@@ -298,26 +304,40 @@ func (r *runner) excerpt(label string) string {
 	return "\nstderr" + note + ", full output in " + path + ":\n" + strings.TrimSpace(string(b))
 }
 
-// candidateBuildEnv returns the minimal environment for building candidate
-// source: no cgo (so no C preprocessing of arbitrary files), read-only module
-// resolution, and private caches, with nothing else inherited.
-func candidateBuildEnv(workDir string) ([]string, error) {
-	modCache, err := exec.Command("go", "env", "GOMODCACHE").Output()
+// buildToolchain is what a sandboxed candidate build runs with.
+type buildToolchain struct {
+	// goroot is the resolved toolchain the candidate module selects.
+	goroot string
+	// modCache is the module cache holding the candidate's dependencies.
+	modCache string
+	// workDir is the build's private HOME, TMPDIR and GOCACHE.
+	workDir string
+}
+
+// prepareBuild resolves the toolchain the candidate module selects and
+// downloads its module dependencies, outside the sandbox. These steps fetch
+// checksum-verified modules and official toolchains and execute no candidate
+// code; the sandboxed build afterwards runs with no network.
+func (r *runner) prepareBuild(ctx context.Context, moduleDir, workDir string) (buildToolchain, error) {
+	if err := r.run(ctx, "go-mod-download", moduleDir, nil, "go", "mod", "download"); err != nil {
+		return buildToolchain{}, fmt.Errorf("download candidate modules: %w", err)
+	}
+	if err := r.run(ctx, "go-env", moduleDir, nil, "go", "env", "GOROOT", "GOMODCACHE"); err != nil {
+		return buildToolchain{}, fmt.Errorf("resolve candidate toolchain: %w", err)
+	}
+	out, err := os.ReadFile(filepath.Join(r.evidenceDir, "go-env.stdout"))
 	if err != nil {
-		return nil, fmt.Errorf("locate module cache: %w", err)
+		return buildToolchain{}, fmt.Errorf("read toolchain: %w", err)
 	}
-	home := filepath.Join(workDir, "build-home")
-	if err := os.MkdirAll(home, 0o700); err != nil {
-		return nil, fmt.Errorf("create build home: %w", err)
+	lines := strings.Fields(string(out))
+	if len(lines) != 2 {
+		return buildToolchain{}, fmt.Errorf("unexpected go env output %q", out)
 	}
-	return []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + home,
-		"GOCACHE=" + filepath.Join(home, "gocache"),
-		"GOMODCACHE=" + strings.TrimSpace(string(modCache)),
-		"CGO_ENABLED=0",
-		"GOFLAGS=-mod=readonly",
-	}, nil
+	t := buildToolchain{goroot: lines[0], modCache: lines[1], workDir: filepath.Join(workDir, "build-home")}
+	if err := os.MkdirAll(t.workDir, 0o700); err != nil {
+		return buildToolchain{}, fmt.Errorf("create build home: %w", err)
+	}
+	return t, nil
 }
 
 // decodeFile decodes one JSON value from a file.

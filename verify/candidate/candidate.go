@@ -216,6 +216,105 @@ func Exec(ctx context.Context, a Artifact, spec Spec) (*Process, error) {
 	return p, nil
 }
 
+// BuildSpec describes one sandboxed compile of candidate source.
+type BuildSpec struct {
+	// ModuleDir is the candidate module's directory, the only source tree
+	// the build may read.
+	ModuleDir string
+	// Package is the package to build, relative to ModuleDir, such as
+	// "./cmd/orders".
+	Package string
+	// Out is the output binary path; its directory is writable.
+	Out string
+	// GOROOT is the resolved Go toolchain root the build runs with. Its bin
+	// and tool binaries are the only programs the build may execute.
+	GOROOT string
+	// ModCache is the already populated module cache, read-only.
+	ModCache string
+	// WorkDir is a private writable directory for HOME, TMPDIR and GOCACHE.
+	WorkDir string
+	// LogFile receives the build's output; it must lie outside ModuleDir.
+	LogFile string
+}
+
+// Build compiles candidate source in the build sandbox. The Go toolchain may
+// start its own compiler, assembler and linker, but the build can read only
+// the candidate module, the toolchain, the read-only module cache and system
+// libraries; write only its private work directory and output directory; and
+// use no network. Directives in candidate source, such as an assembly
+// #include of an outside file, are denied by the operating system. It fails
+// with ErrIsolationUnavailable where the sandbox cannot be enforced.
+func Build(ctx context.Context, spec BuildSpec) error {
+	if runtime.GOOS != "darwin" {
+		return ErrIsolationUnavailable
+	}
+	if _, err := os.Stat(sandboxExec); err != nil {
+		return fmt.Errorf("%w: %v", ErrIsolationUnavailable, err)
+	}
+	paths := map[string]*string{"module": &spec.ModuleDir, "goroot": &spec.GOROOT, "modcache": &spec.ModCache, "work": &spec.WorkDir}
+	for name, p := range paths {
+		resolved, err := filepath.EvalSymlinks(*p)
+		if err != nil {
+			return fmt.Errorf("resolve %s directory: %w", name, err)
+		}
+		*p = resolved
+	}
+	outDir, err := filepath.EvalSymlinks(filepath.Dir(spec.Out))
+	if err != nil {
+		return fmt.Errorf("resolve output directory: %w", err)
+	}
+	logFile, err := os.OpenFile(spec.LogFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("open build log: %w", err)
+	}
+	defer logFile.Close()
+	goBin := filepath.Join(spec.GOROOT, "bin", "go")
+	profile := BuildProfile(spec.ModuleDir, spec.GOROOT, spec.ModCache, spec.WorkDir, outDir)
+	cmd := exec.CommandContext(ctx, sandboxExec, "-p", profile, goBin, "build", "-trimpath",
+		"-o", filepath.Join(outDir, filepath.Base(spec.Out)), spec.Package)
+	cmd.Dir = spec.ModuleDir
+	cmd.Env = []string{
+		"PATH=" + filepath.Join(spec.GOROOT, "bin") + ":/usr/bin:/bin",
+		"HOME=" + spec.WorkDir,
+		"TMPDIR=" + spec.WorkDir,
+		"GOROOT=" + spec.GOROOT,
+		"GOCACHE=" + filepath.Join(spec.WorkDir, "gocache"),
+		"GOMODCACHE=" + spec.ModCache,
+		"GOTOOLCHAIN=local",
+		"GOFLAGS=-mod=readonly",
+		"GOPROXY=off",
+		"GONOSUMDB=*",
+		"GOTELEMETRY=off",
+		"CGO_ENABLED=0",
+	}
+	cmd.Stdout, cmd.Stderr = logFile, logFile
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sandboxed build of %s: %w", spec.Package, err)
+	}
+	return nil
+}
+
+// BuildProfile renders the build sandbox profile. Paths must be absolute and
+// free of symlinks.
+func BuildProfile(moduleDir, goroot, modCache, workDir, outDir string) string {
+	var b strings.Builder
+	b.WriteString("(version 1)\n(deny default)\n(allow process-fork)\n(allow sysctl-read)\n(allow signal (target self))\n")
+	fmt.Fprintf(&b, "(allow process-exec (subpath %s))\n", quote(goroot))
+	fmt.Fprintf(&b, "(allow file-read* (literal \"/\") (subpath \"/usr/lib\") (subpath \"/System\") (subpath \"/private/var/db/dyld\") "+
+		"(literal \"/dev/null\") (literal \"/dev/urandom\") (literal \"/dev/random\") "+
+		"(subpath %s) (subpath %s) (subpath %s) (subpath %s) (subpath %s))\n",
+		quote(moduleDir), quote(goroot), quote(modCache), quote(workDir), quote(outDir))
+	fmt.Fprintf(&b, "(allow file-write* (subpath %s) (subpath %s) (literal \"/dev/null\"))\n", quote(workDir), quote(outDir))
+	b.WriteString("(allow file-read-metadata (literal \"/var\") (literal \"/tmp\") (literal \"/etc\")")
+	for _, root := range []string{moduleDir, goroot, modCache, workDir, outDir} {
+		for dir := filepath.Dir(root); dir != "/"; dir = filepath.Dir(dir) {
+			fmt.Fprintf(&b, " (literal %s)", quote(dir))
+		}
+	}
+	b.WriteString(")\n")
+	return b.String()
+}
+
 // Profile renders the sandbox profile for one candidate process. Paths must be
 // absolute and already free of symlinks.
 func Profile(binary, stateDir string, connectPorts []int, listenPort int) string {
