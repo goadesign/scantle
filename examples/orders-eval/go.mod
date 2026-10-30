@@ -6,7 +6,7 @@ require (
 	github.com/goadesign/scantle v0.0.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/stretchr/testify v1.12.1
-	goa.design/goa-ai v0.89.1-0.20261028052713-99d852887d11
+	goa.design/goa-ai v0.89.1-0.20261030123849-b047a42c444f
 	goa.design/goa/v3 v3.35.1-0.20261023134129-12a5635f9dd0
 )
 

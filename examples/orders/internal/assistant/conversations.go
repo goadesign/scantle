@@ -44,12 +44,6 @@ const (
 	// labelCustomer is the run label holding the customer ID. The generated
 	// tool code injects it into tool payloads as customer_id.
 	labelCustomer = "customer_id"
-
-	// recordTimeout bounds how long Start waits for the runtime to record an
-	// accepted run.
-	recordTimeout = 15 * time.Second
-	// recordPollInterval is how often Start checks for the recorded run.
-	recordPollInterval = 25 * time.Millisecond
 )
 
 // NewConversations returns conversations backed by the runtime, the refund
@@ -75,52 +69,20 @@ func (c *Conversations) Start(ctx context.Context, tenantID, customerID, message
 	if err != nil {
 		return orders.RunState{}, fmt.Errorf("start run: %w", err)
 	}
-	if err := c.awaitRecorded(ctx, runID); err != nil {
-		return orders.RunState{}, err
-	}
 	return orders.RunState{RunID: runID, TenantID: tenantID, CustomerID: customerID, Status: "running"}, nil
-}
-
-// awaitRecorded waits until the runtime has recorded the run it accepted.
-//
-// PROVISIONAL: this bounded wait covers the gap between engine acceptance and
-// the workflow's first activity recording the run. It is not the intended
-// contract (a timeout can leave an accepted workflow behind a failed HTTP
-// call) and will be replaced by an owner-side signal once one is identified.
-// The
-// run's first workflow activity records it together with its labels; until
-// then the API could neither show the run nor prove who owns it, so Start only
-// returns a run ID that run_status can already authorize and report.
-func (c *Conversations) awaitRecorded(ctx context.Context, runID string) error {
-	ctx, cancel := context.WithTimeout(ctx, recordTimeout)
-	defer cancel()
-	tick := time.NewTicker(recordPollInterval)
-	defer tick.Stop()
-	for {
-		_, err := c.store.LoadRun(ctx, runID)
-		if err == nil {
-			return nil
-		}
-		if !errors.Is(err, session.ErrRunNotFound) {
-			return fmt.Errorf("load run %s: %w", runID, err)
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("run %s was not recorded within %s: %w", runID, recordTimeout, ctx.Err())
-		case <-tick.C:
-		}
-	}
 }
 
 // Status returns the state of the conversation that runID belongs to. When the
 // run was suspended and later continued, it follows the continuation chain and
 // reports the newest run, so a caller polling the original run ID sees the
-// outcome of the approved refund.
+// outcome of the approved refund. A run the runtime accepted but has not yet
+// recorded is reported by the runtime's snapshot, with the labels it was
+// started with, so a run is visible as soon as Start returns.
 func (c *Conversations) Status(ctx context.Context, runID string) (orders.RunState, error) {
 	for {
 		meta, err := c.store.LoadRun(ctx, runID)
 		if errors.Is(err, session.ErrRunNotFound) {
-			return orders.RunState{}, orders.ErrRunNotFound
+			break
 		}
 		if err != nil {
 			return orders.RunState{}, fmt.Errorf("load run %s: %w", runID, err)
@@ -132,6 +94,9 @@ func (c *Conversations) Status(ctx context.Context, runID string) (orders.RunSta
 		runID = next.RunID
 	}
 	snap, err := c.rt.GetRunSnapshot(ctx, runID)
+	if errors.Is(err, session.ErrRunNotFound) {
+		return orders.RunState{}, orders.ErrRunNotFound
+	}
 	if err != nil {
 		return orders.RunState{}, fmt.Errorf("snapshot run %s: %w", runID, err)
 	}
