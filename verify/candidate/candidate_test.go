@@ -250,7 +250,7 @@ func TestBuildDeniesReadsOutsideTheModule(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(mod, "answer_arm64.s"), []byte("#include \"textflag.h\"\n"+c.asm), 0o600))
 			logs := t.TempDir()
 			err := Build(t.Context(), BuildSpec{
-				ModuleDir: mod, Package: ".", Out: filepath.Join(t.TempDir(), "probe"),
+				SourceDir: mod, ModuleDir: mod, Package: ".", Out: filepath.Join(t.TempDir(), "probe"),
 				GOROOT: goroot, ModCache: modCache, WorkDir: t.TempDir(), LogFile: filepath.Join(logs, "build.log"),
 			})
 			log, _ := os.ReadFile(filepath.Join(logs, "build.log"))
@@ -276,4 +276,78 @@ func goEnv(t *testing.T, name string) string {
 	out, err := exec.Command("go", "env", name).Output()
 	require.NoError(t, err)
 	return strings.TrimSpace(string(out))
+}
+
+func TestBuildReadsOnlyItsSourceDir(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	goroot, modCache := goEnv(t, "GOROOT"), goEnv(t, "GOMODCACHE")
+	outside := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "extra.go"), []byte("package main\n\nfunc extra() int { return 1 }\n"), 0o600))
+
+	// newTree writes a checkout holding an app module that replaces a sibling
+	// lib module, plus unused links in docs/ that point outside or nowhere.
+	newTree := func(t *testing.T) string {
+		root := t.TempDir()
+		files := map[string]string{
+			"lib/go.mod":  "module example.com/lib\n\ngo 1.26\n",
+			"lib/lib.go":  "package lib\n\nfunc V() int { return 7 }\n",
+			"app/go.mod":  "module example.com/app\n\ngo 1.26\n\nrequire example.com/lib v0.0.0\n\nreplace example.com/lib => ../lib\n",
+			"app/main.go": "package main\n\nimport \"example.com/lib\"\n\nfunc main() { println(lib.V()) }\n",
+		}
+		for name, content := range files {
+			path := filepath.Join(root, filepath.FromSlash(name))
+			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+			require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+		}
+		require.NoError(t, os.MkdirAll(filepath.Join(root, "docs"), 0o700))
+		require.NoError(t, os.Symlink(outside, filepath.Join(root, "docs", "outside")))
+		require.NoError(t, os.Symlink("missing.md", filepath.Join(root, "docs", "dangling.md")))
+		return root
+	}
+	build := func(t *testing.T, sourceDir, moduleDir string) (string, error) {
+		logs := t.TempDir()
+		err := Build(t.Context(), BuildSpec{
+			SourceDir: sourceDir, ModuleDir: moduleDir, Package: ".", Out: filepath.Join(t.TempDir(), "app"),
+			GOROOT: goroot, ModCache: modCache, WorkDir: t.TempDir(), LogFile: filepath.Join(logs, "build.log"),
+		})
+		log, _ := os.ReadFile(filepath.Join(logs, "build.log"))
+		return string(log), err
+	}
+	// unsandboxed builds moduleDir with the host toolchain, proving that a
+	// sandboxed failure comes from the sandbox and not from broken source.
+	unsandboxed := func(t *testing.T, moduleDir string) {
+		cmd := exec.Command("go", "build", "-o", filepath.Join(t.TempDir(), "control"), ".")
+		cmd.Dir = moduleDir
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "the unsandboxed control must succeed: %s", out)
+	}
+
+	t.Run("sibling replace inside the source tree builds despite unused outside links", func(t *testing.T) {
+		root := newTree(t)
+		log, err := build(t, root, filepath.Join(root, "app"))
+		require.NoError(t, err, log)
+	})
+	t.Run("source file linked outside the source tree is denied", func(t *testing.T) {
+		root := newTree(t)
+		require.NoError(t, os.Symlink(filepath.Join(outside, "extra.go"), filepath.Join(root, "app", "extra.go")))
+		unsandboxed(t, filepath.Join(root, "app"))
+		log, err := build(t, root, filepath.Join(root, "app"))
+		require.Error(t, err, "the sandboxed build must not read the linked outside file")
+		assert.Contains(t, log, "extra.go", "the build failed reading the linked file:\n%s", log)
+	})
+	t.Run("replace leaving the source tree is denied", func(t *testing.T) {
+		root := newTree(t)
+		unsandboxed(t, filepath.Join(root, "app"))
+		log, err := build(t, filepath.Join(root, "app"), filepath.Join(root, "app"))
+		require.Error(t, err, "lib is outside SourceDir, so the sandbox must deny reading it")
+		assert.Contains(t, log, "lib", "the build failed reading the replaced module:\n%s", log)
+	})
+	t.Run("module directory outside the source tree is rejected", func(t *testing.T) {
+		root := newTree(t)
+		_, err := build(t, filepath.Join(root, "lib"), filepath.Join(root, "app"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is outside source directory")
+	})
 }

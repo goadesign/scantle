@@ -1,5 +1,5 @@
 // Command scantle runs the Scantle MCP software factory control-plane server
-// and CLI utilities (`scantle serve` and `scantle diff`).
+// and CLI utilities (`scantle serve`, `scantle diff` and `scantle verify`).
 package main
 
 import (
@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/goadesign/scantle/internal/controlplane"
 	"github.com/goadesign/scantle/internal/diff"
 	"github.com/goadesign/scantle/internal/swarm"
+	"github.com/goadesign/scantle/internal/verify"
 )
 
 // serveConfig holds the optional `scantle serve` flags that choose the CP1
@@ -45,6 +47,10 @@ type serveConfig struct {
 	swarmProfilesPath string
 }
 
+// binaryFlags collects repeated `-binary name=pkg` flags for `scantle verify`
+// into verify.Plan.Binaries, rejecting malformed entries and repeated names.
+type binaryFlags map[string]string
+
 // apiKeyEnv maps each supported direct model provider to the environment
 // variable that holds its API key. Keys are read only from the environment so
 // they never appear in process listings or shell history.
@@ -60,7 +66,7 @@ func main() {
 	}
 }
 
-// run dispatches the scantle subcommands (`serve` and `diff`).
+// run dispatches the scantle subcommands (`serve`, `diff` and `verify`).
 func run(args []string) error {
 	sub := "serve"
 	if len(args) > 0 {
@@ -72,8 +78,10 @@ func run(args []string) error {
 		return runServe(args)
 	case "diff":
 		return runDiff(args)
+	case "verify":
+		return runVerify(args)
 	default:
-		return fmt.Errorf("unknown subcommand %q (expected \"serve\" or \"diff\")", sub)
+		return fmt.Errorf("unknown subcommand %q (expected \"serve\", \"diff\" or \"verify\")", sub)
 	}
 }
 
@@ -165,6 +173,127 @@ func runDiff(args []string) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(res)
+}
+
+// runVerify builds the candidate commit in the OS sandbox, runs the evaluator
+// suite commit against it with verify.Run, and writes the JSON report to
+// stdout: the full report, or its builder view with -builder-view. verify.Run
+// also writes the full report to -report-dir. A report that did not pass is
+// still printed, and the command then fails so the exit status is 1. When
+// verify.Run itself fails, nothing is printed and its error is returned.
+// SIGINT and SIGTERM cancel the run.
+func runVerify(args []string) error {
+	plan, builderView, err := parseVerifyFlags(args)
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	report, err := verify.Run(ctx, plan)
+	if err != nil {
+		return err
+	}
+	return writeVerifyReport(os.Stdout, report, builderView)
+}
+
+// writeVerifyReport writes report to w as indented JSON, or its builder view
+// when builderView is set, and then returns an error when the report did not
+// pass so `scantle verify` exits 1 after printing it.
+func writeVerifyReport(w io.Writer, report verify.Report, builderView bool) error {
+	var out any = report
+	if builderView {
+		out = report.ForBuilders()
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		return err
+	}
+	if !report.Passed {
+		return fmt.Errorf("verification did not pass (report %s)", report.Digest)
+	}
+	return nil
+}
+
+// String renders the collected binaries as sorted name=pkg pairs.
+func (b binaryFlags) String() string {
+	pairs := make([]string, 0, len(b))
+	for name, pkg := range b {
+		pairs = append(pairs, name+"="+pkg)
+	}
+	slices.Sort(pairs)
+	return strings.Join(pairs, ",")
+}
+
+// Set records one name=pkg entry. Both parts must be non-empty, and a name may
+// appear only once.
+func (b binaryFlags) Set(v string) error {
+	name, pkg, ok := strings.Cut(v, "=")
+	if !ok || name == "" || pkg == "" {
+		return fmt.Errorf("binary %q must be name=package", v)
+	}
+	if _, dup := b[name]; dup {
+		return fmt.Errorf("binary name %q is repeated", name)
+	}
+	b[name] = pkg
+	return nil
+}
+
+// parseVerifyFlags turns `scantle verify` arguments into a verify.Plan and
+// reports whether the builder view was requested. Every plan field is required
+// and must be given explicitly; commit IDs and repositories are checked by
+// verify.Run.
+func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
+	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
+	binaries := binaryFlags{}
+	var p verify.Plan
+	fs.StringVar(&p.CandidateRepo, "candidate-repo", "", "git repository holding the candidate")
+	fs.StringVar(&p.CandidateCommit, "candidate-commit", "", "full commit ID of the candidate to build")
+	fs.StringVar(&p.CandidateModule, "candidate-module", "", "candidate Go module directory inside -candidate-repo")
+	fs.Var(binaries, "binary", "candidate binary as name=package inside -candidate-module (repeatable)")
+	fs.StringVar(&p.SuiteRepo, "suite-repo", "", "git repository holding the evaluator suite")
+	fs.StringVar(&p.SuiteCommit, "suite-commit", "", "full commit ID of the evaluator suite")
+	fs.StringVar(&p.SuiteModule, "suite-module", "", "suite Go module directory inside -suite-repo")
+	fs.StringVar(&p.SuiteCommand, "suite-command", "", "suite command package inside -suite-module")
+	fs.StringVar(&p.RequestRevision, "request-revision", "", "request_revision of the confirmed change being verified")
+	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds and evidence; keep it away from builders")
+	fs.StringVar(&p.ReportDir, "report-dir", "", "directory that receives the full report as <digest>.json")
+	builderView := fs.Bool("builder-view", false, "print the builder view, which hides holdout scenario details, instead of the full report")
+	if err := fs.Parse(args); err != nil {
+		return verify.Plan{}, false, err
+	}
+	if fs.NArg() > 0 {
+		return verify.Plan{}, false, fmt.Errorf("unexpected arguments %q", fs.Args())
+	}
+	required := []struct {
+		flag  string
+		value string
+	}{
+		{"-candidate-repo", p.CandidateRepo},
+		{"-candidate-commit", p.CandidateCommit},
+		{"-candidate-module", p.CandidateModule},
+		{"-suite-repo", p.SuiteRepo},
+		{"-suite-commit", p.SuiteCommit},
+		{"-suite-module", p.SuiteModule},
+		{"-suite-command", p.SuiteCommand},
+		{"-request-revision", p.RequestRevision},
+		{"-work-dir", p.WorkDir},
+		{"-report-dir", p.ReportDir},
+	}
+	var missing []string
+	for _, r := range required {
+		if r.value == "" {
+			missing = append(missing, r.flag)
+		}
+	}
+	if len(binaries) == 0 {
+		missing = append(missing, "-binary")
+	}
+	if len(missing) > 0 {
+		return verify.Plan{}, false, fmt.Errorf("verify requires %s", strings.Join(missing, ", "))
+	}
+	p.Binaries = binaries
+	return p, *builderView, nil
 }
 
 // readModuleSnapshot reads the module rooted at dir into a design snapshot:

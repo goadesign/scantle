@@ -137,6 +137,7 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	rawBin := filepath.Join(outDir, "designeval-bin")
 	buildLog := filepath.Join(tmpDir, "build.log")
 	if err := candidate.Build(ctx, candidate.BuildSpec{
+		SourceDir: buildDir,
 		ModuleDir: buildDir,
 		Package:   ".",
 		Out:       rawBin,
