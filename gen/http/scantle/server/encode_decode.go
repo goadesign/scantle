@@ -314,14 +314,45 @@ func marshalScantleC4EdgeItemToC4EdgeItemResponseBody(v *scantle.C4EdgeItem) *C4
 	return res
 }
 
-// marshalScantleGuardrailItemToGuardrailItemResponseBody builds a value of
-// type *GuardrailItemResponseBody from a value of type *scantle.GuardrailItem.
-func marshalScantleGuardrailItemToGuardrailItemResponseBody(v *scantle.GuardrailItem) *GuardrailItemResponseBody {
-	res := &GuardrailItemResponseBody{
+// marshalScantleAgentPolicyItemToAgentPolicyItemResponseBody builds a value of
+// type *AgentPolicyItemResponseBody from a value of type
+// *scantle.AgentPolicyItem.
+func marshalScantleAgentPolicyItemToAgentPolicyItemResponseBody(v *scantle.AgentPolicyItem) *AgentPolicyItemResponseBody {
+	res := &AgentPolicyItemResponseBody{
+		AgentID:             v.AgentID,
 		MaxExecutionSeconds: v.MaxExecutionSeconds,
 		MaxToolCalls:        v.MaxToolCalls,
+		MaxRecoveryTurns:    v.MaxRecoveryTurns,
 		CompressAtTurns:     v.CompressAtTurns,
 		KeepRecentTurns:     v.KeepRecentTurns,
+		CacheAfterSystem:    v.CacheAfterSystem,
+		CacheAfterTools:     v.CacheAfterTools,
+	}
+
+	return res
+}
+
+// marshalScantleToolContractItemToToolContractItemResponseBody builds a value
+// of type *ToolContractItemResponseBody from a value of type
+// *scantle.ToolContractItem.
+func marshalScantleToolContractItemToToolContractItemResponseBody(v *scantle.ToolContractItem) *ToolContractItemResponseBody {
+	res := &ToolContractItemResponseBody{
+		ID:                   v.ID,
+		Toolset:              v.Toolset,
+		Name:                 v.Name,
+		Description:          v.Description,
+		ArgsSchema:           v.ArgsSchema,
+		ReturnSchema:         v.ReturnSchema,
+		RequiresConfirmation: v.RequiresConfirmation,
+		BoundedResult:        v.BoundedResult,
+	}
+	if v.InjectedFields != nil {
+		res.InjectedFields = make([]string, len(v.InjectedFields))
+		for i, val := range v.InjectedFields {
+			res.InjectedFields[i] = val
+		}
+	} else {
+		res.InjectedFields = []string{}
 	}
 
 	return res

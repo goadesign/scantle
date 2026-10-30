@@ -19,7 +19,7 @@ import (
 
 // ConfirmIntentPayloadExampleItemTransport stores JSON fields until they have been validated.
 type ConfirmIntentPayloadExampleItemTransport struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID *string `json:"id"`
 	// Plain-English scenario description.
 	Scenario *string `json:"scenario"`
@@ -63,6 +63,8 @@ func ValidateConfirmIntentPayloadExampleItemTransport(value *ConfirmIntentPayloa
 type ConfirmIntentPayloadTransport struct {
 	// Change identifier.
 	ChangeID *string `json:"change_id"`
+	// Reviewed CP1 request_revision digest being confirmed.
+	RequestRevision *string `json:"request_revision"`
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string `json:"answers"`
 	// Confirmed example table.
@@ -76,6 +78,9 @@ func ValidateConfirmIntentPayloadTransport(value *ConfirmIntentPayloadTransport)
 	}
 	if value.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
 	}
 	if value.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
@@ -122,7 +127,7 @@ func ValidateConfirmIntentResultAmbiguityQuestionTransport(value *ConfirmIntentR
 
 // ConfirmIntentResultExampleItemTransport stores JSON fields until they have been validated.
 type ConfirmIntentResultExampleItemTransport struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID *string `json:"id"`
 	// Plain-English scenario description.
 	Scenario *string `json:"scenario"`
@@ -268,13 +273,14 @@ func ValidateDiffPayloadTransport(value *DiffPayloadTransport) (err error) {
 
 // DiffResultTransport stores JSON fields until they have been validated.
 type DiffResultTransport struct {
-	// True when any declaration, contract body, or module directive changed.
+	// True when any declaration, evaluated contract schema, or module directive
+	// changed.
 	HasChanges *bool `json:"has_changes"`
 	// Added scoped declarations.
 	AddedDeclarations []string `json:"added_declarations"`
 	// Removed scoped declarations.
 	RemovedDeclarations []string `json:"removed_declarations"`
-	// Declarations whose payload, result, route, or policy changed.
+	// Declarations whose evaluated schema, route, or policy changed.
 	ModifiedDeclarations []string `json:"modified_declarations"`
 	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string `json:"version_deltas"`
@@ -372,7 +378,7 @@ type PreviewArchitecturePayloadTransport struct {
 	ChangeID *string `json:"change_id"`
 	// Expected CP1 request_revision digest.
 	RequestRevision *string `json:"request_revision"`
-	// Candidate Goa and Goa-AI design source to inspect.
+	// Candidate Goa and Goa-AI design source to evaluate.
 	DesignSource *string `json:"design_source"`
 }
 
@@ -393,13 +399,65 @@ func ValidatePreviewArchitecturePayloadTransport(value *PreviewArchitecturePaylo
 	return err
 }
 
+// PreviewArchitectureResultAgentPolicyItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultAgentPolicyItemTransport struct {
+	// Scoped agent container identifier.
+	AgentID *string `json:"agent_id"`
+	// Per-run execution time budget in seconds.
+	MaxExecutionSeconds *int `json:"max_execution_seconds"`
+	// Per-run retrieval tool-call budget.
+	MaxToolCalls *int `json:"max_tool_calls"`
+	// Maximum consecutive recovery turns after validation failure.
+	MaxRecoveryTurns *int `json:"max_recovery_turns"`
+	// Turn threshold for history compression.
+	CompressAtTurns *int `json:"compress_at_turns"`
+	// Recent turns retained uncompressed.
+	KeepRecentTurns *int `json:"keep_recent_turns"`
+	// True when prompt caching places a checkpoint after system prompts.
+	CacheAfterSystem *bool `json:"cache_after_system"`
+	// True when prompt caching places a checkpoint after tool definitions.
+	CacheAfterTools *bool `json:"cache_after_tools"`
+}
+
+// ValidatePreviewArchitectureResultAgentPolicyItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultAgentPolicyItemTransport(value *PreviewArchitectureResultAgentPolicyItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.AgentID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_id", "body"))
+	}
+	if value.MaxExecutionSeconds == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	}
+	if value.MaxToolCalls == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if value.MaxRecoveryTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_recovery_turns", "body"))
+	}
+	if value.CompressAtTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	}
+	if value.KeepRecentTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	}
+	if value.CacheAfterSystem == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_system", "body"))
+	}
+	if value.CacheAfterTools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_tools", "body"))
+	}
+	return err
+}
+
 // PreviewArchitectureResultC4ContainerItemTransport stores JSON fields until they have been validated.
 type PreviewArchitectureResultC4ContainerItemTransport struct {
 	// Stable container identifier.
 	ID *string `json:"id"`
 	// Human-readable container name.
 	Name *string `json:"name"`
-	// Container role (service, agent, toolset, or dependency).
+	// Container role (service, agent, or toolset).
 	Kind *string `json:"kind"`
 	// Summary of the container's responsibility.
 	Description *string `json:"description"`
@@ -423,8 +481,8 @@ func ValidatePreviewArchitectureResultC4ContainerItemTransport(value *PreviewArc
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if value.Kind != nil {
-		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset" || *value.Kind == "dependency") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset", "dependency"}))
+		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset"}))
 		}
 	}
 	return err
@@ -457,34 +515,59 @@ func ValidatePreviewArchitectureResultC4EdgeItemTransport(value *PreviewArchitec
 	return err
 }
 
-// PreviewArchitectureResultGuardrailItemTransport stores JSON fields until they have been validated.
-type PreviewArchitectureResultGuardrailItemTransport struct {
-	// Per-run execution time budget in seconds.
-	MaxExecutionSeconds *int `json:"max_execution_seconds"`
-	// Per-run retrieval tool-call budget.
-	MaxToolCalls *int `json:"max_tool_calls"`
-	// Turn threshold for history compression.
-	CompressAtTurns *int `json:"compress_at_turns"`
-	// Recent turns retained uncompressed.
-	KeepRecentTurns *int `json:"keep_recent_turns"`
+// PreviewArchitectureResultToolContractItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultToolContractItemTransport struct {
+	// Scoped tool identifier (<toolset>.<tool>).
+	ID *string `json:"id"`
+	// Owning toolset name.
+	Toolset *string `json:"toolset"`
+	// Tool name.
+	Name *string `json:"name"`
+	// Tool description.
+	Description *string `json:"description"`
+	// Canonical evaluated argument schema summary.
+	ArgsSchema *string `json:"args_schema"`
+	// Canonical evaluated return schema summary.
+	ReturnSchema *string `json:"return_schema"`
+	// Server-supplied InjectedFields hidden from the model.
+	InjectedFields []string `json:"injected_fields"`
+	// True when the tool declares a design-time Confirmation gate.
+	RequiresConfirmation *bool `json:"requires_confirmation"`
+	// True when the tool declares a BoundedResult cursor/truncation contract.
+	BoundedResult *bool `json:"bounded_result"`
 }
 
-// ValidatePreviewArchitectureResultGuardrailItemTransport checks decoded JSON before it becomes a service value.
-func ValidatePreviewArchitectureResultGuardrailItemTransport(value *PreviewArchitectureResultGuardrailItemTransport) (err error) {
+// ValidatePreviewArchitectureResultToolContractItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultToolContractItemTransport(value *PreviewArchitectureResultToolContractItemTransport) (err error) {
 	if value == nil {
 		return goa.MissingFieldError("body", "JSON value")
 	}
-	if value.MaxExecutionSeconds == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
 	}
-	if value.MaxToolCalls == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	if value.Toolset == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("toolset", "body"))
 	}
-	if value.CompressAtTurns == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
 	}
-	if value.KeepRecentTurns == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	if value.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if value.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if value.ReturnSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("return_schema", "body"))
+	}
+	if value.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	if value.RequiresConfirmation == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
+	}
+	if value.BoundedResult == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
 	}
 	return err
 }
@@ -495,7 +578,7 @@ type PreviewArchitectureResultTransport struct {
 	ChangeID *string `json:"change_id"`
 	// Bound CP1 request_revision digest.
 	RequestRevision *string `json:"request_revision"`
-	// SHA-256 digest of the inspected Goa design source.
+	// SHA-256 digest of the evaluated Goa design source.
 	DesignDigest *string `json:"design_digest"`
 	// API or primary service name declared in the design.
 	SystemName *string `json:"system_name"`
@@ -503,8 +586,10 @@ type PreviewArchitectureResultTransport struct {
 	Containers []*PreviewArchitectureResultC4ContainerItemTransport `json:"containers"`
 	// Validated directed edges between declared containers.
 	Edges []*PreviewArchitectureResultC4EdgeItemTransport `json:"edges"`
-	// Extracted Goa-AI runtime guardrails.
-	Guardrails *PreviewArchitectureResultGuardrailItemTransport `json:"guardrails"`
+	// Evaluated Goa-AI runtime policies per declared agent.
+	AgentPolicies []*PreviewArchitectureResultAgentPolicyItemTransport `json:"agent_policies"`
+	// Evaluated Goa-AI tool contracts.
+	Tools []*PreviewArchitectureResultToolContractItemTransport `json:"tools"`
 	// Plain-English summary of topology and guardrails.
 	Banner *string `json:"banner"`
 }
@@ -532,8 +617,11 @@ func ValidatePreviewArchitectureResultTransport(value *PreviewArchitectureResult
 	if value.Edges == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
 	}
-	if value.Guardrails == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("guardrails", "body"))
+	if value.AgentPolicies == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_policies", "body"))
+	}
+	if value.Tools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
 	}
 	if value.Banner == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
@@ -552,9 +640,18 @@ func ValidatePreviewArchitectureResultTransport(value *PreviewArchitectureResult
 			}
 		}
 	}
-	if value.Guardrails != nil {
-		if err2 := ValidatePreviewArchitectureResultGuardrailItemTransport(value.Guardrails); err2 != nil {
-			err = goa.MergeErrors(err, err2)
+	for _, e := range value.AgentPolicies {
+		if e != nil {
+			if err2 := ValidatePreviewArchitectureResultAgentPolicyItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Tools {
+		if e != nil {
+			if err2 := ValidatePreviewArchitectureResultToolContractItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
 		}
 	}
 	return err
@@ -562,7 +659,7 @@ func ValidatePreviewArchitectureResultTransport(value *PreviewArchitectureResult
 
 // ProposeChangePayloadTransport stores JSON fields until they have been validated.
 type ProposeChangePayloadTransport struct {
-	// Client-supplied or generated change identifier.
+	// Unique change identifier.
 	ChangeID *string `json:"change_id"`
 	// Operator feature request.
 	Prompt *string `json:"prompt"`
@@ -613,7 +710,7 @@ func ValidateProposeChangeResultAmbiguityQuestionTransport(value *ProposeChangeR
 
 // ProposeChangeResultExampleItemTransport stores JSON fields until they have been validated.
 type ProposeChangeResultExampleItemTransport struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID *string `json:"id"`
 	// Plain-English scenario description.
 	Scenario *string `json:"scenario"`
@@ -744,7 +841,8 @@ func DecodeConfirmIntentPayload(data []byte) (out *scantle.ConfirmIntentPayload,
 	}
 	{
 		out = &scantle.ConfirmIntentPayload{
-			ChangeID: *body.ChangeID,
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
 		}
 		out.Answers = make(map[string]string, len(body.Answers))
 		for key, val := range body.Answers {
@@ -982,7 +1080,22 @@ func EncodePreviewArchitectureResult(in *scantle.ArchitecturePreviewResult) ([]b
 			}
 			body.Edges[i] = encodeC4EdgeItemToPreviewArchitectureResultC4EdgeItemTransport(val)
 		}
-		body.Guardrails = encodeGuardrailItemToPreviewArchitectureResultGuardrailItemTransport(in.Guardrails)
+		body.AgentPolicies = make([]*PreviewArchitectureResultAgentPolicyItemTransport, len(in.AgentPolicies))
+		for i, val := range in.AgentPolicies {
+			if val == nil {
+				body.AgentPolicies[i] = nil
+				continue
+			}
+			body.AgentPolicies[i] = encodeAgentPolicyItemToPreviewArchitectureResultAgentPolicyItemTransport(val)
+		}
+		body.Tools = make([]*PreviewArchitectureResultToolContractItemTransport, len(in.Tools))
+		for i, val := range in.Tools {
+			if val == nil {
+				body.Tools[i] = nil
+				continue
+			}
+			body.Tools[i] = encodeToolContractItemToPreviewArchitectureResultToolContractItemTransport(val)
+		}
 	}
 	if err := ValidatePreviewArchitectureResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate PreviewArchitectureResult JSON: %w", err)
@@ -1086,6 +1199,21 @@ func decodeConfirmIntentPayloadExampleItemTransportToExampleItem(v *ConfirmInten
 	return res
 }
 
+func encodeAgentPolicyItemToPreviewArchitectureResultAgentPolicyItemTransport(v *scantle.AgentPolicyItem) *PreviewArchitectureResultAgentPolicyItemTransport {
+	res := &PreviewArchitectureResultAgentPolicyItemTransport{
+		AgentID:             &v.AgentID,
+		MaxExecutionSeconds: &v.MaxExecutionSeconds,
+		MaxToolCalls:        &v.MaxToolCalls,
+		MaxRecoveryTurns:    &v.MaxRecoveryTurns,
+		CompressAtTurns:     &v.CompressAtTurns,
+		KeepRecentTurns:     &v.KeepRecentTurns,
+		CacheAfterSystem:    &v.CacheAfterSystem,
+		CacheAfterTools:     &v.CacheAfterTools,
+	}
+
+	return res
+}
+
 func encodeAmbiguityQuestionToConfirmIntentResultAmbiguityQuestionTransport(v *scantle.AmbiguityQuestion) *ConfirmIntentResultAmbiguityQuestionTransport {
 	res := &ConfirmIntentResultAmbiguityQuestionTransport{
 		ID:       &v.ID,
@@ -1157,12 +1285,20 @@ func encodeExampleItemToProposeChangeResultExampleItemTransport(v *scantle.Examp
 	return res
 }
 
-func encodeGuardrailItemToPreviewArchitectureResultGuardrailItemTransport(v *scantle.GuardrailItem) *PreviewArchitectureResultGuardrailItemTransport {
-	res := &PreviewArchitectureResultGuardrailItemTransport{
-		MaxExecutionSeconds: &v.MaxExecutionSeconds,
-		MaxToolCalls:        &v.MaxToolCalls,
-		CompressAtTurns:     &v.CompressAtTurns,
-		KeepRecentTurns:     &v.KeepRecentTurns,
+func encodeToolContractItemToPreviewArchitectureResultToolContractItemTransport(v *scantle.ToolContractItem) *PreviewArchitectureResultToolContractItemTransport {
+	res := &PreviewArchitectureResultToolContractItemTransport{
+		ID:                   &v.ID,
+		Toolset:              &v.Toolset,
+		Name:                 &v.Name,
+		Description:          &v.Description,
+		ArgsSchema:           &v.ArgsSchema,
+		ReturnSchema:         &v.ReturnSchema,
+		RequiresConfirmation: &v.RequiresConfirmation,
+		BoundedResult:        &v.BoundedResult,
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
 	}
 
 	return res

@@ -12,6 +12,8 @@ type (
 	ConfirmIntentPayload = struct {
 		// Change identifier.
 		ChangeID string
+		// Reviewed CP1 request_revision digest being confirmed.
+		RequestRevision string
 		// Selected resolution per ambiguity question ID.
 		Answers map[string]string
 		// Confirmed example table.
@@ -53,13 +55,14 @@ type (
 	}
 	// DiffResult defines the JSON result for the scantle.diff tool.
 	DiffResult = struct {
-		// True when any declaration, contract body, or module directive changed.
+		// True when any declaration, evaluated contract schema, or module directive
+		// changed.
 		HasChanges bool
 		// Added scoped declarations.
 		AddedDeclarations []string
 		// Removed scoped declarations.
 		RemovedDeclarations []string
-		// Declarations whose payload, result, route, or policy changed.
+		// Declarations whose evaluated schema, route, or policy changed.
 		ModifiedDeclarations []string
 		// Changed module require, replace, or exclude directives.
 		VersionDeltas []string
@@ -92,7 +95,7 @@ type (
 		ChangeID string
 		// Expected CP1 request_revision digest.
 		RequestRevision string
-		// Candidate Goa and Goa-AI design source to inspect.
+		// Candidate Goa and Goa-AI design source to evaluate.
 		DesignSource string
 	}
 	// PreviewArchitectureResult defines the JSON result for the scantle.preview_architecture tool.
@@ -101,7 +104,7 @@ type (
 		ChangeID string
 		// Bound CP1 request_revision digest.
 		RequestRevision string
-		// SHA-256 digest of the inspected Goa design source.
+		// SHA-256 digest of the evaluated Goa design source.
 		DesignDigest string
 		// API or primary service name declared in the design.
 		SystemName string
@@ -109,14 +112,16 @@ type (
 		Containers []*C4ContainerItem
 		// Validated directed edges between declared containers.
 		Edges []*C4EdgeItem
-		// Extracted Goa-AI runtime guardrails.
-		Guardrails *GuardrailItem
+		// Evaluated Goa-AI runtime policies per declared agent.
+		AgentPolicies []*AgentPolicyItem
+		// Evaluated Goa-AI tool contracts.
+		Tools []*ToolContractItem
 		// Plain-English summary of topology and guardrails.
 		Banner string
 	}
 	// ProposeChangePayload defines the JSON payload for the scantle.propose_change tool.
 	ProposeChangePayload = struct {
-		// Client-supplied or generated change identifier.
+		// Unique change identifier.
 		ChangeID string
 		// Operator feature request.
 		Prompt string
@@ -146,6 +151,25 @@ type (
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision string
 	}
+	// AgentPolicyItem is a nested type used by the generated JSON contract.
+	AgentPolicyItem = struct {
+		// Scoped agent container identifier.
+		AgentID string
+		// Per-run execution time budget in seconds.
+		MaxExecutionSeconds int
+		// Per-run retrieval tool-call budget.
+		MaxToolCalls int
+		// Maximum consecutive recovery turns after validation failure.
+		MaxRecoveryTurns int
+		// Turn threshold for history compression.
+		CompressAtTurns int
+		// Recent turns retained uncompressed.
+		KeepRecentTurns int
+		// True when prompt caching places a checkpoint after system prompts.
+		CacheAfterSystem bool
+		// True when prompt caching places a checkpoint after tool definitions.
+		CacheAfterTools bool
+	}
 	// AmbiguityQuestion is a nested type used by the generated JSON contract.
 	AmbiguityQuestion = struct {
 		// Stable question identifier.
@@ -161,7 +185,7 @@ type (
 		ID string
 		// Human-readable container name.
 		Name string
-		// Container role (service, agent, toolset, or dependency).
+		// Container role (service, agent, or toolset).
 		Kind string
 		// Summary of the container's responsibility.
 		Description string
@@ -177,7 +201,7 @@ type (
 	}
 	// ExampleItem is a nested type used by the generated JSON contract.
 	ExampleItem = struct {
-		// Stable example identifier.
+		// Code-assigned stable example identifier.
 		ID string
 		// Plain-English scenario description.
 		Scenario string
@@ -188,15 +212,25 @@ type (
 		// Evaluator check classification (deterministic or model_judged).
 		VerificationKind string
 	}
-	// GuardrailItem is a nested type used by the generated JSON contract.
-	GuardrailItem = struct {
-		// Per-run execution time budget in seconds.
-		MaxExecutionSeconds int
-		// Per-run retrieval tool-call budget.
-		MaxToolCalls int
-		// Turn threshold for history compression.
-		CompressAtTurns int
-		// Recent turns retained uncompressed.
-		KeepRecentTurns int
+	// ToolContractItem is a nested type used by the generated JSON contract.
+	ToolContractItem = struct {
+		// Scoped tool identifier (<toolset>.<tool>).
+		ID string
+		// Owning toolset name.
+		Toolset string
+		// Tool name.
+		Name string
+		// Tool description.
+		Description string
+		// Canonical evaluated argument schema summary.
+		ArgsSchema string
+		// Canonical evaluated return schema summary.
+		ReturnSchema string
+		// Server-supplied InjectedFields hidden from the model.
+		InjectedFields []string
+		// True when the tool declares a design-time Confirmation gate.
+		RequiresConfirmation bool
+		// True when the tool declares a BoundedResult cursor/truncation contract.
+		BoundedResult bool
 	}
 )

@@ -237,12 +237,17 @@ var (
 var confirmIntentPayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Authenticated operator confirmation of Checkpoint 1 answers and examples.",
+		Description: "Operator confirmation of Checkpoint 1 ambiguity answers and concrete examples.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
 		JSONType:    "string",
 		Description: "Change identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "Reviewed CP1 request_revision digest being confirmed.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("answers")},
@@ -267,7 +272,7 @@ var confirmIntentPayloadFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("id")},
 		JSONType:    "string",
-		Description: "Stable example identifier.",
+		Description: "Code-assigned stable example identifier.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("scenario")},
@@ -293,7 +298,7 @@ var confirmIntentPayloadFields = []tools.FieldMetadata{
 var confirmIntentResultFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Frozen or pending Checkpoint 1 Change Card.",
+		Description: "Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
@@ -368,7 +373,7 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("id")},
 		JSONType:    "string",
-		Description: "Stable example identifier.",
+		Description: "Code-assigned stable example identifier.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("scenario")},
@@ -414,7 +419,7 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 var diffPayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Old and new design and go.mod sources for structural comparison.",
+		Description: "Pair of Goa design sources and go.mod files to compare structurally.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("old_design")},
@@ -440,12 +445,12 @@ var diffPayloadFields = []tools.FieldMetadata{
 var diffResultFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Factual structural and module version diff report.",
+		Description: "Structural diff of evaluated Goa/Goa-AI declarations and go.mod directives.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("has_changes")},
 		JSONType:    "boolean",
-		Description: "True when any declaration, contract body, or module directive changed.",
+		Description: "True when any declaration, evaluated contract schema, or module directive changed.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("added_declarations")},
@@ -470,12 +475,12 @@ var diffResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("modified_declarations")},
 		JSONType:    "array",
-		Description: "Declarations whose payload, result, route, or policy changed.",
+		Description: "Declarations whose evaluated schema, route, or policy changed.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("modified_declarations"), tools.DynamicField{}},
 		JSONType:    "string",
-		Description: "Declarations whose payload, result, route, or policy changed.",
+		Description: "Declarations whose evaluated schema, route, or policy changed.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("version_deltas")},
@@ -496,7 +501,7 @@ var diffResultFields = []tools.FieldMetadata{
 var draftOverridePayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Fast Draft Mode override request in Checkpoint 3.",
+		Description: "Fast Draft Mode request to hot-reload a prompt template on the bound target platform or reject a compiled business-rule edit.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("target_kind")},
@@ -517,7 +522,7 @@ var draftOverridePayloadFields = []tools.FieldMetadata{
 var draftOverrideResultFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Fast Draft Mode result distinguishing 0s target prompt reload from compiled Go rebuild.",
+		Description: "Result of a Checkpoint 3 Fast Draft Mode override request.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("applied_in_store")},
@@ -543,7 +548,7 @@ var draftOverrideResultFields = []tools.FieldMetadata{
 var previewArchitecturePayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Checkpoint 2 request binding a confirmed Change Card to a candidate Goa design.",
+		Description: "Request to derive the Checkpoint 2 C4 topology and guardrails from a candidate Goa design bound to a confirmed Change Card.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
@@ -558,13 +563,13 @@ var previewArchitecturePayloadFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("design_source")},
 		JSONType:    "string",
-		Description: "Candidate Goa and Goa-AI design source to inspect.",
+		Description: "Candidate Goa and Goa-AI design source to evaluate.",
 	},
 }
 var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Checkpoint 2 C4 topology and guardrail preview derived from the candidate Goa design.",
+		Description: "Checkpoint 2 C4 container topology, tool contracts, and per-agent Goa-AI guardrails derived from the evaluated candidate design.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
@@ -579,7 +584,7 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("design_digest")},
 		JSONType:    "string",
-		Description: "SHA-256 digest of the inspected Goa design source.",
+		Description: "SHA-256 digest of the evaluated Goa design source.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("system_name")},
@@ -609,7 +614,7 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("containers"), tools.DynamicField{}, tools.FixedField("kind")},
 		JSONType:    "string",
-		Description: "Container role (service, agent, toolset, or dependency).",
+		Description: "Container role (service, agent, or toolset).",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("containers"), tools.DynamicField{}, tools.FixedField("description")},
@@ -642,29 +647,114 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 		Description: "Contract or transport relationship.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("guardrails")},
-		JSONType:    "object",
-		Description: "Extracted Goa-AI runtime guardrails.",
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies")},
+		JSONType:    "array",
+		Description: "Evaluated Goa-AI runtime policies per declared agent.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("guardrails"), tools.FixedField("max_execution_seconds")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Evaluated Goa-AI runtime policies per declared agent.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("agent_id")},
+		JSONType:    "string",
+		Description: "Scoped agent container identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("max_execution_seconds")},
 		JSONType:    "integer",
 		Description: "Per-run execution time budget in seconds.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("guardrails"), tools.FixedField("max_tool_calls")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("max_tool_calls")},
 		JSONType:    "integer",
 		Description: "Per-run retrieval tool-call budget.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("guardrails"), tools.FixedField("compress_at_turns")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("max_recovery_turns")},
+		JSONType:    "integer",
+		Description: "Maximum consecutive recovery turns after validation failure.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("compress_at_turns")},
 		JSONType:    "integer",
 		Description: "Turn threshold for history compression.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("guardrails"), tools.FixedField("keep_recent_turns")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("keep_recent_turns")},
 		JSONType:    "integer",
 		Description: "Recent turns retained uncompressed.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("cache_after_system")},
+		JSONType:    "boolean",
+		Description: "True when prompt caching places a checkpoint after system prompts.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("agent_policies"), tools.DynamicField{}, tools.FixedField("cache_after_tools")},
+		JSONType:    "boolean",
+		Description: "True when prompt caching places a checkpoint after tool definitions.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools")},
+		JSONType:    "array",
+		Description: "Evaluated Goa-AI tool contracts.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Evaluated Goa-AI tool contracts.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Scoped tool identifier (<toolset>.<tool>).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("toolset")},
+		JSONType:    "string",
+		Description: "Owning toolset name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("name")},
+		JSONType:    "string",
+		Description: "Tool name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("description")},
+		JSONType:    "string",
+		Description: "Tool description.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("args_schema")},
+		JSONType:    "string",
+		Description: "Canonical evaluated argument schema summary.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("return_schema")},
+		JSONType:    "string",
+		Description: "Canonical evaluated return schema summary.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("injected_fields")},
+		JSONType:    "array",
+		Description: "Server-supplied InjectedFields hidden from the model.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("injected_fields"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Server-supplied InjectedFields hidden from the model.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("requires_confirmation")},
+		JSONType:    "boolean",
+		Description: "True when the tool declares a design-time Confirmation gate.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("bounded_result")},
+		JSONType:    "boolean",
+		Description: "True when the tool declares a BoundedResult cursor/truncation contract.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("banner")},
@@ -675,12 +765,12 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 var proposeChangePayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Natural-language feature request or contract evolution.",
+		Description: "Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
 		JSONType:    "string",
-		Description: "Client-supplied or generated change identifier.",
+		Description: "Unique change identifier.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("prompt")},
@@ -696,7 +786,7 @@ var proposeChangePayloadFields = []tools.FieldMetadata{
 var proposeChangeResultFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Frozen or pending Checkpoint 1 Change Card.",
+		Description: "Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
@@ -771,7 +861,7 @@ var proposeChangeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("id")},
 		JSONType:    "string",
-		Description: "Stable example identifier.",
+		Description: "Code-assigned stable example identifier.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("scenario")},
@@ -1336,7 +1426,8 @@ func MarshalConfirmIntentPayload(v *ConfirmIntentPayload) ([]byte, error) {
 	_ = in
 	var out *toolhttp.ConfirmIntentPayloadTransport
 	out = &toolhttp.ConfirmIntentPayloadTransport{
-		ChangeID: &in.ChangeID,
+		ChangeID:        &in.ChangeID,
+		RequestRevision: &in.RequestRevision,
 	}
 	out.Answers = make(map[string]string, len(in.Answers))
 	for key, val := range in.Answers {
@@ -1376,7 +1467,8 @@ func UnmarshalConfirmIntentPayload(data []byte) (*ConfirmIntentPayload, error) {
 	_ = in
 	var out *ConfirmIntentPayload
 	out = &ConfirmIntentPayload{
-		ChangeID: *in.ChangeID,
+		ChangeID:        *in.ChangeID,
+		RequestRevision: *in.RequestRevision,
 	}
 	out.Answers = make(map[string]string, len(in.Answers))
 	for key, val := range in.Answers {
@@ -1790,7 +1882,22 @@ func MarshalPreviewArchitectureResult(v *PreviewArchitectureResult) ([]byte, err
 		}
 		out.Edges[i] = encodeC4EdgeItemToC4EdgeItemTransport(val)
 	}
-	out.Guardrails = encodeGuardrailItemToGuardrailItemTransport(in.Guardrails)
+	out.AgentPolicies = make([]*toolhttp.AgentPolicyItemTransport, len(in.AgentPolicies))
+	for i, val := range in.AgentPolicies {
+		if val == nil {
+			out.AgentPolicies[i] = nil
+			continue
+		}
+		out.AgentPolicies[i] = encodeAgentPolicyItemToAgentPolicyItemTransport(val)
+	}
+	out.Tools = make([]*toolhttp.ToolContractItemTransport, len(in.Tools))
+	for i, val := range in.Tools {
+		if val == nil {
+			out.Tools[i] = nil
+			continue
+		}
+		out.Tools[i] = encodeToolContractItemToToolContractItemTransport(val)
+	}
 	return json.Marshal(out)
 }
 
@@ -1837,7 +1944,22 @@ func UnmarshalPreviewArchitectureResult(data []byte) (*PreviewArchitectureResult
 		}
 		out.Edges[i] = decodeC4EdgeItemTransportToC4EdgeItem(val)
 	}
-	out.Guardrails = decodeGuardrailItemTransportToGuardrailItem(in.Guardrails)
+	out.AgentPolicies = make([]*AgentPolicyItem, len(in.AgentPolicies))
+	for i, val := range in.AgentPolicies {
+		if val == nil {
+			out.AgentPolicies[i] = nil
+			continue
+		}
+		out.AgentPolicies[i] = decodeAgentPolicyItemTransportToAgentPolicyItem(val)
+	}
+	out.Tools = make([]*ToolContractItem, len(in.Tools))
+	for i, val := range in.Tools {
+		if val == nil {
+			out.Tools[i] = nil
+			continue
+		}
+		out.Tools[i] = decodeToolContractItemTransportToToolContractItem(val)
+	}
 	return out, nil
 }
 
@@ -2230,7 +2352,7 @@ func validateProposeChangePayloadJSONValue(path string, value any, description s
 		case "change_id":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Client-supplied or generated change identifier.",
+				typed[key], "Unique change identifier.",
 			); err != nil {
 				return err
 			}
@@ -2566,7 +2688,7 @@ func validateProposeChangeResultExampleItemTransportJSONValue(path string, value
 		case "id":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Stable example identifier.",
+				typed[key], "Code-assigned stable example identifier.",
 			); err != nil {
 				return err
 			}
@@ -2645,11 +2767,19 @@ func validateConfirmIntentPayloadJSONValue(path string, value any, description s
 			); err != nil {
 				return err
 			}
+		case "request_revision":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Reviewed CP1 request_revision digest being confirmed.",
+			); err != nil {
+				return err
+			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"answers",
 				"change_id",
 				"examples",
+				"request_revision",
 			})
 		}
 	}
@@ -2686,7 +2816,7 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 		case "design_source":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate Goa and Goa-AI design source to inspect.",
+				typed[key], "Candidate Goa and Goa-AI design source to evaluate.",
 			); err != nil {
 				return err
 			}
@@ -2728,6 +2858,13 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 	sort.Strings(keys)
 	for _, key := range keys {
 		switch key {
+		case "agent_policies":
+			if err := validatePreviewArchitectureResultRootAgentPoliciesJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluated Goa-AI runtime policies per declared agent.",
+			); err != nil {
+				return err
+			}
 		case "banner":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
@@ -2752,7 +2889,7 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 		case "design_digest":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "SHA-256 digest of the inspected Goa design source.",
+				typed[key], "SHA-256 digest of the evaluated Goa design source.",
 			); err != nil {
 				return err
 			}
@@ -2760,13 +2897,6 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 			if err := validatePreviewArchitectureResultRootEdgesJSONValue(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Validated directed edges between declared containers.",
-			); err != nil {
-				return err
-			}
-		case "guardrails":
-			if err := validatePreviewArchitectureResultGuardrailItemTransportJSONValue(
-				generatedJSONChildPath(path, key, false),
-				typed[key], "Extracted Goa-AI runtime guardrails.",
 			); err != nil {
 				return err
 			}
@@ -2784,18 +2914,177 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 			); err != nil {
 				return err
 			}
+		case "tools":
+			if err := validatePreviewArchitectureResultRootToolsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluated Goa-AI tool contracts.",
+			); err != nil {
+				return err
+			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
+				"agent_policies",
 				"banner",
 				"change_id",
 				"containers",
 				"design_digest",
 				"edges",
-				"guardrails",
 				"request_revision",
 				"system_name",
+				"tools",
 			})
 		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultRootAgentPoliciesJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultRootAgentPoliciesJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validatePreviewArchitectureResultAgentPolicyItemTransportJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultAgentPolicyItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultAgentPolicyItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "agent_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scoped agent container identifier.",
+			); err != nil {
+				return err
+			}
+		case "cache_after_system":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when prompt caching places a checkpoint after system prompts.",
+			); err != nil {
+				return err
+			}
+		case "cache_after_tools":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when prompt caching places a checkpoint after tool definitions.",
+			); err != nil {
+				return err
+			}
+		case "compress_at_turns":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Turn threshold for history compression.",
+			); err != nil {
+				return err
+			}
+		case "keep_recent_turns":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Recent turns retained uncompressed.",
+			); err != nil {
+				return err
+			}
+		case "max_execution_seconds":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Per-run execution time budget in seconds.",
+			); err != nil {
+				return err
+			}
+		case "max_recovery_turns":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Maximum consecutive recovery turns after validation failure.",
+			); err != nil {
+				return err
+			}
+		case "max_tool_calls":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Per-run retrieval tool-call budget.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"agent_id",
+				"cache_after_system",
+				"cache_after_tools",
+				"compress_at_turns",
+				"keep_recent_turns",
+				"max_execution_seconds",
+				"max_recovery_turns",
+				"max_tool_calls",
+			})
+		}
+	}
+	return nil
+}
+
+// validateBooleanJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBooleanJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "boolean", "null", description)
+	}
+	_, ok := value.(bool)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "boolean", decodedJSONType(value), description)
+	}
+	return nil
+}
+
+// validateIntJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateIntJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "integer", "null", description)
+	}
+	typed, ok := value.(json.Number)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "integer", decodedJSONType(value), description)
+	}
+	if _, err := strconv.ParseInt(typed.String(), 10, strconv.IntSize); err != nil {
+		return invalidGeneratedFieldTypeError(field, "integer", "number", description)
 	}
 	return nil
 }
@@ -2861,7 +3150,7 @@ func validatePreviewArchitectureResultC4ContainerItemTransportJSONValue(path str
 		case "kind":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Container role (service, agent, toolset, or dependency).",
+				typed[key], "Container role (service, agent, or toolset).",
 			); err != nil {
 				return err
 			}
@@ -2960,8 +3249,32 @@ func validatePreviewArchitectureResultC4EdgeItemTransportJSONValue(path string, 
 	return nil
 }
 
-// validatePreviewArchitectureResultGuardrailItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
-func validatePreviewArchitectureResultGuardrailItemTransportJSONValue(path string, value any, description string) error {
+// validatePreviewArchitectureResultRootToolsJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultRootToolsJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validatePreviewArchitectureResultToolContractItemTransportJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultToolContractItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultToolContractItemTransportJSONValue(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -2980,61 +3293,82 @@ func validatePreviewArchitectureResultGuardrailItemTransportJSONValue(path strin
 	sort.Strings(keys)
 	for _, key := range keys {
 		switch key {
-		case "compress_at_turns":
-			if err := validateIntJSONValue(
+		case "args_schema":
+			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Turn threshold for history compression.",
+				typed[key], "Canonical evaluated argument schema summary.",
 			); err != nil {
 				return err
 			}
-		case "keep_recent_turns":
-			if err := validateIntJSONValue(
+		case "bounded_result":
+			if err := validateBooleanJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Recent turns retained uncompressed.",
+				typed[key], "True when the tool declares a BoundedResult cursor/truncation contract.",
 			); err != nil {
 				return err
 			}
-		case "max_execution_seconds":
-			if err := validateIntJSONValue(
+		case "description":
+			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Per-run execution time budget in seconds.",
+				typed[key], "Tool description.",
 			); err != nil {
 				return err
 			}
-		case "max_tool_calls":
-			if err := validateIntJSONValue(
+		case "id":
+			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Per-run retrieval tool-call budget.",
+				typed[key], "Scoped tool identifier (<toolset>.<tool>).",
+			); err != nil {
+				return err
+			}
+		case "injected_fields":
+			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Server-supplied InjectedFields hidden from the model.",
+			); err != nil {
+				return err
+			}
+		case "name":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Tool name.",
+			); err != nil {
+				return err
+			}
+		case "requires_confirmation":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when the tool declares a design-time Confirmation gate.",
+			); err != nil {
+				return err
+			}
+		case "return_schema":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Canonical evaluated return schema summary.",
+			); err != nil {
+				return err
+			}
+		case "toolset":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Owning toolset name.",
 			); err != nil {
 				return err
 			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
-				"compress_at_turns",
-				"keep_recent_turns",
-				"max_execution_seconds",
-				"max_tool_calls",
+				"args_schema",
+				"bounded_result",
+				"description",
+				"id",
+				"injected_fields",
+				"name",
+				"requires_confirmation",
+				"return_schema",
+				"toolset",
 			})
 		}
-	}
-	return nil
-}
-
-// validateIntJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
-func validateIntJSONValue(path string, value any, description string) error {
-	field := path
-	if field == "" {
-		field = "$payload"
-	}
-	if value == nil {
-		return invalidGeneratedFieldTypeError(field, "integer", "null", description)
-	}
-	typed, ok := value.(json.Number)
-	if !ok {
-		return invalidGeneratedFieldTypeError(field, "integer", decodedJSONType(value), description)
-	}
-	if _, err := strconv.ParseInt(typed.String(), 10, strconv.IntSize); err != nil {
-		return invalidGeneratedFieldTypeError(field, "integer", "number", description)
 	}
 	return nil
 }
@@ -3151,22 +3485,6 @@ func validateDraftOverrideResultJSONValue(path string, value any, description st
 	return nil
 }
 
-// validateBooleanJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
-func validateBooleanJSONValue(path string, value any, description string) error {
-	field := path
-	if field == "" {
-		field = "$payload"
-	}
-	if value == nil {
-		return invalidGeneratedFieldTypeError(field, "boolean", "null", description)
-	}
-	_, ok := value.(bool)
-	if !ok {
-		return invalidGeneratedFieldTypeError(field, "boolean", decodedJSONType(value), description)
-	}
-	return nil
-}
-
 // validateDiffPayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validateDiffPayloadJSONValue(path string, value any, description string) error {
 	field := path
@@ -3257,14 +3575,14 @@ func validateDiffResultJSONValue(path string, value any, description string) err
 		case "has_changes":
 			if err := validateBooleanJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "True when any declaration, contract body, or module directive changed.",
+				typed[key], "True when any declaration, evaluated contract schema, or module directive changed.",
 			); err != nil {
 				return err
 			}
 		case "modified_declarations":
 			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Declarations whose payload, result, route, or policy changed.",
+				typed[key], "Declarations whose evaluated schema, route, or policy changed.",
 			); err != nil {
 				return err
 			}
@@ -3471,12 +3789,34 @@ func decodeC4EdgeItemTransportToC4EdgeItem(v *toolhttp.C4EdgeItemTransport) *C4E
 
 	return res
 }
-func decodeGuardrailItemTransportToGuardrailItem(v *toolhttp.GuardrailItemTransport) *GuardrailItem {
-	res := &GuardrailItem{
+func decodeAgentPolicyItemTransportToAgentPolicyItem(v *toolhttp.AgentPolicyItemTransport) *AgentPolicyItem {
+	res := &AgentPolicyItem{
+		AgentID:             *v.AgentID,
 		MaxExecutionSeconds: *v.MaxExecutionSeconds,
 		MaxToolCalls:        *v.MaxToolCalls,
+		MaxRecoveryTurns:    *v.MaxRecoveryTurns,
 		CompressAtTurns:     *v.CompressAtTurns,
 		KeepRecentTurns:     *v.KeepRecentTurns,
+		CacheAfterSystem:    *v.CacheAfterSystem,
+		CacheAfterTools:     *v.CacheAfterTools,
+	}
+
+	return res
+}
+func decodeToolContractItemTransportToToolContractItem(v *toolhttp.ToolContractItemTransport) *ToolContractItem {
+	res := &ToolContractItem{
+		ID:                   *v.ID,
+		Toolset:              *v.Toolset,
+		Name:                 *v.Name,
+		Description:          *v.Description,
+		ArgsSchema:           *v.ArgsSchema,
+		ReturnSchema:         *v.ReturnSchema,
+		RequiresConfirmation: *v.RequiresConfirmation,
+		BoundedResult:        *v.BoundedResult,
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
 	}
 
 	return res
@@ -3500,12 +3840,34 @@ func encodeC4EdgeItemToC4EdgeItemTransport(v *C4EdgeItem) *toolhttp.C4EdgeItemTr
 
 	return res
 }
-func encodeGuardrailItemToGuardrailItemTransport(v *GuardrailItem) *toolhttp.GuardrailItemTransport {
-	res := &toolhttp.GuardrailItemTransport{
+func encodeAgentPolicyItemToAgentPolicyItemTransport(v *AgentPolicyItem) *toolhttp.AgentPolicyItemTransport {
+	res := &toolhttp.AgentPolicyItemTransport{
+		AgentID:             &v.AgentID,
 		MaxExecutionSeconds: &v.MaxExecutionSeconds,
 		MaxToolCalls:        &v.MaxToolCalls,
+		MaxRecoveryTurns:    &v.MaxRecoveryTurns,
 		CompressAtTurns:     &v.CompressAtTurns,
 		KeepRecentTurns:     &v.KeepRecentTurns,
+		CacheAfterSystem:    &v.CacheAfterSystem,
+		CacheAfterTools:     &v.CacheAfterTools,
+	}
+
+	return res
+}
+func encodeToolContractItemToToolContractItemTransport(v *ToolContractItem) *toolhttp.ToolContractItemTransport {
+	res := &toolhttp.ToolContractItemTransport{
+		ID:                   &v.ID,
+		Toolset:              &v.Toolset,
+		Name:                 &v.Name,
+		Description:          &v.Description,
+		ArgsSchema:           &v.ArgsSchema,
+		ReturnSchema:         &v.ReturnSchema,
+		RequiresConfirmation: &v.RequiresConfirmation,
+		BoundedResult:        &v.BoundedResult,
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
 	}
 
 	return res

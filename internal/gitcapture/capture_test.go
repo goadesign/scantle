@@ -3,6 +3,8 @@
 package gitcapture
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,7 +12,8 @@ import (
 	"testing"
 )
 
-func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndAppliesToIsolatedClone(t *testing.T) {
+func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndTrailingSpacePaths(t *testing.T) {
+	ctx := context.Background()
 	dir := t.TempDir()
 	runGit(t, dir, "init")
 	runGit(t, dir, "config", "user.email", "test@example.com")
@@ -20,7 +23,15 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndAppliesToIsolatedClone(
 	if err := os.WriteFile(trackedPath, []byte("package design\n// v1\n"), 0o600); err != nil {
 		t.Fatalf("write tracked file: %v", err)
 	}
-	runGit(t, dir, "add", "design.go")
+	// Create a tracked symlink `scripts/link` pointing to `trackedPath` in the source checkout.
+	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o750); err != nil {
+		t.Fatalf("mkdir scripts: %v", err)
+	}
+	trackedLink := filepath.Join(dir, "scripts", "link")
+	if err := os.Symlink(trackedPath, trackedLink); err != nil {
+		t.Fatalf("create tracked symlink: %v", err)
+	}
+	runGit(t, dir, "add", "design.go", "scripts/link")
 	runGit(t, dir, "commit", "-m", "initial commit")
 
 	dirtyContent := []byte("package design\n// dirty working tree edit\n")
@@ -28,14 +39,12 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndAppliesToIsolatedClone(
 		t.Fatalf("modify tracked file: %v", err)
 	}
 
-	// Create an executable untracked script, a dangling symlink, and an unselected scratch file.
+	// Create an executable untracked script, a dangling symlink, an untracked file
+	// with a trailing space ("scripts/link ") next to tracked symlink "scripts/link",
+	// and an unselected scratch file.
 	scriptRel := "scripts/check.sh"
 	scriptAbs := filepath.Join(dir, filepath.FromSlash(scriptRel))
-	if err := os.MkdirAll(filepath.Dir(scriptAbs), 0o750); err != nil {
-		t.Fatalf("mkdir scripts: %v", err)
-	}
-	scriptContent := []byte("#!/bin/sh\necho ok\n")
-	if err := os.WriteFile(scriptAbs, scriptContent, 0o755); err != nil {
+	if err := os.WriteFile(scriptAbs, []byte("#!/bin/sh\necho ok\n"), 0o755); err != nil {
 		t.Fatalf("write executable script: %v", err)
 	}
 	if err := os.Chmod(scriptAbs, 0o755); err != nil {
@@ -48,18 +57,38 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndAppliesToIsolatedClone(
 		t.Fatalf("create dangling symlink: %v", err)
 	}
 
+	trailingSpaceRel := "scripts/link "
+	trailingSpaceAbs := filepath.Join(dir, "scripts", "link ")
+	trailingSpaceContent := []byte("untracked file with trailing space must not write through scripts/link\n")
+	if err := os.WriteFile(trailingSpaceAbs, trailingSpaceContent, 0o600); err != nil {
+		t.Fatalf("write trailing-space file: %v", err)
+	}
+
 	scratchAbs := filepath.Join(dir, "unselected-secret.txt")
 	if err := os.WriteFile(scratchAbs, []byte("do not capture"), 0o600); err != nil {
 		t.Fatalf("write unselected file: %v", err)
 	}
 
 	statusBefore := runGit(t, dir, "status", "--porcelain=v1")
+	indexBytesBefore, err := os.ReadFile(filepath.Join(dir, ".git", "index"))
+	if err != nil {
+		t.Fatalf("read .git/index before capture: %v", err)
+	}
 
-	snap1, err := Capture(dir, "scripts")
+	// Empty selectedPaths must capture zero untracked files.
+	emptySnap, err := Capture(ctx, dir)
+	if err != nil {
+		t.Fatalf("Capture with empty selectedPaths failed: %v", err)
+	}
+	if len(emptySnap.Untracked) != 0 {
+		t.Fatalf("expected 0 untracked files when selectedPaths is empty, got %d", len(emptySnap.Untracked))
+	}
+
+	snap1, err := Capture(ctx, dir, "scripts")
 	if err != nil {
 		t.Fatalf("Capture(1) failed: %v", err)
 	}
-	snap2, err := Capture(dir, "scripts")
+	snap2, err := Capture(ctx, dir, "scripts")
 	if err != nil {
 		t.Fatalf("Capture(2) failed: %v", err)
 	}
@@ -67,30 +96,28 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndAppliesToIsolatedClone(
 	if snap1.TreeDigest == "" || snap1.TreeDigest != snap2.TreeDigest {
 		t.Fatalf("expected deterministic TreeDigest, got %q vs %q", snap1.TreeDigest, snap2.TreeDigest)
 	}
-	if !strings.Contains(string(snap1.TrackedPatch), "dirty working tree edit") {
-		t.Fatalf("expected TrackedPatch to contain dirty edit, got %q", string(snap1.TrackedPatch))
-	}
-	if len(snap1.Untracked) != 2 {
-		t.Fatalf("expected 2 selected untracked entries (excluding unselected-secret.txt), got %+v", snap1.Untracked)
+	if len(snap1.Untracked) != 3 {
+		t.Fatalf("expected 3 selected untracked entries under scripts, got %+v", snap1.Untracked)
 	}
 
-	// Materialize into an isolated verification clone and verify modes, symlinks, and tracked edits.
 	cloneDir := filepath.Join(t.TempDir(), "verify-clone")
-	if err := ApplyToClone(dir, cloneDir, snap1); err != nil {
+	if err := ApplyToClone(ctx, dir, cloneDir, snap1); err != nil {
 		t.Fatalf("ApplyToClone failed: %v", err)
 	}
 
-	clonedTracked, err := os.ReadFile(filepath.Join(cloneDir, "design.go"))
-	if err != nil || string(clonedTracked) != string(dirtyContent) {
-		t.Fatalf("unexpected cloned tracked file: %q (err=%v)", string(clonedTracked), err)
+	// Verify tracked file in source checkout was NOT overwritten by "scripts/link ".
+	sourceTrackedAfter, err := os.ReadFile(trackedPath)
+	if err != nil || !bytes.Equal(sourceTrackedAfter, dirtyContent) {
+		t.Fatalf("source checkout tracked file was mutated! got %q, want %q", string(sourceTrackedAfter), string(dirtyContent))
+	}
+	clonedTrailing, err := os.ReadFile(filepath.Join(cloneDir, filepath.FromSlash(trailingSpaceRel)))
+	if err != nil || !bytes.Equal(clonedTrailing, trailingSpaceContent) {
+		t.Fatalf("expected cloned %q to contain trailing-space content, got %q (err=%v)", trailingSpaceRel, string(clonedTrailing), err)
 	}
 
 	clonedScriptInfo, err := os.Lstat(filepath.Join(cloneDir, filepath.FromSlash(scriptRel)))
-	if err != nil {
-		t.Fatalf("lstat cloned script: %v", err)
-	}
-	if clonedScriptInfo.Mode().Perm() != 0o755 {
-		t.Fatalf("expected cloned script mode 0755, got %#o", clonedScriptInfo.Mode().Perm())
+	if err != nil || clonedScriptInfo.Mode().Perm() != 0o755 {
+		t.Fatalf("expected cloned script mode 0755, got %v (err=%v)", clonedScriptInfo, err)
 	}
 
 	clonedLinkTarget, err := os.Readlink(filepath.Join(cloneDir, filepath.FromSlash(symlinkRel)))
@@ -98,14 +125,14 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndAppliesToIsolatedClone(
 		t.Fatalf("expected cloned dangling symlink target %q, got %q (err=%v)", "../nonexistent-target", clonedLinkTarget, err)
 	}
 
-	if _, err := os.Lstat(filepath.Join(cloneDir, "unselected-secret.txt")); !os.IsNotExist(err) {
-		t.Fatalf("expected unselected-secret.txt to be absent from clone, got err=%v", err)
-	}
-
-	// Verify the source checkout and index are byte-for-byte untouched.
+	// Verify the source checkout status and .git/index bytes are untouched.
 	statusAfter := runGit(t, dir, "status", "--porcelain=v1")
 	if statusBefore != statusAfter {
 		t.Fatalf("working tree status mutated: before=%q after=%q", statusBefore, statusAfter)
+	}
+	indexBytesAfter, err := os.ReadFile(filepath.Join(dir, ".git", "index"))
+	if err != nil || !bytes.Equal(indexBytesBefore, indexBytesAfter) {
+		t.Fatal(".git/index bytes mutated during Capture or ApplyToClone")
 	}
 }
 

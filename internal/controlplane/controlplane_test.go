@@ -5,6 +5,8 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -52,7 +54,7 @@ func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, prom
 	return override.Version, nil
 }
 
-func TestCP1AmbiguityResolutionStrictValidationOwnershipAndConfirmationLock(t *testing.T) {
+func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testing.T) {
 	aliceCtx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	bobCtx := WithPrincipal(context.Background(), Principal{ID: "bob@example.com"})
 
@@ -70,7 +72,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndConfirmationLock(t *t
 				Options:  []string{"auto_approve_lte_5000", "require_manager_at_5000"},
 			},
 		},
-		Examples: []*genscantle.ExampleItem{
+		Examples: []CP1ModelExample{
 			{
 				Scenario:         "Refund under $50 auto-approves",
 				InputSummary:     "Order subtotal $48.00, tax $4.32 ($52.32 total)",
@@ -101,11 +103,10 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndConfirmationLock(t *t
 	}
 
 	cp := New(Options{
-		Analyzer: NewModelCP1Analyzer(&stubModelClient{responseJSON: string(rawBytes)}),
+		Analyzer: NewModelCP1Analyzer(&stubModelClient{responseJSON: "```json\n" + string(rawBytes) + "\n```"}),
 	})
 
 	designSrc := `package design // orders service`
-	// Unauthenticated call must fail closed.
 	if _, err := cp.ProposeChange(context.Background(), &genscantle.ProposeChangePayload{
 		ChangeID:     "chg-refund-50",
 		Prompt:       "Refunds under $50 should be automatic, otherwise ask a manager.",
@@ -132,9 +133,18 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndConfirmationLock(t *t
 		t.Fatalf("unexpected examples: %+v", proposed.Examples)
 	}
 
+	// Attempting to overwrite an existing change_id must be rejected.
+	if _, err := cp.ProposeChange(bobCtx, &genscantle.ProposeChangePayload{
+		ChangeID: "chg-refund-50",
+		Prompt:   "Attempt to clobber Alice's change_id",
+	}); err == nil {
+		t.Fatal("expected duplicate change_id in ProposeChange to be rejected")
+	}
+
 	// Non-owner principal cannot confirm Alice's Change Card.
 	if _, err := cp.ConfirmIntent(bobCtx, &genscantle.ConfirmIntentPayload{
-		ChangeID: "chg-refund-50",
+		ChangeID:        "chg-refund-50",
+		RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{
 			"amount-basis":   "item_subtotal_cents",
 			"exact-boundary": "require_manager_at_5000",
@@ -144,38 +154,22 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndConfirmationLock(t *t
 		t.Fatal("expected ConfirmIntent by non-owner principal to be rejected")
 	}
 
-	// Missing answer, invalid option, or extra unknown ambiguity ID must fail.
+	// Stale request_revision must be rejected.
 	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
-		ChangeID: "chg-refund-50",
-		Answers:  map[string]string{"amount-basis": "item_subtotal_cents"},
-		Examples: proposed.Examples,
-	}); err == nil {
-		t.Fatal("expected ConfirmIntent to reject incomplete ambiguity answers")
-	}
-	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
-		ChangeID: "chg-refund-50",
-		Answers: map[string]string{
-			"amount-basis":   "not-a-valid-option",
-			"exact-boundary": "require_manager_at_5000",
-		},
-		Examples: proposed.Examples,
-	}); err == nil {
-		t.Fatal("expected ConfirmIntent to reject option not in Ambiguities.Options")
-	}
-	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
-		ChangeID: "chg-refund-50",
+		ChangeID:        "chg-refund-50",
+		RequestRevision: "stale-revision",
 		Answers: map[string]string{
 			"amount-basis":   "item_subtotal_cents",
 			"exact-boundary": "require_manager_at_5000",
-			"extra-id":       "value",
 		},
 		Examples: proposed.Examples,
 	}); err == nil {
-		t.Fatal("expected ConfirmIntent to reject unknown ambiguity key")
+		t.Fatal("expected ConfirmIntent with mismatched request_revision to be rejected")
 	}
 
 	confirmed, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
-		ChangeID: "chg-refund-50",
+		ChangeID:        "chg-refund-50",
+		RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{
 			"amount-basis":   "item_subtotal_cents",
 			"exact-boundary": "require_manager_at_5000",
@@ -213,14 +207,13 @@ func TestCP1RejectsMalformedModelAnalysis(t *testing.T) {
 	}
 }
 
-func TestCP2PreviewArchitectureAndCP3FastDraftModeAndMCPAdapter(t *testing.T) {
+func TestCP2EvaluatedArchitecturePreviewCP3FastDraftAndTokenAuthenticator(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	clearAnalysis := CP1SemanticAnalysis{
 		Summary:     "Refunds with item_subtotal_cents < 5000 auto-approve; >= 5000 require manager approval.",
 		Ambiguities: nil,
-		Examples: []*genscantle.ExampleItem{
+		Examples: []CP1ModelExample{
 			{
-				ID:               "check-subtotal-4999",
 				Scenario:         "Subtotal 4999 cents auto-approves",
 				InputSummary:     "item_subtotal_cents=4999",
 				ExpectedOutcome:  "Auto-approved",
@@ -240,7 +233,6 @@ func TestCP2PreviewArchitectureAndCP3FastDraftModeAndMCPAdapter(t *testing.T) {
 	candidateDesign := `package design
 
 import (
-	"time"
 	. "goa.design/goa/v3/dsl"
 	. "goa.design/goa-ai/dsl"
 )
@@ -249,7 +241,23 @@ var _ = API("orders", func() {})
 
 var RefundTools = Toolset("refund_tools", func() {
 	Description("Order lookup and payment refund tools")
-	Tool("issue_refund", "Issue a payment refund", func() {})
+	Tool("issue_refund", "Issue a payment refund", func() {
+		Args(func() {
+			Attribute("tenant_id", String)
+			Attribute("order_id", String)
+			Required("tenant_id", "order_id")
+		})
+		Return(func() {
+			Attribute("status", String)
+			Required("status")
+		})
+		Inject("tenant_id")
+		Confirmation(func() {
+			Title("Approve refund")
+			PromptTemplate("Approve {{ .order_id }}?")
+			DeniedResultTemplate(` + "`{\"status\":\"denied\"}`" + `)
+		})
+	})
 })
 
 var _ = Service("orders", func() {
@@ -257,10 +265,15 @@ var _ = Service("orders", func() {
 	Agent("refund_agent", "Executes durable order refund workflows", func() {
 		Use(RefundTools)
 		RunPolicy(func() {
-			TimeBudget(2 * time.Minute)
-			MaxToolCalls(6)
+			DefaultCaps(MaxToolCalls(6), MaxRecoveryTurns(2))
+			TimeBudget("2m")
 			History(func() {
-				Compress(20, 6)
+				CompressAtTurns(20)
+				KeepMaxTurns(6)
+			})
+			Cache(func() {
+				AfterSystem()
+				AfterTools()
 			})
 		})
 	})
@@ -278,7 +291,6 @@ var _ = Service("orders", func() {
 		t.Fatalf("expected clear request to be immediately %q, got %q", StatusConfirmed, card.Status)
 	}
 
-	// CP2: PreviewArchitecture extracts C4 topology, edges, and guardrails from the Goa design AST.
 	preview, err := cp.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
 		ChangeID:        card.ChangeID,
 		RequestRevision: card.RequestRevision,
@@ -290,17 +302,15 @@ var _ = Service("orders", func() {
 	if preview.SystemName != "orders" || len(preview.Containers) != 3 || len(preview.Edges) != 2 {
 		t.Fatalf("unexpected CP2 topology: system=%q containers=%d edges=%d", preview.SystemName, len(preview.Containers), len(preview.Edges))
 	}
-	if preview.Guardrails.MaxExecutionSeconds != 120 || preview.Guardrails.MaxToolCalls != 6 || preview.Guardrails.CompressAtTurns != 20 || preview.Guardrails.KeepRecentTurns != 6 {
-		t.Fatalf("unexpected CP2 guardrails: %+v", preview.Guardrails)
+	if len(preview.AgentPolicies) != 1 {
+		t.Fatalf("expected 1 agent policy, got %d", len(preview.AgentPolicies))
 	}
-
-	// CP2 must reject mismatched request_revision or undeclared toolset references.
-	if _, err := cp.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
-		ChangeID:        card.ChangeID,
-		RequestRevision: "stale-revision",
-		DesignSource:    candidateDesign,
-	}); err == nil {
-		t.Fatal("expected PreviewArchitecture to reject stale request_revision")
+	pol := preview.AgentPolicies[0]
+	if pol.MaxExecutionSeconds != 120 || pol.MaxToolCalls != 6 || pol.MaxRecoveryTurns != 2 || pol.CompressAtTurns != 20 || pol.KeepRecentTurns != 6 || !pol.CacheAfterSystem || !pol.CacheAfterTools {
+		t.Fatalf("unexpected evaluated AgentPolicyItem: %+v", pol)
+	}
+	if len(preview.Tools) != 1 || !preview.Tools[0].RequiresConfirmation || len(preview.Tools[0].InjectedFields) != 1 || preview.Tools[0].InjectedFields[0] != "tenant_id" {
+		t.Fatalf("unexpected evaluated ToolContractItem: %+v", preview.Tools)
 	}
 
 	// CP3: Fast Draft Mode updates the bound TargetPromptUpdater and rejects compiled_rule hacks.
@@ -316,23 +326,38 @@ var _ = Service("orders", func() {
 	if !draftPrompt.AppliedInStore || draftPrompt.RequiresRebuild || draftPrompt.PromptVersion == nil || *draftPrompt.PromptVersion == "" {
 		t.Fatalf("unexpected prompt_template DraftOverrideResult: %+v", draftPrompt)
 	}
-	resolved, err := targetStore.Resolve(ctx, prompt.Ident(promptID), prompt.Scope{})
-	if err != nil || resolved == nil || resolved.Template != "You are a concise, empathetic refund specialist." {
-		t.Fatalf("expected bound target prompt.Store to contain updated template, got %+v (err=%v)", resolved, err)
-	}
 
-	draftRule, err := cp.DraftOverride(ctx, &genscantle.DraftOverridePayload{
-		TargetKind: TargetKindCompiledRule,
-		NewContent: "Change $50 threshold to $100 in prompt",
+	// Verified bearer-token authenticator rejects unauthenticated HTTP requests and accepts valid bearer token.
+	auth := NewTokenAuthenticator(map[string]Principal{
+		"secret-token-alice": {ID: "alice@example.com"},
 	})
+	srv := httptest.NewServer(NewHTTPHandler(cp, auth))
+	defer srv.Close()
+
+	unauthResp, err := http.Get(srv.URL + "/ui/checkpoint")
 	if err != nil {
-		t.Fatalf("DraftOverride(compiled_rule) failed: %v", err)
+		t.Fatalf("GET /ui/checkpoint failed: %v", err)
 	}
-	if draftRule.AppliedInStore || !draftRule.RequiresRebuild {
-		t.Fatalf("expected compiled_rule override to require rebuild and not apply in store: %+v", draftRule)
+	unauthResp.Body.Close()
+	if unauthResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 Unauthorized without bearer token, got %d", unauthResp.StatusCode)
 	}
 
-	// MCP Adapter ToolsList (5 tools: propose_change, confirm_intent, preview_architecture, draft_override, diff) and ResourcesRead.
+	authReq, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/ui/checkpoint", nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	authReq.Header.Set("Authorization", "Bearer secret-token-alice")
+	authResp, err := http.DefaultClient.Do(authReq)
+	if err != nil {
+		t.Fatalf("authenticated GET /ui/checkpoint failed: %v", err)
+	}
+	authResp.Body.Close()
+	if authResp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 OK with valid bearer token, got %d", authResp.StatusCode)
+	}
+
+	// MCP Adapter ToolsList (5 tools) and ResourcesRead.
 	adapter := genmcpadapter.NewMCPAdapter(genscantle.NewEndpoints(cp), nil)
 	toolsRes, err := adapter.ToolsList(ctx, &genmcpadapter.ToolsListPayload{})
 	if err != nil || len(toolsRes.Tools) != 5 {

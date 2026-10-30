@@ -15,7 +15,7 @@ import (
 // ProposeChangeRequestBody is the type of the "scantle" service
 // "propose_change" endpoint HTTP request body.
 type ProposeChangeRequestBody struct {
-	// Client-supplied or generated change identifier.
+	// Unique change identifier.
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
 	// Operator feature request.
 	Prompt string `form:"prompt" json:"prompt" xml:"prompt"`
@@ -28,6 +28,8 @@ type ProposeChangeRequestBody struct {
 type ConfirmIntentRequestBody struct {
 	// Change identifier.
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Reviewed CP1 request_revision digest being confirmed.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string `form:"answers" json:"answers" xml:"answers"`
 	// Confirmed example table.
@@ -41,7 +43,7 @@ type PreviewArchitectureRequestBody struct {
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
 	// Expected CP1 request_revision digest.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
-	// Candidate Goa and Goa-AI design source to inspect.
+	// Candidate Goa and Goa-AI design source to evaluate.
 	DesignSource string `form:"design_source" json:"design_source" xml:"design_source"`
 }
 
@@ -126,7 +128,7 @@ type PreviewArchitectureResponseBody struct {
 	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
 	// Bound CP1 request_revision digest.
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
-	// SHA-256 digest of the inspected Goa design source.
+	// SHA-256 digest of the evaluated Goa design source.
 	DesignDigest *string `form:"design_digest,omitempty" json:"design_digest,omitempty" xml:"design_digest,omitempty"`
 	// API or primary service name declared in the design.
 	SystemName *string `form:"system_name,omitempty" json:"system_name,omitempty" xml:"system_name,omitempty"`
@@ -134,8 +136,10 @@ type PreviewArchitectureResponseBody struct {
 	Containers []*C4ContainerItemResponseBody `form:"containers,omitempty" json:"containers,omitempty" xml:"containers,omitempty"`
 	// Validated directed edges between declared containers.
 	Edges []*C4EdgeItemResponseBody `form:"edges,omitempty" json:"edges,omitempty" xml:"edges,omitempty"`
-	// Extracted Goa-AI runtime guardrails.
-	Guardrails *GuardrailItemResponseBody `form:"guardrails,omitempty" json:"guardrails,omitempty" xml:"guardrails,omitempty"`
+	// Evaluated Goa-AI runtime policies per declared agent.
+	AgentPolicies []*AgentPolicyItemResponseBody `form:"agent_policies,omitempty" json:"agent_policies,omitempty" xml:"agent_policies,omitempty"`
+	// Evaluated Goa-AI tool contracts.
+	Tools []*ToolContractItemResponseBody `form:"tools,omitempty" json:"tools,omitempty" xml:"tools,omitempty"`
 	// Plain-English summary of topology and guardrails.
 	Banner *string `form:"banner,omitempty" json:"banner,omitempty" xml:"banner,omitempty"`
 }
@@ -156,13 +160,14 @@ type DraftOverrideResponseBody struct {
 // DiffResponseBody is the type of the "scantle" service "diff" endpoint HTTP
 // response body.
 type DiffResponseBody struct {
-	// True when any declaration, contract body, or module directive changed.
+	// True when any declaration, evaluated contract schema, or module directive
+	// changed.
 	HasChanges *bool `form:"has_changes,omitempty" json:"has_changes,omitempty" xml:"has_changes,omitempty"`
 	// Added scoped declarations.
 	AddedDeclarations []string `form:"added_declarations,omitempty" json:"added_declarations,omitempty" xml:"added_declarations,omitempty"`
 	// Removed scoped declarations.
 	RemovedDeclarations []string `form:"removed_declarations,omitempty" json:"removed_declarations,omitempty" xml:"removed_declarations,omitempty"`
-	// Declarations whose payload, result, route, or policy changed.
+	// Declarations whose evaluated schema, route, or policy changed.
 	ModifiedDeclarations []string `form:"modified_declarations,omitempty" json:"modified_declarations,omitempty" xml:"modified_declarations,omitempty"`
 	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string `form:"version_deltas,omitempty" json:"version_deltas,omitempty" xml:"version_deltas,omitempty"`
@@ -183,7 +188,7 @@ type AmbiguityQuestionResponseBody struct {
 
 // ExampleItemResponseBody is used to define fields on response body types.
 type ExampleItemResponseBody struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
 	// Plain-English scenario description.
 	Scenario *string `form:"scenario,omitempty" json:"scenario,omitempty" xml:"scenario,omitempty"`
@@ -201,7 +206,7 @@ type C4ContainerItemResponseBody struct {
 	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
 	// Human-readable container name.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// Container role (service, agent, toolset, or dependency).
+	// Container role (service, agent, or toolset).
 	Kind *string `form:"kind,omitempty" json:"kind,omitempty" xml:"kind,omitempty"`
 	// Summary of the container's responsibility.
 	Description *string `form:"description,omitempty" json:"description,omitempty" xml:"description,omitempty"`
@@ -217,21 +222,51 @@ type C4EdgeItemResponseBody struct {
 	Protocol *string `form:"protocol,omitempty" json:"protocol,omitempty" xml:"protocol,omitempty"`
 }
 
-// GuardrailItemResponseBody is used to define fields on response body types.
-type GuardrailItemResponseBody struct {
+// AgentPolicyItemResponseBody is used to define fields on response body types.
+type AgentPolicyItemResponseBody struct {
+	// Scoped agent container identifier.
+	AgentID *string `form:"agent_id,omitempty" json:"agent_id,omitempty" xml:"agent_id,omitempty"`
 	// Per-run execution time budget in seconds.
 	MaxExecutionSeconds *int `form:"max_execution_seconds,omitempty" json:"max_execution_seconds,omitempty" xml:"max_execution_seconds,omitempty"`
 	// Per-run retrieval tool-call budget.
 	MaxToolCalls *int `form:"max_tool_calls,omitempty" json:"max_tool_calls,omitempty" xml:"max_tool_calls,omitempty"`
+	// Maximum consecutive recovery turns after validation failure.
+	MaxRecoveryTurns *int `form:"max_recovery_turns,omitempty" json:"max_recovery_turns,omitempty" xml:"max_recovery_turns,omitempty"`
 	// Turn threshold for history compression.
 	CompressAtTurns *int `form:"compress_at_turns,omitempty" json:"compress_at_turns,omitempty" xml:"compress_at_turns,omitempty"`
 	// Recent turns retained uncompressed.
 	KeepRecentTurns *int `form:"keep_recent_turns,omitempty" json:"keep_recent_turns,omitempty" xml:"keep_recent_turns,omitempty"`
+	// True when prompt caching places a checkpoint after system prompts.
+	CacheAfterSystem *bool `form:"cache_after_system,omitempty" json:"cache_after_system,omitempty" xml:"cache_after_system,omitempty"`
+	// True when prompt caching places a checkpoint after tool definitions.
+	CacheAfterTools *bool `form:"cache_after_tools,omitempty" json:"cache_after_tools,omitempty" xml:"cache_after_tools,omitempty"`
+}
+
+// ToolContractItemResponseBody is used to define fields on response body types.
+type ToolContractItemResponseBody struct {
+	// Scoped tool identifier (<toolset>.<tool>).
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Owning toolset name.
+	Toolset *string `form:"toolset,omitempty" json:"toolset,omitempty" xml:"toolset,omitempty"`
+	// Tool name.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// Tool description.
+	Description *string `form:"description,omitempty" json:"description,omitempty" xml:"description,omitempty"`
+	// Canonical evaluated argument schema summary.
+	ArgsSchema *string `form:"args_schema,omitempty" json:"args_schema,omitempty" xml:"args_schema,omitempty"`
+	// Canonical evaluated return schema summary.
+	ReturnSchema *string `form:"return_schema,omitempty" json:"return_schema,omitempty" xml:"return_schema,omitempty"`
+	// Server-supplied InjectedFields hidden from the model.
+	InjectedFields []string `form:"injected_fields,omitempty" json:"injected_fields,omitempty" xml:"injected_fields,omitempty"`
+	// True when the tool declares a design-time Confirmation gate.
+	RequiresConfirmation *bool `form:"requires_confirmation,omitempty" json:"requires_confirmation,omitempty" xml:"requires_confirmation,omitempty"`
+	// True when the tool declares a BoundedResult cursor/truncation contract.
+	BoundedResult *bool `form:"bounded_result,omitempty" json:"bounded_result,omitempty" xml:"bounded_result,omitempty"`
 }
 
 // ExampleItemRequestBody is used to define fields on request body types.
 type ExampleItemRequestBody struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID string `form:"id" json:"id" xml:"id"`
 	// Plain-English scenario description.
 	Scenario string `form:"scenario" json:"scenario" xml:"scenario"`
@@ -258,7 +293,8 @@ func NewProposeChangeRequestBody(p *scantle.ProposeChangePayload) *ProposeChange
 // the "confirm_intent" endpoint of the "scantle" service.
 func NewConfirmIntentRequestBody(p *scantle.ConfirmIntentPayload) *ConfirmIntentRequestBody {
 	body := &ConfirmIntentRequestBody{
-		ChangeID: p.ChangeID,
+		ChangeID:        p.ChangeID,
+		RequestRevision: p.RequestRevision,
 	}
 	if p.Answers != nil {
 		body.Answers = make(map[string]string, len(p.Answers))
@@ -433,7 +469,22 @@ func NewPreviewArchitectureArchitecturePreviewResultOK(body *PreviewArchitecture
 		}
 		v.Edges[i] = unmarshalC4EdgeItemResponseBodyToScantleC4EdgeItem(val)
 	}
-	v.Guardrails = unmarshalGuardrailItemResponseBodyToScantleGuardrailItem(body.Guardrails)
+	v.AgentPolicies = make([]*scantle.AgentPolicyItem, len(body.AgentPolicies))
+	for i, val := range body.AgentPolicies {
+		if val == nil {
+			v.AgentPolicies[i] = nil
+			continue
+		}
+		v.AgentPolicies[i] = unmarshalAgentPolicyItemResponseBodyToScantleAgentPolicyItem(val)
+	}
+	v.Tools = make([]*scantle.ToolContractItem, len(body.Tools))
+	for i, val := range body.Tools {
+		if val == nil {
+			v.Tools[i] = nil
+			continue
+		}
+		v.Tools[i] = unmarshalToolContractItemResponseBodyToScantleToolContractItem(val)
+	}
 
 	return v
 }
@@ -591,8 +642,11 @@ func ValidatePreviewArchitectureResponseBody(body *PreviewArchitectureResponseBo
 	if body.Edges == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
 	}
-	if body.Guardrails == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("guardrails", "body"))
+	if body.AgentPolicies == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_policies", "body"))
+	}
+	if body.Tools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
 	}
 	if body.Banner == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
@@ -611,9 +665,18 @@ func ValidatePreviewArchitectureResponseBody(body *PreviewArchitectureResponseBo
 			}
 		}
 	}
-	if body.Guardrails != nil {
-		if err2 := validateGuardrailItemResponseBody(body.Guardrails, "body.guardrails"); err2 != nil {
-			err = goa.MergeErrors(err, err2)
+	for _, e := range body.AgentPolicies {
+		if e != nil {
+			if err2 := validateAgentPolicyItemResponseBody(e, "body.agent_policies[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Tools {
+		if e != nil {
+			if err2 := validateToolContractItemResponseBody(e, "body.tools[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
 		}
 	}
 	return
@@ -754,8 +817,8 @@ func ValidateC4ContainerItemResponseBody(body *C4ContainerItemResponseBody) (err
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if body.Kind != nil {
-		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "dependency") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset", "dependency"}))
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset"}))
 		}
 	}
 	return
@@ -777,8 +840,8 @@ func validateC4ContainerItemResponseBody(body *C4ContainerItemResponseBody, path
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", path))
 	}
 	if body.Kind != nil {
-		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "dependency") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".kind", *body.Kind, []any{"service", "agent", "toolset", "dependency"}))
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".kind", *body.Kind, []any{"service", "agent", "toolset"}))
 		}
 	}
 	return
@@ -813,14 +876,20 @@ func validateC4EdgeItemResponseBody(body *C4EdgeItemResponseBody, path string) (
 	return
 }
 
-// ValidateGuardrailItemResponseBody runs the validations defined on
-// GuardrailItem
-func ValidateGuardrailItemResponseBody(body *GuardrailItemResponseBody) (err error) {
+// ValidateAgentPolicyItemResponseBody runs the validations defined on
+// AgentPolicyItem
+func ValidateAgentPolicyItemResponseBody(body *AgentPolicyItemResponseBody) (err error) {
+	if body.AgentID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_id", "body"))
+	}
 	if body.MaxExecutionSeconds == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
 	}
 	if body.MaxToolCalls == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if body.MaxRecoveryTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_recovery_turns", "body"))
 	}
 	if body.CompressAtTurns == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
@@ -828,23 +897,107 @@ func ValidateGuardrailItemResponseBody(body *GuardrailItemResponseBody) (err err
 	if body.KeepRecentTurns == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
 	}
+	if body.CacheAfterSystem == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_system", "body"))
+	}
+	if body.CacheAfterTools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_tools", "body"))
+	}
 	return
 }
 
-// validateGuardrailItemResponseBody checks GuardrailItem and reports errors
-// using the path supplied by its caller
-func validateGuardrailItemResponseBody(body *GuardrailItemResponseBody, path string) (err error) {
+// validateAgentPolicyItemResponseBody checks AgentPolicyItem and reports
+// errors using the path supplied by its caller
+func validateAgentPolicyItemResponseBody(body *AgentPolicyItemResponseBody, path string) (err error) {
+	if body.AgentID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_id", path))
+	}
 	if body.MaxExecutionSeconds == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", path))
 	}
 	if body.MaxToolCalls == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", path))
 	}
+	if body.MaxRecoveryTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_recovery_turns", path))
+	}
 	if body.CompressAtTurns == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", path))
 	}
 	if body.KeepRecentTurns == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", path))
+	}
+	if body.CacheAfterSystem == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_system", path))
+	}
+	if body.CacheAfterTools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_tools", path))
+	}
+	return
+}
+
+// ValidateToolContractItemResponseBody runs the validations defined on
+// ToolContractItem
+func ValidateToolContractItemResponseBody(body *ToolContractItemResponseBody) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Toolset == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("toolset", "body"))
+	}
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if body.ReturnSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("return_schema", "body"))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	if body.RequiresConfirmation == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
+	}
+	if body.BoundedResult == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
+	}
+	return
+}
+
+// validateToolContractItemResponseBody checks ToolContractItem and reports
+// errors using the path supplied by its caller
+func validateToolContractItemResponseBody(body *ToolContractItemResponseBody, path string) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", path))
+	}
+	if body.Toolset == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("toolset", path))
+	}
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", path))
+	}
+	if body.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", path))
+	}
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", path))
+	}
+	if body.ReturnSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("return_schema", path))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", path))
+	}
+	if body.RequiresConfirmation == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", path))
+	}
+	if body.BoundedResult == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", path))
 	}
 	return
 }

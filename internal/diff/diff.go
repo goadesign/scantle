@@ -1,29 +1,29 @@
-// Package diff computes structural AST and module dependency diffs for Goa
-// designs and go.mod files without emitting a blanket compatibility verdict.
+// Package diff computes structural contract and module dependency diffs for
+// evaluated Goa/Goa-AI designs and go.mod files without emitting a blanket
+// compatibility verdict.
 package diff
 
 import (
+	"context"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"slices"
 	"strings"
 
+	"github.com/goadesign/scantle/internal/designeval"
 	"golang.org/x/mod/modfile"
 )
 
 type (
-	// Report summarizes the structural Goa design declarations and go.mod
+	// Report summarizes the evaluated Goa/Goa-AI design declarations and go.mod
 	// directives that changed between two snapshots.
 	Report struct {
-		// HasChanges is true when at least one declaration, contract body, or module directive changed.
+		// HasChanges is true when at least one declaration, evaluated contract schema, or module directive changed.
 		HasChanges bool
-		// AddedDeclarations lists newly introduced scoped Goa design declarations.
+		// AddedDeclarations lists newly introduced scoped Goa/Goa-AI declarations.
 		AddedDeclarations []string
-		// RemovedDeclarations lists deleted scoped Goa design declarations.
+		// RemovedDeclarations lists deleted scoped Goa/Goa-AI declarations.
 		RemovedDeclarations []string
-		// ModifiedDeclarations lists scoped Goa declarations whose contract body changed.
+		// ModifiedDeclarations lists scoped Goa/Goa-AI declarations whose evaluated contract changed.
 		ModifiedDeclarations []string
 		// VersionDeltas lists changed, added, or removed go.mod require, replace, or exclude directives.
 		VersionDeltas []string
@@ -32,41 +32,24 @@ type (
 	}
 )
 
-var (
-	// dslCalls lists the Goa and Goa-AI DSL call names tracked as scoped declarations.
-	dslCalls = map[string]bool{
-		"API":      true,
-		"Service":  true,
-		"Method":   true,
-		"Agent":    true,
-		"Toolset":  true,
-		"Use":      true,
-		"Tool":     true,
-		"Resource": true,
-		"MCP":      true,
-		"Suite":    true,
-		"Scenario": true,
-		"Type":     true,
-	}
-)
-
-// Compare parses old and new Go/Goa design sources and go.mod files and returns
-// a factual structural diff Report.
-func Compare(oldDesign, newDesign, oldGoMod, newGoMod string) (Report, error) {
-	oldDecls, err := parseDeclarations(oldDesign)
+// Compare evaluates old and new Go/Goa design sources via the real Goa/Goa-AI
+// DSL evaluator, parses old and new go.mod files via golang.org/x/mod/modfile,
+// and returns a factual structural diff Report.
+func Compare(ctx context.Context, oldDesign, newDesign, oldGoMod, newGoMod string) (Report, error) {
+	oldEval, err := designeval.Evaluate(ctx, oldDesign)
 	if err != nil {
-		return Report{}, fmt.Errorf("parse old design: %w", err)
+		return Report{}, fmt.Errorf("evaluate old design: %w", err)
 	}
-	newDecls, err := parseDeclarations(newDesign)
+	newEval, err := designeval.Evaluate(ctx, newDesign)
 	if err != nil {
-		return Report{}, fmt.Errorf("parse new design: %w", err)
+		return Report{}, fmt.Errorf("evaluate new design: %w", err)
 	}
 	deltas, err := compareGoMod(oldGoMod, newGoMod)
 	if err != nil {
 		return Report{}, err
 	}
 
-	added, removed, modified := diffDeclarations(oldDecls, newDecls)
+	added, removed, modified := diffDeclarations(oldEval.Declarations, newEval.Declarations)
 	hasChanges := len(added) > 0 || len(removed) > 0 || len(modified) > 0 || len(deltas) > 0
 
 	summary := "No structural design or module dependency changes."
@@ -97,189 +80,8 @@ func Compare(oldDesign, newDesign, oldGoMod, newGoMod string) (Report, error) {
 	}, nil
 }
 
-// parseDeclarations extracts scoped `<Kind>:<Name>` identifiers mapped to their
-// canonical non-child AST body signature from a Go/Goa design source string.
-func parseDeclarations(src string) (map[string]string, error) {
-	decls := make(map[string]string)
-	if strings.TrimSpace(src) == "" {
-		return decls, nil
-	}
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "design.go", src, parser.SkipObjectResolution)
-	if err != nil {
-		return nil, err
-	}
-	walkNode(file, nil, decls)
-	return decls, nil
-}
-
-// walkNode traverses n with the active declaration scope stack and populates decls.
-func walkNode(n ast.Node, scope []string, decls map[string]string) {
-	if n == nil {
-		return
-	}
-	if call, ok := n.(*ast.CallExpr); ok {
-		if seg, isTracked := trackedCallSegment(call); isTracked {
-			nextScope := append(slices.Clone(scope), seg)
-			key := strings.Join(nextScope, "/")
-			var sig strings.Builder
-			for i, arg := range call.Args {
-				if i > 0 {
-					sig.WriteByte(',')
-				}
-				writeBodySignature(&sig, arg)
-			}
-			decls[key] = sig.String()
-			for _, arg := range call.Args {
-				walkNode(arg, nextScope, decls)
-			}
-			return
-		}
-	}
-	ast.Inspect(n, func(child ast.Node) bool {
-		if child == nil || child == n {
-			return true
-		}
-		if call, ok := child.(*ast.CallExpr); ok {
-			if _, isTracked := trackedCallSegment(call); isTracked {
-				walkNode(call, scope, decls)
-				return false
-			}
-		}
-		return true
-	})
-}
-
-// trackedCallSegment returns `<Kind>:<Name>` when call is a tracked Goa/Goa-AI
-// declaration with a string literal or identifier name in Args[0].
-func trackedCallSegment(call *ast.CallExpr) (string, bool) {
-	if call == nil || len(call.Args) == 0 {
-		return "", false
-	}
-	name := callIdent(call.Fun)
-	if !dslCalls[name] {
-		return "", false
-	}
-	label := extractLabel(call.Args[0])
-	if label == "" {
-		return "", false
-	}
-	return name + ":" + label, true
-}
-
-// extractLabel extracts a declaration label from a string literal or identifier.
-func extractLabel(expr ast.Expr) string {
-	switch v := expr.(type) {
-	case *ast.BasicLit:
-		if v.Kind == token.STRING {
-			return strings.Trim(v.Value, "\"`")
-		}
-	case *ast.Ident:
-		return v.Name
-	}
-	return ""
-}
-
-// writeBodySignature serializes the canonical AST structure of node into b while
-// skipping nested tracked declarations (which have their own keys in decls).
-func writeBodySignature(b *strings.Builder, node ast.Node) {
-	if node == nil {
-		return
-	}
-	switch v := node.(type) {
-	case *ast.CallExpr:
-		if _, isTracked := trackedCallSegment(v); isTracked {
-			return
-		}
-		b.WriteString("Call(")
-		writeBodySignature(b, v.Fun)
-		for _, arg := range v.Args {
-			b.WriteByte(',')
-			writeBodySignature(b, arg)
-		}
-		b.WriteByte(')')
-	case *ast.FuncLit:
-		b.WriteString("Func(")
-		if v.Body != nil {
-			for _, stmt := range v.Body.List {
-				writeBodySignature(b, stmt)
-			}
-		}
-		b.WriteByte(')')
-	case *ast.ExprStmt:
-		writeBodySignature(b, v.X)
-	case *ast.AssignStmt:
-		b.WriteString("Assign(")
-		for _, lhs := range v.Lhs {
-			writeBodySignature(b, lhs)
-		}
-		b.WriteByte('=')
-		for _, rhs := range v.Rhs {
-			writeBodySignature(b, rhs)
-		}
-		b.WriteByte(')')
-	case *ast.BlockStmt:
-		for _, stmt := range v.List {
-			writeBodySignature(b, stmt)
-		}
-	case *ast.Ident:
-		b.WriteString("Ident(")
-		b.WriteString(v.Name)
-		b.WriteByte(')')
-	case *ast.BasicLit:
-		b.WriteString("Lit(")
-		b.WriteString(v.Value)
-		b.WriteByte(')')
-	case *ast.SelectorExpr:
-		writeBodySignature(b, v.X)
-		b.WriteByte('.')
-		writeBodySignature(b, v.Sel)
-	case *ast.UnaryExpr:
-		b.WriteString(v.Op.String())
-		writeBodySignature(b, v.X)
-	case *ast.BinaryExpr:
-		b.WriteByte('(')
-		writeBodySignature(b, v.X)
-		b.WriteString(v.Op.String())
-		writeBodySignature(b, v.Y)
-		b.WriteByte(')')
-	case *ast.KeyValueExpr:
-		writeBodySignature(b, v.Key)
-		b.WriteByte(':')
-		writeBodySignature(b, v.Value)
-	case *ast.CompositeLit:
-		writeBodySignature(b, v.Type)
-		b.WriteByte('{')
-		for _, elt := range v.Elts {
-			writeBodySignature(b, elt)
-			b.WriteByte(';')
-		}
-		b.WriteByte('}')
-	default:
-		ast.Inspect(node, func(child ast.Node) bool {
-			if child == nil || child == node {
-				return true
-			}
-			writeBodySignature(b, child)
-			return false
-		})
-	}
-}
-
-// callIdent returns the unqualified function name for an AST call expression.
-func callIdent(expr ast.Expr) string {
-	switch v := expr.(type) {
-	case *ast.Ident:
-		return v.Name
-	case *ast.SelectorExpr:
-		return v.Sel.Name
-	default:
-		return ""
-	}
-}
-
-// diffDeclarations partitions old and new declaration maps into sorted added,
-// removed, and modified declaration slices.
+// diffDeclarations partitions old and new evaluated declaration maps into
+// sorted added, removed, and modified declaration slices.
 func diffDeclarations(oldDecls, newDecls map[string]string) (added, removed, modified []string) {
 	added = make([]string, 0)
 	removed = make([]string, 0)
@@ -344,8 +146,8 @@ func compareGoMod(oldMod, newMod string) ([]string, error) {
 	return deltas, nil
 }
 
-// parseGoModDirectives parses require, replace, and exclude directives from a
-// go.mod file string using golang.org/x/mod/modfile.
+// parseGoModDirectives parses require, replace, and version-qualified exclude
+// directives from a go.mod file string using golang.org/x/mod/modfile.
 func parseGoModDirectives(raw string) (map[string]string, error) {
 	pins := make(map[string]string)
 	if strings.TrimSpace(raw) == "" {
@@ -379,7 +181,7 @@ func parseGoModDirectives(raw string) (map[string]string, error) {
 		if exc == nil {
 			continue
 		}
-		pins["exclude "+exc.Mod.Path] = exc.Mod.Version
+		pins["exclude "+exc.Mod.Path+"@"+exc.Mod.Version] = "excluded"
 	}
 	return pins, nil
 }

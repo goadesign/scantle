@@ -49,7 +49,7 @@ func BuildConfirmIntentPayload(scantleConfirmIntentBody *string) (*scantle.Confi
 		}
 		err = json.Unmarshal([]byte(*scantleConfirmIntentBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ]\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ],\n      \"request_revision\": \"Rerum consequatur iste necessitatibus ab dolor enim.\"\n   }'")
 		}
 		if body.Answers == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
@@ -69,7 +69,8 @@ func BuildConfirmIntentPayload(scantleConfirmIntentBody *string) (*scantle.Confi
 		}
 	}
 	v := &scantle.ConfirmIntentPayload{
-		ChangeID: body.ChangeID,
+		ChangeID:        body.ChangeID,
+		RequestRevision: body.RequestRevision,
 	}
 	if body.Answers != nil {
 		v.Answers = make(map[string]string, len(body.Answers))

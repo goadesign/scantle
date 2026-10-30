@@ -15,6 +15,8 @@ type (
 	ConfirmIntentPayloadTransport struct {
 		// Change identifier.
 		ChangeID *string `json:"change_id"`
+		// Reviewed CP1 request_revision digest being confirmed.
+		RequestRevision *string `json:"request_revision"`
 		// Selected resolution per ambiguity question ID.
 		Answers map[string]string `json:"answers"`
 		// Confirmed example table.
@@ -65,13 +67,14 @@ type (
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	DiffResultTransport struct {
-		// True when any declaration, contract body, or module directive changed.
+		// True when any declaration, evaluated contract schema, or module directive
+		// changed.
 		HasChanges *bool `json:"has_changes"`
 		// Added scoped declarations.
 		AddedDeclarations []string `json:"added_declarations"`
 		// Removed scoped declarations.
 		RemovedDeclarations []string `json:"removed_declarations"`
-		// Declarations whose payload, result, route, or policy changed.
+		// Declarations whose evaluated schema, route, or policy changed.
 		ModifiedDeclarations []string `json:"modified_declarations"`
 		// Changed module require, replace, or exclude directives.
 		VersionDeltas []string `json:"version_deltas"`
@@ -113,7 +116,7 @@ type (
 		ChangeID *string `json:"change_id"`
 		// Expected CP1 request_revision digest.
 		RequestRevision *string `json:"request_revision"`
-		// Candidate Goa and Goa-AI design source to inspect.
+		// Candidate Goa and Goa-AI design source to evaluate.
 		DesignSource *string `json:"design_source"`
 	}
 	// PreviewArchitectureResultTransport is the internal JSON transport type for PreviewArchitectureResult.
@@ -125,7 +128,7 @@ type (
 		ChangeID *string `json:"change_id"`
 		// Bound CP1 request_revision digest.
 		RequestRevision *string `json:"request_revision"`
-		// SHA-256 digest of the inspected Goa design source.
+		// SHA-256 digest of the evaluated Goa design source.
 		DesignDigest *string `json:"design_digest"`
 		// API or primary service name declared in the design.
 		SystemName *string `json:"system_name"`
@@ -133,8 +136,10 @@ type (
 		Containers []*C4ContainerItemTransport `json:"containers"`
 		// Validated directed edges between declared containers.
 		Edges []*C4EdgeItemTransport `json:"edges"`
-		// Extracted Goa-AI runtime guardrails.
-		Guardrails *GuardrailItemTransport `json:"guardrails"`
+		// Evaluated Goa-AI runtime policies per declared agent.
+		AgentPolicies []*AgentPolicyItemTransport `json:"agent_policies"`
+		// Evaluated Goa-AI tool contracts.
+		Tools []*ToolContractItemTransport `json:"tools"`
 		// Plain-English summary of topology and guardrails.
 		Banner *string `json:"banner"`
 	}
@@ -143,7 +148,7 @@ type (
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	ProposeChangePayloadTransport struct {
-		// Client-supplied or generated change identifier.
+		// Unique change identifier.
 		ChangeID *string `json:"change_id"`
 		// Operator feature request.
 		Prompt *string `json:"prompt"`
@@ -176,6 +181,28 @@ type (
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision *string `json:"request_revision"`
 	}
+	// AgentPolicyItemTransport is the internal JSON transport type for AgentPolicyItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	AgentPolicyItemTransport struct {
+		// Scoped agent container identifier.
+		AgentID *string `json:"agent_id"`
+		// Per-run execution time budget in seconds.
+		MaxExecutionSeconds *int `json:"max_execution_seconds"`
+		// Per-run retrieval tool-call budget.
+		MaxToolCalls *int `json:"max_tool_calls"`
+		// Maximum consecutive recovery turns after validation failure.
+		MaxRecoveryTurns *int `json:"max_recovery_turns"`
+		// Turn threshold for history compression.
+		CompressAtTurns *int `json:"compress_at_turns"`
+		// Recent turns retained uncompressed.
+		KeepRecentTurns *int `json:"keep_recent_turns"`
+		// True when prompt caching places a checkpoint after system prompts.
+		CacheAfterSystem *bool `json:"cache_after_system"`
+		// True when prompt caching places a checkpoint after tool definitions.
+		CacheAfterTools *bool `json:"cache_after_tools"`
+	}
 	// AmbiguityQuestionTransport is the internal JSON transport type for AmbiguityQuestionTransport.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
@@ -197,7 +224,7 @@ type (
 		ID *string `json:"id"`
 		// Human-readable container name.
 		Name *string `json:"name"`
-		// Container role (service, agent, toolset, or dependency).
+		// Container role (service, agent, or toolset).
 		Kind *string `json:"kind"`
 		// Summary of the container's responsibility.
 		Description *string `json:"description"`
@@ -219,7 +246,7 @@ type (
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	ExampleItemTransport struct {
-		// Stable example identifier.
+		// Code-assigned stable example identifier.
 		ID *string `json:"id"`
 		// Plain-English scenario description.
 		Scenario *string `json:"scenario"`
@@ -230,18 +257,28 @@ type (
 		// Evaluator check classification (deterministic or model_judged).
 		VerificationKind *string `json:"verification_kind"`
 	}
-	// GuardrailItemTransport is the internal JSON transport type for GuardrailItemTransport.
+	// ToolContractItemTransport is the internal JSON transport type for ToolContractItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
-	GuardrailItemTransport struct {
-		// Per-run execution time budget in seconds.
-		MaxExecutionSeconds *int `json:"max_execution_seconds"`
-		// Per-run retrieval tool-call budget.
-		MaxToolCalls *int `json:"max_tool_calls"`
-		// Turn threshold for history compression.
-		CompressAtTurns *int `json:"compress_at_turns"`
-		// Recent turns retained uncompressed.
-		KeepRecentTurns *int `json:"keep_recent_turns"`
+	ToolContractItemTransport struct {
+		// Scoped tool identifier (<toolset>.<tool>).
+		ID *string `json:"id"`
+		// Owning toolset name.
+		Toolset *string `json:"toolset"`
+		// Tool name.
+		Name *string `json:"name"`
+		// Tool description.
+		Description *string `json:"description"`
+		// Canonical evaluated argument schema summary.
+		ArgsSchema *string `json:"args_schema"`
+		// Canonical evaluated return schema summary.
+		ReturnSchema *string `json:"return_schema"`
+		// Server-supplied InjectedFields hidden from the model.
+		InjectedFields []string `json:"injected_fields"`
+		// True when the tool declares a design-time Confirmation gate.
+		RequiresConfirmation *bool `json:"requires_confirmation"`
+		// True when the tool declares a BoundedResult cursor/truncation contract.
+		BoundedResult *bool `json:"bounded_result"`
 	}
 )

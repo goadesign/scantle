@@ -5,42 +5,24 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	genscantle "github.com/goadesign/scantle/gen/scantle"
 	"github.com/goadesign/scantle/internal/controlplane"
+	"github.com/goadesign/scantle/internal/diff"
 )
-
-type (
-	// fileCP1Analyzer loads a static or pre-recorded CP1SemanticAnalysis JSON
-	// document when -cp1-analysis-file is configured on `scantle serve`.
-	fileCP1Analyzer struct {
-		// path is the JSON file path containing a CP1SemanticAnalysis document.
-		path string
-	}
-)
-
-func (f fileCP1Analyzer) Analyze(_ context.Context, _, _ string) (controlplane.CP1SemanticAnalysis, error) {
-	raw, err := os.ReadFile(f.path)
-	if err != nil {
-		return controlplane.CP1SemanticAnalysis{}, fmt.Errorf("read cp1 analysis file: %w", err)
-	}
-	var out controlplane.CP1SemanticAnalysis
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return controlplane.CP1SemanticAnalysis{}, fmt.Errorf("decode cp1 analysis file: %w", err)
-	}
-	return out, nil
-}
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "scantle: %v\n", err)
+		fmt.Fprintf(os.Stderr, "scantle: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -62,22 +44,26 @@ func run(args []string) error {
 	}
 }
 
-// runServe starts the Scantle HTTP and MCP JSON-RPC server.
+// runServe starts the Scantle HTTP and MCP JSON-RPC server protected by a
+// verified bearer-token authenticator.
 func runServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	addr := fs.String("addr", "127.0.0.1:8090", "HTTP and MCP listen address")
-	cp1File := fs.String("cp1-analysis-file", "", "Optional path to a CP1SemanticAnalysis JSON file for CP1 propose_change")
+	principalID := fs.String("principal", "", "Authenticated operator principal ID")
+	authToken := fs.String("auth-token", os.Getenv("SCANTLE_AUTH_TOKEN"), "Bearer token required on HTTP and MCP requests")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	var opts controlplane.Options
-	if *cp1File != "" {
-		opts.Analyzer = fileCP1Analyzer{path: *cp1File}
+	if strings.TrimSpace(*principalID) == "" || strings.TrimSpace(*authToken) == "" {
+		return errors.New("serve requires -principal and -auth-token (or SCANTLE_AUTH_TOKEN)")
 	}
-	cp := controlplane.New(opts)
+	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{
+		strings.TrimSpace(*authToken): {ID: strings.TrimSpace(*principalID)},
+	})
+	cp := controlplane.New(controlplane.Options{})
 	srv := &http.Server{
 		Addr:              *addr,
-		Handler:           controlplane.NewHTTPHandler(cp),
+		Handler:           controlplane.NewHTTPHandler(cp, auth),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -128,15 +114,17 @@ func runDiff(args []string) error {
 	if err != nil {
 		return err
 	}
-	cp := controlplane.New(controlplane.Options{})
-	res, err := cp.Diff(context.Background(), &genscantle.DiffPayload{
-		OldDesign: oldDesign,
-		NewDesign: newDesign,
-		OldGomod:  oldMod,
-		NewGomod:  newMod,
-	})
+	rep, err := diff.Compare(context.Background(), oldDesign, newDesign, oldMod, newMod)
 	if err != nil {
 		return err
+	}
+	res := &genscantle.DiffResult{
+		HasChanges:           rep.HasChanges,
+		AddedDeclarations:    rep.AddedDeclarations,
+		RemovedDeclarations:  rep.RemovedDeclarations,
+		ModifiedDeclarations: rep.ModifiedDeclarations,
+		VersionDeltas:        rep.VersionDeltas,
+		Summary:              rep.Summary,
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")

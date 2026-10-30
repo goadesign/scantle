@@ -14,6 +14,9 @@ func ValidateConfirmIntentPayloadTransport(body *ConfirmIntentPayloadTransport) 
 	if body.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
 	if body.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
 	}
@@ -179,8 +182,11 @@ func ValidatePreviewArchitectureResultTransport(body *PreviewArchitectureResultT
 	if body.Edges == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
 	}
-	if body.Guardrails == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("guardrails", "body"))
+	if body.AgentPolicies == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_policies", "body"))
+	}
+	if body.Tools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
 	}
 	if body.Banner == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
@@ -199,9 +205,18 @@ func ValidatePreviewArchitectureResultTransport(body *PreviewArchitectureResultT
 			}
 		}
 	}
-	if body.Guardrails != nil {
-		if err2 := ValidateGuardrailItemTransport(body.Guardrails); err2 != nil {
-			err = goa.MergeErrors(err, err2)
+	for _, e := range body.AgentPolicies {
+		if e != nil {
+			if err2 := ValidateAgentPolicyItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Tools {
+		if e != nil {
+			if err2 := ValidateToolContractItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
 		}
 	}
 	return
@@ -263,6 +278,35 @@ func ValidateProposeChangeResultTransport(body *ProposeChangeResultTransport) (e
 	return
 }
 
+// ValidateAgentPolicyItemTransport runs the validations defined on AgentPolicyItemTransport.
+func ValidateAgentPolicyItemTransport(body *AgentPolicyItemTransport) (err error) {
+	if body.AgentID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("agent_id", "body"))
+	}
+	if body.MaxExecutionSeconds == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	}
+	if body.MaxToolCalls == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if body.MaxRecoveryTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_recovery_turns", "body"))
+	}
+	if body.CompressAtTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	}
+	if body.KeepRecentTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	}
+	if body.CacheAfterSystem == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_system", "body"))
+	}
+	if body.CacheAfterTools == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cache_after_tools", "body"))
+	}
+	return
+}
+
 // ValidateAmbiguityQuestionTransport runs the validations defined on AmbiguityQuestionTransport.
 func ValidateAmbiguityQuestionTransport(body *AmbiguityQuestionTransport) (err error) {
 	if body.ID == nil {
@@ -292,8 +336,8 @@ func ValidateC4ContainerItemTransport(body *C4ContainerItemTransport) (err error
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if body.Kind != nil {
-		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "dependency") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset", "dependency"}))
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset"}))
 		}
 	}
 	return
@@ -338,19 +382,34 @@ func ValidateExampleItemTransport(body *ExampleItemTransport) (err error) {
 	return
 }
 
-// ValidateGuardrailItemTransport runs the validations defined on GuardrailItemTransport.
-func ValidateGuardrailItemTransport(body *GuardrailItemTransport) (err error) {
-	if body.MaxExecutionSeconds == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+// ValidateToolContractItemTransport runs the validations defined on ToolContractItemTransport.
+func ValidateToolContractItemTransport(body *ToolContractItemTransport) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
 	}
-	if body.MaxToolCalls == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	if body.Toolset == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("toolset", "body"))
 	}
-	if body.CompressAtTurns == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
 	}
-	if body.KeepRecentTurns == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	if body.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if body.ReturnSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("return_schema", "body"))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	if body.RequiresConfirmation == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
+	}
+	if body.BoundedResult == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
 	}
 	return
 }

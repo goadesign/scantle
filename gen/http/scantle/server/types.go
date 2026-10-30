@@ -15,7 +15,7 @@ import (
 // ProposeChangeRequestBody is the type of the "scantle" service
 // "propose_change" endpoint HTTP request body.
 type ProposeChangeRequestBody struct {
-	// Client-supplied or generated change identifier.
+	// Unique change identifier.
 	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
 	// Operator feature request.
 	Prompt *string `form:"prompt,omitempty" json:"prompt,omitempty" xml:"prompt,omitempty"`
@@ -28,6 +28,8 @@ type ProposeChangeRequestBody struct {
 type ConfirmIntentRequestBody struct {
 	// Change identifier.
 	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
+	// Reviewed CP1 request_revision digest being confirmed.
+	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
 	// Confirmed example table.
@@ -41,7 +43,7 @@ type PreviewArchitectureRequestBody struct {
 	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
 	// Expected CP1 request_revision digest.
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
-	// Candidate Goa and Goa-AI design source to inspect.
+	// Candidate Goa and Goa-AI design source to evaluate.
 	DesignSource *string `form:"design_source,omitempty" json:"design_source,omitempty" xml:"design_source,omitempty"`
 }
 
@@ -126,7 +128,7 @@ type PreviewArchitectureResponseBody struct {
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
 	// Bound CP1 request_revision digest.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
-	// SHA-256 digest of the inspected Goa design source.
+	// SHA-256 digest of the evaluated Goa design source.
 	DesignDigest string `form:"design_digest" json:"design_digest" xml:"design_digest"`
 	// API or primary service name declared in the design.
 	SystemName string `form:"system_name" json:"system_name" xml:"system_name"`
@@ -134,8 +136,10 @@ type PreviewArchitectureResponseBody struct {
 	Containers []*C4ContainerItemResponseBody `form:"containers" json:"containers" xml:"containers"`
 	// Validated directed edges between declared containers.
 	Edges []*C4EdgeItemResponseBody `form:"edges" json:"edges" xml:"edges"`
-	// Extracted Goa-AI runtime guardrails.
-	Guardrails *GuardrailItemResponseBody `form:"guardrails" json:"guardrails" xml:"guardrails"`
+	// Evaluated Goa-AI runtime policies per declared agent.
+	AgentPolicies []*AgentPolicyItemResponseBody `form:"agent_policies" json:"agent_policies" xml:"agent_policies"`
+	// Evaluated Goa-AI tool contracts.
+	Tools []*ToolContractItemResponseBody `form:"tools" json:"tools" xml:"tools"`
 	// Plain-English summary of topology and guardrails.
 	Banner string `form:"banner" json:"banner" xml:"banner"`
 }
@@ -156,13 +160,14 @@ type DraftOverrideResponseBody struct {
 // DiffResponseBody is the type of the "scantle" service "diff" endpoint HTTP
 // response body.
 type DiffResponseBody struct {
-	// True when any declaration, contract body, or module directive changed.
+	// True when any declaration, evaluated contract schema, or module directive
+	// changed.
 	HasChanges bool `form:"has_changes" json:"has_changes" xml:"has_changes"`
 	// Added scoped declarations.
 	AddedDeclarations []string `form:"added_declarations" json:"added_declarations" xml:"added_declarations"`
 	// Removed scoped declarations.
 	RemovedDeclarations []string `form:"removed_declarations" json:"removed_declarations" xml:"removed_declarations"`
-	// Declarations whose payload, result, route, or policy changed.
+	// Declarations whose evaluated schema, route, or policy changed.
 	ModifiedDeclarations []string `form:"modified_declarations" json:"modified_declarations" xml:"modified_declarations"`
 	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string `form:"version_deltas" json:"version_deltas" xml:"version_deltas"`
@@ -183,7 +188,7 @@ type AmbiguityQuestionResponseBody struct {
 
 // ExampleItemResponseBody is used to define fields on response body types.
 type ExampleItemResponseBody struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID string `form:"id" json:"id" xml:"id"`
 	// Plain-English scenario description.
 	Scenario string `form:"scenario" json:"scenario" xml:"scenario"`
@@ -201,7 +206,7 @@ type C4ContainerItemResponseBody struct {
 	ID string `form:"id" json:"id" xml:"id"`
 	// Human-readable container name.
 	Name string `form:"name" json:"name" xml:"name"`
-	// Container role (service, agent, toolset, or dependency).
+	// Container role (service, agent, or toolset).
 	Kind string `form:"kind" json:"kind" xml:"kind"`
 	// Summary of the container's responsibility.
 	Description string `form:"description" json:"description" xml:"description"`
@@ -217,21 +222,51 @@ type C4EdgeItemResponseBody struct {
 	Protocol string `form:"protocol" json:"protocol" xml:"protocol"`
 }
 
-// GuardrailItemResponseBody is used to define fields on response body types.
-type GuardrailItemResponseBody struct {
+// AgentPolicyItemResponseBody is used to define fields on response body types.
+type AgentPolicyItemResponseBody struct {
+	// Scoped agent container identifier.
+	AgentID string `form:"agent_id" json:"agent_id" xml:"agent_id"`
 	// Per-run execution time budget in seconds.
 	MaxExecutionSeconds int `form:"max_execution_seconds" json:"max_execution_seconds" xml:"max_execution_seconds"`
 	// Per-run retrieval tool-call budget.
 	MaxToolCalls int `form:"max_tool_calls" json:"max_tool_calls" xml:"max_tool_calls"`
+	// Maximum consecutive recovery turns after validation failure.
+	MaxRecoveryTurns int `form:"max_recovery_turns" json:"max_recovery_turns" xml:"max_recovery_turns"`
 	// Turn threshold for history compression.
 	CompressAtTurns int `form:"compress_at_turns" json:"compress_at_turns" xml:"compress_at_turns"`
 	// Recent turns retained uncompressed.
 	KeepRecentTurns int `form:"keep_recent_turns" json:"keep_recent_turns" xml:"keep_recent_turns"`
+	// True when prompt caching places a checkpoint after system prompts.
+	CacheAfterSystem bool `form:"cache_after_system" json:"cache_after_system" xml:"cache_after_system"`
+	// True when prompt caching places a checkpoint after tool definitions.
+	CacheAfterTools bool `form:"cache_after_tools" json:"cache_after_tools" xml:"cache_after_tools"`
+}
+
+// ToolContractItemResponseBody is used to define fields on response body types.
+type ToolContractItemResponseBody struct {
+	// Scoped tool identifier (<toolset>.<tool>).
+	ID string `form:"id" json:"id" xml:"id"`
+	// Owning toolset name.
+	Toolset string `form:"toolset" json:"toolset" xml:"toolset"`
+	// Tool name.
+	Name string `form:"name" json:"name" xml:"name"`
+	// Tool description.
+	Description string `form:"description" json:"description" xml:"description"`
+	// Canonical evaluated argument schema summary.
+	ArgsSchema string `form:"args_schema" json:"args_schema" xml:"args_schema"`
+	// Canonical evaluated return schema summary.
+	ReturnSchema string `form:"return_schema" json:"return_schema" xml:"return_schema"`
+	// Server-supplied InjectedFields hidden from the model.
+	InjectedFields []string `form:"injected_fields" json:"injected_fields" xml:"injected_fields"`
+	// True when the tool declares a design-time Confirmation gate.
+	RequiresConfirmation bool `form:"requires_confirmation" json:"requires_confirmation" xml:"requires_confirmation"`
+	// True when the tool declares a BoundedResult cursor/truncation contract.
+	BoundedResult bool `form:"bounded_result" json:"bounded_result" xml:"bounded_result"`
 }
 
 // ExampleItemRequestBody is used to define fields on request body types.
 type ExampleItemRequestBody struct {
-	// Stable example identifier.
+	// Code-assigned stable example identifier.
 	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
 	// Plain-English scenario description.
 	Scenario *string `form:"scenario,omitempty" json:"scenario,omitempty" xml:"scenario,omitempty"`
@@ -381,8 +416,29 @@ func NewPreviewArchitectureResponseBody(res *scantle.ArchitecturePreviewResult) 
 	} else {
 		body.Edges = []*C4EdgeItemResponseBody{}
 	}
-	if res.Guardrails != nil {
-		body.Guardrails = marshalScantleGuardrailItemToGuardrailItemResponseBody(res.Guardrails)
+	if res.AgentPolicies != nil {
+		body.AgentPolicies = make([]*AgentPolicyItemResponseBody, len(res.AgentPolicies))
+		for i, val := range res.AgentPolicies {
+			if val == nil {
+				body.AgentPolicies[i] = nil
+				continue
+			}
+			body.AgentPolicies[i] = marshalScantleAgentPolicyItemToAgentPolicyItemResponseBody(val)
+		}
+	} else {
+		body.AgentPolicies = []*AgentPolicyItemResponseBody{}
+	}
+	if res.Tools != nil {
+		body.Tools = make([]*ToolContractItemResponseBody, len(res.Tools))
+		for i, val := range res.Tools {
+			if val == nil {
+				body.Tools[i] = nil
+				continue
+			}
+			body.Tools[i] = marshalScantleToolContractItemToToolContractItemResponseBody(val)
+		}
+	} else {
+		body.Tools = []*ToolContractItemResponseBody{}
 	}
 	return body
 }
@@ -457,7 +513,8 @@ func NewProposeChangePayload(body *ProposeChangeRequestBody) *scantle.ProposeCha
 // payload.
 func NewConfirmIntentPayload(body *ConfirmIntentRequestBody) *scantle.ConfirmIntentPayload {
 	v := &scantle.ConfirmIntentPayload{
-		ChangeID: *body.ChangeID,
+		ChangeID:        *body.ChangeID,
+		RequestRevision: *body.RequestRevision,
 	}
 	v.Answers = make(map[string]string, len(body.Answers))
 	for key, val := range body.Answers {
@@ -530,6 +587,9 @@ func ValidateProposeChangeRequestBody(body *ProposeChangeRequestBody) (err error
 func ValidateConfirmIntentRequestBody(body *ConfirmIntentRequestBody) (err error) {
 	if body.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
 	}
 	if body.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
