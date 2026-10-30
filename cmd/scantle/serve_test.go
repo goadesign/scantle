@@ -93,7 +93,29 @@ func TestLoadSwarmProfilesDecodesStrictly(t *testing.T) {
 		},
 		{name: "unknown field", content: `[{"id":"a","api_key":"x"}]`, wantErr: `unknown field "api_key"`},
 		{name: "trailing data", content: `[] []`, wantErr: "trailing data"},
+		{name: "empty array", content: `[]`, want: []swarm.ProviderProfile{}},
 		{name: "not an array", content: `{"id":"a"}`, wantErr: "decode -swarm-profiles"},
+		{name: "null", content: `null`, wantErr: "expected a JSON array, got null"},
+		{
+			name: "duplicate id",
+			content: `[{"id":"a","provider":"openai","model":"m","family":"gpt"},` +
+				`{"id":"a","provider":"anthropic","model":"n","family":"claude"}]`,
+			wantErr: `duplicate provider profile id "a"`,
+		},
+		{name: "empty required field", content: `[{"id":"a","provider":"openai","family":"gpt"}]`, wantErr: "requires non-empty"},
+		{
+			name:    "unknown capability",
+			content: `[{"id":"a","provider":"openai","model":"m","family":"gpt","capabilities":["deployer"]}]`,
+			wantErr: `unsupported capability "deployer"`,
+		},
+		{
+			name:    "valid profiles without builder capability",
+			content: `[{"id":"a","provider":"openai","model":"m","family":"gpt","capabilities":["reviewer"]}]`,
+			want: []swarm.ProviderProfile{{
+				ID: "a", Provider: "openai", Model: "m", Family: "gpt",
+				Capabilities: []swarm.RoleKind{swarm.RoleReviewer},
+			}},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

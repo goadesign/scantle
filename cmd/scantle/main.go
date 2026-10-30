@@ -289,8 +289,11 @@ func newCP1Analyzer(cfg serveConfig, getenv func(string) string) (controlplane.C
 }
 
 // loadSwarmProfiles decodes the JSON array of swarm.ProviderProfile at path,
-// rejecting unknown fields and trailing data. An empty path means no profiles
-// are configured. Profile contents are checked by swarm.Plan at CP2.
+// rejecting null, unknown fields and trailing data, then rejects malformed
+// entries (duplicate IDs, empty required fields, unknown capabilities) with
+// swarm.Plan's own profile checks. Plan is given no builders, so only its
+// configuration error matters here; whether the roster is ready is decided per
+// CP2 request. An empty path means no profiles are configured.
 func loadSwarmProfiles(path string) ([]swarm.ProviderProfile, error) {
 	if path == "" {
 		return nil, nil
@@ -302,12 +305,18 @@ func loadSwarmProfiles(path string) ([]swarm.ProviderProfile, error) {
 	defer f.Close()
 	dec := json.NewDecoder(f)
 	dec.DisallowUnknownFields()
-	var profiles []swarm.ProviderProfile
+	var profiles *[]swarm.ProviderProfile
 	if err := dec.Decode(&profiles); err != nil {
 		return nil, fmt.Errorf("decode -swarm-profiles %s: %w", path, err)
+	}
+	if profiles == nil {
+		return nil, fmt.Errorf("decode -swarm-profiles %s: expected a JSON array, got null", path)
 	}
 	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("decode -swarm-profiles %s: trailing data after the profile array", path)
 	}
-	return profiles, nil
+	if _, err := swarm.Plan(swarm.Request{Profiles: *profiles}); err != nil {
+		return nil, fmt.Errorf("-swarm-profiles %s: %w", path, err)
+	}
+	return *profiles, nil
 }
