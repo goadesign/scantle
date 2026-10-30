@@ -13,7 +13,6 @@ package swarm
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 )
@@ -455,51 +454,45 @@ func normalizeBuilders(in []BuilderScope) ([]BuilderScope, error) {
 	return out, nil
 }
 
-// normalizePaths validates repository-relative path globs, deduplicates and
-// sorts them, and falls back to defaults when no non-empty path is supplied.
+// normalizePaths validates repository-relative path globs without rewriting
+// supplied path bytes, deduplicates and sorts them, and falls back to defaults
+// only when in is empty.
 func normalizePaths(in, defaults []string) ([]string, error) {
-	seen := make(map[string]bool, len(in))
+	src := in
+	if len(src) == 0 {
+		src = defaults
+	}
+	seen := make(map[string]bool, len(src))
 	var out []string
-	for _, p := range in {
-		trimmed := strings.TrimSpace(p)
-		if trimmed == "" {
-			continue
-		}
-		if err := validateRelativePathGlob(trimmed); err != nil {
+	for _, p := range src {
+		if err := validateRelativePathGlob(p); err != nil {
 			return nil, err
 		}
-		if !seen[trimmed] {
-			seen[trimmed] = true
-			out = append(out, trimmed)
-		}
-	}
-	if len(out) == 0 && len(defaults) > 0 {
-		for _, p := range defaults {
-			trimmed := strings.TrimSpace(p)
-			if trimmed == "" {
-				continue
-			}
-			if err := validateRelativePathGlob(trimmed); err != nil {
-				return nil, err
-			}
-			if !seen[trimmed] {
-				seen[trimmed] = true
-				out = append(out, trimmed)
-			}
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
 		}
 	}
 	slices.Sort(out)
 	return out, nil
 }
 
-// validateRelativePathGlob verifies that p is a repository-relative path glob
-// without leading slashes, volume prefixes, backslashes, or `..` parent traversal.
+// validateRelativePathGlob verifies that p is a non-empty repository-relative
+// path glob without NUL bytes, leading slashes, volume prefixes, backslashes,
+// or `.` / `..` path traversal segments.
 func validateRelativePathGlob(p string) error {
+	if p == "" || strings.TrimSpace(p) == "" {
+		return errors.New("ownership path must not be empty")
+	}
+	if strings.ContainsRune(p, 0) {
+		return fmt.Errorf("ownership path %q must not contain NUL bytes", p)
+	}
 	if strings.HasPrefix(p, "/") || strings.Contains(p, "\\") || (len(p) >= 2 && p[1] == ':') {
 		return fmt.Errorf("ownership path %q must be repository-relative", p)
 	}
-	if slices.Contains(strings.Split(p, "/"), "..") {
-		return fmt.Errorf("ownership path %q must not traverse parent directories", p)
+	segs := strings.Split(p, "/")
+	if slices.Contains(segs, "") || slices.Contains(segs, ".") || slices.Contains(segs, "..") {
+		return fmt.Errorf("ownership path %q must not contain empty, current-directory, or parent-directory segments", p)
 	}
 	return nil
 }
@@ -554,17 +547,11 @@ func selectBuilderProfiles(eligible []ProviderProfile, builders []BuilderScope) 
 	var chosenDefault ProviderProfile
 	bestScore := -1
 	for _, cand := range builderCapable {
-		combined := maps.Clone(pinnedFamilies)
-		if combined == nil {
-			combined = make(map[string]bool, 1)
-		}
-		combined[cand.Family] = true
-
 		score := 0
-		if hasDisjointFamilySet(reviewerCapable, combined) {
+		if hasDisjointFamily(reviewerCapable, pinnedFamilies, cand.Family) {
 			score += 4
 		}
-		if hasDisjointFamilySet(evalCapable, combined) {
+		if hasDisjointFamily(evalCapable, pinnedFamilies, cand.Family) {
 			score += 2
 		}
 		if pinnedFamilies[cand.Family] {
@@ -594,11 +581,11 @@ func selectBuilderProfiles(eligible []ProviderProfile, builders []BuilderScope) 
 	return out, nil
 }
 
-// hasDisjointFamilySet reports whether any profile in candidates has a Family
-// outside avoidFamilies.
-func hasDisjointFamilySet(candidates []ProviderProfile, avoidFamilies map[string]bool) bool {
+// hasDisjointFamily reports whether any profile in candidates has a Family
+// distinct from candFamily and absent from pinnedFamilies.
+func hasDisjointFamily(candidates []ProviderProfile, pinnedFamilies map[string]bool, candFamily string) bool {
 	for _, c := range candidates {
-		if !avoidFamilies[c.Family] {
+		if c.Family != candFamily && !pinnedFamilies[c.Family] {
 			return true
 		}
 	}

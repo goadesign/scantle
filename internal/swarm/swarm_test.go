@@ -301,10 +301,11 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 		assert.ErrorContains(t, RequireReady(plan), "unconfigured")
 	})
 
-	// Case 5c: Absolute or parent-traversing ownership paths are rejected at the boundary.
-	t.Run("absolute_or_traversing_paths_rejected", func(t *testing.T) {
+	// Case 5c: Absolute, parent-traversing, NUL-containing, or empty ownership paths are rejected,
+	// while valid paths with significant spaces are preserved verbatim.
+	t.Run("invalid_paths_rejected_and_valid_spaces_preserved", func(t *testing.T) {
 		t.Parallel()
-		for _, badPath := range []string{"/outside/**", "../outside/**", "internal/../../outside/**"} {
+		for _, badPath := range []string{"", "   ", "/outside/**", "../outside/**", "internal/../../outside/**", "internal/orders\x00.go"} {
 			_, err := Plan(Request{
 				ChangeID:     "chg-bad-path",
 				DesignDigest: "sha256:bad",
@@ -312,11 +313,25 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 					{ID: "p1", Provider: "anthropic", Model: "m1", Family: "claude", Authenticated: true, Capabilities: allRoles()},
 				},
 				Builders: []BuilderScope{
-					{Name: "orders", Paths: []string{badPath}},
+					{Name: "orders", Paths: []string{"internal/orders/**", badPath}},
 				},
 			})
 			require.Error(t, err, "expected path %q to be rejected", badPath)
 		}
+
+		planSpaces, err := Plan(Request{
+			ChangeID:     "chg-spaces",
+			DesignDigest: "sha256:spaces",
+			Profiles: []ProviderProfile{
+				{ID: "p1", Provider: "anthropic", Model: "m1", Family: "claude", Authenticated: true, Capabilities: allRoles()},
+			},
+			Builders: []BuilderScope{
+				{Name: "orders", Paths: []string{" reports/**"}},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, planSpaces.Assignments, 4)
+		assert.Equal(t, []string{" reports/**"}, planSpaces.Assignments[1].OwnedPaths)
 	})
 
 	// Case 6: Duplicate profile IDs and long/colliding builder names.
