@@ -1,13 +1,14 @@
 package runstore
 
 // The schema stores each reference-store value in its own table. Identity
-// values (run subjects, invocations, early terminal outcomes) use the
-// generated goa-ai codecs; times use time.Time's binary encoding, which keeps
-// the full range and the zone offset. Unique keys and
+// values are stored byte for byte (see identity.go); early terminal outcomes
+// use the generated goa-ai codec, as the reference store does. Records keep
+// their payload length so transcript pages are chosen without reading
+// payloads. Unique keys and
 // partial unique indexes enforce the single-winner rules that the reference
 // store checks under its mutex.
 
-// schema lists the statements that create version 1 of the database.
+// schema lists the statements that create version 2 of the database.
 var schema = []string{
 	// sessions holds host-owned sessions. ended_at is NULL while active.
 	`CREATE TABLE sessions (
@@ -69,6 +70,7 @@ var schema = []string{
 		turn_id TEXT NOT NULL,
 		type TEXT NOT NULL,
 		payload BLOB NOT NULL,
+		payload_bytes INTEGER NOT NULL,
 		timestamp BLOB NOT NULL,
 		PRIMARY KEY (run_id, seq),
 		UNIQUE (run_id, event_key)

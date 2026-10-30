@@ -6,7 +6,6 @@ package runstore
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -55,10 +54,6 @@ type (
 		terminal string
 	}
 
-	// binaryTime stores a time.Time column as its binary encoding, so reads
-	// return the same instant and zone offset for any representable date.
-	binaryTime time.Time
-
 	// runStartKind records who owns execution for the whole Run lifetime.
 	// Zero is invalid; missing metadata never implies a synchronous start.
 	runStartKind int64
@@ -84,25 +79,6 @@ const (
 	// resolutionRelinquished is the resolution_kind of a RelinquishedSuspension.
 	resolutionRelinquished = "relinquished"
 )
-
-// Value encodes the time with time.Time.MarshalBinary.
-func (v binaryTime) Value() (driver.Value, error) {
-	return time.Time(v).MarshalBinary()
-}
-
-// Scan decodes a column written by Value.
-func (v *binaryTime) Scan(src any) error {
-	data, ok := src.([]byte)
-	if !ok {
-		return fmt.Errorf("time column holds %T, want []byte", src)
-	}
-	var value time.Time
-	if err := value.UnmarshalBinary(data); err != nil {
-		return fmt.Errorf("decode time column: %w", err)
-	}
-	*v = binaryTime(value)
-	return nil
-}
 
 // scanRun decodes the columns listed by runColumns.
 func scanRun(rows *sql.Rows) (runRow, error) {
@@ -187,7 +163,9 @@ func scanRecord(rows *sql.Rows) (*runlog.Event, error) {
 }
 
 // encodeRunIdentity encodes the run's subject, original invocation and labels.
-// Nil labels are stored as NULL so a read returns nil, not an empty map.
+// The generated validators reject invalid UTF-8 before a run is stored, so the
+// JSON codecs keep every accepted value exactly. Nil labels are stored as
+// NULL so a read returns nil, not an empty map.
 func encodeRunIdentity(meta session.RunMeta) (subject, origin, labels []byte, err error) {
 	subject, err = genrunidentity.EncodeRunSubject(&meta.Subject)
 	if err != nil {
@@ -289,11 +267,12 @@ func (t *txn) loadSession(sessionID string) (session.Session, bool, error) {
 	}
 	result := session.Session{ID: sessionID, Status: session.SessionStatus(status), CreatedAt: time.Time(createdAt)}
 	if endedAt != nil {
-		var at time.Time
-		if err := at.UnmarshalBinary(endedAt); err != nil {
+		var at binaryTime
+		if err := at.Scan(endedAt); err != nil {
 			return session.Session{}, false, fmt.Errorf("stored session %q end time: %w", sessionID, err)
 		}
-		result.EndedAt = &at
+		ended := time.Time(at)
+		result.EndedAt = &ended
 	}
 	return result, true, nil
 }
@@ -462,15 +441,6 @@ func (t *txn) recordByKey(runID, key string) (*runlog.Event, error) {
 	return records[0], nil
 }
 
-// recordBySeq returns the record whose run-scoped ID is seq.
-func (t *txn) recordBySeq(runID string, seq int64) (*runlog.Event, error) {
-	records, err := t.queryRecords(`SELECT `+recordColumns+` FROM records WHERE run_id = ? AND seq = ?`, runID, seq)
-	if err != nil || len(records) == 0 {
-		return nil, err
-	}
-	return records[0], nil
-}
-
 // queryRecords decodes every record selected by query.
 func (t *txn) queryRecords(query string, args ...any) ([]*runlog.Event, error) {
 	rows, err := t.tx.QueryContext(t.ctx, query, args...)
@@ -513,16 +483,10 @@ func (t *txn) insertRecord(record *runlog.Event) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encode record subject: %w", err)
 	}
-	// Encode the caller's timestamp here so an unencodable zone offset is a
-	// rejected command, not a database failure.
-	timestamp, err := record.Timestamp.MarshalBinary()
-	if err != nil {
-		return "", fmt.Errorf("encode record timestamp: %w", err)
-	}
-	if _, err := t.exec(`INSERT INTO records (run_id, seq, event_key, session_id, session_seq, subject, turn_id, type, payload, timestamp)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	if _, err := t.exec(`INSERT INTO records (run_id, seq, event_key, session_id, session_seq, subject, turn_id, type, payload, payload_bytes, timestamp)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.RunID, seq, record.EventKey, record.SessionID, sessionSeq, subject, record.TurnID,
-		string(record.Type), []byte(record.Payload), timestamp); err != nil {
+		string(record.Type), []byte(record.Payload), len(record.Payload), binaryTime(record.Timestamp)); err != nil {
 		return "", err
 	}
 	return strconv.FormatInt(seq, 10), nil

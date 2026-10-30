@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -219,6 +220,125 @@ func TestHandlesRaceContinuations(t *testing.T) {
 			require.ErrorIs(t, err, session.ErrRunConflict, "the winner stays permanent")
 		}
 	}
+}
+
+// TestPagesDoNotReadRecordsBeyondThePage proves transcript and run-record
+// pages never read rows after the returned page. The test corrupts the stored
+// subject of every record after the page through a separate connection; any
+// read of those rows fails to decode, so the first pages succeed only if the
+// store never reads them, and the following page then fails.
+func TestPagesDoNotReadRecordsBeyondThePage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	store := openStoreAt(t, path)
+	ctx := t.Context()
+	start := session.RunStart{Subject: genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent("agent")}, RunID: "run", StartedAt: time.Now().UTC().Truncate(time.Millisecond)}
+	start = publishStartHistory(t, store, start, "")
+	_, err := store.StartOneShotRun(ctx, storage.OneShotRunStart{RequestDigest: [32]byte{1}, Run: start, Started: startedRecord(t, "started", start)})
+	require.NoError(t, err)
+	// Record 1 is RunStarted; records 2-5 are transcript records. Records 2
+	// and 3 fill the 1 MiB transcript budget exactly.
+	var ids []string
+	for i, size := range []int{transcriptPageMaxPayloadBytes - 256, 256, 256, 256} {
+		message := &model.Message{Role: model.ConversationRoleUser, Parts: []model.Part{model.TextPart{}}}
+		empty, err := transcript.EncodeRunLogDelta([]*model.Message{message})
+		require.NoError(t, err)
+		message.Parts[0] = model.TextPart{Text: strings.Repeat("x", size-len(empty))}
+		payload, err := transcript.EncodeRunLogDelta([]*model.Message{message})
+		require.NoError(t, err)
+		stored, err := store.AppendRunRecord(ctx, &runlog.Event{
+			RunID: start.RunID, Subject: start.Subject, EventKey: fmt.Sprint("message-", i),
+			Timestamp: start.StartedAt, Type: transcript.RunLogMessagesAppended, Payload: payload,
+		})
+		require.NoError(t, err)
+		ids = append(ids, stored.ID)
+	}
+	raw, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(30000)")
+	require.NoError(t, err)
+	_, err = raw.ExecContext(ctx, `UPDATE records SET subject = x'00' WHERE run_id = ? AND seq > 3`, start.RunID)
+	require.NoError(t, err)
+	require.NoError(t, raw.Close())
+
+	page, err := store.ListRunTranscriptRecords(ctx, start.RunID, ids[3], "", 10000)
+	require.NoError(t, err, "the transcript page reads only its own records")
+	require.Len(t, page.Events, 2)
+	assert.Equal(t, ids[1], page.NextCursor)
+	_, err = store.ListRunTranscriptRecords(ctx, start.RunID, ids[3], page.NextCursor, 10000)
+	require.ErrorContains(t, err, "subject", "the corrupted records are detected when read")
+
+	records, err := store.ListRunRecords(ctx, start.RunID, "", 3)
+	require.NoError(t, err, "the run-record page reads only its own records")
+	require.Len(t, records.Events, 3)
+	assert.Equal(t, "3", records.NextCursor)
+	_, err = store.ListRunRecords(ctx, start.RunID, records.NextCursor, 3)
+	require.ErrorContains(t, err, "subject")
+}
+
+// TestHandlesRaceRelinquishAndContinuation races two Store handles on one
+// file: one relinquishes a root suspension while the other starts its
+// continuation. Exactly one resolution wins permanently, both handles see it,
+// and a losing successor leaves no run or records.
+func TestHandlesRaceRelinquishAndContinuation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	handles := [2]*runstore.Store{openStoreAt(t, path), openStoreAt(t, path)}
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	subject := genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent("agent")}
+	_, err := handles[0].CreateSession(ctx, "session", now)
+	require.NoError(t, err)
+	outcomes := make(map[string]int)
+	for round := range 40 {
+		predecessor := session.RunStart{Subject: subject, RunID: fmt.Sprintf("predecessor-%d", round), SessionID: "session", StartedAt: now}
+		predecessor = publishStartHistory(t, handles[0], predecessor, "")
+		_, err := handles[0].StartRootRun(ctx, rootStartCommand(t, predecessor))
+		require.NoError(t, err)
+		_, err = handles[1].RecordRunSuspension(ctx, storage.RunSuspension{
+			RunID: predecessor.RunID, Suspension: session.RunSuspension{ID: "checkpoint", Data: []byte(`{"saved":true}`)},
+			Record: suspendedRecord(t, "suspended", predecessor, "checkpoint"),
+		})
+		require.NoError(t, err)
+		successor := session.RunStart{Subject: subject, RunID: fmt.Sprintf("successor-%d", round), SessionID: "session", PredecessorRunID: predecessor.RunID, StartedAt: now}
+		command := rootStartCommand(t, publishStartHistory(t, handles[1], successor, ""))
+		relinquish := storage.RunSuspensionRelinquishment{RunID: predecessor.RunID, SuspensionID: "checkpoint", Reason: "user_requested"}
+		var resolution session.SuspensionResolution
+		errs := raceHandles(handles, func(i int, handle *runstore.Store) error {
+			if i == 0 {
+				var err error
+				resolution, err = handle.RelinquishRunSuspension(ctx, relinquish)
+				return err
+			}
+			_, err := handle.StartRootRun(ctx, command)
+			return err
+		})
+		require.NoError(t, errs[0], "relinquishment returns the winning resolution")
+		for _, handle := range handles {
+			meta, err := handle.LoadRun(ctx, predecessor.RunID)
+			require.NoError(t, err)
+			assert.Equal(t, resolution, meta.SuspensionResolution)
+			again, err := handle.RelinquishRunSuspension(ctx, relinquish)
+			require.NoError(t, err)
+			assert.Equal(t, resolution, again, "the winner stays permanent")
+		}
+		switch resolution.(type) {
+		case session.RelinquishedSuspension:
+			outcomes["relinquished"]++
+			require.ErrorIs(t, errs[1], session.ErrRunConflict)
+			for _, handle := range handles {
+				_, err := handle.LoadRun(ctx, successor.RunID)
+				require.ErrorIs(t, err, session.ErrRunNotFound)
+				_, err = handle.ListRunRecords(ctx, successor.RunID, "", 10)
+				require.ErrorIs(t, err, session.ErrRunNotFound, "the losing successor leaves no records")
+				_, err = handle.StartRootRun(ctx, command)
+				require.ErrorIs(t, err, session.ErrRunConflict)
+			}
+		case session.ContinuedSuspension:
+			outcomes["continued"]++
+			require.NoError(t, errs[1])
+			assert.Equal(t, session.ContinuedSuspension{RunID: successor.RunID}, resolution)
+		default:
+			require.FailNow(t, "missing exclusive resolution")
+		}
+	}
+	t.Logf("outcomes over 40 rounds: %v", outcomes)
 }
 
 // takeDurableSnapshot reads every value TestReopenPreservesState writes.

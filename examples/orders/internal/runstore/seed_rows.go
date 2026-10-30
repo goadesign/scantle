@@ -184,11 +184,9 @@ func (t *txn) insertAttempt(row attemptRow) error {
 	// UTF-8 and break exact declaration retries.
 	var prompts []byte
 	if len(d.RenderedPrompts) > 0 {
-		var buffer bytes.Buffer
-		if err := gob.NewEncoder(&buffer).Encode(d.RenderedPrompts); err != nil {
+		if prompts, err = gobEncode(d.RenderedPrompts); err != nil {
 			return fmt.Errorf("encode preparation attempt prompts: %w", err)
 		}
-		prompts = buffer.Bytes()
 	}
 	source := row.seed.Source
 	if source == nil {
@@ -221,29 +219,35 @@ func (t *txn) publishAttempt(runID, attemptID string) error {
 
 // seedRecordByKey returns an attempt's record stored under an append key.
 func (t *txn) seedRecordByKey(runID, attemptID, key string) (storage.SeedRecord, bool, error) {
-	records, err := t.querySeedRecords(`SELECT `+seedRecordColumns+` FROM seed_records WHERE run_id = ? AND attempt_id = ? AND record_key = ?`,
-		runID, attemptID, key)
-	if err != nil || len(records) == 0 {
-		return storage.SeedRecord{}, false, err
-	}
-	return records[0], true, nil
+	var (
+		record storage.SeedRecord
+		found  bool
+	)
+	err := t.eachSeedRecord(`SELECT `+seedRecordColumns+` FROM seed_records WHERE run_id = ? AND attempt_id = ? AND record_key = ?`,
+		[]any{runID, attemptID, key}, func(stored storage.SeedRecord) bool {
+			record, found = stored, true
+			return false
+		})
+	return record, found, err
 }
 
-// seedRecords returns at most limit records with positions in (after, end].
-func (t *txn) seedRecords(runID, attemptID string, after, end int64, limit int) ([]storage.SeedRecord, error) {
-	return t.querySeedRecords(`SELECT `+seedRecordColumns+` FROM seed_records
+// seedRecords calls visit for each record with a position in (after, end],
+// at most limit records, reading one row at a time. Iteration stops when
+// visit returns false, so later rows are never read.
+func (t *txn) seedRecords(runID, attemptID string, after, end int64, limit int, visit func(storage.SeedRecord) bool) error {
+	return t.eachSeedRecord(`SELECT `+seedRecordColumns+` FROM seed_records
 		WHERE run_id = ? AND attempt_id = ? AND position > ? AND position <= ? ORDER BY position LIMIT ?`,
-		runID, attemptID, after, end, limit)
+		[]any{runID, attemptID, after, end, limit}, visit)
 }
 
-// querySeedRecords decodes every seed record selected by query.
-func (t *txn) querySeedRecords(query string, args ...any) ([]storage.SeedRecord, error) {
+// eachSeedRecord decodes the seed records selected by query one row at a
+// time and passes each to visit until it returns false.
+func (t *txn) eachSeedRecord(query string, args []any, visit func(storage.SeedRecord) bool) error {
 	rows, err := t.tx.QueryContext(t.ctx, query, args...)
 	if err != nil {
-		return nil, &dbError{err: fmt.Errorf("runstore: query seed records: %w", err)}
+		return &dbError{err: fmt.Errorf("runstore: query seed records: %w", err)}
 	}
 	defer rows.Close() //nolint:errcheck // rows.Err reports iteration failures.
-	var result []storage.SeedRecord
 	for rows.Next() {
 		var (
 			record                       storage.SeedRecord
@@ -255,7 +259,7 @@ func (t *txn) querySeedRecords(query string, args ...any) ([]storage.SeedRecord,
 		)
 		if err := rows.Scan(&position, &record.Key, &record.PreviousID, &messages, &literal, &literalFinal,
 			&prefixRunID, &prefixEndID, &excludeSystem, &excludeReason, &prepared); err != nil {
-			return nil, &dbError{err: fmt.Errorf("runstore: scan seed record: %w", err)}
+			return &dbError{err: fmt.Errorf("runstore: scan seed record: %w", err)}
 		}
 		record.ID = strconv.FormatInt(position, 10)
 		record.Messages = messages
@@ -269,12 +273,14 @@ func (t *txn) querySeedRecords(query string, args ...any) ([]storage.SeedRecord,
 				ExcludeSystem: excludeSystem.Bool, ExcludeReasoning: excludeReason.Bool,
 			}
 		}
-		result = append(result, record)
+		if !visit(record) {
+			break
+		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, &dbError{err: fmt.Errorf("runstore: read seed records: %w", err)}
+		return &dbError{err: fmt.Errorf("runstore: read seed records: %w", err)}
 	}
-	return result, nil
+	return nil
 }
 
 // insertSeedRecord stores one accepted record at position. The primary key

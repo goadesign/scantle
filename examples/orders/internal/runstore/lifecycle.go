@@ -22,6 +22,17 @@ import (
 	"goa.design/goa-ai/runtime/agent/transcript"
 )
 
+type (
+	// recordSize is one stored record's position and payload length, read
+	// without its payload.
+	recordSize struct {
+		// seq is the record's run-scoped position.
+		seq int64
+		// bytes is the record's payload length.
+		bytes int
+	}
+)
+
 const (
 	// transcriptPageMaxRecords bounds the records returned by one transcript
 	// or seed page, matching the reference store.
@@ -190,8 +201,13 @@ func (s *Store) ListRunRecords(ctx context.Context, runID, cursor string, limit 
 			return session.ErrRunNotFound
 		}
 		records, err := t.queryRecords(`SELECT `+recordColumns+` FROM records WHERE run_id = ? AND seq > ? ORDER BY seq LIMIT ?`,
-			runID, after, limit+1)
-		page = recordPage(records, after, limit)
+			runID, after, limit)
+		if err != nil {
+			return err
+		}
+		var one int
+		more, err := t.scanOne(`SELECT 1 FROM records WHERE run_id = ? AND seq > ? LIMIT 1`, []any{runID, after + int64(limit)}, &one)
+		page = recordPage(records, more, after, limit)
 		return err
 	})
 	return page, err
@@ -224,8 +240,13 @@ func (s *Store) ListSessionRunRecords(ctx context.Context, sessionID, cursor str
 			return session.ErrSessionNotFound
 		}
 		records, err := t.queryRecords(`SELECT `+recordColumns+` FROM records WHERE session_id = ? AND session_seq > ? ORDER BY session_seq LIMIT ?`,
-			sessionID, after, limit+1)
-		page = recordPage(records, after, limit)
+			sessionID, after, limit)
+		if err != nil {
+			return err
+		}
+		var one int
+		more, err := t.scanOne(`SELECT 1 FROM records WHERE session_id = ? AND session_seq > ? LIMIT 1`, []any{sessionID, after + int64(limit)}, &one)
+		page = recordPage(records, more, after, limit)
 		return err
 	})
 	return page, err
@@ -252,7 +273,7 @@ func (s *Store) ListRunTranscriptRecords(ctx context.Context, runID, throughReco
 			return session.ErrRunNotFound
 		}
 		invalid := storage.NewContractError(fmt.Errorf("%w: run %q", storage.ErrInvalidTranscriptPosition, runID))
-		end, err := t.committedPosition(runID, throughRecordID)
+		end, _, err := t.committedPosition(runID, throughRecordID)
 		if err != nil {
 			return err
 		}
@@ -261,88 +282,109 @@ func (s *Store) ListRunTranscriptRecords(ctx context.Context, runID, throughReco
 		}
 		var after int64
 		if afterRecordID != "" {
-			after, err = t.committedPosition(runID, afterRecordID)
+			var typ runlog.Type
+			after, typ, err = t.committedPosition(runID, afterRecordID)
 			if err != nil {
 				return err
 			}
-			if after == 0 || after > end {
-				return invalid
-			}
-			cursor, err := t.recordBySeq(runID, after)
-			if err != nil {
-				return err
-			}
-			if !isTranscriptRecord(cursor) {
+			if after == 0 || after > end || !isTranscriptType(typ) {
 				return invalid
 			}
 		}
+		// Choose the page from stored positions and payload lengths, then load
+		// only the chosen payloads in this same snapshot.
 		pageLimit := min(limit, transcriptPageMaxRecords)
-		records, err := t.queryRecords(`SELECT `+recordColumns+` FROM records WHERE run_id = ? AND seq > ? AND seq <= ? AND type IN (?, ?) ORDER BY seq LIMIT ?`,
-			runID, after, end, string(transcript.RunLogMessagesSeeded), string(transcript.RunLogMessagesAppended), pageLimit+1)
+		sizes, err := t.transcriptSizes(runID, after, end, pageLimit+1)
 		if err != nil {
 			return err
 		}
-		page, err = transcriptPage(records, pageLimit)
+		count, next, err := transcriptPage(sizes, pageLimit)
+		if err != nil || count == 0 {
+			return err
+		}
+		records, err := t.queryRecords(`SELECT `+recordColumns+` FROM records WHERE run_id = ? AND seq > ? AND seq <= ? AND type IN (?, ?) ORDER BY seq`,
+			runID, after, sizes[count-1].seq, string(transcript.RunLogMessagesSeeded), string(transcript.RunLogMessagesAppended))
+		page = runlog.Page{Events: records, NextCursor: next}
 		return err
 	})
 	return page, err
 }
 
-// recordPage returns the first limit records read after position after and,
-// when the query found one more record, the position of the last returned
-// record. Run and session positions are contiguous from 1, so that position
-// is after+limit.
-func recordPage(records []*runlog.Event, after int64, limit int) runlog.Page {
-	if len(records) <= limit {
+// recordPage returns the records read after position after and, when more
+// records follow them, the position of the last returned record. Run and
+// session positions are contiguous from 1, so that position is after+limit.
+func recordPage(records []*runlog.Event, more bool, after int64, limit int) runlog.Page {
+	if !more {
 		return runlog.Page{Events: records}
 	}
-	return runlog.Page{Events: records[:limit], NextCursor: strconv.FormatInt(after+int64(limit), 10)}
+	return runlog.Page{Events: records, NextCursor: strconv.FormatInt(after+int64(limit), 10)}
 }
 
-// transcriptPage applies the transcript byte budget to records already
-// limited to at most limit+1 transcript records in commit order.
-func transcriptPage(records []*runlog.Event, limit int) (runlog.Page, error) {
-	var page runlog.Page
+// transcriptPage applies the transcript record and byte budgets to at most
+// limit+1 transcript record sizes in commit order. It returns how many leading
+// records the page holds and the continuation cursor.
+func transcriptPage(sizes []recordSize, limit int) (int, string, error) {
 	payloadBytes := 0
-	for _, record := range records {
-		if len(page.Events) == limit {
-			page.NextCursor = page.Events[len(page.Events)-1].ID
-			break
+	for index, record := range sizes {
+		if index == limit {
+			return index, strconv.FormatInt(sizes[index-1].seq, 10), nil
 		}
-		size := len(record.Payload)
-		if size > transcriptPageMaxPayloadBytes {
-			return runlog.Page{}, storage.NewContractError(fmt.Errorf(
+		if record.bytes > transcriptPageMaxPayloadBytes {
+			return 0, "", storage.NewContractError(fmt.Errorf(
 				"transcript record %q payload size %d exceeds supported page size %d bytes",
-				record.ID, size, transcriptPageMaxPayloadBytes,
+				strconv.FormatInt(record.seq, 10), record.bytes, transcriptPageMaxPayloadBytes,
 			))
 		}
-		if size > transcriptPageMaxPayloadBytes-payloadBytes {
-			page.NextCursor = page.Events[len(page.Events)-1].ID
-			break
+		if record.bytes > transcriptPageMaxPayloadBytes-payloadBytes {
+			return index, strconv.FormatInt(sizes[index-1].seq, 10), nil
 		}
-		page.Events = append(page.Events, record)
-		payloadBytes += size
+		payloadBytes += record.bytes
 	}
-	return page, nil
+	return len(sizes), "", nil
 }
 
-// isTranscriptRecord reports whether record carries transcript messages.
-func isTranscriptRecord(record *runlog.Event) bool {
-	return record.Type == transcript.RunLogMessagesSeeded || record.Type == transcript.RunLogMessagesAppended
+// isTranscriptType reports whether records of typ carry transcript messages.
+func isTranscriptType(typ runlog.Type) bool {
+	return typ == transcript.RunLogMessagesSeeded || typ == transcript.RunLogMessagesAppended
 }
 
-// committedPosition returns the run sequence of an exact record ID, or zero
-// when no record of the run has that ID.
-func (t *txn) committedPosition(runID, recordID string) (int64, error) {
+// committedPosition returns the run sequence and type of an exact record ID,
+// or zero when no record of the run has that ID. It does not read the payload.
+func (t *txn) committedPosition(runID, recordID string) (int64, runlog.Type, error) {
 	position, err := strconv.ParseInt(recordID, 10, 64)
 	if err != nil || position <= 0 || strconv.FormatInt(position, 10) != recordID {
-		return 0, nil
+		return 0, "", nil
 	}
-	record, err := t.recordBySeq(runID, position)
-	if err != nil || record == nil {
-		return 0, err
+	var typ string
+	found, err := t.scanOne(`SELECT type FROM records WHERE run_id = ? AND seq = ?`, []any{runID, position}, &typ)
+	if err != nil || !found {
+		return 0, "", err
 	}
-	return position, nil
+	return position, runlog.Type(typ), nil
+}
+
+// transcriptSizes returns at most limit transcript record positions and
+// payload lengths in (after, end], without reading payloads.
+func (t *txn) transcriptSizes(runID string, after, end int64, limit int) ([]recordSize, error) {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT seq, payload_bytes FROM records
+		WHERE run_id = ? AND seq > ? AND seq <= ? AND type IN (?, ?) ORDER BY seq LIMIT ?`,
+		runID, after, end, string(transcript.RunLogMessagesSeeded), string(transcript.RunLogMessagesAppended), limit)
+	if err != nil {
+		return nil, &dbError{err: fmt.Errorf("runstore: query transcript sizes: %w", err)}
+	}
+	defer rows.Close() //nolint:errcheck // rows.Err reports iteration failures.
+	var result []recordSize
+	for rows.Next() {
+		var size recordSize
+		if err := rows.Scan(&size.seq, &size.bytes); err != nil {
+			return nil, &dbError{err: fmt.Errorf("runstore: scan transcript size: %w", err)}
+		}
+		result = append(result, size)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, &dbError{err: fmt.Errorf("runstore: read transcript sizes: %w", err)}
+	}
+	return result, nil
 }
 
 // recordRunCancellation applies the write-once cancellation reason.

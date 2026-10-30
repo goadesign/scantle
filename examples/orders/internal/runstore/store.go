@@ -61,7 +61,7 @@ type (
 
 const (
 	// schemaVersion is the PRAGMA user_version written by the current schema.
-	schemaVersion = 1
+	schemaVersion = 2
 	// busyTimeoutMillis is how long a connection waits for another writer to
 	// release the database lock before SQLite reports SQLITE_BUSY.
 	busyTimeoutMillis = 30_000
