@@ -472,12 +472,24 @@ cfg := <agentpkg>.<AgentConfig>{Planner: myPlanner}
 * **`orders.orders`** 
 * **Tool: `orders.continue_orders`**
 * *Continue listing the customer's orders.*
+  * Bound to service method `ListOrders`; its validation and errors apply.
+  * Server-injected (never ask the model for these): `tenant_id`, `customer_id`
+  * Bounded result: the service reports `returned` and `truncated`; continue with `orders.continue_orders`
 * **Tool: `orders.issue_store_credit`**
 * *Refund an order whose total, including tax and shipping, is $50.00 or less as instant store credit.*
+  * Bound to service method `IssueStoreCredit`; its validation and errors apply.
+  * Server-injected (never ask the model for these): `tenant_id`, `customer_id`
 * **Tool: `orders.list_orders`**
 * *List the customer's orders, newest first.*
+  * Bound to service method `ListOrders`; its validation and errors apply.
+  * Server-injected (never ask the model for these): `tenant_id`, `customer_id`
+  * Bounded result: the service reports `returned` and `truncated`; continue with `orders.continue_orders`
 * **Tool: `orders.request_refund`**
 * *Refund an order whose total, including tax and shipping, is over $50.00. A manager must approve it first.*
+  * Bound to service method `RequestRefund`; its validation and errors apply.
+  * Server-injected (never ask the model for these): `tenant_id`, `customer_id`
+  * Requires confirmation before it runs
+* Exact input schemas for this agent, including `BindField` and lookup variants: `gen/orders/agents/refund/specs/tool_schemas.json` (`input_binding`).
 * **Tools this agent EXPORTS for others to use:**
 * *This agent does not export any toolsets.*
 </details>
