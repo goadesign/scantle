@@ -1,15 +1,34 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"goa.design/goa-ai/features/model/gateway"
+	"goa.design/goa-ai/runtime/agent/model"
+	"google.golang.org/grpc"
 
+	"github.com/goadesign/scantle/internal/controlplane"
 	"github.com/goadesign/scantle/internal/swarm"
 )
+
+// scriptedCP1Provider is a model.Provider served by a local model gateway in
+// tests. It answers every Complete call with one fixed CP1 analysis.
+type scriptedCP1Provider struct {
+	// analysis is the JSON CP1 analysis returned as assistant text.
+	analysis string
+}
 
 func TestNewCP1AnalyzerSelectsModelFromFlags(t *testing.T) {
 	env := map[string]string{
@@ -155,4 +174,92 @@ func TestServeOptionsWiresAnalyzerAndProfiles(t *testing.T) {
 
 	_, _, err = serveOptions(serveConfig{swarmProfilesPath: filepath.Join(t.TempDir(), "missing.json")}, os.Getenv)
 	require.ErrorContains(t, err, "read -swarm-profiles")
+}
+
+// TestServeGatewayModeAnswersProposeChangeOverHTTP drives the path that used
+// to fail: serve options built with -model-gateway-addr, a real gRPC model
+// gateway, and an authenticated HTTP propose_change call. A clear request
+// (no open questions) comes back confirmed with code-owned check IDs and a
+// SHA-256 request revision.
+func TestServeGatewayModeAnswersProposeChangeOverHTTP(t *testing.T) {
+	analysis, err := json.Marshal(controlplane.CP1SemanticAnalysis{
+		Summary:     "Give VIP customers instant store credit up to $150.",
+		Ambiguities: []controlplane.CP1ModelAmbiguity{},
+		Examples: []controlplane.CP1ModelExample{{
+			Scenario:         "VIP refund under the limit",
+			InputSummary:     "VIP customer, $120.00 total",
+			ExpectedOutcome:  "Instant store credit, no manager approval",
+			VerificationKind: "deterministic",
+		}},
+		PreservedBehaviors: []string{"Non-VIP refunds over $50.00 still wait for a manager."},
+	})
+	require.NoError(t, err)
+	gatewayAddr := startModelGateway(t, &scriptedCP1Provider{analysis: string(analysis)})
+
+	opts, closeModel, err := serveOptions(serveConfig{gatewayAddr: gatewayAddr}, func(string) string { return "" })
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, closeModel()) })
+	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{
+		"test-token": {ID: "operator@example.com"},
+	})
+	srv := httptest.NewServer(controlplane.NewHTTPHandler(controlplane.New(opts), auth))
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/changes/propose",
+		strings.NewReader(`{"change_id":"vip-refunds","prompt":"VIP customers get instant store credit up to $150."}`))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var card struct {
+		Status          string  `json:"status"`
+		ConfirmedBy     *string `json:"confirmed_by"`
+		RequestRevision string  `json:"request_revision"`
+		Examples        []struct {
+			ID string `json:"id"`
+		} `json:"examples"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&card))
+	assert.Equal(t, controlplane.StatusConfirmed, card.Status)
+	require.NotNil(t, card.ConfirmedBy)
+	assert.Equal(t, "operator@example.com", *card.ConfirmedBy)
+	require.Len(t, card.Examples, 1)
+	assert.Equal(t, "vip-refunds-check-01", card.Examples[0].ID)
+	assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{64}$`), card.RequestRevision)
+}
+
+// Complete returns the scripted CP1 analysis as assistant text.
+func (p *scriptedCP1Provider) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
+	return &model.Response{
+		Content: []model.Message{{
+			Role:  model.ConversationRoleAssistant,
+			Parts: []model.Part{model.TextPart{Text: p.analysis}},
+		}},
+		StopReason: "stop",
+	}, nil
+}
+
+// Stream is unused because the CP1 analyzer only calls Complete.
+func (p *scriptedCP1Provider) Stream(_ context.Context, _ *model.Request) (model.Streamer, error) {
+	return nil, errors.New("streaming not used by CP1 analyzer")
+}
+
+// startModelGateway serves provider through a Goa-AI model gateway on a
+// loopback gRPC listener and returns its address. The server stops when the
+// test ends.
+func startModelGateway(t *testing.T, provider model.Provider) string {
+	t.Helper()
+	gw, err := gateway.NewServer(gateway.WithProvider(provider))
+	require.NoError(t, err)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	grpcSrv := grpc.NewServer()
+	gateway.RegisterGRPCServer(grpcSrv, gw)
+	go func() { assert.NoError(t, grpcSrv.Serve(lis)) }()
+	t.Cleanup(grpcSrv.Stop)
+	return lis.Addr().String()
 }
