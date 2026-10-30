@@ -251,10 +251,20 @@ const buildStopGrace = 10 * time.Second
 
 // Build compiles source in the build sandbox. The Go toolchain may start its
 // own compiler, assembler and linker, but the build can read only SourceDir,
-// the toolchain, the read-only module cache and system libraries; write only its private work directory and output directory; and
-// use no network. Directives in candidate source, such as an assembly
-// #include of an outside file, are denied by the operating system. It fails
-// with ErrIsolationUnavailable where the sandbox cannot be enforced.
+// the toolchain, the read-only module cache, its own work and output
+// directories, and system libraries; write only its work and output
+// directories; and use no network. Directives in candidate source, such as an
+// assembly #include of an outside file, and links or replace directives that
+// leave SourceDir are denied by the operating system. It fails with
+// ErrIsolationUnavailable where the sandbox cannot be enforced.
+//
+// Besides SourceDir, the build trusts GOROOT and ModCache as fixed inputs: the
+// selected toolchain, and module versions verified against their checksums
+// when they were downloaded. A source file linked into either reads bytes the
+// build could already read by importing that toolchain package or module
+// version, so such a link grants nothing beyond that trust. WorkDir and the
+// output directory hold only what builds in this run wrote; callers give each
+// run fresh ones.
 func Build(ctx context.Context, spec BuildSpec) error {
 	if runtime.GOOS != "darwin" {
 		return ErrIsolationUnavailable
