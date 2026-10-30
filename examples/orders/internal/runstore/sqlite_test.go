@@ -5,6 +5,7 @@ package runstore_test
 // still choose exactly one winner for each single-winner operation.
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -271,6 +272,67 @@ func TestPagesDoNotReadRecordsBeyondThePage(t *testing.T) {
 	assert.Equal(t, "3", records.NextCursor)
 	_, err = store.ListRunRecords(ctx, start.RunID, records.NextCursor, 3)
 	require.ErrorContains(t, err, "subject")
+}
+
+// TestSeedPagesDoNotReadRecordsBeyondThePage proves seed history and
+// compiled-start pages never read rows after the returned page. Each range
+// holds three records of which only one fits the page budget. The test makes
+// every later row unreadable through a separate connection (a literal_final
+// value that is not a boolean); the first pages succeed only if the store
+// never reads those rows, and the following pages then fail.
+func TestSeedPagesDoNotReadRecordsBeyondThePage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	store := openStoreAt(t, path)
+	ctx := t.Context()
+	declaration := storage.SeedDeclaration{
+		Subject: genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent("agent")},
+		RunID:   "run", CommandID: "command", AttemptID: "attempt", Kind: storage.SeedLiteral,
+	}
+	bindSeedTestOperation(t, store, declaration, rootExecutionOrigin(declaration.RunID))
+	_, err := store.BeginRunSeed(ctx, declaration)
+	require.NoError(t, err)
+	end := storage.EmptySeedEndID
+	appendRecord := func(key string, record storage.SeedRecord) {
+		record.Key, record.PreviousID = key, end
+		end, err = store.AppendRunSeed(ctx, storage.SeedAppend{RunID: declaration.RunID, AttemptID: declaration.AttemptID, Record: record})
+		require.NoError(t, err)
+	}
+	// Each history record encodes to about 600 KiB, so two exceed the page.
+	for i := range 3 {
+		messages, err := transcript.EncodeRunLogDelta([]*model.Message{{Role: model.ConversationRoleUser, Parts: []model.Part{model.TextPart{Text: strings.Repeat("x", 600<<10)}}}})
+		require.NoError(t, err)
+		appendRecord(fmt.Sprint("history-", i), storage.SeedRecord{Messages: messages})
+	}
+	historyEnd := end
+	// Each compiled-start part base64-encodes to about 600 KiB.
+	prepared := bytes.Repeat([]byte{7}, 450<<10)
+	for i := range 3 {
+		appendRecord(fmt.Sprint("prepared-", i), storage.SeedRecord{Prepared: prepared})
+	}
+	require.NoError(t, store.PublishRunSeed(ctx, storage.SeedPublication{
+		RunID: declaration.RunID, AttemptID: declaration.AttemptID, SeedEndID: historyEnd, EndID: end,
+		PreparedBytes: int64(3 * len(prepared)),
+	}))
+	raw, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(30000)")
+	require.NoError(t, err)
+	_, err = raw.ExecContext(ctx, `UPDATE seed_records SET literal_final = 5 WHERE run_id = ? AND position NOT IN (1, 4)`, declaration.RunID)
+	require.NoError(t, err)
+	require.NoError(t, raw.Close())
+
+	history, err := store.ListRunSeedRecords(ctx, declaration.RunID, historyEnd, "", 10)
+	require.NoError(t, err, "the history page reads only its own records")
+	require.Len(t, history.Records, 1)
+	assert.Equal(t, "1", history.NextCursor)
+	_, err = store.ListRunSeedRecords(ctx, declaration.RunID, historyEnd, history.NextCursor, 10)
+	require.ErrorContains(t, err, "bool", "the unreadable rows are detected when read")
+
+	compiled, err := store.ListRunPreparationRecords(ctx, declaration.RunID, end, "", 10)
+	require.NoError(t, err, "the compiled-start page reads only its own records")
+	require.Len(t, compiled.Records, 1)
+	assert.Equal(t, "4", compiled.NextCursor)
+	assert.Equal(t, prepared, compiled.Records[0].Prepared)
+	_, err = store.ListRunPreparationRecords(ctx, declaration.RunID, end, compiled.NextCursor, 10)
+	require.ErrorContains(t, err, "bool")
 }
 
 // TestHandlesRaceRelinquishAndContinuation races two Store handles on one

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -240,6 +241,18 @@ func (t *txn) seedRecords(runID, attemptID string, after, end int64, limit int, 
 		[]any{runID, attemptID, after, end, limit}, visit)
 }
 
+// seedRecordSizes returns at most limit record positions and encoded JSON
+// sizes in (after, end], without reading record content.
+func (t *txn) seedRecordSizes(runID, attemptID string, after, end int64, limit int) ([]recordSize, error) {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT position, json_bytes FROM seed_records
+		WHERE run_id = ? AND attempt_id = ? AND position > ? AND position <= ? ORDER BY position LIMIT ?`,
+		runID, attemptID, after, end, limit)
+	if err != nil {
+		return nil, &dbError{err: fmt.Errorf("runstore: query seed record sizes: %w", err)}
+	}
+	return scanSizes(rows)
+}
+
 // eachSeedRecord decodes the seed records selected by query one row at a
 // time and passes each to visit until it returns false.
 func (t *txn) eachSeedRecord(query string, args []any, visit func(storage.SeedRecord) bool) error {
@@ -286,6 +299,20 @@ func (t *txn) eachSeedRecord(query string, args []any, visit func(storage.SeedRe
 // insertSeedRecord stores one accepted record at position. The primary key
 // and the unique append key make each position and key single-winner.
 func (t *txn) insertSeedRecord(runID, attemptID string, position int64, record storage.SeedRecord) error {
+	// Measure the record exactly as reads return it: empty content reads
+	// back as nil.
+	returned := record
+	returned.Messages, returned.Prepared = nil, nil
+	if len(record.Messages) > 0 {
+		returned.Messages = record.Messages
+	}
+	if len(record.Prepared) > 0 {
+		returned.Prepared = record.Prepared
+	}
+	encoded, err := json.Marshal(returned)
+	if err != nil {
+		return fmt.Errorf("encode seed record: %w", err)
+	}
 	var (
 		literal, literalFinal, prefixRunID, prefixEndID any
 		excludeSystem, excludeReasoning                 any
@@ -297,10 +324,10 @@ func (t *txn) insertSeedRecord(runID, attemptID string, position int64, record s
 		prefixRunID, prefixEndID = record.Prefix.RunID, record.Prefix.EndID
 		excludeSystem, excludeReasoning = record.Prefix.ExcludeSystem, record.Prefix.ExcludeReasoning
 	}
-	_, err := t.exec(`INSERT INTO seed_records (run_id, attempt_id, position, record_key, previous_id, messages,
-		literal_data, literal_final, prefix_run_id, prefix_end_id, prefix_exclude_system, prefix_exclude_reasoning, prepared)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err = t.exec(`INSERT INTO seed_records (run_id, attempt_id, position, record_key, previous_id, messages,
+		literal_data, literal_final, prefix_run_id, prefix_end_id, prefix_exclude_system, prefix_exclude_reasoning, prepared, json_bytes)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		runID, attemptID, position, record.Key, record.PreviousID, nonEmptyBytes(record.Messages),
-		literal, literalFinal, prefixRunID, prefixEndID, excludeSystem, excludeReasoning, nonEmptyBytes(record.Prepared))
+		literal, literalFinal, prefixRunID, prefixEndID, excludeSystem, excludeReasoning, nonEmptyBytes(record.Prepared), len(encoded))
 	return err
 }

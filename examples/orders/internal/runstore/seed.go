@@ -363,6 +363,34 @@ func (s *Store) ListRunPreparationRecords(ctx context.Context, runID, endID, aft
 	return contractResult(page, err)
 }
 
+// seedPage applies the seed record limit and the logical page budget to at
+// most limit+1 record sizes in order, exactly as storage.ValidateSeedPageSize
+// measures a page that names its last record as the cursor. It returns how
+// many leading records the page holds and the continuation cursor.
+func seedPage(sizes []recordSize, limit int) (int, string, error) {
+	sum := 0
+	for index, record := range sizes {
+		if index == limit {
+			return index, strconv.FormatInt(sizes[index-1].seq, 10), nil
+		}
+		sum += record.bytes
+		if size := seedPageBytes(sum, index+1, strconv.FormatInt(record.seq, 10)); size > storage.MaxSeedPageBytes {
+			if index == 0 {
+				return 0, "", fmt.Errorf("seed page size %d exceeds %d bytes", size, storage.MaxSeedPageBytes)
+			}
+			return index, strconv.FormatInt(sizes[index-1].seq, 10), nil
+		}
+	}
+	return len(sizes), "", nil
+}
+
+// seedPageBytes is the length of the JSON encoding of a SeedPage holding
+// count records whose encodings total recordBytes, with the given cursor:
+// {"Records":[r1,...,rn],"NextCursor":"cursor"}.
+func seedPageBytes(recordBytes, count int, cursor string) int {
+	return len(`{"Records":[],"NextCursor":""}`) + recordBytes + count - 1 + len(cursor)
+}
+
 // preparationMatches reports whether an attempt belongs to the operation.
 func preparationMatches(state attemptRow, operation storage.PreparationOperation) bool {
 	d := state.seed.Declaration
@@ -447,58 +475,24 @@ func (t *txn) preparationPage(state attemptRow, start, end int64, afterID string
 		after = parsed
 	}
 	limit = min(limit, transcriptPageMaxRecords)
-	// Records are read one at a time; reading stops at the first record that
-	// would overflow the page budget, so at most one record beyond the page
-	// is read.
-	var (
-		page     storage.SeedPage
-		full     bool
-		emptyErr error
-	)
+	// Choose the page from positions and stored JSON sizes, then read only
+	// the chosen records in this same snapshot.
 	runID, attemptID := state.seed.Declaration.RunID, state.seed.Declaration.AttemptID
-	err := t.seedRecords(runID, attemptID, after, end, limit, func(record storage.SeedRecord) bool {
+	sizes, err := t.seedRecordSizes(runID, attemptID, after, end, limit+1)
+	if err != nil {
+		return storage.SeedPage{}, err
+	}
+	count, next, err := seedPage(sizes, limit)
+	if err != nil || count == 0 {
+		return storage.SeedPage{}, err
+	}
+	page := storage.SeedPage{NextCursor: next}
+	err = t.seedRecords(runID, attemptID, after, sizes[count-1].seq, count, func(record storage.SeedRecord) bool {
 		page.Records = append(page.Records, record)
-		// Count the complete response, including a potential next cursor.
-		page.NextCursor = record.ID
-		if err := storage.ValidateSeedPageSize(page); err != nil {
-			page.Records = page.Records[:len(page.Records)-1]
-			if len(page.Records) == 0 {
-				emptyErr = err
-			}
-			full = true
-			return false
-		}
 		return true
 	})
 	if err != nil {
 		return storage.SeedPage{}, err
-	}
-	if emptyErr != nil {
-		return storage.SeedPage{}, emptyErr
-	}
-	page.NextCursor = ""
-	if len(page.Records) == 0 {
-		return page, nil
-	}
-	last := page.Records[len(page.Records)-1].ID
-	if full {
-		page.NextCursor = last
-		return page, nil
-	}
-	if len(page.Records) == limit {
-		lastPosition, err := strconv.ParseInt(last, 10, 64)
-		if err != nil {
-			return storage.SeedPage{}, err
-		}
-		var one int
-		more, err := t.scanOne(`SELECT 1 FROM seed_records WHERE run_id = ? AND attempt_id = ? AND position > ? AND position <= ? LIMIT 1`,
-			[]any{runID, attemptID, lastPosition, end}, &one)
-		if err != nil {
-			return storage.SeedPage{}, err
-		}
-		if more {
-			page.NextCursor = last
-		}
 	}
 	return page, nil
 }

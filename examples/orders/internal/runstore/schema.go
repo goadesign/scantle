@@ -116,6 +116,9 @@ var schema = []string{
 	`CREATE INDEX preparation_attempts_by_session ON preparation_attempts (session_id)`,
 	// seed_records holds each attempt's ordered initial-history and
 	// compiled-start records. Exactly one content column group is set.
+	// json_bytes is the record's encoded JSON size as returned in a page:
+	// the page budget counts base64 and escaped JSON, which length() of the
+	// stored columns cannot give, so it is measured once at append.
 	`CREATE TABLE seed_records (
 		run_id TEXT NOT NULL,
 		attempt_id TEXT NOT NULL,
@@ -130,6 +133,7 @@ var schema = []string{
 		prefix_exclude_system INTEGER,
 		prefix_exclude_reasoning INTEGER,
 		prepared BLOB,
+		json_bytes INTEGER NOT NULL,
 		PRIMARY KEY (run_id, attempt_id, position),
 		UNIQUE (run_id, attempt_id, record_key),
 		FOREIGN KEY (run_id, attempt_id) REFERENCES preparation_attempts (run_id, attempt_id) ON DELETE CASCADE

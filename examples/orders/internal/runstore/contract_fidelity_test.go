@@ -5,6 +5,7 @@ package runstore_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,8 @@ import (
 // unchanged: rendered-prompt text and command IDs with invalid UTF-8 survive
 // exact retries and reads, a tool call ID with invalid UTF-8 is rejected
 // without binding anything, and record timestamps far in
-// the future or with a -60 second zone keep their instant, offset and name.
+// the future or with a -60 second, wider-than-int32 or 64 KiB-named zone keep
+// their instant, offset and name.
 func (f factory) ValuesRoundTripExactly(t *testing.T) {
 	store, start := f.runningRootStore(t)
 	declaration := storage.SeedDeclaration{
@@ -43,9 +45,12 @@ func (f factory) ValuesRoundTripExactly(t *testing.T) {
 		time.Date(2300, time.January, 1, 1, 0, 0, 0, time.FixedZone("plus-one", 3600)),
 		// Go's binary time encoding reserves a -1 minute offset for UTC.
 		time.Date(2026, time.March, 4, 5, 6, 7, 8_000_000, time.FixedZone("minus-sixty", -60)),
+		// Offsets beyond int32 and zone names beyond 65535 bytes are valid.
+		time.Date(2026, time.March, 4, 5, 6, 7, 0, time.FixedZone("wide", 1<<31)),
+		time.Date(2026, time.March, 4, 5, 6, 7, 0, time.FixedZone(strings.Repeat("z", 65536), 3600)),
 	} {
 		_, wantOffset := at.Zone()
-		key := fmt.Sprint("note", wantOffset)
+		key := fmt.Sprint("note", wantOffset, len(at.Location().String()))
 		note := record(key, start.RunID, start.Subject, start.SessionID, "note")
 		note.Timestamp = at
 		stored, err := store.AppendRunRecord(t.Context(), note)
