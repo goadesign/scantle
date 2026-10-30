@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,10 +25,13 @@ import (
 )
 
 // scriptedCP1Provider is a model.Provider served by a local model gateway in
-// tests. It answers every Complete call with one fixed CP1 analysis.
+// tests. It answers every Complete call with one fixed CP1 analysis and
+// records the output allowance the gateway forwarded.
 type scriptedCP1Provider struct {
 	// analysis is the JSON CP1 analysis returned as assistant text.
 	analysis string
+	// maxTokens is the MaxTokens of the last request the gateway delivered.
+	maxTokens atomic.Int64
 }
 
 func TestNewCP1AnalyzerSelectsModelFromFlags(t *testing.T) {
@@ -180,7 +184,7 @@ func TestServeOptionsWiresAnalyzerAndProfiles(t *testing.T) {
 // to fail: serve options built with -model-gateway-addr, a real gRPC model
 // gateway, and an authenticated HTTP propose_change call. A clear request
 // (no open questions) comes back confirmed with code-owned check IDs and a
-// SHA-256 request revision.
+// SHA-256 request revision, and the CP1 output allowance reaches the provider.
 func TestServeGatewayModeAnswersProposeChangeOverHTTP(t *testing.T) {
 	analysis, err := json.Marshal(controlplane.CP1SemanticAnalysis{
 		Summary:     "Give VIP customers instant store credit up to $150.",
@@ -194,7 +198,8 @@ func TestServeGatewayModeAnswersProposeChangeOverHTTP(t *testing.T) {
 		PreservedBehaviors: []string{"Non-VIP refunds over $50.00 still wait for a manager."},
 	})
 	require.NoError(t, err)
-	gatewayAddr := startModelGateway(t, &scriptedCP1Provider{analysis: string(analysis)})
+	provider := &scriptedCP1Provider{analysis: string(analysis)}
+	gatewayAddr := startModelGateway(t, provider)
 
 	opts, closeModel, err := serveOptions(serveConfig{gatewayAddr: gatewayAddr}, func(string) string { return "" })
 	require.NoError(t, err)
@@ -230,10 +235,12 @@ func TestServeGatewayModeAnswersProposeChangeOverHTTP(t *testing.T) {
 	require.Len(t, card.Examples, 1)
 	assert.Equal(t, "vip-refunds-check-01", card.Examples[0].ID)
 	assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{64}$`), card.RequestRevision)
+	assert.EqualValues(t, 4096, provider.maxTokens.Load(), "CP1 output allowance must reach the provider through the gateway")
 }
 
 // Complete returns the scripted CP1 analysis as assistant text.
-func (p *scriptedCP1Provider) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
+func (p *scriptedCP1Provider) Complete(_ context.Context, req *model.Request) (*model.Response, error) {
+	p.maxTokens.Store(int64(req.MaxTokens))
 	return &model.Response{
 		Content: []model.Message{{
 			Role:  model.ConversationRoleAssistant,

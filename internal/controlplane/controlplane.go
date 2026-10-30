@@ -185,6 +185,12 @@ const (
 	TargetKindPromptTemplate = "prompt_template"
 	// TargetKindCompiledRule identifies a compiled Go business rule that cannot be overridden via prompt store.
 	TargetKindCompiledRule = "compiled_rule"
+	// cp1AnalysisMaxOutputTokens is the output allowance for the one CP1
+	// inference that writes the structured Change Card analysis. It caps that
+	// response only, not the cost of a whole change. Providers such as
+	// Anthropic require a positive allowance on every request. A response that
+	// runs out of allowance fails Analyze, so no partial card is ever stored.
+	cp1AnalysisMaxOutputTokens = 4096
 	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML document host.
 	checkpointUIHTML = `<!doctype html>
 <html lang="en">
@@ -402,6 +408,7 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 			Name:   "cp1_change_card_analysis",
 			Schema: cp1AnalysisJSONSchema,
 		},
+		MaxTokens: cp1AnalysisMaxOutputTokens,
 	}
 	resp, err := a.client.Complete(ctx, req)
 	if err != nil {

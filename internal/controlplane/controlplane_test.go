@@ -11,6 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
+	"goa.design/goa-ai/features/model/anthropic"
+
 	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
 	genscantle "github.com/goadesign/scantle/gen/scantle"
 	"github.com/goadesign/scantle/internal/goldenpath"
@@ -522,4 +527,119 @@ func newStubModelClient(t *testing.T, responseJSON string) model.Client {
 		t.Fatalf("model.NewClient: %v", err)
 	}
 	return client
+}
+
+// TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter runs the CP1
+// analyzer through the real Anthropic adapter configured as NewFromAPIKey
+// configures it (default model only, no client-wide MaxTokens). The request
+// must carry cp1AnalysisMaxOutputTokens, and a response cut off at that
+// allowance must fail without storing a Change Card.
+func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
+	analysis, err := json.Marshal(CP1SemanticAnalysis{
+		Summary:            "Give VIP customers instant store credit up to $150.",
+		Ambiguities:        []CP1ModelAmbiguity{},
+		Examples:           []CP1ModelExample{{Scenario: "VIP refund", InputSummary: "$120.00 total", ExpectedOutcome: "Instant store credit", VerificationKind: "deterministic"}},
+		PreservedBehaviors: []string{},
+	})
+	if err != nil {
+		t.Fatalf("marshal analysis: %v", err)
+	}
+	ctx := WithPrincipal(context.Background(), Principal{ID: "operator@example.com"})
+
+	cases := []struct {
+		name       string
+		stopReason string
+		text       string
+		wantErr    bool
+	}{
+		{name: "complete response", stopReason: "end_turn", text: string(analysis)},
+		{name: "response cut off at the allowance", stopReason: "max_tokens", text: string(analysis[:len(analysis)/2]), wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			msgs := &recordingAnthropicMessages{resp: anthropicTextMessage(t, tc.text, tc.stopReason)}
+			client, err := anthropic.New(msgs, anthropic.Options{DefaultModel: "claude-sonnet-4-5"})
+			if err != nil {
+				t.Fatalf("anthropic.New: %v", err)
+			}
+			cp := New(Options{Analyzer: NewModelCP1Analyzer(client)})
+
+			card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "vip", Prompt: "VIP refunds up to $150."})
+			if msgs.calls != 1 {
+				t.Fatalf("Anthropic Messages.New calls = %d, want 1 (err: %v)", msgs.calls, err)
+			}
+			if got := msgs.last.MaxTokens; got != cp1AnalysisMaxOutputTokens {
+				t.Fatalf("encoded max_tokens = %d, want %d", got, cp1AnalysisMaxOutputTokens)
+			}
+			if !tc.wantErr {
+				if err != nil {
+					t.Fatalf("ProposeChange: %v", err)
+				}
+				if card.Status != StatusConfirmed {
+					t.Fatalf("status = %q, want %q", card.Status, StatusConfirmed)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("ProposeChange succeeded on a cut-off response")
+			}
+			cp.mu.RLock()
+			_, stored := cp.cards["vip"]
+			cp.mu.RUnlock()
+			if stored {
+				t.Fatal("cut-off response stored a Change Card")
+			}
+		})
+	}
+}
+
+// recordingAnthropicMessages is an anthropic.MessagesClient that records the
+// encoded request and returns a fixed message.
+type recordingAnthropicMessages struct {
+	// resp is the message returned by New.
+	resp *anthropicsdk.Message
+	// last is the most recent request body encoded by the adapter.
+	last anthropicsdk.MessageNewParams
+	// calls counts New invocations.
+	calls int
+}
+
+// New records body and returns the fixed message.
+func (m *recordingAnthropicMessages) New(_ context.Context, body anthropicsdk.MessageNewParams, _ ...option.RequestOption) (*anthropicsdk.Message, error) {
+	m.last = body
+	m.calls++
+	return m.resp, nil
+}
+
+// NewStreaming is unused because the CP1 analyzer only calls Complete.
+func (m *recordingAnthropicMessages) NewStreaming(context.Context, anthropicsdk.MessageNewParams, ...option.RequestOption) *ssestream.Stream[anthropicsdk.MessageStreamEventUnion] {
+	panic("streaming not used by CP1 analyzer")
+}
+
+// CountTokens is unused because the CP1 analyzer does not count tokens.
+func (m *recordingAnthropicMessages) CountTokens(context.Context, anthropicsdk.MessageCountTokensParams, ...option.RequestOption) (*anthropicsdk.MessageTokensCount, error) {
+	return nil, errors.New("token counting not used by CP1 analyzer")
+}
+
+// anthropicTextMessage decodes a provider-shaped assistant message holding
+// text with the given stop reason, as the Anthropic API would return it.
+func anthropicTextMessage(t *testing.T, text, stopReason string) *anthropicsdk.Message {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{
+		"id":          "msg_test",
+		"type":        "message",
+		"role":        "assistant",
+		"model":       "claude-sonnet-4-5",
+		"content":     []map[string]any{{"type": "text", "text": text}},
+		"stop_reason": stopReason,
+		"usage":       map[string]any{"input_tokens": 10, "output_tokens": 20},
+	})
+	if err != nil {
+		t.Fatalf("marshal message: %v", err)
+	}
+	var msg anthropicsdk.Message
+	if err := json.Unmarshal(raw, &msg); err != nil {
+		t.Fatalf("decode message: %v", err)
+	}
+	return &msg
 }
