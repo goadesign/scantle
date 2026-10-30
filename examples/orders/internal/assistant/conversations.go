@@ -81,7 +81,13 @@ func (c *Conversations) Start(ctx context.Context, tenantID, customerID, message
 	return orders.RunState{RunID: runID, TenantID: tenantID, CustomerID: customerID, Status: "running"}, nil
 }
 
-// awaitRecorded waits until the runtime has recorded the run it accepted. The
+// awaitRecorded waits until the runtime has recorded the run it accepted.
+//
+// PROVISIONAL: this bounded wait covers the gap between engine acceptance and
+// the workflow's first activity recording the run. It is not the intended
+// contract (a timeout can leave an accepted workflow behind a failed HTTP
+// call) and will be replaced by an owner-side signal once one is identified.
+// The
 // run's first workflow activity records it together with its labels; until
 // then the API could neither show the run nor prove who owns it, so Start only
 // returns a run ID that run_status can already authorize and report.
