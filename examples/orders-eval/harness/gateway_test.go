@@ -35,14 +35,19 @@ func TestMeterRecordsEveryCallWithoutDoubleCounting(t *testing.T) {
 	})
 	_, _ = partial(t.Context(), &model.Request{})
 
+	failedWithUsage := m.unary(func(context.Context, *model.Request) (*model.Response, error) {
+		return nil, model.RetainUsage(errors.New("stream broke"), model.TokenUsage{Model: "m", InputTokens: 20})
+	})
+	_, _ = failedWithUsage(t.Context(), &model.Request{})
+
 	failedUnknown := m.unary(func(context.Context, *model.Request) (*model.Response, error) {
 		return nil, errors.New("provider unavailable")
 	})
 	_, _ = failedUnknown(t.Context(), &model.Request{})
 
 	got := m.total()
-	assert.Equal(t, 5, got.Calls)
-	assert.Equal(t, 3, got.Unreported, "missing usage, partial usage and an error without usage are unreported, never zero")
+	assert.Equal(t, 6, got.Calls)
+	assert.Equal(t, 4, got.Unreported, "missing usage, partial usage and failed calls are unreported, never zero or an undercount")
 	assert.Equal(t, Tokens{Input: 17, Output: 3}, got.ByModel["m"], "stream chunk usage is not added to the final total")
 }
 
