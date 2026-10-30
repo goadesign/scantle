@@ -143,7 +143,7 @@ func (e *Env) Start(ctx context.Context, depsURL string) (*Platform, error) {
 	addr := "127.0.0.1:" + strconv.Itoa(apiPort)
 	p.api, err = candidate.Exec(ctx, e.Orders, candidate.Spec{
 		Args: []string{"--env", "sim", "--commerce-url", depsURL, "--temporal", temporalAddr,
-			"--listen", addr, "--model-provider", "scripted"},
+			"--listen", addr, "--model-provider", "scripted", "--state-dir", apiState},
 		Env:          []string{"ORDERS_JWT_KEY=" + e.signingKey},
 		StateDir:     apiState,
 		ConnectPorts: []int{temporalPort, depsPort},

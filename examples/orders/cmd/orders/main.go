@@ -2,7 +2,9 @@
 //
 // It is the composition root: it reads flags and environment, constructs the
 // dependency clients, the runtime store, the Temporal engine and the model
-// client, and passes them to the service and agent packages. The --env flag
+// client, and passes them to the service and agent packages. The runtime
+// store is a SQLite database under --state-dir, so runs, checkpoints and
+// records survive restarts. The --env flag
 // only records which environment the commerce and payments endpoints belong
 // to; the endpoints themselves come from --commerce-url and --payments-url.
 package main
@@ -17,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -29,13 +32,13 @@ import (
 	"github.com/goadesign/scantle/examples/orders/internal/assistant"
 	"github.com/goadesign/scantle/examples/orders/internal/orders"
 	"github.com/goadesign/scantle/examples/orders/internal/refundflow"
+	"github.com/goadesign/scantle/examples/orders/internal/runstore"
 	"github.com/goadesign/scantle/examples/orders/internal/scriptedmodel"
 	"go.temporal.io/sdk/client"
 	"goa.design/goa-ai/features/model/anthropic"
 	temporalengine "goa.design/goa-ai/runtime/agent/engine/temporal"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/runtime"
-	storageinmem "goa.design/goa-ai/runtime/agent/storage/inmem"
 	goahttp "goa.design/goa/v3/http"
 )
 
@@ -51,6 +54,8 @@ type config struct {
 	temporalAddr string
 	// refundQueue is the task queue the refund worker polls.
 	refundQueue string
+	// stateDir is the directory holding the runtime store database.
+	stateDir string
 	// modelProvider selects the refund agent's model: "anthropic" or
 	// "scripted", the deterministic zero-key demo stand-in.
 	modelProvider string
@@ -62,7 +67,12 @@ type config struct {
 	signingKey []byte
 }
 
-const modelID = "default"
+const (
+	// modelID is the runtime's registered name for the refund agent's model.
+	modelID = "default"
+	// runtimeDatabase is the runtime store's file name inside --state-dir.
+	runtimeDatabase = "orders-runtime.db"
+)
 
 func main() {
 	cfg, err := parseConfig()
@@ -78,12 +88,21 @@ func main() {
 	}
 }
 
-// run wires the service and serves it until ctx ends.
-func run(ctx context.Context, cfg config) error {
+// run wires the service and serves it until ctx ends. The runtime store is
+// opened first and closed last, after the agent engine has stopped writing.
+func run(ctx context.Context, cfg config) (err error) {
 	commerce, err := newCommerceClient(cfg.commerceURL)
 	if err != nil {
 		return err
 	}
+	if err := os.MkdirAll(cfg.stateDir, 0o700); err != nil {
+		return fmt.Errorf("create state directory: %w", err)
+	}
+	store, err := runstore.Open(ctx, filepath.Join(cfg.stateDir, runtimeDatabase))
+	if err != nil {
+		return fmt.Errorf("open runtime store: %w", err)
+	}
+	defer func() { err = errors.Join(err, store.Close()) }()
 	temporal, err := client.Dial(client.Options{HostPort: cfg.temporalAddr})
 	if err != nil {
 		return fmt.Errorf("connect to temporal: %w", err)
@@ -99,7 +118,6 @@ func run(ctx context.Context, cfg config) error {
 	}
 	defer func() { _ = eng.Close() }()
 
-	store := storageinmem.New()
 	rt := runtime.New(store, runtime.WithEngine(eng))
 	if err := rt.PromptRegistry.Register(assistant.SystemPrompt()); err != nil {
 		return fmt.Errorf("register system prompt: %w", err)
@@ -155,6 +173,7 @@ func parseConfig() (config, error) {
 	flag.StringVar(&cfg.commerceURL, "commerce-url", "", "base URL of the commerce system")
 	flag.StringVar(&cfg.temporalAddr, "temporal", "localhost:7233", "Temporal frontend address")
 	flag.StringVar(&cfg.refundQueue, "refund-queue", "orders.refunds", "task queue of the refund worker")
+	flag.StringVar(&cfg.stateDir, "state-dir", ".scantle/state", "directory of the durable runtime store ("+runtimeDatabase+")")
 	flag.StringVar(&cfg.modelProvider, "model-provider", "anthropic", `refund agent model: "anthropic", or "scripted" for the zero-key demo`)
 	flag.StringVar(&cfg.model, "model", "claude-sonnet-5-5", "Anthropic model used by the refund agent")
 	flag.Parse()

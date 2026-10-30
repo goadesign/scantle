@@ -1,0 +1,288 @@
+package runstore_test
+
+// These tests cover what only a durable store can show: state survives closing
+// and reopening the database file, and separate Store handles on one file
+// still choose exactly one winner for each single-winner operation.
+
+import (
+	"database/sql"
+	"fmt"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/goadesign/scantle/examples/orders/internal/runstore"
+	genrunidentity "goa.design/goa-ai/registry/gen/runidentity"
+	"goa.design/goa-ai/runtime/agent/model"
+	"goa.design/goa-ai/runtime/agent/runlog"
+	"goa.design/goa-ai/runtime/agent/session"
+	"goa.design/goa-ai/runtime/agent/storage"
+	"goa.design/goa-ai/runtime/agent/transcript"
+)
+
+type (
+	// durableSnapshot is everything a reopened store must return unchanged.
+	durableSnapshot struct {
+		// session is the host session.
+		session session.Session
+		// runs maps run IDs to their metadata.
+		runs map[string]session.RunMeta
+		// records maps run IDs to their complete ordered records.
+		records map[string][]*runlog.Event
+		// sessionRecords is the complete session commit order.
+		sessionRecords []*runlog.Event
+		// suspension is the suspended run's checkpoint.
+		suspension session.RunSuspension
+		// seed is the root run's publication.
+		seed storage.RunSeed
+		// seedRecords is the root run's published history.
+		seedRecords storage.SeedPage
+		// preparation is the root run's accepted preparation.
+		preparation storage.RunPreparation
+	}
+)
+
+// TestReopenPreservesState proves closing and reopening the file returns
+// identical sessions, runs, records, checkpoint bytes, resolutions and
+// publications, and that exact retries still return their original positions.
+func TestReopenPreservesState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	checkpoint := session.RunSuspension{ID: "checkpoint", Data: []byte("{\"saved\":\"\xe9 exact bytes \\u0000\"}\n")}
+	subject := genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent("agent")}
+	root := session.RunStart{Subject: subject, RunID: "root", SessionID: "session", StartedAt: now, Labels: map[string]string{"tenant": "t1"}}
+	literal, err := transcript.EncodeRunLogDelta([]*model.Message{{Role: model.ConversationRoleUser, Parts: []model.Part{model.TextPart{Text: "refund order 7"}}}})
+	require.NoError(t, err)
+
+	first, err := runstore.Open(ctx, path)
+	require.NoError(t, err)
+	_, err = first.CreateSession(ctx, "session", now)
+	require.NoError(t, err)
+	declaration := storage.SeedDeclaration{Subject: subject, RunID: root.RunID, SessionID: root.SessionID, CommandID: root.RunID, AttemptID: "attempt", Kind: storage.SeedLiteral}
+	bindSeedTestOperation(t, first, declaration, rootExecutionOrigin(root.RunID))
+	_, err = first.BeginRunSeed(ctx, declaration)
+	require.NoError(t, err)
+	literalAppend := storage.SeedAppend{RunID: root.RunID, AttemptID: "attempt", Record: storage.SeedRecord{Key: "input", PreviousID: storage.EmptySeedEndID, Messages: literal}}
+	root.SeedEndID, err = first.AppendRunSeed(ctx, literalAppend)
+	require.NoError(t, err)
+	require.NoError(t, first.PublishRunSeed(ctx, appendSeedTestCompletion(t, first, declaration, root.SeedEndID)))
+	rootCommand := rootStartCommand(t, root)
+	started, err := first.StartRootRun(ctx, rootCommand)
+	require.NoError(t, err)
+	ordinary := record("note", root.RunID, subject, root.SessionID, "note")
+	noted, err := first.AppendRunRecord(ctx, ordinary)
+	require.NoError(t, err)
+	_, err = first.RecordRunSuspension(ctx, storage.RunSuspension{RunID: root.RunID, Suspension: checkpoint, Record: suspendedRecord(t, "suspended", root, checkpoint.ID)})
+	require.NoError(t, err)
+	successor := publishStartHistory(t, first, session.RunStart{Subject: subject, RunID: "successor", SessionID: root.SessionID, PredecessorRunID: root.RunID, StartedAt: now}, "")
+	successorCommand := rootStartCommand(t, successor)
+	admitted, err := first.StartRootRun(ctx, successorCommand)
+	require.NoError(t, err)
+	_, err = first.RecordRunSuspension(ctx, storage.RunSuspension{RunID: successor.RunID, Suspension: checkpoint, Record: suspendedRecord(t, "suspended", successor, checkpoint.ID)})
+	require.NoError(t, err)
+	relinquished, err := first.RelinquishRunSuspension(ctx, storage.RunSuspensionRelinquishment{RunID: successor.RunID, SuspensionID: checkpoint.ID, Reason: "user_requested"})
+	require.NoError(t, err)
+	before := takeDurableSnapshot(t, first, declaration, root, successor)
+	require.NoError(t, first.Close())
+
+	reopened := openStoreAt(t, path)
+	after := takeDurableSnapshot(t, reopened, declaration, root, successor)
+	assert.Equal(t, before, after)
+	assert.Equal(t, checkpoint.Data, after.suspension.Data, "checkpoint bytes survive byte for byte")
+	assert.Equal(t, session.ContinuedSuspension{RunID: successor.RunID}, after.runs[root.RunID].SuspensionResolution)
+	assert.Equal(t, relinquished, after.runs[successor.RunID].SuspensionResolution)
+
+	position, err := reopened.AppendRunSeed(ctx, literalAppend)
+	require.NoError(t, err)
+	assert.Equal(t, root.SeedEndID, position, "seed retries keep their position after reopen")
+	retried, err := reopened.AppendRunRecord(ctx, ordinary)
+	require.NoError(t, err)
+	assert.Equal(t, noted.ID, retried.ID)
+	assert.False(t, retried.Inserted)
+	replayed, err := reopened.StartRootRun(ctx, rootCommand)
+	require.NoError(t, err)
+	assert.Equal(t, started.Started.ID, replayed.Started.ID)
+	assert.Equal(t, session.RunStatusSuspended, replayed.RunStatus)
+	replayedSuccessor, err := reopened.StartRootRun(ctx, successorCommand)
+	require.NoError(t, err)
+	assert.Equal(t, admitted.Started.ID, replayedSuccessor.Started.ID)
+	resolution, err := reopened.RelinquishRunSuspension(ctx, storage.RunSuspensionRelinquishment{RunID: successor.RunID, SuspensionID: checkpoint.ID, Reason: "user_requested"})
+	require.NoError(t, err)
+	assert.Equal(t, relinquished, resolution, "the first closure time survives reopen")
+	assert.Equal(t, after, takeDurableSnapshot(t, reopened, declaration, root, successor), "exact retries write nothing")
+}
+
+// TestOpenChecksSchemaVersion proves reopening is idempotent and an unknown
+// schema version or a DSN-like path is rejected.
+func TestOpenChecksSchemaVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	store, err := runstore.Open(t.Context(), path)
+	require.NoError(t, err)
+	require.NoError(t, store.Close())
+	again, err := runstore.Open(t.Context(), path)
+	require.NoError(t, err, "opening the current schema is idempotent")
+	require.NoError(t, again.Close())
+	raw, err := sql.Open("sqlite", path)
+	require.NoError(t, err)
+	_, err = raw.ExecContext(t.Context(), "PRAGMA user_version = 99")
+	require.NoError(t, err)
+	require.NoError(t, raw.Close())
+	_, err = runstore.Open(t.Context(), path)
+	require.ErrorContains(t, err, "unsupported schema version 99")
+	_, err = runstore.Open(t.Context(), path+"?mode=ro")
+	require.ErrorContains(t, err, "invalid database path")
+}
+
+// TestHandlesRaceSeedPublication races two Store handles on one file publishing
+// competing attempts and proves exactly one attempt is published.
+func TestHandlesRaceSeedPublication(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	handles := [2]*runstore.Store{openStoreAt(t, path), openStoreAt(t, path)}
+	ctx := t.Context()
+	subject := genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent("agent")}
+	for round := range 20 {
+		runID := fmt.Sprintf("run-%d", round)
+		operation := storage.PreparationOperation{Subject: subject, RunID: runID, CommandID: "command"}
+		_, err := handles[0].BeginRunPreparationOperation(ctx, storage.RunPreparationBegin{Operation: operation, Origin: rootExecutionOrigin(runID)})
+		require.NoError(t, err)
+		publications := make([]storage.SeedPublication, len(handles))
+		for i, handle := range handles {
+			declaration := storage.SeedDeclaration{Subject: subject, RunID: runID, CommandID: "command", AttemptID: fmt.Sprintf("attempt-%d", i), Kind: storage.SeedLiteral}
+			_, err := handle.BeginRunSeed(ctx, declaration)
+			require.NoError(t, err)
+			publications[i] = appendSeedTestCompletion(t, handle, declaration, storage.EmptySeedEndID)
+		}
+		errs := raceHandles(handles, func(i int, handle *runstore.Store) error {
+			return handle.PublishRunSeed(ctx, publications[i])
+		})
+		winner := requireOneWinner(t, errs, storage.ErrSeedConflict)
+		for i, handle := range handles {
+			accepted, found, err := handle.FindRunPreparation(ctx, operation)
+			require.NoError(t, err)
+			require.True(t, found)
+			assert.Equal(t, publications[winner].AttemptID, accepted.Seed.Declaration.AttemptID)
+			settled, found, err := handle.SettleRunPreparation(ctx, storage.PreparationAttempt{Operation: operation, AttemptID: publications[i].AttemptID})
+			require.NoError(t, err)
+			require.True(t, found, "settling either attempt returns the single winner")
+			assert.Equal(t, accepted, settled)
+		}
+		require.ErrorIs(t, handles[1-winner].PublishRunSeed(ctx, publications[1-winner]), storage.ErrSeedConflict)
+	}
+}
+
+// TestHandlesRaceContinuations races two Store handles on one file continuing
+// one suspension and proves one successor wins permanently while the loser
+// leaves no run or records.
+func TestHandlesRaceContinuations(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "runtime.db")
+	handles := [2]*runstore.Store{openStoreAt(t, path), openStoreAt(t, path)}
+	ctx := t.Context()
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	subject := genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent("agent")}
+	_, err := handles[0].CreateSession(ctx, "session", now)
+	require.NoError(t, err)
+	for round := range 20 {
+		predecessor := session.RunStart{Subject: subject, RunID: fmt.Sprintf("predecessor-%d", round), SessionID: "session", StartedAt: now}
+		predecessor = publishStartHistory(t, handles[0], predecessor, "")
+		_, err := handles[1].StartRootRun(ctx, rootStartCommand(t, predecessor))
+		require.NoError(t, err)
+		_, err = handles[0].RecordRunSuspension(ctx, storage.RunSuspension{
+			RunID: predecessor.RunID, Suspension: session.RunSuspension{ID: "checkpoint", Data: []byte(`{"saved":true}`)},
+			Record: suspendedRecord(t, "suspended", predecessor, "checkpoint"),
+		})
+		require.NoError(t, err)
+		commands := make([]storage.RootRunStart, len(handles))
+		for i := range handles {
+			successor := session.RunStart{Subject: subject, RunID: fmt.Sprintf("successor-%d-%d", round, i), SessionID: "session", PredecessorRunID: predecessor.RunID, StartedAt: now}
+			commands[i] = rootStartCommand(t, publishStartHistory(t, handles[i], successor, ""))
+		}
+		errs := raceHandles(handles, func(i int, handle *runstore.Store) error {
+			_, err := handle.StartRootRun(ctx, commands[i])
+			return err
+		})
+		winner := requireOneWinner(t, errs, session.ErrRunConflict)
+		loser := commands[1-winner].Run.RunID
+		for _, handle := range handles {
+			meta, err := handle.LoadRun(ctx, predecessor.RunID)
+			require.NoError(t, err)
+			assert.Equal(t, session.ContinuedSuspension{RunID: commands[winner].Run.RunID}, meta.SuspensionResolution)
+			_, err = handle.LoadRun(ctx, loser)
+			require.ErrorIs(t, err, session.ErrRunNotFound)
+			_, err = handle.ListRunRecords(ctx, loser, "", 10)
+			require.ErrorIs(t, err, session.ErrRunNotFound, "the losing successor leaves no records")
+			_, err = handle.StartRootRun(ctx, commands[1-winner])
+			require.ErrorIs(t, err, session.ErrRunConflict, "the winner stays permanent")
+		}
+	}
+}
+
+// takeDurableSnapshot reads every value TestReopenPreservesState writes.
+func takeDurableSnapshot(t *testing.T, store contractStore, declaration storage.SeedDeclaration, runs ...session.RunStart) durableSnapshot {
+	t.Helper()
+	ctx := t.Context()
+	snapshot := durableSnapshot{runs: make(map[string]session.RunMeta), records: make(map[string][]*runlog.Event)}
+	var err error
+	snapshot.session, err = store.LoadSession(ctx, declaration.SessionID)
+	require.NoError(t, err)
+	for _, start := range runs {
+		snapshot.runs[start.RunID], err = store.LoadRun(ctx, start.RunID)
+		require.NoError(t, err)
+		snapshot.records[start.RunID] = runRecords(t, store, start.RunID)
+	}
+	page, err := store.ListSessionRunRecords(ctx, declaration.SessionID, "", 1000)
+	require.NoError(t, err)
+	snapshot.sessionRecords = page.Events
+	snapshot.suspension, err = store.LoadRunSuspension(ctx, runs[0].RunID)
+	require.NoError(t, err)
+	snapshot.seed, err = store.LoadRunSeed(ctx, runs[0].RunID, runs[0].SeedEndID)
+	require.NoError(t, err)
+	snapshot.seedRecords, err = store.ListRunSeedRecords(ctx, runs[0].RunID, runs[0].SeedEndID, "", 10)
+	require.NoError(t, err)
+	var found bool
+	snapshot.preparation, found, err = store.FindRunPreparation(ctx, storage.PreparationOperation{
+		Subject: declaration.Subject, RunID: declaration.RunID, SessionID: declaration.SessionID, CommandID: declaration.CommandID,
+	})
+	require.NoError(t, err)
+	require.True(t, found)
+	return snapshot
+}
+
+// raceHandles releases one call per handle at the same time and returns each
+// call's error by handle index.
+func raceHandles(handles [2]*runstore.Store, call func(int, *runstore.Store) error) [2]error {
+	var (
+		errs    [2]error
+		release = make(chan struct{})
+		workers sync.WaitGroup
+	)
+	for i, handle := range handles {
+		workers.Go(func() {
+			<-release
+			errs[i] = call(i, handle)
+		})
+	}
+	close(release)
+	workers.Wait()
+	return errs
+}
+
+// requireOneWinner requires exactly one successful call and a permanent
+// rejection of the other, and returns the winning handle index.
+func requireOneWinner(t *testing.T, errs [2]error, rejection error) int {
+	t.Helper()
+	require.True(t, (errs[0] == nil) != (errs[1] == nil), "exactly one call must win: %v", errs)
+	winner := 0
+	if errs[0] != nil {
+		winner = 1
+	}
+	loserErr := errs[1-winner]
+	require.ErrorIs(t, loserErr, rejection)
+	var contractErr *storage.ContractError
+	require.ErrorAs(t, loserErr, &contractErr)
+	return winner
+}
