@@ -222,3 +222,58 @@ func freePort(t *testing.T) int {
 	require.NoError(t, ln.Close())
 	return port
 }
+
+func TestBuildDeniesReadsOutsideTheModule(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	goroot, modCache := goEnv(t, "GOROOT"), goEnv(t, "GOMODCACHE")
+	protected := t.TempDir()
+	secret := filepath.Join(protected, "secret.h")
+	require.NoError(t, os.WriteFile(secret, []byte("#define SECRET 42\n"), 0o600))
+
+	mod := t.TempDir()
+	includePath, err := filepath.Rel(mod, secret)
+	require.NoError(t, err)
+	cases := []struct {
+		name    string
+		asm     string
+		wantErr bool
+	}{
+		{"plain module builds", "TEXT ·answer(SB),$0-8\n\tMOVD $42, R0\n\tMOVD R0, ret+0(FP)\n\tRET\n", false},
+		{"assembly include of a protected file is denied", "#include \"" + includePath + "\"\nTEXT ·answer(SB),$0-8\n\tMOVD $SECRET, R0\n\tMOVD R0, ret+0(FP)\n\tRET\n", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(filepath.Join(mod, "go.mod"), []byte("module probebuild\n\ngo 1.26\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(mod, "main.go"), []byte("package main\n\nfunc answer() int\n\nfunc main() { println(answer()) }\n"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(mod, "answer_arm64.s"), []byte("#include \"textflag.h\"\n"+c.asm), 0o600))
+			logs := t.TempDir()
+			err := Build(t.Context(), BuildSpec{
+				ModuleDir: mod, Package: ".", Out: filepath.Join(t.TempDir(), "probe"),
+				GOROOT: goroot, ModCache: modCache, WorkDir: t.TempDir(), LogFile: filepath.Join(logs, "build.log"),
+			})
+			log, _ := os.ReadFile(filepath.Join(logs, "build.log"))
+			if !c.wantErr {
+				require.NoError(t, err, string(log))
+				return
+			}
+			// Control: the same build outside the sandbox reads the protected
+			// file, so the sandboxed failure is the sandbox refusing it.
+			control := exec.Command("go", "build", "-o", filepath.Join(t.TempDir(), "control"), ".")
+			control.Dir = mod
+			controlOut, controlErr := control.CombinedOutput()
+			require.NoError(t, controlErr, "the unsandboxed control must succeed to prove the include works: %s", controlOut)
+			require.Error(t, err, "the sandboxed build must not read the protected file")
+			assert.Contains(t, string(log), "#include", "the build failed at the include:\n%s", log)
+		})
+	}
+}
+
+// goEnv returns one go env value.
+func goEnv(t *testing.T, name string) string {
+	t.Helper()
+	out, err := exec.Command("go", "env", name).Output()
+	require.NoError(t, err)
+	return strings.TrimSpace(string(out))
+}

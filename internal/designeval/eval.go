@@ -20,6 +20,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	genscantle "github.com/goadesign/scantle/gen/scantle"
 	"github.com/goadesign/scantle/verify/candidate"
@@ -42,6 +43,17 @@ type (
 		AgentPolicies []*genscantle.AgentPolicyItem `json:"agent_policies"`
 		// Tools lists the evaluated Goa-AI tool contracts across all declared toolsets.
 		Tools []*genscantle.ToolContractItem `json:"tools"`
+	}
+
+	// toolchainEnv holds the resolved Go toolchain root, module cache directory,
+	// and private sandboxed build work directory for candidate.Build.
+	toolchainEnv struct {
+		// goroot is the resolved Go toolchain root.
+		goroot string
+		// modCache is the read-only Go module cache directory.
+		modCache string
+		// workDir is the private writable directory for GOCACHE, HOME, and TMPDIR.
+		workDir string
 	}
 )
 
@@ -644,8 +656,33 @@ func describeErrors(api *goaexpr.APIExpr, errs []*goaexpr.ErrorExpr) string {
 `
 )
 
-// Evaluate compiles a standalone Goa/Goa-AI design evaluator binary and runs it
-// inside verify/candidate.Exec's OS-enforced single-process sandbox, returning
+var (
+	// resolveToolchainEnv caches the resolved GOROOT, GOMODCACHE, and private
+	// sandboxed build cache directory used by candidate.Build.
+	resolveToolchainEnv = sync.OnceValues(func() (toolchainEnv, error) {
+		out, err := exec.Command("go", "env", "GOROOT", "GOMODCACHE").Output()
+		if err != nil {
+			return toolchainEnv{}, fmt.Errorf("resolve go env GOROOT GOMODCACHE: %w", err)
+		}
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		if len(lines) < 2 || strings.TrimSpace(lines[0]) == "" || strings.TrimSpace(lines[1]) == "" {
+			return toolchainEnv{}, fmt.Errorf("unexpected go env output %q", string(out))
+		}
+		workDir, err := os.MkdirTemp("", "scantle-designeval-work-*")
+		if err != nil {
+			return toolchainEnv{}, fmt.Errorf("create designeval work dir: %w", err)
+		}
+		return toolchainEnv{
+			goroot:   strings.TrimSpace(lines[0]),
+			modCache: strings.TrimSpace(lines[1]),
+			workDir:  workDir,
+		}, nil
+	})
+)
+
+// Evaluate compiles a standalone Goa/Goa-AI design evaluator binary inside
+// verify/candidate.Build's OS-enforced build sandbox and runs it inside
+// verify/candidate.Exec's OS-enforced single-process runtime sandbox, returning
 // the evaluated Result.
 func Evaluate(ctx context.Context, designSource string) (Result, error) {
 	if strings.TrimSpace(designSource) == "" {
@@ -667,27 +704,39 @@ func Evaluate(ctx context.Context, designSource string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	tc, err := resolveToolchainEnv()
+	if err != nil {
+		return Result{}, err
+	}
 
 	tmpDir, err := os.MkdirTemp("", "scantle-designeval-*")
 	if err != nil {
 		return Result{}, fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if rmErr := os.RemoveAll(tmpDir); rmErr != nil {
+			return
+		}
+	}()
 
 	buildDir := filepath.Join(tmpDir, "build")
+	outDir := filepath.Join(tmpDir, "out")
 	storeDir := filepath.Join(tmpDir, "store")
 	stateDir := filepath.Join(tmpDir, "state")
-	for _, d := range []string{buildDir, storeDir, stateDir, filepath.Join(buildDir, "design")} {
+	for _, d := range []string{buildDir, outDir, storeDir, stateDir, filepath.Join(buildDir, "design")} {
 		if err := os.MkdirAll(d, 0o750); err != nil {
 			return Result{}, fmt.Errorf("mkdir %q: %w", d, err)
 		}
 	}
 
-	if err := os.Symlink(filepath.Join(modRoot, "go.mod"), filepath.Join(buildDir, "go.mod")); err != nil {
-		return Result{}, fmt.Errorf("symlink go.mod: %w", err)
-	}
-	if err := os.Symlink(filepath.Join(modRoot, "go.sum"), filepath.Join(buildDir, "go.sum")); err != nil {
-		return Result{}, fmt.Errorf("symlink go.sum: %w", err)
+	for _, name := range []string{"go.mod", "go.sum"} {
+		data, err := os.ReadFile(filepath.Join(modRoot, name))
+		if err != nil {
+			return Result{}, fmt.Errorf("read %s: %w", name, err)
+		}
+		if err := os.WriteFile(filepath.Join(buildDir, name), data, 0o600); err != nil {
+			return Result{}, fmt.Errorf("write %s: %w", name, err)
+		}
 	}
 
 	if err := os.WriteFile(filepath.Join(buildDir, "design", "design.go"), []byte(normalizedSrc), 0o600); err != nil {
@@ -698,21 +747,33 @@ func Evaluate(ctx context.Context, designSource string) (Result, error) {
 		return Result{}, fmt.Errorf("write evaluator main.go: %w", err)
 	}
 
-	rawBin := filepath.Join(buildDir, "designeval-bin")
-	buildCmd := exec.CommandContext(ctx, "go", "build", "-mod=readonly", "-o", rawBin, ".")
-	buildCmd.Dir = buildDir
-	buildCmd.Env = minimalBuildEnv(tmpDir)
-	var buildStderr bytes.Buffer
-	buildCmd.Stderr = &buildStderr
-	if err := buildCmd.Run(); err != nil {
-		return Result{}, fmt.Errorf("compile Goa design: %w (%s)", err, strings.TrimSpace(buildStderr.String()))
+	rawBin := filepath.Join(outDir, "designeval-bin")
+	buildLog := filepath.Join(tmpDir, "build.log")
+	if err := candidate.Build(ctx, candidate.BuildSpec{
+		ModuleDir: buildDir,
+		Package:   ".",
+		Out:       rawBin,
+		GOROOT:    tc.goroot,
+		ModCache:  tc.modCache,
+		WorkDir:   tc.workDir,
+		LogFile:   buildLog,
+	}); err != nil {
+		logBytes, readErr := os.ReadFile(buildLog)
+		if readErr != nil {
+			return Result{}, fmt.Errorf("compile Goa design: %w", err)
+		}
+		return Result{}, fmt.Errorf("compile Goa design: %w (%s)", err, strings.TrimSpace(string(logBytes)))
 	}
 
 	art, err := candidate.Pin(storeDir, rawBin)
 	if err != nil {
 		return Result{}, fmt.Errorf("pin design evaluator binary: %w", err)
 	}
-	defer candidate.RemoveStore(storeDir)
+	defer func() {
+		if rmErr := candidate.RemoveStore(storeDir); rmErr != nil {
+			return
+		}
+	}()
 
 	outFile := filepath.Join(stateDir, "evaluated.json")
 	logFile := filepath.Join(tmpDir, "designeval.log")
@@ -725,7 +786,10 @@ func Evaluate(ctx context.Context, designSource string) (Result, error) {
 		return Result{}, fmt.Errorf("exec sandboxed design evaluator: %w", err)
 	}
 	if waitErr := proc.Wait(); waitErr != nil {
-		excerpt, _, _ := proc.Excerpt(16 << 10)
+		excerpt, _, exErr := proc.Excerpt(16 << 10)
+		if exErr != nil {
+			return Result{}, fmt.Errorf("evaluate Goa design in sandbox: %w", waitErr)
+		}
 		return Result{}, fmt.Errorf("evaluate Goa design in sandbox: %w (%s)", waitErr, strings.TrimSpace(excerpt))
 	}
 
@@ -757,22 +821,6 @@ func normalizeDesignPackage(src string) (string, error) {
 		return buf.String(), nil
 	}
 	return src, nil
-}
-
-// minimalBuildEnv constructs an explicit environment for `go build` without
-// inheriting ambient API keys or control-plane secrets.
-func minimalBuildEnv(tmpDir string) []string {
-	env := []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + os.Getenv("HOME"),
-		"TMPDIR=" + tmpDir,
-	}
-	for _, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOROOT", "GOPROXY", "GOSUMDB"} {
-		if val := os.Getenv(key); val != "" {
-			env = append(env, key+"="+val)
-		}
-	}
-	return env
 }
 
 // locateModuleRoot resolves the repository root containing go.mod and returns
