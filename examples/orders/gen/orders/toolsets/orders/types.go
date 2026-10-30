@@ -30,8 +30,6 @@ type (
 		CustomerID string
 		// Order to refund.
 		OrderID string
-		// Identity of this tool call; makes retries safe.
-		ToolCallID string
 	}
 	// IssueStoreCreditResult defines the JSON result for the orders.issue_store_credit tool.
 	IssueStoreCreditResult = struct {
@@ -66,8 +64,6 @@ type (
 		CustomerID string
 		// Order to refund.
 		OrderID string
-		// Identity of this tool call; makes retries safe.
-		ToolCallID string
 	}
 	// RequestRefundResult defines the JSON result for the orders.request_refund tool.
 	RequestRefundResult = struct {

@@ -78,3 +78,54 @@ func BuildListOrdersPayload(commerceListOrdersTenantID *string, commerceListOrde
 
 	return v, nil
 }
+
+// BuildGetOrderPayload builds the payload for the commerce get_order endpoint
+// from CLI flags.
+func BuildGetOrderPayload(commerceGetOrderTenantID *string, commerceGetOrderCustomerID *string, commerceGetOrderOrderID *string) (*commerce.GetOrderPayload, error) {
+	var err error
+	var tenantID string
+	{
+		if commerceGetOrderTenantID == nil {
+			return nil, fmt.Errorf("missing required flag --tenant-id")
+		}
+		tenantID = *commerceGetOrderTenantID
+		if utf8.RuneCountInString(tenantID) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("tenant_id", tenantID, utf8.RuneCountInString(tenantID), 1, true))
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	var customerID string
+	{
+		if commerceGetOrderCustomerID == nil {
+			return nil, fmt.Errorf("missing required flag --customer-id")
+		}
+		customerID = *commerceGetOrderCustomerID
+		if utf8.RuneCountInString(customerID) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("customer_id", customerID, utf8.RuneCountInString(customerID), 1, true))
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	var orderID string
+	{
+		if commerceGetOrderOrderID == nil {
+			return nil, fmt.Errorf("missing required flag --order-id")
+		}
+		orderID = *commerceGetOrderOrderID
+		if utf8.RuneCountInString(orderID) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("order_id", orderID, utf8.RuneCountInString(orderID), 1, true))
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	v := &commerce.GetOrderPayload{}
+	v.TenantID = tenantID
+	v.CustomerID = customerID
+	v.OrderID = orderID
+
+	return v, nil
+}

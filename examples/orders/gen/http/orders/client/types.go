@@ -71,6 +71,24 @@ type ApproveRefundResponseBody struct {
 	ApprovalPrompt *string `form:"approval_prompt,omitempty" json:"approval_prompt,omitempty" xml:"approval_prompt,omitempty"`
 }
 
+// ChatUnauthorizedResponseBody is the type of the "orders" service "chat"
+// endpoint HTTP response body for the "unauthorized" error.
+type ChatUnauthorizedResponseBody struct {
+	// Name is the name of this class of errors.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+	// Is the error temporary?
+	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
+	// Is the error a timeout?
+	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
+	// Is the error a server-side fault?
+	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
+}
+
 // ChatForbiddenResponseBody is the type of the "orders" service "chat"
 // endpoint HTTP response body for the "forbidden" error.
 type ChatForbiddenResponseBody struct {
@@ -125,6 +143,24 @@ type ChatInvalidRefundResponseBody struct {
 	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
 }
 
+// RunStatusUnauthorizedResponseBody is the type of the "orders" service
+// "run_status" endpoint HTTP response body for the "unauthorized" error.
+type RunStatusUnauthorizedResponseBody struct {
+	// Name is the name of this class of errors.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+	// Is the error temporary?
+	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
+	// Is the error a timeout?
+	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
+	// Is the error a server-side fault?
+	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
+}
+
 // RunStatusForbiddenResponseBody is the type of the "orders" service
 // "run_status" endpoint HTTP response body for the "forbidden" error.
 type RunStatusForbiddenResponseBody struct {
@@ -164,6 +200,24 @@ type RunStatusNotFoundResponseBody struct {
 // RunStatusInvalidRefundResponseBody is the type of the "orders" service
 // "run_status" endpoint HTTP response body for the "invalid_refund" error.
 type RunStatusInvalidRefundResponseBody struct {
+	// Name is the name of this class of errors.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+	// Is the error temporary?
+	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
+	// Is the error a timeout?
+	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
+	// Is the error a server-side fault?
+	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
+}
+
+// ApproveRefundUnauthorizedResponseBody is the type of the "orders" service
+// "approve_refund" endpoint HTTP response body for the "unauthorized" error.
+type ApproveRefundUnauthorizedResponseBody struct {
 	// Name is the name of this class of errors.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
 	// ID is a unique identifier for this particular occurrence of the problem.
@@ -265,6 +319,20 @@ func NewChatRunViewAccepted(body *ChatResponseBody) *orders.RunView {
 	return v
 }
 
+// NewChatUnauthorized builds a orders service chat endpoint unauthorized error.
+func NewChatUnauthorized(body *ChatUnauthorizedResponseBody) *goa.ServiceError {
+	v := &goa.ServiceError{
+		Name:      *body.Name,
+		ID:        *body.ID,
+		Message:   *body.Message,
+		Temporary: *body.Temporary,
+		Timeout:   *body.Timeout,
+		Fault:     *body.Fault,
+	}
+
+	return v
+}
+
 // NewChatForbidden builds a orders service chat endpoint forbidden error.
 func NewChatForbidden(body *ChatForbiddenResponseBody) *goa.ServiceError {
 	v := &goa.ServiceError{
@@ -317,6 +385,21 @@ func NewRunStatusRunViewOK(body *RunStatusResponseBody) *orders.RunView {
 		Reply:          body.Reply,
 		ApprovalID:     body.ApprovalID,
 		ApprovalPrompt: body.ApprovalPrompt,
+	}
+
+	return v
+}
+
+// NewRunStatusUnauthorized builds a orders service run_status endpoint
+// unauthorized error.
+func NewRunStatusUnauthorized(body *RunStatusUnauthorizedResponseBody) *goa.ServiceError {
+	v := &goa.ServiceError{
+		Name:      *body.Name,
+		ID:        *body.ID,
+		Message:   *body.Message,
+		Temporary: *body.Temporary,
+		Timeout:   *body.Timeout,
+		Fault:     *body.Fault,
 	}
 
 	return v
@@ -376,6 +459,21 @@ func NewApproveRefundRunViewAccepted(body *ApproveRefundResponseBody) *orders.Ru
 		Reply:          body.Reply,
 		ApprovalID:     body.ApprovalID,
 		ApprovalPrompt: body.ApprovalPrompt,
+	}
+
+	return v
+}
+
+// NewApproveRefundUnauthorized builds a orders service approve_refund endpoint
+// unauthorized error.
+func NewApproveRefundUnauthorized(body *ApproveRefundUnauthorizedResponseBody) *goa.ServiceError {
+	v := &goa.ServiceError{
+		Name:      *body.Name,
+		ID:        *body.ID,
+		Message:   *body.Message,
+		Temporary: *body.Temporary,
+		Timeout:   *body.Timeout,
+		Fault:     *body.Fault,
 	}
 
 	return v
@@ -476,6 +574,30 @@ func ValidateApproveRefundResponseBody(body *ApproveRefundResponseBody) (err err
 	return
 }
 
+// ValidateChatUnauthorizedResponseBody runs the validations defined on
+// ChatUnauthorizedResponseBody
+func ValidateChatUnauthorizedResponseBody(body *ChatUnauthorizedResponseBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Message == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	if body.Temporary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
+	}
+	if body.Timeout == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
+	}
+	if body.Fault == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
+	}
+	return
+}
+
 // ValidateChatForbiddenResponseBody runs the validations defined on
 // ChatForbiddenResponseBody
 func ValidateChatForbiddenResponseBody(body *ChatForbiddenResponseBody) (err error) {
@@ -548,6 +670,30 @@ func ValidateChatInvalidRefundResponseBody(body *ChatInvalidRefundResponseBody) 
 	return
 }
 
+// ValidateRunStatusUnauthorizedResponseBody runs the validations defined on
+// RunStatusUnauthorizedResponseBody
+func ValidateRunStatusUnauthorizedResponseBody(body *RunStatusUnauthorizedResponseBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Message == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	if body.Temporary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
+	}
+	if body.Timeout == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
+	}
+	if body.Fault == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
+	}
+	return
+}
+
 // ValidateRunStatusForbiddenResponseBody runs the validations defined on
 // RunStatusForbiddenResponseBody
 func ValidateRunStatusForbiddenResponseBody(body *RunStatusForbiddenResponseBody) (err error) {
@@ -599,6 +745,30 @@ func ValidateRunStatusNotFoundResponseBody(body *RunStatusNotFoundResponseBody) 
 // ValidateRunStatusInvalidRefundResponseBody runs the validations defined on
 // RunStatusInvalidRefundResponseBody
 func ValidateRunStatusInvalidRefundResponseBody(body *RunStatusInvalidRefundResponseBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Message == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	if body.Temporary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
+	}
+	if body.Timeout == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
+	}
+	if body.Fault == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
+	}
+	return
+}
+
+// ValidateApproveRefundUnauthorizedResponseBody runs the validations defined
+// on ApproveRefundUnauthorizedResponseBody
+func ValidateApproveRefundUnauthorizedResponseBody(body *ApproveRefundUnauthorizedResponseBody) (err error) {
 	if body.Name == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
 	}

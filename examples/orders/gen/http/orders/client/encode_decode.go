@@ -64,6 +64,7 @@ func EncodeChatRequest(encoder func(*http.Request) goahttp.Encoder) func(*http.R
 // chat endpoint. restoreBody controls whether the response body should be
 // restored after having been read.
 // DecodeChatResponse may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): http.StatusUnauthorized
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
 //   - "not_found" (type *goa.ServiceError): http.StatusNotFound
 //   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
@@ -104,6 +105,20 @@ func DecodeChatResponse(decoder func(*http.Response) goahttp.Decoder, restoreBod
 			}
 			res := NewChatRunViewAccepted(&body)
 			return res, nil
+		case http.StatusUnauthorized:
+			var (
+				body ChatUnauthorizedResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("orders", "chat", err)
+			}
+			err = ValidateChatUnauthorizedResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("orders", "chat", err)
+			}
+			return nil, NewChatUnauthorized(&body)
 		case http.StatusForbidden:
 			var (
 				body ChatForbiddenResponseBody
@@ -207,6 +222,7 @@ func EncodeRunStatusRequest(encoder func(*http.Request) goahttp.Encoder) func(*h
 // orders run_status endpoint. restoreBody controls whether the response body
 // should be restored after having been read.
 // DecodeRunStatusResponse may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): http.StatusUnauthorized
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
 //   - "not_found" (type *goa.ServiceError): http.StatusNotFound
 //   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
@@ -247,6 +263,20 @@ func DecodeRunStatusResponse(decoder func(*http.Response) goahttp.Decoder, resto
 			}
 			res := NewRunStatusRunViewOK(&body)
 			return res, nil
+		case http.StatusUnauthorized:
+			var (
+				body RunStatusUnauthorizedResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("orders", "run_status", err)
+			}
+			err = ValidateRunStatusUnauthorizedResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("orders", "run_status", err)
+			}
+			return nil, NewRunStatusUnauthorized(&body)
 		case http.StatusForbidden:
 			var (
 				body RunStatusForbiddenResponseBody
@@ -356,6 +386,7 @@ func EncodeApproveRefundRequest(encoder func(*http.Request) goahttp.Encoder) fun
 // orders approve_refund endpoint. restoreBody controls whether the response
 // body should be restored after having been read.
 // DecodeApproveRefundResponse may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): http.StatusUnauthorized
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
 //   - "not_found" (type *goa.ServiceError): http.StatusNotFound
 //   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
@@ -396,6 +427,20 @@ func DecodeApproveRefundResponse(decoder func(*http.Response) goahttp.Decoder, r
 			}
 			res := NewApproveRefundRunViewAccepted(&body)
 			return res, nil
+		case http.StatusUnauthorized:
+			var (
+				body ApproveRefundUnauthorizedResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("orders", "approve_refund", err)
+			}
+			err = ValidateApproveRefundUnauthorizedResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("orders", "approve_refund", err)
+			}
+			return nil, NewApproveRefundUnauthorized(&body)
 		case http.StatusForbidden:
 			var (
 				body ApproveRefundForbiddenResponseBody

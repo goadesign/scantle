@@ -3,6 +3,10 @@ module github.com/goadesign/scantle/examples/orders
 go 1.27.3
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/stretchr/testify v1.12.1
+	go.temporal.io/api v1.63.6
+	go.temporal.io/sdk v1.49.0
 	goa.design/goa-ai v0.89.1-0.20261028052713-99d852887d11
 	goa.design/goa/v3 v3.35.1-0.20261023134129-12a5635f9dd0
 )
@@ -64,7 +68,6 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/tidwall/gjson v1.20.0 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.2 // indirect
@@ -77,8 +80,6 @@ require (
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	go.temporal.io/api v1.63.6 // indirect
-	go.temporal.io/sdk v1.49.0 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	goa.design/clue v1.3.0 // indirect

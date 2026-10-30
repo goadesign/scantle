@@ -13,3 +13,8 @@ import "fmt"
 func ListOrdersCommercePath(tenantID string, customerID string) string {
 	return fmt.Sprintf("/tenants/%v/customers/%v/orders", tenantID, customerID)
 }
+
+// GetOrderCommercePath returns the URL path to the commerce service get_order HTTP endpoint.
+func GetOrderCommercePath(tenantID string, customerID string, orderID string) string {
+	return fmt.Sprintf("/tenants/%v/customers/%v/orders/%v", tenantID, customerID, orderID)
+}

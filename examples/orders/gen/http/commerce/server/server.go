@@ -20,6 +20,7 @@ import (
 type Server struct {
 	Mounts     []*MountPoint
 	ListOrders http.Handler
+	GetOrder   http.Handler
 }
 
 // MountPoint holds information about the mounted endpoints.
@@ -50,8 +51,10 @@ func New(
 	return &Server{
 		Mounts: []*MountPoint{
 			{"ListOrders", "GET", "/tenants/{tenant_id}/customers/{customer_id}/orders"},
+			{"GetOrder", "GET", "/tenants/{tenant_id}/customers/{customer_id}/orders/{order_id}"},
 		},
 		ListOrders: NewListOrdersHandler(e.ListOrders, mux, decoder, encoder, errhandler, formatter),
+		GetOrder:   NewGetOrderHandler(e.GetOrder, mux, decoder, encoder, errhandler, formatter),
 	}
 }
 
@@ -61,6 +64,7 @@ func (s *Server) Service() string { return "commerce" }
 // Use wraps the server handlers with the given middleware.
 func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.ListOrders = m(s.ListOrders)
+	s.GetOrder = m(s.GetOrder)
 }
 
 // MethodNames returns the methods served.
@@ -69,6 +73,7 @@ func (s *Server) MethodNames() []string { return commerce.MethodNames[:] }
 // Mount configures the mux to serve the commerce endpoints.
 func Mount(mux goahttp.Muxer, h *Server) {
 	MountListOrdersHandler(mux, h.ListOrders)
+	MountGetOrderHandler(mux, h.GetOrder)
 }
 
 // Mount configures the mux to serve the commerce endpoints.
@@ -106,6 +111,59 @@ func NewListOrdersHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "list_orders")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "commerce")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountGetOrderHandler configures the mux to serve the "commerce" service
+// "get_order" endpoint.
+func MountGetOrderHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("GET", "/tenants/{tenant_id}/customers/{customer_id}/orders/{order_id}", f)
+}
+
+// NewGetOrderHandler creates a HTTP handler which loads the HTTP request and
+// calls the "commerce" service "get_order" endpoint.
+func NewGetOrderHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodeGetOrderRequest(mux, decoder)
+		encodeResponse = EncodeGetOrderResponse(encoder)
+		encodeError    = EncodeGetOrderError(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "get_order")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "commerce")
 		payload, err := decodeRequest(r)
 		if err != nil {

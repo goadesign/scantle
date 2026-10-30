@@ -37,6 +37,19 @@ paths:
                                 reply: Doloremque deleniti.
                                 run_id: Iste aut enim et in beatae.
                                 status: running
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: unauthorized
+                                temporary: false
+                                timeout: false
                 "403":
                     description: 'forbidden: The caller may not perform this action.'
                     content:
@@ -109,6 +122,19 @@ paths:
                                 reply: Voluptatibus illo enim atque beatae nam.
                                 run_id: Aliquam delectus deleniti tempore mollitia velit.
                                 status: running
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: unauthorized
+                                temporary: false
+                                timeout: false
                 "403":
                     description: 'forbidden: The caller may not perform this action.'
                     content:
@@ -200,6 +226,19 @@ paths:
                                 reply: Error quo eos ratione quis sint.
                                 run_id: Aut placeat quia.
                                 status: failed
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: unauthorized
+                                temporary: false
+                                timeout: false
                 "403":
                     description: 'forbidden: The caller may not perform this action.'
                     content:
@@ -326,6 +365,71 @@ paths:
                                       tax_cents: 5943857639072305571
                                       total_cents: 6277315588612917884
                                 total: 8917658905915546728
+    /tenants/{tenant_id}/customers/{customer_id}/orders/{order_id}:
+        get:
+            tags:
+                - commerce
+            summary: get_order commerce
+            description: Load one of a customer's orders. Orders of other customers are not found.
+            operationId: commerce#get_order
+            parameters:
+                - name: tenant_id
+                  in: path
+                  description: Merchant tenant.
+                  required: true
+                  schema:
+                    type: string
+                    description: Merchant tenant.
+                    example: lod
+                    minLength: 1
+                  example: lod
+                - name: customer_id
+                  in: path
+                  description: Customer who must own the order.
+                  required: true
+                  schema:
+                    type: string
+                    description: Customer who must own the order.
+                    example: zu
+                    minLength: 1
+                  example: zu
+                - name: order_id
+                  in: path
+                  description: Order to load.
+                  required: true
+                  schema:
+                    type: string
+                    description: Order to load.
+                    example: t
+                    minLength: 1
+                  example: t
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Order'
+                            example:
+                                id: 9qx
+                                items_cents: 8501862368368123323
+                                placed_at: "2012-12-01T11:20:09Z"
+                                shipping_cents: 6486290811802831612
+                                tax_cents: 7645902224622136067
+                                total_cents: 5903079118353159991
+                "404":
+                    description: 'not_found: The customer has no such order.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: not_found
+                                temporary: false
+                                timeout: false
     /tenants/{tenant_id}/refunds:
         post:
             tags:
@@ -410,7 +514,7 @@ components:
                 fault:
                     type: boolean
                     description: Is the error a server-side fault?
-                    example: true
+                    example: false
                 id:
                     type: string
                     description: ID is a unique identifier for this particular occurrence of the problem.
@@ -430,15 +534,15 @@ components:
                 timeout:
                     type: boolean
                     description: Is the error a timeout?
-                    example: false
+                    example: true
             description: Error response result type
             example:
-                fault: true
+                fault: false
                 id: 123abc
                 message: parameter 'p' must be an integer
                 name: bad_request
                 temporary: true
-                timeout: false
+                timeout: true
             required:
                 - name
                 - id

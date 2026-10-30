@@ -68,12 +68,11 @@ var orderTools = Toolset("orders", func() {
 			Attribute("tenant_id", String, "Merchant tenant.")
 			Attribute("customer_id", String, "Customer who owns the order.")
 			Attribute("order_id", String, "Order to refund.", func() { MinLength(1) })
-			Attribute("tool_call_id", String, "Identity of this tool call; makes retries safe.")
-			Required("tenant_id", "customer_id", "order_id", "tool_call_id")
+			Required("tenant_id", "customer_id", "order_id")
 		})
 		Return(RefundOutcome)
 		BindTo("orders", "issue_store_credit")
-		Inject("tenant_id", "customer_id", "tool_call_id")
+		Inject("tenant_id", "customer_id")
 	})
 
 	Tool("request_refund", "Refund an order whose total, including tax and shipping, is over $50.00. A manager must approve it first.", func() {
@@ -81,12 +80,11 @@ var orderTools = Toolset("orders", func() {
 			Attribute("tenant_id", String, "Merchant tenant.")
 			Attribute("customer_id", String, "Customer who owns the order.")
 			Attribute("order_id", String, "Order to refund.", func() { MinLength(1) })
-			Attribute("tool_call_id", String, "Identity of this tool call; makes retries safe.")
-			Required("tenant_id", "customer_id", "order_id", "tool_call_id")
+			Required("tenant_id", "customer_id", "order_id")
 		})
 		Return(RefundOutcome)
 		BindTo("orders", "request_refund")
-		Inject("tenant_id", "customer_id", "tool_call_id")
+		Inject("tenant_id", "customer_id")
 		Confirmation(func() {
 			Title("Approve refund")
 			PromptTemplate(`Refund order {{ .order_id }} to the customer's card?`)
@@ -120,11 +118,13 @@ var RunView = Type("RunView", func() {
 var _ = Service("orders", func() {
 	Description("Refund assistant for a merchant's customers.")
 	Security(JWTAuth, func() { Scope("orders:chat") })
+	Error("unauthorized", ErrorResult, "The bearer token is missing or invalid.")
 	Error("forbidden", ErrorResult, "The caller may not perform this action.")
 	Error("not_found", ErrorResult, "The run or approval does not exist.")
 	Error("invalid_refund", ErrorResult, "The refund breaks a business rule.")
 
 	HTTP(func() {
+		Response("unauthorized", StatusUnauthorized)
 		Response("forbidden", StatusForbidden)
 		Response("not_found", StatusNotFound)
 		Response("invalid_refund", StatusUnprocessableEntity)
@@ -221,12 +221,12 @@ var _ = Service("orders", func() {
 	})
 })
 
-// RefundCommand is the server-side refund request built from a tool call.
+// RefundCommand is the server-side refund request built from a tool call. An
+// order is refunded at most once, so the order identifies the refund.
 var RefundCommand = Type("RefundCommand", func() {
 	Description("Refund request with identity supplied by the server.")
 	Attribute("tenant_id", String, "Merchant tenant.", func() { MinLength(1) })
 	Attribute("customer_id", String, "Customer who owns the order.", func() { MinLength(1) })
 	Attribute("order_id", String, "Order to refund.", func() { MinLength(1) })
-	Attribute("tool_call_id", String, "Identity of the tool call; makes retries safe.", func() { MinLength(1) })
-	Required("tenant_id", "customer_id", "order_id", "tool_call_id")
+	Required("tenant_id", "customer_id", "order_id")
 })

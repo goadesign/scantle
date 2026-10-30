@@ -16,12 +16,14 @@ import (
 // Client is the "commerce" service client.
 type Client struct {
 	ListOrdersEndpoint goa.Endpoint
+	GetOrderEndpoint   goa.Endpoint
 }
 
 // NewClient initializes a "commerce" service client given the endpoints.
-func NewClient(listOrders goa.Endpoint) *Client {
+func NewClient(listOrders, getOrder goa.Endpoint) *Client {
 	return &Client{
 		ListOrdersEndpoint: listOrders,
+		GetOrderEndpoint:   getOrder,
 	}
 }
 
@@ -33,4 +35,17 @@ func (c *Client) ListOrders(ctx context.Context, p *ListOrdersPayload) (res *Ord
 		return
 	}
 	return ires.(*OrderPage), nil
+}
+
+// GetOrder calls the "get_order" endpoint of the "commerce" service.
+// GetOrder may return the following errors:
+//   - "not_found" (type *goa.ServiceError): The customer has no such order.
+//   - error: internal error
+func (c *Client) GetOrder(ctx context.Context, p *GetOrderPayload) (res *Order, err error) {
+	var ires any
+	ires, err = c.GetOrderEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*Order), nil
 }

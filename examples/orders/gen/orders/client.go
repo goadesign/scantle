@@ -37,6 +37,7 @@ func NewClient(chat, runStatus, approveRefund, listOrders, issueStoreCredit, req
 
 // Chat calls the "chat" endpoint of the "orders" service.
 // Chat may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
 //   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
@@ -52,6 +53,7 @@ func (c *Client) Chat(ctx context.Context, p *ChatPayload) (res *RunView, err er
 
 // RunStatus calls the "run_status" endpoint of the "orders" service.
 // RunStatus may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
 //   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
@@ -67,6 +69,7 @@ func (c *Client) RunStatus(ctx context.Context, p *RunStatusPayload) (res *RunVi
 
 // ApproveRefund calls the "approve_refund" endpoint of the "orders" service.
 // ApproveRefund may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
 //   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
@@ -82,6 +85,7 @@ func (c *Client) ApproveRefund(ctx context.Context, p *ApproveRefundPayload) (re
 
 // ListOrders calls the "list_orders" endpoint of the "orders" service.
 // ListOrders may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
 //   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
@@ -98,6 +102,7 @@ func (c *Client) ListOrders(ctx context.Context, p *ListOrdersPayload) (res *Lis
 // IssueStoreCredit calls the "issue_store_credit" endpoint of the "orders"
 // service.
 // IssueStoreCredit may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
 //   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
@@ -113,6 +118,7 @@ func (c *Client) IssueStoreCredit(ctx context.Context, p *RefundCommand) (res *R
 
 // RequestRefund calls the "request_refund" endpoint of the "orders" service.
 // RequestRefund may return the following errors:
+//   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
 //   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.

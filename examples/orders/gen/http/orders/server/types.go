@@ -73,6 +73,24 @@ type ApproveRefundResponseBody struct {
 	ApprovalPrompt *string `form:"approval_prompt,omitempty" json:"approval_prompt,omitempty" xml:"approval_prompt,omitempty"`
 }
 
+// ChatUnauthorizedResponseBody is the type of the "orders" service "chat"
+// endpoint HTTP response body for the "unauthorized" error.
+type ChatUnauthorizedResponseBody struct {
+	// Name is the name of this class of errors.
+	Name string `form:"name" json:"name" xml:"name"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID string `form:"id" json:"id" xml:"id"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message string `form:"message" json:"message" xml:"message"`
+	// Is the error temporary?
+	Temporary bool `form:"temporary" json:"temporary" xml:"temporary"`
+	// Is the error a timeout?
+	Timeout bool `form:"timeout" json:"timeout" xml:"timeout"`
+	// Is the error a server-side fault?
+	Fault bool `form:"fault" json:"fault" xml:"fault"`
+}
+
 // ChatForbiddenResponseBody is the type of the "orders" service "chat"
 // endpoint HTTP response body for the "forbidden" error.
 type ChatForbiddenResponseBody struct {
@@ -127,6 +145,24 @@ type ChatInvalidRefundResponseBody struct {
 	Fault bool `form:"fault" json:"fault" xml:"fault"`
 }
 
+// RunStatusUnauthorizedResponseBody is the type of the "orders" service
+// "run_status" endpoint HTTP response body for the "unauthorized" error.
+type RunStatusUnauthorizedResponseBody struct {
+	// Name is the name of this class of errors.
+	Name string `form:"name" json:"name" xml:"name"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID string `form:"id" json:"id" xml:"id"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message string `form:"message" json:"message" xml:"message"`
+	// Is the error temporary?
+	Temporary bool `form:"temporary" json:"temporary" xml:"temporary"`
+	// Is the error a timeout?
+	Timeout bool `form:"timeout" json:"timeout" xml:"timeout"`
+	// Is the error a server-side fault?
+	Fault bool `form:"fault" json:"fault" xml:"fault"`
+}
+
 // RunStatusForbiddenResponseBody is the type of the "orders" service
 // "run_status" endpoint HTTP response body for the "forbidden" error.
 type RunStatusForbiddenResponseBody struct {
@@ -166,6 +202,24 @@ type RunStatusNotFoundResponseBody struct {
 // RunStatusInvalidRefundResponseBody is the type of the "orders" service
 // "run_status" endpoint HTTP response body for the "invalid_refund" error.
 type RunStatusInvalidRefundResponseBody struct {
+	// Name is the name of this class of errors.
+	Name string `form:"name" json:"name" xml:"name"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID string `form:"id" json:"id" xml:"id"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message string `form:"message" json:"message" xml:"message"`
+	// Is the error temporary?
+	Temporary bool `form:"temporary" json:"temporary" xml:"temporary"`
+	// Is the error a timeout?
+	Timeout bool `form:"timeout" json:"timeout" xml:"timeout"`
+	// Is the error a server-side fault?
+	Fault bool `form:"fault" json:"fault" xml:"fault"`
+}
+
+// ApproveRefundUnauthorizedResponseBody is the type of the "orders" service
+// "approve_refund" endpoint HTTP response body for the "unauthorized" error.
+type ApproveRefundUnauthorizedResponseBody struct {
 	// Name is the name of this class of errors.
 	Name string `form:"name" json:"name" xml:"name"`
 	// ID is a unique identifier for this particular occurrence of the problem.
@@ -274,6 +328,20 @@ func NewApproveRefundResponseBody(res *orders.RunView) *ApproveRefundResponseBod
 	return body
 }
 
+// NewChatUnauthorizedResponseBody builds the HTTP response body from the
+// result of the "chat" endpoint of the "orders" service.
+func NewChatUnauthorizedResponseBody(res *goa.ServiceError) *ChatUnauthorizedResponseBody {
+	body := &ChatUnauthorizedResponseBody{
+		Name:      res.Name,
+		ID:        res.ID,
+		Message:   res.Message,
+		Temporary: res.Temporary,
+		Timeout:   res.Timeout,
+		Fault:     res.Fault,
+	}
+	return body
+}
+
 // NewChatForbiddenResponseBody builds the HTTP response body from the result
 // of the "chat" endpoint of the "orders" service.
 func NewChatForbiddenResponseBody(res *goa.ServiceError) *ChatForbiddenResponseBody {
@@ -316,6 +384,20 @@ func NewChatInvalidRefundResponseBody(res *goa.ServiceError) *ChatInvalidRefundR
 	return body
 }
 
+// NewRunStatusUnauthorizedResponseBody builds the HTTP response body from the
+// result of the "run_status" endpoint of the "orders" service.
+func NewRunStatusUnauthorizedResponseBody(res *goa.ServiceError) *RunStatusUnauthorizedResponseBody {
+	body := &RunStatusUnauthorizedResponseBody{
+		Name:      res.Name,
+		ID:        res.ID,
+		Message:   res.Message,
+		Temporary: res.Temporary,
+		Timeout:   res.Timeout,
+		Fault:     res.Fault,
+	}
+	return body
+}
+
 // NewRunStatusForbiddenResponseBody builds the HTTP response body from the
 // result of the "run_status" endpoint of the "orders" service.
 func NewRunStatusForbiddenResponseBody(res *goa.ServiceError) *RunStatusForbiddenResponseBody {
@@ -348,6 +430,20 @@ func NewRunStatusNotFoundResponseBody(res *goa.ServiceError) *RunStatusNotFoundR
 // result of the "run_status" endpoint of the "orders" service.
 func NewRunStatusInvalidRefundResponseBody(res *goa.ServiceError) *RunStatusInvalidRefundResponseBody {
 	body := &RunStatusInvalidRefundResponseBody{
+		Name:      res.Name,
+		ID:        res.ID,
+		Message:   res.Message,
+		Temporary: res.Temporary,
+		Timeout:   res.Timeout,
+		Fault:     res.Fault,
+	}
+	return body
+}
+
+// NewApproveRefundUnauthorizedResponseBody builds the HTTP response body from
+// the result of the "approve_refund" endpoint of the "orders" service.
+func NewApproveRefundUnauthorizedResponseBody(res *goa.ServiceError) *ApproveRefundUnauthorizedResponseBody {
+	body := &ApproveRefundUnauthorizedResponseBody{
 		Name:      res.Name,
 		ID:        res.ID,
 		Message:   res.Message,

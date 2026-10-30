@@ -21,6 +21,10 @@ type Client struct {
 	// endpoint.
 	ListOrdersDoer goahttp.Doer
 
+	// GetOrder Doer is the HTTP client used to make requests to the get_order
+	// endpoint.
+	GetOrderDoer goahttp.Doer
+
 	// RestoreResponseBody controls whether the response bodies are reset after
 	// decoding so they can be read again.
 	RestoreResponseBody bool
@@ -42,6 +46,7 @@ func NewClient(
 ) *Client {
 	return &Client{
 		ListOrdersDoer:      doer,
+		GetOrderDoer:        doer,
 		RestoreResponseBody: restoreBody,
 		scheme:              scheme,
 		host:                host,
@@ -69,6 +74,25 @@ func (c *Client) ListOrders() goa.Endpoint {
 		resp, err := c.ListOrdersDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("commerce", "list_orders", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// GetOrder returns an endpoint that makes HTTP requests to the commerce
+// service get_order server.
+func (c *Client) GetOrder() goa.Endpoint {
+	var (
+		decodeResponse = DecodeGetOrderResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildGetOrderRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.GetOrderDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("commerce", "get_order", err)
 		}
 		return decodeResponse(resp)
 	}

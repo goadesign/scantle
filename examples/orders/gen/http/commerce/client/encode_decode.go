@@ -117,6 +117,103 @@ func DecodeListOrdersResponse(decoder func(*http.Response) goahttp.Decoder, rest
 	}
 }
 
+// BuildGetOrderRequest instantiates a HTTP request object with method and path
+// set to call the "commerce" service "get_order" endpoint
+func (c *Client) BuildGetOrderRequest(ctx context.Context, v any) (*http.Request, error) {
+	var (
+		tenantID   string
+		customerID string
+		orderID    string
+	)
+	{
+		p, ok := v.(*commerce.GetOrderPayload)
+		if !ok {
+			return nil, goahttp.ErrInvalidType("commerce", "get_order", "*commerce.GetOrderPayload", v)
+		}
+		tenantID = p.TenantID
+		customerID = p.CustomerID
+		orderID = p.OrderID
+	}
+
+	rawPath := fmt.Sprintf("/tenants/%v/customers/%v/orders/%v", url.PathEscape(fmt.Sprint(tenantID)), url.PathEscape(fmt.Sprint(customerID)), url.PathEscape(fmt.Sprint(orderID)))
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: GetOrderCommercePath(tenantID, customerID, orderID), RawPath: rawPath}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, goahttp.ErrInvalidURL("commerce", "get_order", u.String(), err)
+	}
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	return req, nil
+}
+
+// DecodeGetOrderResponse returns a decoder for responses returned by the
+// commerce get_order endpoint. restoreBody controls whether the response body
+// should be restored after having been read.
+// DecodeGetOrderResponse may return the following errors:
+//   - "not_found" (type *goa.ServiceError): http.StatusNotFound
+//   - error: internal error
+func DecodeGetOrderResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
+	return func(resp *http.Response) (result any, decodeErr error) {
+		responseBody := resp.Body
+		if restoreBody {
+			b, readErr := io.ReadAll(responseBody)
+			closeErr := responseBody.Close()
+			if err := errors.Join(readErr, closeErr); err != nil {
+				return nil, goahttp.ErrDecodingError("commerce", "get_order", err)
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			defer func() {
+				resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			}()
+		} else {
+			defer func() {
+				if err := responseBody.Close(); err != nil {
+					decodeErr = errors.Join(decodeErr, goahttp.ErrDecodingError("commerce", "get_order", err))
+				}
+			}()
+		}
+		switch resp.StatusCode {
+		case http.StatusOK:
+			var (
+				body GetOrderResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("commerce", "get_order", err)
+			}
+			err = ValidateGetOrderResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("commerce", "get_order", err)
+			}
+			res := NewGetOrderOrderOK(&body)
+			return res, nil
+		case http.StatusNotFound:
+			var (
+				body GetOrderNotFoundResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("commerce", "get_order", err)
+			}
+			err = ValidateGetOrderNotFoundResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("commerce", "get_order", err)
+			}
+			return nil, NewGetOrderNotFound(&body)
+		default:
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("commerce", "get_order", err)
+			}
+			return nil, goahttp.ErrInvalidResponse("commerce", "get_order", resp.StatusCode, string(body))
+		}
+	}
+}
+
 // unmarshalOrderResponseBodyToCommerceOrder builds a value of type
 // *commerce.Order from a value of type *OrderResponseBody.
 func unmarshalOrderResponseBodyToCommerceOrder(v *OrderResponseBody) *commerce.Order {

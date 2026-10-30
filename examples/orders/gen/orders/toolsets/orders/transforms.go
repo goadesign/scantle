@@ -46,7 +46,6 @@ func InitIssueStoreCreditMethodPayload(in *IssueStoreCreditPayload) *orders.Refu
 		TenantID:   in.TenantID,
 		CustomerID: in.CustomerID,
 		OrderID:    in.OrderID,
-		ToolCallID: in.ToolCallID,
 	}
 	return out
 }
@@ -100,7 +99,6 @@ func InitRequestRefundMethodPayload(in *RequestRefundPayload) *orders.RefundComm
 		TenantID:   in.TenantID,
 		CustomerID: in.CustomerID,
 		OrderID:    in.OrderID,
-		ToolCallID: in.ToolCallID,
 	}
 	return out
 }

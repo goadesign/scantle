@@ -40,6 +40,18 @@ paths:
                         required:
                             - run_id
                             - status
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    schema:
+                        $ref: '#/definitions/OrdersChatUnauthorizedResponseBody'
+                    examples:
+                        application/vnd.goa.error:
+                            fault: false
+                            id: 123abc
+                            message: parameter 'p' must be an integer
+                            name: unauthorized
+                            temporary: false
+                            timeout: false
                 "403":
                     description: 'forbidden: The caller may not perform this action.'
                     schema:
@@ -106,6 +118,18 @@ paths:
                         required:
                             - run_id
                             - status
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    schema:
+                        $ref: '#/definitions/OrdersRunStatusUnauthorizedResponseBody'
+                    examples:
+                        application/vnd.goa.error:
+                            fault: false
+                            id: 123abc
+                            message: parameter 'p' must be an integer
+                            name: unauthorized
+                            temporary: false
+                            timeout: false
                 "403":
                     description: 'forbidden: The caller may not perform this action.'
                     schema:
@@ -185,6 +209,18 @@ paths:
                         required:
                             - run_id
                             - status
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    schema:
+                        $ref: '#/definitions/OrdersApproveRefundUnauthorizedResponseBody'
+                    examples:
+                        application/vnd.goa.error:
+                            fault: false
+                            id: 123abc
+                            message: parameter 'p' must be an integer
+                            name: unauthorized
+                            temporary: false
+                            timeout: false
                 "403":
                     description: 'forbidden: The caller may not perform this action.'
                     schema:
@@ -268,6 +304,58 @@ paths:
                             - total
             schemes:
                 - http
+    /tenants/{tenant_id}/customers/{customer_id}/orders/{order_id}:
+        get:
+            tags:
+                - commerce
+            summary: get_order commerce
+            description: Load one of a customer's orders. Orders of other customers are not found.
+            operationId: commerce#get_order
+            parameters:
+                - name: tenant_id
+                  in: path
+                  description: Merchant tenant.
+                  required: true
+                  type: string
+                  minLength: 1
+                - name: customer_id
+                  in: path
+                  description: Customer who must own the order.
+                  required: true
+                  type: string
+                  minLength: 1
+                - name: order_id
+                  in: path
+                  description: Order to load.
+                  required: true
+                  type: string
+                  minLength: 1
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        $ref: '#/definitions/Order'
+                        required:
+                            - id
+                            - placed_at
+                            - items_cents
+                            - tax_cents
+                            - shipping_cents
+                            - total_cents
+                "404":
+                    description: 'not_found: The customer has no such order.'
+                    schema:
+                        $ref: '#/definitions/CommerceGetOrderNotFoundResponseBody'
+                    examples:
+                        application/vnd.goa.error:
+                            fault: false
+                            id: 123abc
+                            message: parameter 'p' must be an integer
+                            name: not_found
+                            temporary: false
+                            timeout: false
+            schemes:
+                - http
     /tenants/{tenant_id}/refunds:
         post:
             tags:
@@ -310,6 +398,49 @@ paths:
             schemes:
                 - http
 definitions:
+    CommerceGetOrderNotFoundResponseBody:
+        title: 'Mediatype identifier: application/vnd.goa.error; view=default'
+        type: object
+        properties:
+            fault:
+                type: boolean
+                description: Is the error a server-side fault?
+                example: false
+            id:
+                type: string
+                description: ID is a unique identifier for this particular occurrence of the problem.
+                example: 123abc
+            message:
+                type: string
+                description: Message is a human-readable explanation specific to this occurrence of the problem.
+                example: parameter 'p' must be an integer
+            name:
+                type: string
+                description: Name is the name of this class of errors.
+                example: bad_request
+            temporary:
+                type: boolean
+                description: Is the error temporary?
+                example: false
+            timeout:
+                type: boolean
+                description: Is the error a timeout?
+                example: true
+        description: Error response result type (default view)
+        example:
+            fault: false
+            id: 123abc
+            message: parameter 'p' must be an integer
+            name: bad_request
+            temporary: false
+            timeout: true
+        required:
+            - name
+            - id
+            - message
+            - temporary
+            - timeout
+            - fault
     Order:
         title: Order
         type: object
@@ -580,6 +711,49 @@ definitions:
             approved: true
         required:
             - approved
+    OrdersApproveRefundUnauthorizedResponseBody:
+        title: 'Mediatype identifier: application/vnd.goa.error; view=default'
+        type: object
+        properties:
+            fault:
+                type: boolean
+                description: Is the error a server-side fault?
+                example: true
+            id:
+                type: string
+                description: ID is a unique identifier for this particular occurrence of the problem.
+                example: 123abc
+            message:
+                type: string
+                description: Message is a human-readable explanation specific to this occurrence of the problem.
+                example: parameter 'p' must be an integer
+            name:
+                type: string
+                description: Name is the name of this class of errors.
+                example: bad_request
+            temporary:
+                type: boolean
+                description: Is the error temporary?
+                example: false
+            timeout:
+                type: boolean
+                description: Is the error a timeout?
+                example: false
+        description: Error response result type (default view)
+        example:
+            fault: true
+            id: 123abc
+            message: parameter 'p' must be an integer
+            name: bad_request
+            temporary: false
+            timeout: false
+        required:
+            - name
+            - id
+            - message
+            - temporary
+            - timeout
+            - fault
     OrdersChatForbiddenResponseBody:
         title: 'Mediatype identifier: application/vnd.goa.error; view=default'
         type: object
@@ -722,6 +896,49 @@ definitions:
             message: r7
         required:
             - message
+    OrdersChatUnauthorizedResponseBody:
+        title: 'Mediatype identifier: application/vnd.goa.error; view=default'
+        type: object
+        properties:
+            fault:
+                type: boolean
+                description: Is the error a server-side fault?
+                example: false
+            id:
+                type: string
+                description: ID is a unique identifier for this particular occurrence of the problem.
+                example: 123abc
+            message:
+                type: string
+                description: Message is a human-readable explanation specific to this occurrence of the problem.
+                example: parameter 'p' must be an integer
+            name:
+                type: string
+                description: Name is the name of this class of errors.
+                example: bad_request
+            temporary:
+                type: boolean
+                description: Is the error temporary?
+                example: true
+            timeout:
+                type: boolean
+                description: Is the error a timeout?
+                example: true
+        description: Error response result type (default view)
+        example:
+            fault: false
+            id: 123abc
+            message: parameter 'p' must be an integer
+            name: bad_request
+            temporary: true
+            timeout: true
+        required:
+            - name
+            - id
+            - message
+            - temporary
+            - timeout
+            - fault
     OrdersRunStatusForbiddenResponseBody:
         title: 'Mediatype identifier: application/vnd.goa.error; view=default'
         type: object
@@ -809,6 +1026,49 @@ definitions:
             - timeout
             - fault
     OrdersRunStatusNotFoundResponseBody:
+        title: 'Mediatype identifier: application/vnd.goa.error; view=default'
+        type: object
+        properties:
+            fault:
+                type: boolean
+                description: Is the error a server-side fault?
+                example: false
+            id:
+                type: string
+                description: ID is a unique identifier for this particular occurrence of the problem.
+                example: 123abc
+            message:
+                type: string
+                description: Message is a human-readable explanation specific to this occurrence of the problem.
+                example: parameter 'p' must be an integer
+            name:
+                type: string
+                description: Name is the name of this class of errors.
+                example: bad_request
+            temporary:
+                type: boolean
+                description: Is the error temporary?
+                example: true
+            timeout:
+                type: boolean
+                description: Is the error a timeout?
+                example: false
+        description: Error response result type (default view)
+        example:
+            fault: false
+            id: 123abc
+            message: parameter 'p' must be an integer
+            name: bad_request
+            temporary: true
+            timeout: false
+        required:
+            - name
+            - id
+            - message
+            - temporary
+            - timeout
+            - fault
+    OrdersRunStatusUnauthorizedResponseBody:
         title: 'Mediatype identifier: application/vnd.goa.error; view=default'
         type: object
         properties:

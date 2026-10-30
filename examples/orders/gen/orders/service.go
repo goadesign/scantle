@@ -132,8 +132,6 @@ type RefundCommand struct {
 	CustomerID string
 	// Order to refund.
 	OrderID string
-	// Identity of the tool call; makes retries safe.
-	ToolCallID string
 }
 
 // RefundOutcome is the result type of the orders service issue_store_credit
@@ -171,6 +169,11 @@ type RunView struct {
 	ApprovalID *string
 	// What the manager is asked to approve.
 	ApprovalPrompt *string
+}
+
+// MakeUnauthorized builds a goa.ServiceError from an error.
+func MakeUnauthorized(err error) *goa.ServiceError {
+	return goa.NewServiceError(err, "unauthorized", false, false, false)
 }
 
 // MakeForbidden builds a goa.ServiceError from an error.
@@ -266,8 +269,6 @@ type jsonRefundCommandTransport struct {
 	CustomerID *string `json:"customer_id"`
 	// Order to refund.
 	OrderID *string `json:"order_id"`
-	// Identity of the tool call; makes retries safe.
-	ToolCallID *string `json:"tool_call_id"`
 }
 
 // validatejsonRefundCommandTransport checks decoded JSON before it becomes a service value.
@@ -284,9 +285,6 @@ func validatejsonRefundCommandTransport(value *jsonRefundCommandTransport) (err 
 	if value.OrderID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("order_id", "body"))
 	}
-	if value.ToolCallID == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("tool_call_id", "body"))
-	}
 	if value.TenantID != nil {
 		if utf8.RuneCountInString(*value.TenantID) < 1 {
 			err = goa.MergeErrors(err, goa.InvalidLengthError("body.tenant_id", *value.TenantID, utf8.RuneCountInString(*value.TenantID), 1, true))
@@ -300,11 +298,6 @@ func validatejsonRefundCommandTransport(value *jsonRefundCommandTransport) (err 
 	if value.OrderID != nil {
 		if utf8.RuneCountInString(*value.OrderID) < 1 {
 			err = goa.MergeErrors(err, goa.InvalidLengthError("body.order_id", *value.OrderID, utf8.RuneCountInString(*value.OrderID), 1, true))
-		}
-	}
-	if value.ToolCallID != nil {
-		if utf8.RuneCountInString(*value.ToolCallID) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.tool_call_id", *value.ToolCallID, utf8.RuneCountInString(*value.ToolCallID), 1, true))
 		}
 	}
 	return err
@@ -453,9 +446,6 @@ func validateRefundCommandOriginal(value *RefundCommand) (err error) {
 	if utf8.RuneCountInString(value.OrderID) < 1 {
 		err = goa.MergeErrors(err, goa.InvalidLengthError("value.order_id", value.OrderID, utf8.RuneCountInString(value.OrderID), 1, true))
 	}
-	if utf8.RuneCountInString(value.ToolCallID) < 1 {
-		err = goa.MergeErrors(err, goa.InvalidLengthError("value.tool_call_id", value.ToolCallID, utf8.RuneCountInString(value.ToolCallID), 1, true))
-	}
 	return err
 }
 
@@ -600,7 +590,6 @@ func EncodeRefundCommand(in *RefundCommand) ([]byte, error) {
 			TenantID:   &in.TenantID,
 			CustomerID: &in.CustomerID,
 			OrderID:    &in.OrderID,
-			ToolCallID: &in.ToolCallID,
 		}
 	}
 	if err := validatejsonRefundCommandTransport(body); err != nil {
@@ -634,7 +623,6 @@ func ValidateRefundCommandValue(in *RefundCommand) error {
 			TenantID:   &in.TenantID,
 			CustomerID: &in.CustomerID,
 			OrderID:    &in.OrderID,
-			ToolCallID: &in.ToolCallID,
 		}
 	}
 	if err := validatejsonRefundCommandTransport(body); err != nil {
@@ -672,7 +660,6 @@ func DecodeRefundCommand(data []byte) (out *RefundCommand, err error) {
 			TenantID:   *body.TenantID,
 			CustomerID: *body.CustomerID,
 			OrderID:    *body.OrderID,
-			ToolCallID: *body.ToolCallID,
 		}
 	}
 	return out, nil
@@ -1026,19 +1013,11 @@ func validateRefundCommandJSONValue(path string, value any, description string) 
 			); err != nil {
 				return err
 			}
-		case "tool_call_id":
-			if err := validateOrderJSONValue2(
-				generatedJSONChildPath(path, key, false),
-				typed[key], "Identity of the tool call; makes retries safe.",
-			); err != nil {
-				return err
-			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"customer_id",
 				"order_id",
 				"tenant_id",
-				"tool_call_id",
 			})
 		}
 	}
@@ -1402,9 +1381,6 @@ func checkRefundCommandRefundCommandValue(in *RefundCommand, field string, activ
 		}
 		if !utf8.ValidString(string(in.OrderID)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "order_id", false))
-		}
-		if !utf8.ValidString(string(in.ToolCallID)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "tool_call_id", false))
 		}
 	}
 	return nil

@@ -25,7 +25,7 @@ import (
 //	command (subcommand1|subcommand2|...)
 func UsageCommands() []string {
 	return []string{
-		"commerce list-orders",
+		"commerce (list-orders|get-order)",
 		"payments refund",
 		"orders (chat|run-status|approve-refund)",
 	}
@@ -76,6 +76,11 @@ func ParseEndpoint(
 		commerceListOrdersCursorFlag     = new(cliStringFlag)
 		commerceListOrdersLimitFlag      = commerceListOrdersFlags.String("limit", "20", "")
 
+		commerceGetOrderFlags          = flag.NewFlagSet("get-order", flag.ExitOnError)
+		commerceGetOrderTenantIDFlag   = new(cliStringFlag)
+		commerceGetOrderCustomerIDFlag = new(cliStringFlag)
+		commerceGetOrderOrderIDFlag    = new(cliStringFlag)
+
 		paymentsFlags = flag.NewFlagSet("payments", flag.ContinueOnError)
 
 		paymentsRefundFlags              = flag.NewFlagSet("refund", flag.ExitOnError)
@@ -102,6 +107,9 @@ func ParseEndpoint(
 	commerceListOrdersFlags.Var(commerceListOrdersTenantIDFlag, "tenant-id", "Merchant tenant.")
 	commerceListOrdersFlags.Var(commerceListOrdersCustomerIDFlag, "customer-id", "Customer whose orders to list.")
 	commerceListOrdersFlags.Var(commerceListOrdersCursorFlag, "cursor", "")
+	commerceGetOrderFlags.Var(commerceGetOrderTenantIDFlag, "tenant-id", "Merchant tenant.")
+	commerceGetOrderFlags.Var(commerceGetOrderCustomerIDFlag, "customer-id", "Customer who must own the order.")
+	commerceGetOrderFlags.Var(commerceGetOrderOrderIDFlag, "order-id", "Order to load.")
 	paymentsRefundFlags.Var(paymentsRefundBodyFlag, "body", "")
 	paymentsRefundFlags.Var(paymentsRefundTenantIDFlag, "tenant-id", "Merchant tenant.")
 	paymentsRefundFlags.Var(paymentsRefundIdempotencyKeyFlag, "idempotency-key", "")
@@ -116,6 +124,7 @@ func ParseEndpoint(
 
 	commerceFlags.Usage = commerceUsage
 	commerceListOrdersFlags.Usage = commerceListOrdersUsage
+	commerceGetOrderFlags.Usage = commerceGetOrderUsage
 
 	paymentsFlags.Usage = paymentsUsage
 	paymentsRefundFlags.Usage = paymentsRefundUsage
@@ -166,6 +175,9 @@ func ParseEndpoint(
 			case "list-orders":
 				epf = commerceListOrdersFlags
 
+			case "get-order":
+				epf = commerceGetOrderFlags
+
 			}
 
 		case "payments":
@@ -214,6 +226,9 @@ func ParseEndpoint(
 			case "list-orders":
 				endpoint = c.ListOrders()
 				data, err = commercec.BuildListOrdersPayload(commerceListOrdersTenantIDFlag.value, commerceListOrdersCustomerIDFlag.value, commerceListOrdersCursorFlag.value, *commerceListOrdersLimitFlag)
+			case "get-order":
+				endpoint = c.GetOrder()
+				data, err = commercec.BuildGetOrderPayload(commerceGetOrderTenantIDFlag.value, commerceGetOrderCustomerIDFlag.value, commerceGetOrderOrderIDFlag.value)
 			}
 		case "payments":
 			c := paymentsc.NewClient(scheme, host, doer, enc, dec, restore)
@@ -250,6 +265,7 @@ func commerceUsage() {
 	fmt.Fprintf(os.Stderr, "Usage:\n    %s [globalflags] commerce COMMAND [flags]\n\n", os.Args[0])
 	fmt.Fprintln(os.Stderr, "COMMAND:")
 	fmt.Fprintln(os.Stderr, `    list-orders: List one page of a customer's orders, newest first.`)
+	fmt.Fprintln(os.Stderr, `    get-order: Load one of a customer's orders. Orders of other customers are not found.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s commerce COMMAND --help\n", os.Args[0])
@@ -276,6 +292,28 @@ func commerceListOrdersUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "commerce list-orders --tenant-id \"w\" --customer-id \"l\" --cursor \"Saepe excepturi est accusantium assumenda adipisci iste.\" --limit 43")
+}
+
+func commerceGetOrderUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] commerce get-order", os.Args[0])
+	fmt.Fprint(os.Stderr, " -tenant-id STRING")
+	fmt.Fprint(os.Stderr, " -customer-id STRING")
+	fmt.Fprint(os.Stderr, " -order-id STRING")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Load one of a customer's orders. Orders of other customers are not found.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -tenant-id STRING: Merchant tenant.`)
+	fmt.Fprintln(os.Stderr, `    -customer-id STRING: Customer who must own the order.`)
+	fmt.Fprintln(os.Stderr, `    -order-id STRING: Order to load.`)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "commerce get-order --tenant-id \"lod\" --customer-id \"zu\" --order-id \"t\"")
 }
 
 // paymentsUsage displays the usage of the payments command and its subcommands.

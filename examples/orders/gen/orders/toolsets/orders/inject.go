@@ -77,10 +77,6 @@ func InjectIssueStoreCredit(p *IssueStoreCreditPayload, meta tools.ToolCallMeta,
 		}
 		p.CustomerID = v
 	}
-	{
-		v := meta.ToolCallID
-		p.ToolCallID = v
-	}
 	return nil
 }
 
@@ -164,10 +160,6 @@ func InjectRequestRefund(p *RequestRefundPayload, meta tools.ToolCallMeta, label
 			return fmt.Errorf("tool %q: required label %q is missing; call WithLabels(%q, ...) at run start", "orders.request_refund", "customer_id", "customer_id")
 		}
 		p.CustomerID = v
-	}
-	{
-		v := meta.ToolCallID
-		p.ToolCallID = v
 	}
 	return nil
 }

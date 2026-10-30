@@ -63,6 +63,22 @@ var _ = Service("commerce", func() {
 			Response(StatusOK)
 		})
 	})
+	Method("get_order", func() {
+		Description("Load one of a customer's orders. Orders of other customers are not found.")
+		Payload(func() {
+			Attribute("tenant_id", String, "Merchant tenant.", func() { MinLength(1) })
+			Attribute("customer_id", String, "Customer who must own the order.", func() { MinLength(1) })
+			Attribute("order_id", String, "Order to load.", func() { MinLength(1) })
+			Required("tenant_id", "customer_id", "order_id")
+		})
+		Result(Order)
+		Error("not_found", ErrorResult, "The customer has no such order.")
+		HTTP(func() {
+			GET("/tenants/{tenant_id}/customers/{customer_id}/orders/{order_id}")
+			Response(StatusOK)
+			Response("not_found", StatusNotFound)
+		})
+	})
 })
 
 // The payments service is the contract of the external payment provider. The

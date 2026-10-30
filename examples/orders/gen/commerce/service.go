@@ -25,6 +25,8 @@ import (
 type Service interface {
 	// List one page of a customer's orders, newest first.
 	ListOrders(context.Context, *ListOrdersPayload) (res *OrderPage, err error)
+	// Load one of a customer's orders. Orders of other customers are not found.
+	GetOrder(context.Context, *GetOrderPayload) (res *Order, err error)
 }
 
 // APIName is the name of the API as defined in the design.
@@ -41,7 +43,17 @@ const ServiceName = "commerce"
 // MethodNames lists the service method names as defined in the design. These
 // are the same values that are set in the endpoint request contexts under the
 // MethodKey key.
-var MethodNames = [1]string{"list_orders"}
+var MethodNames = [2]string{"list_orders", "get_order"}
+
+// GetOrderPayload is the payload type of the commerce service get_order method.
+type GetOrderPayload struct {
+	// Merchant tenant.
+	TenantID string
+	// Customer who must own the order.
+	CustomerID string
+	// Order to load.
+	OrderID string
+}
 
 // ListOrdersPayload is the payload type of the commerce service list_orders
 // method.
@@ -56,7 +68,7 @@ type ListOrdersPayload struct {
 	Limit int
 }
 
-// A customer order with its charged amounts in cents.
+// Order is the result type of the commerce service get_order method.
 type Order struct {
 	// Order identifier.
 	ID string
@@ -80,6 +92,11 @@ type OrderPage struct {
 	Total int
 	// Cursor for the next page; absent on the last page.
 	NextCursor *string
+}
+
+// MakeNotFound builds a goa.ServiceError from an error.
+func MakeNotFound(err error) *goa.ServiceError {
+	return goa.NewServiceError(err, "not_found", false, false, false)
 }
 
 // jsonOrderPageTransport stores JSON fields until they have been validated.

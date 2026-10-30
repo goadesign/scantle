@@ -16,18 +16,21 @@ import (
 // Endpoints wraps the "commerce" service endpoints.
 type Endpoints struct {
 	ListOrders goa.Endpoint
+	GetOrder   goa.Endpoint
 }
 
 // NewEndpoints wraps the methods of the "commerce" service with endpoints.
 func NewEndpoints(s Service) *Endpoints {
 	return &Endpoints{
 		ListOrders: NewListOrdersEndpoint(s),
+		GetOrder:   NewGetOrderEndpoint(s),
 	}
 }
 
 // Use applies the given middleware to all the "commerce" service endpoints.
 func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 	e.ListOrders = m(e.ListOrders)
+	e.GetOrder = m(e.GetOrder)
 }
 
 // NewListOrdersEndpoint returns an endpoint function that calls the method
@@ -36,5 +39,14 @@ func NewListOrdersEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
 		p := req.(*ListOrdersPayload)
 		return s.ListOrders(ctx, p)
+	}
+}
+
+// NewGetOrderEndpoint returns an endpoint function that calls the method
+// "get_order" of service "commerce".
+func NewGetOrderEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		p := req.(*GetOrderPayload)
+		return s.GetOrder(ctx, p)
 	}
 }
