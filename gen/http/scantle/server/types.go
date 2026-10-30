@@ -28,12 +28,21 @@ type ProposeChangeRequestBody struct {
 type ConfirmIntentRequestBody struct {
 	// Change identifier.
 	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
-	// Authenticated operator identity.
-	Operator *string `form:"operator,omitempty" json:"operator,omitempty" xml:"operator,omitempty"`
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
 	// Confirmed example table.
 	Examples []*ExampleItemRequestBody `form:"examples,omitempty" json:"examples,omitempty" xml:"examples,omitempty"`
+}
+
+// PreviewArchitectureRequestBody is the type of the "scantle" service
+// "preview_architecture" endpoint HTTP request body.
+type PreviewArchitectureRequestBody struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
+	// Expected CP1 request_revision digest.
+	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Candidate Goa and Goa-AI design source to inspect.
+	DesignSource *string `form:"design_source,omitempty" json:"design_source,omitempty" xml:"design_source,omitempty"`
 }
 
 // DraftOverrideRequestBody is the type of the "scantle" service
@@ -67,15 +76,21 @@ type ProposeChangeResponseBody struct {
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
 	// Checkpoint status (needs_confirmation or confirmed).
 	Status string `form:"status" json:"status" xml:"status"`
+	// Original operator feature request.
+	Prompt string `form:"prompt" json:"prompt" xml:"prompt"`
 	// Plain-English summary of requested behavior.
 	Summary string `form:"summary" json:"summary" xml:"summary"`
-	// Unresolved domain questions, empty when clear.
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
 	Ambiguities []*AmbiguityQuestionResponseBody `form:"ambiguities,omitempty" json:"ambiguities,omitempty" xml:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
 	// Concrete examples mapped to evaluator checks.
 	Examples []*ExampleItemResponseBody `form:"examples" json:"examples" xml:"examples"`
 	// Existing contract invariants preserved by this change.
 	PreservedBehaviors []string `form:"preserved_behaviors" json:"preserved_behaviors" xml:"preserved_behaviors"`
-	// SHA-256 digest of the confirmed Change Card.
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
 }
 
@@ -86,26 +101,53 @@ type ConfirmIntentResponseBody struct {
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
 	// Checkpoint status (needs_confirmation or confirmed).
 	Status string `form:"status" json:"status" xml:"status"`
+	// Original operator feature request.
+	Prompt string `form:"prompt" json:"prompt" xml:"prompt"`
 	// Plain-English summary of requested behavior.
 	Summary string `form:"summary" json:"summary" xml:"summary"`
-	// Unresolved domain questions, empty when clear.
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
 	Ambiguities []*AmbiguityQuestionResponseBody `form:"ambiguities,omitempty" json:"ambiguities,omitempty" xml:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
 	// Concrete examples mapped to evaluator checks.
 	Examples []*ExampleItemResponseBody `form:"examples" json:"examples" xml:"examples"`
 	// Existing contract invariants preserved by this change.
 	PreservedBehaviors []string `form:"preserved_behaviors" json:"preserved_behaviors" xml:"preserved_behaviors"`
-	// SHA-256 digest of the confirmed Change Card.
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+}
+
+// PreviewArchitectureResponseBody is the type of the "scantle" service
+// "preview_architecture" endpoint HTTP response body.
+type PreviewArchitectureResponseBody struct {
+	// Bound Change Card identifier.
+	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Bound CP1 request_revision digest.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// SHA-256 digest of the inspected Goa design source.
+	DesignDigest string `form:"design_digest" json:"design_digest" xml:"design_digest"`
+	// API or primary service name declared in the design.
+	SystemName string `form:"system_name" json:"system_name" xml:"system_name"`
+	// Derived C4 containers.
+	Containers []*C4ContainerItemResponseBody `form:"containers" json:"containers" xml:"containers"`
+	// Validated directed edges between declared containers.
+	Edges []*C4EdgeItemResponseBody `form:"edges" json:"edges" xml:"edges"`
+	// Extracted Goa-AI runtime guardrails.
+	Guardrails *GuardrailItemResponseBody `form:"guardrails" json:"guardrails" xml:"guardrails"`
+	// Plain-English summary of topology and guardrails.
+	Banner string `form:"banner" json:"banner" xml:"banner"`
 }
 
 // DraftOverrideResponseBody is the type of the "scantle" service
 // "draft_override" endpoint HTTP response body.
 type DraftOverrideResponseBody struct {
-	// True when updated in prompt.Store for 0s reload.
+	// True when updated in the target platform's prompt.Store for 0s reload.
 	AppliedInStore bool `form:"applied_in_store" json:"applied_in_store" xml:"applied_in_store"`
 	// True when the change modifies a compiled Go business rule.
 	RequiresRebuild bool `form:"requires_rebuild" json:"requires_rebuild" xml:"requires_rebuild"`
-	// New prompt version digest when applied in prompt.Store.
+	// New prompt version digest returned by the target platform.
 	PromptVersion *string `form:"prompt_version,omitempty" json:"prompt_version,omitempty" xml:"prompt_version,omitempty"`
 	// Operator-facing status explanation.
 	Message string `form:"message" json:"message" xml:"message"`
@@ -114,13 +156,15 @@ type DraftOverrideResponseBody struct {
 // DiffResponseBody is the type of the "scantle" service "diff" endpoint HTTP
 // response body.
 type DiffResponseBody struct {
-	// True when any declaration or module pin changed.
+	// True when any declaration, contract body, or module directive changed.
 	HasChanges bool `form:"has_changes" json:"has_changes" xml:"has_changes"`
-	// Added services, methods, agents, or tools.
+	// Added scoped declarations.
 	AddedDeclarations []string `form:"added_declarations" json:"added_declarations" xml:"added_declarations"`
-	// Removed services, methods, agents, or tools.
+	// Removed scoped declarations.
 	RemovedDeclarations []string `form:"removed_declarations" json:"removed_declarations" xml:"removed_declarations"`
-	// Changed module dependency pins.
+	// Declarations whose payload, result, route, or policy changed.
+	ModifiedDeclarations []string `form:"modified_declarations" json:"modified_declarations" xml:"modified_declarations"`
+	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string `form:"version_deltas" json:"version_deltas" xml:"version_deltas"`
 	// Human-readable structural diff summary.
 	Summary string `form:"summary" json:"summary" xml:"summary"`
@@ -151,6 +195,40 @@ type ExampleItemResponseBody struct {
 	VerificationKind string `form:"verification_kind" json:"verification_kind" xml:"verification_kind"`
 }
 
+// C4ContainerItemResponseBody is used to define fields on response body types.
+type C4ContainerItemResponseBody struct {
+	// Stable container identifier.
+	ID string `form:"id" json:"id" xml:"id"`
+	// Human-readable container name.
+	Name string `form:"name" json:"name" xml:"name"`
+	// Container role (service, agent, toolset, or dependency).
+	Kind string `form:"kind" json:"kind" xml:"kind"`
+	// Summary of the container's responsibility.
+	Description string `form:"description" json:"description" xml:"description"`
+}
+
+// C4EdgeItemResponseBody is used to define fields on response body types.
+type C4EdgeItemResponseBody struct {
+	// Source container ID.
+	FromID string `form:"from_id" json:"from_id" xml:"from_id"`
+	// Target container ID.
+	ToID string `form:"to_id" json:"to_id" xml:"to_id"`
+	// Contract or transport relationship.
+	Protocol string `form:"protocol" json:"protocol" xml:"protocol"`
+}
+
+// GuardrailItemResponseBody is used to define fields on response body types.
+type GuardrailItemResponseBody struct {
+	// Per-run execution time budget in seconds.
+	MaxExecutionSeconds int `form:"max_execution_seconds" json:"max_execution_seconds" xml:"max_execution_seconds"`
+	// Per-run retrieval tool-call budget.
+	MaxToolCalls int `form:"max_tool_calls" json:"max_tool_calls" xml:"max_tool_calls"`
+	// Turn threshold for history compression.
+	CompressAtTurns int `form:"compress_at_turns" json:"compress_at_turns" xml:"compress_at_turns"`
+	// Recent turns retained uncompressed.
+	KeepRecentTurns int `form:"keep_recent_turns" json:"keep_recent_turns" xml:"keep_recent_turns"`
+}
+
 // ExampleItemRequestBody is used to define fields on request body types.
 type ExampleItemRequestBody struct {
 	// Stable example identifier.
@@ -171,7 +249,9 @@ func NewProposeChangeResponseBody(res *scantle.ChangeCardResult) *ProposeChangeR
 	body := &ProposeChangeResponseBody{
 		ChangeID:        res.ChangeID,
 		Status:          res.Status,
+		Prompt:          res.Prompt,
 		Summary:         res.Summary,
+		ConfirmedBy:     res.ConfirmedBy,
 		RequestRevision: res.RequestRevision,
 	}
 	if res.Ambiguities != nil {
@@ -182,6 +262,14 @@ func NewProposeChangeResponseBody(res *scantle.ChangeCardResult) *ProposeChangeR
 				continue
 			}
 			body.Ambiguities[i] = marshalScantleAmbiguityQuestionToAmbiguityQuestionResponseBody(val)
+		}
+	}
+	if res.Answers != nil {
+		body.Answers = make(map[string]string, len(res.Answers))
+		for key, val := range res.Answers {
+			tk := key
+			tv := val
+			body.Answers[tk] = tv
 		}
 	}
 	if res.Examples != nil {
@@ -213,7 +301,9 @@ func NewConfirmIntentResponseBody(res *scantle.ChangeCardResult) *ConfirmIntentR
 	body := &ConfirmIntentResponseBody{
 		ChangeID:        res.ChangeID,
 		Status:          res.Status,
+		Prompt:          res.Prompt,
 		Summary:         res.Summary,
+		ConfirmedBy:     res.ConfirmedBy,
 		RequestRevision: res.RequestRevision,
 	}
 	if res.Ambiguities != nil {
@@ -224,6 +314,14 @@ func NewConfirmIntentResponseBody(res *scantle.ChangeCardResult) *ConfirmIntentR
 				continue
 			}
 			body.Ambiguities[i] = marshalScantleAmbiguityQuestionToAmbiguityQuestionResponseBody(val)
+		}
+	}
+	if res.Answers != nil {
+		body.Answers = make(map[string]string, len(res.Answers))
+		for key, val := range res.Answers {
+			tk := key
+			tv := val
+			body.Answers[tk] = tv
 		}
 	}
 	if res.Examples != nil {
@@ -245,6 +343,46 @@ func NewConfirmIntentResponseBody(res *scantle.ChangeCardResult) *ConfirmIntentR
 		}
 	} else {
 		body.PreservedBehaviors = []string{}
+	}
+	return body
+}
+
+// NewPreviewArchitectureResponseBody builds the HTTP response body from the
+// result of the "preview_architecture" endpoint of the "scantle" service.
+func NewPreviewArchitectureResponseBody(res *scantle.ArchitecturePreviewResult) *PreviewArchitectureResponseBody {
+	body := &PreviewArchitectureResponseBody{
+		ChangeID:        res.ChangeID,
+		RequestRevision: res.RequestRevision,
+		DesignDigest:    res.DesignDigest,
+		SystemName:      res.SystemName,
+		Banner:          res.Banner,
+	}
+	if res.Containers != nil {
+		body.Containers = make([]*C4ContainerItemResponseBody, len(res.Containers))
+		for i, val := range res.Containers {
+			if val == nil {
+				body.Containers[i] = nil
+				continue
+			}
+			body.Containers[i] = marshalScantleC4ContainerItemToC4ContainerItemResponseBody(val)
+		}
+	} else {
+		body.Containers = []*C4ContainerItemResponseBody{}
+	}
+	if res.Edges != nil {
+		body.Edges = make([]*C4EdgeItemResponseBody, len(res.Edges))
+		for i, val := range res.Edges {
+			if val == nil {
+				body.Edges[i] = nil
+				continue
+			}
+			body.Edges[i] = marshalScantleC4EdgeItemToC4EdgeItemResponseBody(val)
+		}
+	} else {
+		body.Edges = []*C4EdgeItemResponseBody{}
+	}
+	if res.Guardrails != nil {
+		body.Guardrails = marshalScantleGuardrailItemToGuardrailItemResponseBody(res.Guardrails)
 	}
 	return body
 }
@@ -284,6 +422,14 @@ func NewDiffResponseBody(res *scantle.DiffResult) *DiffResponseBody {
 	} else {
 		body.RemovedDeclarations = []string{}
 	}
+	if res.ModifiedDeclarations != nil {
+		body.ModifiedDeclarations = make([]string, len(res.ModifiedDeclarations))
+		for i, val := range res.ModifiedDeclarations {
+			body.ModifiedDeclarations[i] = val
+		}
+	} else {
+		body.ModifiedDeclarations = []string{}
+	}
 	if res.VersionDeltas != nil {
 		body.VersionDeltas = make([]string, len(res.VersionDeltas))
 		for i, val := range res.VersionDeltas {
@@ -312,7 +458,6 @@ func NewProposeChangePayload(body *ProposeChangeRequestBody) *scantle.ProposeCha
 func NewConfirmIntentPayload(body *ConfirmIntentRequestBody) *scantle.ConfirmIntentPayload {
 	v := &scantle.ConfirmIntentPayload{
 		ChangeID: *body.ChangeID,
-		Operator: *body.Operator,
 	}
 	v.Answers = make(map[string]string, len(body.Answers))
 	for key, val := range body.Answers {
@@ -327,6 +472,18 @@ func NewConfirmIntentPayload(body *ConfirmIntentRequestBody) *scantle.ConfirmInt
 			continue
 		}
 		v.Examples[i] = unmarshalExampleItemRequestBodyToScantleExampleItem(val)
+	}
+
+	return v
+}
+
+// NewPreviewArchitecturePayload builds a scantle service preview_architecture
+// endpoint payload.
+func NewPreviewArchitecturePayload(body *PreviewArchitectureRequestBody) *scantle.PreviewArchitecturePayload {
+	v := &scantle.PreviewArchitecturePayload{
+		ChangeID:        *body.ChangeID,
+		RequestRevision: *body.RequestRevision,
+		DesignSource:    *body.DesignSource,
 	}
 
 	return v
@@ -374,9 +531,6 @@ func ValidateConfirmIntentRequestBody(body *ConfirmIntentRequestBody) (err error
 	if body.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}
-	if body.Operator == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("operator", "body"))
-	}
 	if body.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
 	}
@@ -389,6 +543,21 @@ func ValidateConfirmIntentRequestBody(body *ConfirmIntentRequestBody) (err error
 				err = goa.MergeErrors(err, err2)
 			}
 		}
+	}
+	return
+}
+
+// ValidatePreviewArchitectureRequestBody runs the validations defined on
+// PreviewArchitectureRequestBody
+func ValidatePreviewArchitectureRequestBody(body *PreviewArchitectureRequestBody) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.DesignSource == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
 	}
 	return
 }

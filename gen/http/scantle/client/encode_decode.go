@@ -238,6 +238,87 @@ func DecodeConfirmIntentResponse(decoder func(*http.Response) goahttp.Decoder, r
 	}
 }
 
+// BuildPreviewArchitectureRequest instantiates a HTTP request object with
+// method and path set to call the "scantle" service "preview_architecture"
+// endpoint
+func (c *Client) BuildPreviewArchitectureRequest(ctx context.Context, v any) (*http.Request, error) {
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: PreviewArchitectureScantlePath()}
+	req, err := http.NewRequest("POST", u.String(), nil)
+	if err != nil {
+		return nil, goahttp.ErrInvalidURL("scantle", "preview_architecture", u.String(), err)
+	}
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	return req, nil
+}
+
+// EncodePreviewArchitectureRequest returns an encoder for requests sent to the
+// scantle preview_architecture server.
+func EncodePreviewArchitectureRequest(encoder func(*http.Request) goahttp.Encoder) func(*http.Request, any) error {
+	return func(req *http.Request, v any) error {
+		p, ok := v.(*scantle.PreviewArchitecturePayload)
+		if !ok {
+			return goahttp.ErrInvalidType("scantle", "preview_architecture", "*scantle.PreviewArchitecturePayload", v)
+		}
+		body := NewPreviewArchitectureRequestBody(p)
+		if err := encoder(req).Encode(&body); err != nil {
+			return goahttp.ErrEncodingError("scantle", "preview_architecture", err)
+		}
+		return nil
+	}
+}
+
+// DecodePreviewArchitectureResponse returns a decoder for responses returned
+// by the scantle preview_architecture endpoint. restoreBody controls whether
+// the response body should be restored after having been read.
+func DecodePreviewArchitectureResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
+	return func(resp *http.Response) (result any, decodeErr error) {
+		responseBody := resp.Body
+		if restoreBody {
+			b, readErr := io.ReadAll(responseBody)
+			closeErr := responseBody.Close()
+			if err := errors.Join(readErr, closeErr); err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "preview_architecture", err)
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			defer func() {
+				resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			}()
+		} else {
+			defer func() {
+				if err := responseBody.Close(); err != nil {
+					decodeErr = errors.Join(decodeErr, goahttp.ErrDecodingError("scantle", "preview_architecture", err))
+				}
+			}()
+		}
+		switch resp.StatusCode {
+		case http.StatusOK:
+			var (
+				body PreviewArchitectureResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "preview_architecture", err)
+			}
+			err = ValidatePreviewArchitectureResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("scantle", "preview_architecture", err)
+			}
+			res := NewPreviewArchitectureArchitecturePreviewResultOK(&body)
+			return res, nil
+		default:
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "preview_architecture", err)
+			}
+			return nil, goahttp.ErrInvalidResponse("scantle", "preview_architecture", resp.StatusCode, string(body))
+		}
+	}
+}
+
 // BuildDraftOverrideRequest instantiates a HTTP request object with method and
 // path set to call the "scantle" service "draft_override" endpoint
 func (c *Client) BuildDraftOverrideRequest(ctx context.Context, v any) (*http.Request, error) {
@@ -451,6 +532,45 @@ func marshalExampleItemRequestBodyToScantleExampleItem(v *ExampleItemRequestBody
 		InputSummary:     v.InputSummary,
 		ExpectedOutcome:  v.ExpectedOutcome,
 		VerificationKind: v.VerificationKind,
+	}
+
+	return res
+}
+
+// unmarshalC4ContainerItemResponseBodyToScantleC4ContainerItem builds a value
+// of type *scantle.C4ContainerItem from a value of type
+// *C4ContainerItemResponseBody.
+func unmarshalC4ContainerItemResponseBodyToScantleC4ContainerItem(v *C4ContainerItemResponseBody) *scantle.C4ContainerItem {
+	res := &scantle.C4ContainerItem{
+		ID:          *v.ID,
+		Name:        *v.Name,
+		Kind:        *v.Kind,
+		Description: *v.Description,
+	}
+
+	return res
+}
+
+// unmarshalC4EdgeItemResponseBodyToScantleC4EdgeItem builds a value of type
+// *scantle.C4EdgeItem from a value of type *C4EdgeItemResponseBody.
+func unmarshalC4EdgeItemResponseBodyToScantleC4EdgeItem(v *C4EdgeItemResponseBody) *scantle.C4EdgeItem {
+	res := &scantle.C4EdgeItem{
+		FromID:   *v.FromID,
+		ToID:     *v.ToID,
+		Protocol: *v.Protocol,
+	}
+
+	return res
+}
+
+// unmarshalGuardrailItemResponseBodyToScantleGuardrailItem builds a value of
+// type *scantle.GuardrailItem from a value of type *GuardrailItemResponseBody.
+func unmarshalGuardrailItemResponseBodyToScantleGuardrailItem(v *GuardrailItemResponseBody) *scantle.GuardrailItem {
+	res := &scantle.GuardrailItem{
+		MaxExecutionSeconds: *v.MaxExecutionSeconds,
+		MaxToolCalls:        *v.MaxToolCalls,
+		CompressAtTurns:     *v.CompressAtTurns,
+		KeepRecentTurns:     *v.KeepRecentTurns,
 	}
 
 	return res

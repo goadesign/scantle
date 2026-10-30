@@ -43,7 +43,6 @@ paths:
                                   input_summary: Deserunt tempore deleniti.
                                   scenario: Vitae velit dicta excepturi distinctio.
                                   verification_kind: deterministic
-                            operator: Culpa repellat.
             responses:
                 "200":
                     description: OK response.
@@ -74,7 +73,11 @@ paths:
                                         - Facere voluptatum dolorem.
                                         - Sit qui nam odio itaque aut.
                                       question: Inventore maxime esse.
+                                answers:
+                                    Corrupti vero ut voluptate similique animi.: Cumque nisi nihil dolores nemo qui.
+                                    Enim quod quis fugit.: Deleniti voluptas aperiam et similique exercitationem.
                                 change_id: Sunt deleniti.
+                                confirmed_by: Non qui provident consectetur.
                                 examples:
                                     - expected_outcome: Voluptatem necessitatibus numquam.
                                       id: Nemo libero.
@@ -89,9 +92,65 @@ paths:
                                 preserved_behaviors:
                                     - Voluptatem aut sapiente ut.
                                     - Dolorum quasi magnam nostrum dolorum magnam.
+                                prompt: Blanditiis qui.
                                 request_revision: Alias cupiditate aut quia natus fuga eius.
                                 status: needs_confirmation
                                 summary: Et accusantium expedita.
+    /changes/preview:
+        post:
+            tags:
+                - scantle
+            summary: preview_architecture scantle
+            description: Extract and validate the Checkpoint 2 C4 container topology and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.
+            operationId: scantle#preview_architecture
+            requestBody:
+                description: Request body for preview_architecture.
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/PreviewArchitecturePayload'
+                        example:
+                            change_id: Nam ut commodi.
+                            design_source: Eligendi voluptates vitae voluptatem ut illum.
+                            request_revision: Et esse in incidunt repellendus in voluptate.
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ArchitecturePreviewResult'
+                            example:
+                                banner: Praesentium temporibus in repudiandae.
+                                change_id: Quisquam sapiente.
+                                containers:
+                                    - description: Tempora ab omnis minima veritatis.
+                                      id: Deserunt non quia earum.
+                                      kind: agent
+                                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                                    - description: Tempora ab omnis minima veritatis.
+                                      id: Deserunt non quia earum.
+                                      kind: agent
+                                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                                design_digest: Perferendis molestias nisi cupiditate in.
+                                edges:
+                                    - from_id: Ut esse ipsa.
+                                      protocol: Et dolor neque non molestias voluptas.
+                                      to_id: Non et dolor dolorum ipsa ullam.
+                                    - from_id: Ut esse ipsa.
+                                      protocol: Et dolor neque non molestias voluptas.
+                                      to_id: Non et dolor dolorum ipsa ullam.
+                                    - from_id: Ut esse ipsa.
+                                      protocol: Et dolor neque non molestias voluptas.
+                                      to_id: Non et dolor dolorum ipsa ullam.
+                                guardrails:
+                                    compress_at_turns: 6971589543997433724
+                                    keep_recent_turns: 2370376143502343678
+                                    max_execution_seconds: 6666018236189547699
+                                    max_tool_calls: 8420136584449978805
+                                request_revision: Quos aperiam quia.
+                                system_name: Expedita vero et minima.
     /changes/propose:
         post:
             tags:
@@ -140,7 +199,10 @@ paths:
                                         - Facere voluptatum dolorem.
                                         - Sit qui nam odio itaque aut.
                                       question: Inventore maxime esse.
+                                answers:
+                                    Ducimus quo illo expedita.: Culpa vero voluptatum itaque facilis.
                                 change_id: Dolor adipisci ut nam quia ad.
+                                confirmed_by: Tenetur voluptas aspernatur officia ipsam ut.
                                 examples:
                                     - expected_outcome: Voluptatem necessitatibus numquam.
                                       id: Nemo libero.
@@ -157,6 +219,7 @@ paths:
                                     - Exercitationem ea dolores quo ab rerum adipisci.
                                     - Aut et nostrum.
                                     - Mollitia commodi qui error.
+                                prompt: Culpa aut.
                                 request_revision: Necessitatibus quos et ut natus voluptates corporis.
                                 status: needs_confirmation
                                 summary: Maiores voluptate soluta quasi et in.
@@ -165,7 +228,7 @@ paths:
             tags:
                 - scantle
             summary: diff scantle
-            description: Compare Goa design ASTs and go.mod versions without emitting a blanket compatibility verdict.
+            description: Compare Goa design ASTs and go.mod directives without emitting a blanket compatibility verdict.
             operationId: scantle#diff
             requestBody:
                 description: Request body for diff.
@@ -193,6 +256,10 @@ paths:
                                     - Aut esse qui.
                                     - Debitis ut corrupti.
                                 has_changes: true
+                                modified_declarations:
+                                    - Temporibus sunt dolorem quo.
+                                    - Numquam provident.
+                                    - Beatae laborum qui ut.
                                 removed_declarations:
                                     - Quidem ea quidem sunt non.
                                     - Perferendis et eum.
@@ -207,7 +274,7 @@ paths:
             tags:
                 - scantle
             summary: draft_override scantle
-            description: Apply a Fast Draft Mode prompt override in prompt.Store or reject a compiled-rule prompt hack.
+            description: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.
             operationId: scantle#draft_override
             requestBody:
                 description: Request body for draft_override.
@@ -285,6 +352,159 @@ components:
                 - id
                 - question
                 - options
+        ArchitecturePreviewResult:
+            type: object
+            properties:
+                banner:
+                    type: string
+                    description: Plain-English summary of topology and guardrails.
+                    example: Praesentium temporibus in repudiandae.
+                change_id:
+                    type: string
+                    description: Bound Change Card identifier.
+                    example: Quisquam sapiente.
+                containers:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/C4ContainerItem'
+                    description: Derived C4 containers.
+                    example:
+                        - description: Tempora ab omnis minima veritatis.
+                          id: Deserunt non quia earum.
+                          kind: agent
+                          name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                        - description: Tempora ab omnis minima veritatis.
+                          id: Deserunt non quia earum.
+                          kind: agent
+                          name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                design_digest:
+                    type: string
+                    description: SHA-256 digest of the inspected Goa design source.
+                    example: Perferendis molestias nisi cupiditate in.
+                edges:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/C4EdgeItem'
+                    description: Validated directed edges between declared containers.
+                    example:
+                        - from_id: Ut esse ipsa.
+                          protocol: Et dolor neque non molestias voluptas.
+                          to_id: Non et dolor dolorum ipsa ullam.
+                        - from_id: Ut esse ipsa.
+                          protocol: Et dolor neque non molestias voluptas.
+                          to_id: Non et dolor dolorum ipsa ullam.
+                        - from_id: Ut esse ipsa.
+                          protocol: Et dolor neque non molestias voluptas.
+                          to_id: Non et dolor dolorum ipsa ullam.
+                guardrails:
+                    $ref: '#/components/schemas/GuardrailItem'
+                request_revision:
+                    type: string
+                    description: Bound CP1 request_revision digest.
+                    example: Quos aperiam quia.
+                system_name:
+                    type: string
+                    description: API or primary service name declared in the design.
+                    example: Expedita vero et minima.
+            description: Checkpoint 2 C4 topology and guardrail preview derived from the candidate Goa design.
+            example:
+                banner: Praesentium temporibus in repudiandae.
+                change_id: Quisquam sapiente.
+                containers:
+                    - description: Tempora ab omnis minima veritatis.
+                      id: Deserunt non quia earum.
+                      kind: agent
+                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                    - description: Tempora ab omnis minima veritatis.
+                      id: Deserunt non quia earum.
+                      kind: agent
+                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                design_digest: Perferendis molestias nisi cupiditate in.
+                edges:
+                    - from_id: Ut esse ipsa.
+                      protocol: Et dolor neque non molestias voluptas.
+                      to_id: Non et dolor dolorum ipsa ullam.
+                    - from_id: Ut esse ipsa.
+                      protocol: Et dolor neque non molestias voluptas.
+                      to_id: Non et dolor dolorum ipsa ullam.
+                    - from_id: Ut esse ipsa.
+                      protocol: Et dolor neque non molestias voluptas.
+                      to_id: Non et dolor dolorum ipsa ullam.
+                guardrails:
+                    compress_at_turns: 6971589543997433724
+                    keep_recent_turns: 2370376143502343678
+                    max_execution_seconds: 6666018236189547699
+                    max_tool_calls: 8420136584449978805
+                request_revision: Quos aperiam quia.
+                system_name: Expedita vero et minima.
+            required:
+                - change_id
+                - request_revision
+                - design_digest
+                - system_name
+                - containers
+                - edges
+                - guardrails
+                - banner
+        C4ContainerItem:
+            type: object
+            properties:
+                description:
+                    type: string
+                    description: Summary of the container's responsibility.
+                    example: Tempora ab omnis minima veritatis.
+                id:
+                    type: string
+                    description: Stable container identifier.
+                    example: Deserunt non quia earum.
+                kind:
+                    type: string
+                    description: Container role (service, agent, toolset, or dependency).
+                    example: agent
+                    enum:
+                        - service
+                        - agent
+                        - toolset
+                        - dependency
+                name:
+                    type: string
+                    description: Human-readable container name.
+                    example: Quaerat facilis eum quisquam magnam voluptatem corporis.
+            description: C4 container derived from the target Goa/Goa-AI design.
+            example:
+                description: Tempora ab omnis minima veritatis.
+                id: Deserunt non quia earum.
+                kind: agent
+                name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+            required:
+                - id
+                - name
+                - kind
+                - description
+        C4EdgeItem:
+            type: object
+            properties:
+                from_id:
+                    type: string
+                    description: Source container ID.
+                    example: Ut esse ipsa.
+                protocol:
+                    type: string
+                    description: Contract or transport relationship.
+                    example: Et dolor neque non molestias voluptas.
+                to_id:
+                    type: string
+                    description: Target container ID.
+                    example: Non et dolor dolorum ipsa ullam.
+            description: Directed contract relationship between two C4 containers.
+            example:
+                from_id: Ut esse ipsa.
+                protocol: Et dolor neque non molestias voluptas.
+                to_id: Non et dolor dolorum ipsa ullam.
+            required:
+                - from_id
+                - to_id
+                - protocol
         ChangeCardResult:
             type: object
             properties:
@@ -292,7 +512,7 @@ components:
                     type: array
                     items:
                         $ref: '#/components/schemas/AmbiguityQuestion'
-                    description: Unresolved domain questions, empty when clear.
+                    description: Domain questions surfaced at CP1, retained for audit after confirmation.
                     example:
                         - id: Aut fuga velit.
                           options:
@@ -315,10 +535,22 @@ components:
                             - Facere voluptatum dolorem.
                             - Sit qui nam odio itaque aut.
                           question: Inventore maxime esse.
+                answers:
+                    type: object
+                    description: Confirmed resolution per ambiguity question ID.
+                    example:
+                        Ducimus quo illo expedita.: Culpa vero voluptatum itaque facilis.
+                    additionalProperties:
+                        type: string
+                        example: Culpa vero voluptatum itaque facilis.
                 change_id:
                     type: string
                     description: Change identifier.
                     example: Dolor adipisci ut nam quia ad.
+                confirmed_by:
+                    type: string
+                    description: Authenticated principal that confirmed the Change Card.
+                    example: Tenetur voluptas aspernatur officia ipsam ut.
                 examples:
                     type: array
                     items:
@@ -346,9 +578,13 @@ components:
                         - Exercitationem ea dolores quo ab rerum adipisci.
                         - Aut et nostrum.
                         - Mollitia commodi qui error.
+                prompt:
+                    type: string
+                    description: Original operator feature request.
+                    example: Culpa aut.
                 request_revision:
                     type: string
-                    description: SHA-256 digest of the confirmed Change Card.
+                    description: SHA-256 digest of the canonical versioned Change Card.
                     example: Necessitatibus quos et ut natus voluptates corporis.
                 status:
                     type: string
@@ -385,7 +621,10 @@ components:
                         - Facere voluptatum dolorem.
                         - Sit qui nam odio itaque aut.
                       question: Inventore maxime esse.
+                answers:
+                    Ducimus quo illo expedita.: Culpa vero voluptatum itaque facilis.
                 change_id: Dolor adipisci ut nam quia ad.
+                confirmed_by: Tenetur voluptas aspernatur officia ipsam ut.
                 examples:
                     - expected_outcome: Voluptatem necessitatibus numquam.
                       id: Nemo libero.
@@ -402,12 +641,14 @@ components:
                     - Exercitationem ea dolores quo ab rerum adipisci.
                     - Aut et nostrum.
                     - Mollitia commodi qui error.
+                prompt: Culpa aut.
                 request_revision: Necessitatibus quos et ut natus voluptates corporis.
                 status: needs_confirmation
                 summary: Maiores voluptate soluta quasi et in.
             required:
                 - change_id
                 - status
+                - prompt
                 - summary
                 - examples
                 - preserved_behaviors
@@ -450,10 +691,6 @@ components:
                           input_summary: Deserunt tempore deleniti.
                           scenario: Vitae velit dicta excepturi distinctio.
                           verification_kind: deterministic
-                operator:
-                    type: string
-                    description: Authenticated operator identity.
-                    example: Culpa repellat.
             description: Request body for confirm_intent.
             example:
                 answers:
@@ -477,10 +714,8 @@ components:
                       input_summary: Deserunt tempore deleniti.
                       scenario: Vitae velit dicta excepturi distinctio.
                       verification_kind: deterministic
-                operator: Culpa repellat.
             required:
                 - change_id
-                - operator
                 - answers
                 - examples
         DiffPayload:
@@ -521,7 +756,7 @@ components:
                     items:
                         type: string
                         example: Nostrum at rerum voluptatem eligendi quia.
-                    description: Added services, methods, agents, or tools.
+                    description: Added scoped declarations.
                     example:
                         - Nostrum at rerum voluptatem eligendi quia.
                         - Voluptates possimus.
@@ -529,14 +764,24 @@ components:
                         - Debitis ut corrupti.
                 has_changes:
                     type: boolean
-                    description: True when any declaration or module pin changed.
+                    description: True when any declaration, contract body, or module directive changed.
                     example: true
+                modified_declarations:
+                    type: array
+                    items:
+                        type: string
+                        example: Temporibus sunt dolorem quo.
+                    description: Declarations whose payload, result, route, or policy changed.
+                    example:
+                        - Temporibus sunt dolorem quo.
+                        - Numquam provident.
+                        - Beatae laborum qui ut.
                 removed_declarations:
                     type: array
                     items:
                         type: string
                         example: Quidem ea quidem sunt non.
-                    description: Removed services, methods, agents, or tools.
+                    description: Removed scoped declarations.
                     example:
                         - Quidem ea quidem sunt non.
                         - Perferendis et eum.
@@ -549,7 +794,7 @@ components:
                     items:
                         type: string
                         example: Sint magnam.
-                    description: Changed module dependency pins.
+                    description: Changed module require, replace, or exclude directives.
                     example:
                         - Sint magnam.
                         - Aut dignissimos autem voluptas fuga dolorem inventore.
@@ -563,6 +808,10 @@ components:
                     - Aut esse qui.
                     - Debitis ut corrupti.
                 has_changes: true
+                modified_declarations:
+                    - Temporibus sunt dolorem quo.
+                    - Numquam provident.
+                    - Beatae laborum qui ut.
                 removed_declarations:
                     - Quidem ea quidem sunt non.
                     - Perferendis et eum.
@@ -576,6 +825,7 @@ components:
                 - has_changes
                 - added_declarations
                 - removed_declarations
+                - modified_declarations
                 - version_deltas
                 - summary
         DraftOverridePayload:
@@ -609,7 +859,7 @@ components:
             properties:
                 applied_in_store:
                     type: boolean
-                    description: True when updated in prompt.Store for 0s reload.
+                    description: True when updated in the target platform's prompt.Store for 0s reload.
                     example: false
                 message:
                     type: string
@@ -617,13 +867,13 @@ components:
                     example: Ad assumenda iusto.
                 prompt_version:
                     type: string
-                    description: New prompt version digest when applied in prompt.Store.
+                    description: New prompt version digest returned by the target platform.
                     example: Provident iste temporibus magni molestiae facilis dolores.
                 requires_rebuild:
                     type: boolean
                     description: True when the change modifies a compiled Go business rule.
                     example: false
-            description: Fast Draft Mode result distinguishing 0s prompt reload from compiled Go rebuild.
+            description: Fast Draft Mode result distinguishing 0s target prompt reload from compiled Go rebuild.
             example:
                 applied_in_store: false
                 message: Ad assumenda iusto.
@@ -672,6 +922,64 @@ components:
                 - input_summary
                 - expected_outcome
                 - verification_kind
+        GuardrailItem:
+            type: object
+            properties:
+                compress_at_turns:
+                    type: integer
+                    description: Turn threshold for history compression.
+                    example: 6971589543997433724
+                    format: int64
+                keep_recent_turns:
+                    type: integer
+                    description: Recent turns retained uncompressed.
+                    example: 2370376143502343678
+                    format: int64
+                max_execution_seconds:
+                    type: integer
+                    description: Per-run execution time budget in seconds.
+                    example: 6666018236189547699
+                    format: int64
+                max_tool_calls:
+                    type: integer
+                    description: Per-run retrieval tool-call budget.
+                    example: 8420136584449978805
+                    format: int64
+            description: Active Goa-AI cost and safety guardrails extracted from the design.
+            example:
+                compress_at_turns: 6971589543997433724
+                keep_recent_turns: 2370376143502343678
+                max_execution_seconds: 6666018236189547699
+                max_tool_calls: 8420136584449978805
+            required:
+                - max_execution_seconds
+                - max_tool_calls
+                - compress_at_turns
+                - keep_recent_turns
+        PreviewArchitecturePayload:
+            type: object
+            properties:
+                change_id:
+                    type: string
+                    description: Confirmed Change Card identifier.
+                    example: Nam ut commodi.
+                design_source:
+                    type: string
+                    description: Candidate Goa and Goa-AI design source to inspect.
+                    example: Eligendi voluptates vitae voluptatem ut illum.
+                request_revision:
+                    type: string
+                    description: Expected CP1 request_revision digest.
+                    example: Et esse in incidunt repellendus in voluptate.
+            description: Request body for preview_architecture.
+            example:
+                change_id: Nam ut commodi.
+                design_source: Eligendi voluptates vitae voluptatem ut illum.
+                request_revision: Et esse in incidunt repellendus in voluptate.
+            required:
+                - change_id
+                - request_revision
+                - design_source
         ProposeChangePayload:
             type: object
             properties:

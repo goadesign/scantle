@@ -49,7 +49,7 @@ func BuildConfirmIntentPayload(scantleConfirmIntentBody *string) (*scantle.Confi
 		}
 		err = json.Unmarshal([]byte(*scantleConfirmIntentBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ],\n      \"operator\": \"Culpa repellat.\"\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ]\n   }'")
 		}
 		if body.Answers == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
@@ -70,7 +70,6 @@ func BuildConfirmIntentPayload(scantleConfirmIntentBody *string) (*scantle.Confi
 	}
 	v := &scantle.ConfirmIntentPayload{
 		ChangeID: body.ChangeID,
-		Operator: body.Operator,
 	}
 	if body.Answers != nil {
 		v.Answers = make(map[string]string, len(body.Answers))
@@ -91,6 +90,29 @@ func BuildConfirmIntentPayload(scantleConfirmIntentBody *string) (*scantle.Confi
 		}
 	} else {
 		v.Examples = []*scantle.ExampleItem{}
+	}
+
+	return v, nil
+}
+
+// BuildPreviewArchitecturePayload builds the payload for the scantle
+// preview_architecture endpoint from CLI flags.
+func BuildPreviewArchitecturePayload(scantlePreviewArchitectureBody *string) (*scantle.PreviewArchitecturePayload, error) {
+	var err error
+	var body PreviewArchitectureRequestBody
+	{
+		if scantlePreviewArchitectureBody == nil {
+			return nil, fmt.Errorf("missing required flag --body")
+		}
+		err = json.Unmarshal([]byte(*scantlePreviewArchitectureBody), &body)
+		if err != nil {
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design_source\": \"Eligendi voluptates vitae voluptatem ut illum.\",\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
+		}
+	}
+	v := &scantle.PreviewArchitecturePayload{
+		ChangeID:        body.ChangeID,
+		RequestRevision: body.RequestRevision,
+		DesignSource:    body.DesignSource,
 	}
 
 	return v, nil

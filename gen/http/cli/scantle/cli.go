@@ -23,7 +23,7 @@ import (
 //	command (subcommand1|subcommand2|...)
 func UsageCommands() []string {
 	return []string{
-		"scantle (checkpoint-ui|propose-change|confirm-intent|draft-override|diff)",
+		"scantle (checkpoint-ui|propose-change|confirm-intent|preview-architecture|draft-override|diff)",
 	}
 }
 
@@ -72,6 +72,9 @@ func ParseEndpoint(
 		scantleConfirmIntentFlags    = flag.NewFlagSet("confirm-intent", flag.ExitOnError)
 		scantleConfirmIntentBodyFlag = new(cliStringFlag)
 
+		scantlePreviewArchitectureFlags    = flag.NewFlagSet("preview-architecture", flag.ExitOnError)
+		scantlePreviewArchitectureBodyFlag = new(cliStringFlag)
+
 		scantleDraftOverrideFlags    = flag.NewFlagSet("draft-override", flag.ExitOnError)
 		scantleDraftOverrideBodyFlag = new(cliStringFlag)
 
@@ -80,6 +83,7 @@ func ParseEndpoint(
 	)
 	scantleProposeChangeFlags.Var(scantleProposeChangeBodyFlag, "body", "")
 	scantleConfirmIntentFlags.Var(scantleConfirmIntentBodyFlag, "body", "")
+	scantlePreviewArchitectureFlags.Var(scantlePreviewArchitectureBodyFlag, "body", "")
 	scantleDraftOverrideFlags.Var(scantleDraftOverrideBodyFlag, "body", "")
 	scantleDiffFlags.Var(scantleDiffBodyFlag, "body", "")
 
@@ -87,6 +91,7 @@ func ParseEndpoint(
 	scantleCheckpointUIFlags.Usage = scantleCheckpointUIUsage
 	scantleProposeChangeFlags.Usage = scantleProposeChangeUsage
 	scantleConfirmIntentFlags.Usage = scantleConfirmIntentUsage
+	scantlePreviewArchitectureFlags.Usage = scantlePreviewArchitectureUsage
 	scantleDraftOverrideFlags.Usage = scantleDraftOverrideUsage
 	scantleDiffFlags.Usage = scantleDiffUsage
 
@@ -133,6 +138,9 @@ func ParseEndpoint(
 			case "confirm-intent":
 				epf = scantleConfirmIntentFlags
 
+			case "preview-architecture":
+				epf = scantlePreviewArchitectureFlags
+
 			case "draft-override":
 				epf = scantleDraftOverrideFlags
 
@@ -172,6 +180,9 @@ func ParseEndpoint(
 			case "confirm-intent":
 				endpoint = c.ConfirmIntent()
 				data, err = scantlec.BuildConfirmIntentPayload(scantleConfirmIntentBodyFlag.value)
+			case "preview-architecture":
+				endpoint = c.PreviewArchitecture()
+				data, err = scantlec.BuildPreviewArchitecturePayload(scantlePreviewArchitectureBodyFlag.value)
 			case "draft-override":
 				endpoint = c.DraftOverride()
 				data, err = scantlec.BuildDraftOverridePayload(scantleDraftOverrideBodyFlag.value)
@@ -196,8 +207,9 @@ func scantleUsage() {
 	fmt.Fprintln(os.Stderr, `    checkpoint-ui: Serve the interactive MCP Apps HTML host for Scantle checkpoints.`)
 	fmt.Fprintln(os.Stderr, `    propose-change: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.`)
 	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm Checkpoint 1 answers and examples to freeze the Change Card.`)
-	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override in prompt.Store or reject a compiled-rule prompt hack.`)
-	fmt.Fprintln(os.Stderr, `    diff: Compare Goa design ASTs and go.mod versions without emitting a blanket compatibility verdict.`)
+	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.`)
+	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
+	fmt.Fprintln(os.Stderr, `    diff: Compare Goa design ASTs and go.mod directives without emitting a blanket compatibility verdict.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s scantle COMMAND --help\n", os.Args[0])
@@ -251,7 +263,25 @@ func scantleConfirmIntentUsage() {
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle confirm-intent --body '{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ],\n      \"operator\": \"Culpa repellat.\"\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle confirm-intent --body '{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ]\n   }'")
+}
+
+func scantlePreviewArchitectureUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] scantle preview-architecture", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Extract and validate the Checkpoint 2 C4 container topology and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle preview-architecture --body '{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design_source\": \"Eligendi voluptates vitae voluptatem ut illum.\",\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
 }
 
 func scantleDraftOverrideUsage() {
@@ -262,7 +292,7 @@ func scantleDraftOverrideUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Apply a Fast Draft Mode prompt override in prompt.Store or reject a compiled-rule prompt hack.`)
+	fmt.Fprintln(os.Stderr, `Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)
@@ -280,7 +310,7 @@ func scantleDiffUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Compare Goa design ASTs and go.mod versions without emitting a blanket compatibility verdict.`)
+	fmt.Fprintln(os.Stderr, `Compare Goa design ASTs and go.mod directives without emitting a blanket compatibility verdict.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)

@@ -63,8 +63,6 @@ func ValidateConfirmIntentPayloadExampleItemTransport(value *ConfirmIntentPayloa
 type ConfirmIntentPayloadTransport struct {
 	// Change identifier.
 	ChangeID *string `json:"change_id"`
-	// Authenticated operator identity.
-	Operator *string `json:"operator"`
 	// Selected resolution per ambiguity question ID.
 	Answers map[string]string `json:"answers"`
 	// Confirmed example table.
@@ -78,9 +76,6 @@ func ValidateConfirmIntentPayloadTransport(value *ConfirmIntentPayloadTransport)
 	}
 	if value.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
-	}
-	if value.Operator == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("operator", "body"))
 	}
 	if value.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
@@ -173,15 +168,21 @@ type ConfirmIntentResultTransport struct {
 	ChangeID *string `json:"change_id"`
 	// Checkpoint status (needs_confirmation or confirmed).
 	Status *string `json:"status"`
+	// Original operator feature request.
+	Prompt *string `json:"prompt"`
 	// Plain-English summary of requested behavior.
 	Summary *string `json:"summary"`
-	// Unresolved domain questions, empty when clear.
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
 	Ambiguities []*ConfirmIntentResultAmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `json:"answers,omitempty"`
 	// Concrete examples mapped to evaluator checks.
 	Examples []*ConfirmIntentResultExampleItemTransport `json:"examples"`
 	// Existing contract invariants preserved by this change.
 	PreservedBehaviors []string `json:"preserved_behaviors"`
-	// SHA-256 digest of the confirmed Change Card.
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `json:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
 }
 
@@ -195,6 +196,9 @@ func ValidateConfirmIntentResultTransport(value *ConfirmIntentResultTransport) (
 	}
 	if value.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if value.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if value.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -264,13 +268,15 @@ func ValidateDiffPayloadTransport(value *DiffPayloadTransport) (err error) {
 
 // DiffResultTransport stores JSON fields until they have been validated.
 type DiffResultTransport struct {
-	// True when any declaration or module pin changed.
+	// True when any declaration, contract body, or module directive changed.
 	HasChanges *bool `json:"has_changes"`
-	// Added services, methods, agents, or tools.
+	// Added scoped declarations.
 	AddedDeclarations []string `json:"added_declarations"`
-	// Removed services, methods, agents, or tools.
+	// Removed scoped declarations.
 	RemovedDeclarations []string `json:"removed_declarations"`
-	// Changed module dependency pins.
+	// Declarations whose payload, result, route, or policy changed.
+	ModifiedDeclarations []string `json:"modified_declarations"`
+	// Changed module require, replace, or exclude directives.
 	VersionDeltas []string `json:"version_deltas"`
 	// Human-readable structural diff summary.
 	Summary *string `json:"summary"`
@@ -289,6 +295,9 @@ func ValidateDiffResultTransport(value *DiffResultTransport) (err error) {
 	}
 	if value.RemovedDeclarations == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("removed_declarations", "body"))
+	}
+	if value.ModifiedDeclarations == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("modified_declarations", "body"))
 	}
 	if value.VersionDeltas == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("version_deltas", "body"))
@@ -330,11 +339,11 @@ func ValidateDraftOverridePayloadTransport(value *DraftOverridePayloadTransport)
 
 // DraftOverrideResultTransport stores JSON fields until they have been validated.
 type DraftOverrideResultTransport struct {
-	// True when updated in prompt.Store for 0s reload.
+	// True when updated in the target platform's prompt.Store for 0s reload.
 	AppliedInStore *bool `json:"applied_in_store"`
 	// True when the change modifies a compiled Go business rule.
 	RequiresRebuild *bool `json:"requires_rebuild"`
-	// New prompt version digest when applied in prompt.Store.
+	// New prompt version digest returned by the target platform.
 	PromptVersion *string `json:"prompt_version,omitempty"`
 	// Operator-facing status explanation.
 	Message *string `json:"message"`
@@ -353,6 +362,200 @@ func ValidateDraftOverrideResultTransport(value *DraftOverrideResultTransport) (
 	}
 	if value.Message == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	return err
+}
+
+// PreviewArchitecturePayloadTransport stores JSON fields until they have been validated.
+type PreviewArchitecturePayloadTransport struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Expected CP1 request_revision digest.
+	RequestRevision *string `json:"request_revision"`
+	// Candidate Goa and Goa-AI design source to inspect.
+	DesignSource *string `json:"design_source"`
+}
+
+// ValidatePreviewArchitecturePayloadTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitecturePayloadTransport(value *PreviewArchitecturePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.DesignSource == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
+	}
+	return err
+}
+
+// PreviewArchitectureResultC4ContainerItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultC4ContainerItemTransport struct {
+	// Stable container identifier.
+	ID *string `json:"id"`
+	// Human-readable container name.
+	Name *string `json:"name"`
+	// Container role (service, agent, toolset, or dependency).
+	Kind *string `json:"kind"`
+	// Summary of the container's responsibility.
+	Description *string `json:"description"`
+}
+
+// ValidatePreviewArchitectureResultC4ContainerItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultC4ContainerItemTransport(value *PreviewArchitectureResultC4ContainerItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if value.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if value.Kind != nil {
+		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset" || *value.Kind == "dependency") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset", "dependency"}))
+		}
+	}
+	return err
+}
+
+// PreviewArchitectureResultC4EdgeItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultC4EdgeItemTransport struct {
+	// Source container ID.
+	FromID *string `json:"from_id"`
+	// Target container ID.
+	ToID *string `json:"to_id"`
+	// Contract or transport relationship.
+	Protocol *string `json:"protocol"`
+}
+
+// ValidatePreviewArchitectureResultC4EdgeItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultC4EdgeItemTransport(value *PreviewArchitectureResultC4EdgeItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.FromID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("from_id", "body"))
+	}
+	if value.ToID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("to_id", "body"))
+	}
+	if value.Protocol == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("protocol", "body"))
+	}
+	return err
+}
+
+// PreviewArchitectureResultGuardrailItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultGuardrailItemTransport struct {
+	// Per-run execution time budget in seconds.
+	MaxExecutionSeconds *int `json:"max_execution_seconds"`
+	// Per-run retrieval tool-call budget.
+	MaxToolCalls *int `json:"max_tool_calls"`
+	// Turn threshold for history compression.
+	CompressAtTurns *int `json:"compress_at_turns"`
+	// Recent turns retained uncompressed.
+	KeepRecentTurns *int `json:"keep_recent_turns"`
+}
+
+// ValidatePreviewArchitectureResultGuardrailItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultGuardrailItemTransport(value *PreviewArchitectureResultGuardrailItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.MaxExecutionSeconds == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	}
+	if value.MaxToolCalls == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if value.CompressAtTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	}
+	if value.KeepRecentTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
+	}
+	return err
+}
+
+// PreviewArchitectureResultTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultTransport struct {
+	// Bound Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Bound CP1 request_revision digest.
+	RequestRevision *string `json:"request_revision"`
+	// SHA-256 digest of the inspected Goa design source.
+	DesignDigest *string `json:"design_digest"`
+	// API or primary service name declared in the design.
+	SystemName *string `json:"system_name"`
+	// Derived C4 containers.
+	Containers []*PreviewArchitectureResultC4ContainerItemTransport `json:"containers"`
+	// Validated directed edges between declared containers.
+	Edges []*PreviewArchitectureResultC4EdgeItemTransport `json:"edges"`
+	// Extracted Goa-AI runtime guardrails.
+	Guardrails *PreviewArchitectureResultGuardrailItemTransport `json:"guardrails"`
+	// Plain-English summary of topology and guardrails.
+	Banner *string `json:"banner"`
+}
+
+// ValidatePreviewArchitectureResultTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultTransport(value *PreviewArchitectureResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.DesignDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_digest", "body"))
+	}
+	if value.SystemName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("system_name", "body"))
+	}
+	if value.Containers == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("containers", "body"))
+	}
+	if value.Edges == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
+	}
+	if value.Guardrails == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("guardrails", "body"))
+	}
+	if value.Banner == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
+	}
+	for _, e := range value.Containers {
+		if e != nil {
+			if err2 := ValidatePreviewArchitectureResultC4ContainerItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Edges {
+		if e != nil {
+			if err2 := ValidatePreviewArchitectureResultC4EdgeItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	if value.Guardrails != nil {
+		if err2 := ValidatePreviewArchitectureResultGuardrailItemTransport(value.Guardrails); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return err
 }
@@ -456,15 +659,21 @@ type ProposeChangeResultTransport struct {
 	ChangeID *string `json:"change_id"`
 	// Checkpoint status (needs_confirmation or confirmed).
 	Status *string `json:"status"`
+	// Original operator feature request.
+	Prompt *string `json:"prompt"`
 	// Plain-English summary of requested behavior.
 	Summary *string `json:"summary"`
-	// Unresolved domain questions, empty when clear.
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
 	Ambiguities []*ProposeChangeResultAmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `json:"answers,omitempty"`
 	// Concrete examples mapped to evaluator checks.
 	Examples []*ProposeChangeResultExampleItemTransport `json:"examples"`
 	// Existing contract invariants preserved by this change.
 	PreservedBehaviors []string `json:"preserved_behaviors"`
-	// SHA-256 digest of the confirmed Change Card.
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `json:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
 }
 
@@ -478,6 +687,9 @@ func ValidateProposeChangeResultTransport(value *ProposeChangeResultTransport) (
 	}
 	if value.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if value.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if value.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -533,7 +745,6 @@ func DecodeConfirmIntentPayload(data []byte) (out *scantle.ConfirmIntentPayload,
 	{
 		out = &scantle.ConfirmIntentPayload{
 			ChangeID: *body.ChangeID,
-			Operator: *body.Operator,
 		}
 		out.Answers = make(map[string]string, len(body.Answers))
 		for key, val := range body.Answers {
@@ -560,7 +771,9 @@ func EncodeConfirmIntentResult(in *scantle.ChangeCardResult) ([]byte, error) {
 		body = &ConfirmIntentResultTransport{
 			ChangeID:        &in.ChangeID,
 			Status:          &in.Status,
+			Prompt:          &in.Prompt,
 			Summary:         &in.Summary,
+			ConfirmedBy:     in.ConfirmedBy,
 			RequestRevision: &in.RequestRevision,
 		}
 		if in.Ambiguities != nil {
@@ -571,6 +784,14 @@ func EncodeConfirmIntentResult(in *scantle.ChangeCardResult) ([]byte, error) {
 					continue
 				}
 				body.Ambiguities[i] = encodeAmbiguityQuestionToConfirmIntentResultAmbiguityQuestionTransport(val)
+			}
+		}
+		if in.Answers != nil {
+			body.Answers = make(map[string]string, len(in.Answers))
+			for key, val := range in.Answers {
+				tk := key
+				tv := val
+				body.Answers[tk] = tv
 			}
 		}
 		body.Examples = make([]*ConfirmIntentResultExampleItemTransport, len(in.Examples))
@@ -640,6 +861,10 @@ func EncodeDiffResult(in *scantle.DiffResult) ([]byte, error) {
 		for i, val := range in.RemovedDeclarations {
 			body.RemovedDeclarations[i] = val
 		}
+		body.ModifiedDeclarations = make([]string, len(in.ModifiedDeclarations))
+		for i, val := range in.ModifiedDeclarations {
+			body.ModifiedDeclarations[i] = val
+		}
 		body.VersionDeltas = make([]string, len(in.VersionDeltas))
 		for i, val := range in.VersionDeltas {
 			body.VersionDeltas[i] = val
@@ -703,6 +928,72 @@ func EncodeDraftOverrideResult(in *scantle.DraftOverrideResult) ([]byte, error) 
 	return data, nil
 }
 
+// DecodePreviewArchitecturePayload checks JSON field names from the Goa design and returns a service value.
+func DecodePreviewArchitecturePayload(data []byte) (out *scantle.PreviewArchitecturePayload, err error) {
+	var body *PreviewArchitecturePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode PreviewArchitecturePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode PreviewArchitecturePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode PreviewArchitecturePayload JSON after first value: %w", err)
+	}
+	if err := ValidatePreviewArchitecturePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate PreviewArchitecturePayload JSON: %w", err)
+	}
+	{
+		out = &scantle.PreviewArchitecturePayload{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			DesignSource:    *body.DesignSource,
+		}
+	}
+	return out, nil
+}
+
+// EncodePreviewArchitectureResult turns a service value into JSON using the field names in the Goa design.
+func EncodePreviewArchitectureResult(in *scantle.ArchitecturePreviewResult) ([]byte, error) {
+	var body *PreviewArchitectureResultTransport
+	{
+		body = &PreviewArchitectureResultTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			DesignDigest:    &in.DesignDigest,
+			SystemName:      &in.SystemName,
+			Banner:          &in.Banner,
+		}
+		body.Containers = make([]*PreviewArchitectureResultC4ContainerItemTransport, len(in.Containers))
+		for i, val := range in.Containers {
+			if val == nil {
+				body.Containers[i] = nil
+				continue
+			}
+			body.Containers[i] = encodeC4ContainerItemToPreviewArchitectureResultC4ContainerItemTransport(val)
+		}
+		body.Edges = make([]*PreviewArchitectureResultC4EdgeItemTransport, len(in.Edges))
+		for i, val := range in.Edges {
+			if val == nil {
+				body.Edges[i] = nil
+				continue
+			}
+			body.Edges[i] = encodeC4EdgeItemToPreviewArchitectureResultC4EdgeItemTransport(val)
+		}
+		body.Guardrails = encodeGuardrailItemToPreviewArchitectureResultGuardrailItemTransport(in.Guardrails)
+	}
+	if err := ValidatePreviewArchitectureResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate PreviewArchitectureResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode PreviewArchitectureResult JSON: %w", err)
+	}
+	return data, nil
+}
+
 // DecodeProposeChangePayload checks JSON field names from the Goa design and returns a service value.
 func DecodeProposeChangePayload(data []byte) (out *scantle.ProposeChangePayload, err error) {
 	var body *ProposeChangePayloadTransport
@@ -737,7 +1028,9 @@ func EncodeProposeChangeResult(in *scantle.ChangeCardResult) ([]byte, error) {
 		body = &ProposeChangeResultTransport{
 			ChangeID:        &in.ChangeID,
 			Status:          &in.Status,
+			Prompt:          &in.Prompt,
 			Summary:         &in.Summary,
+			ConfirmedBy:     in.ConfirmedBy,
 			RequestRevision: &in.RequestRevision,
 		}
 		if in.Ambiguities != nil {
@@ -748,6 +1041,14 @@ func EncodeProposeChangeResult(in *scantle.ChangeCardResult) ([]byte, error) {
 					continue
 				}
 				body.Ambiguities[i] = encodeAmbiguityQuestionToProposeChangeResultAmbiguityQuestionTransport(val)
+			}
+		}
+		if in.Answers != nil {
+			body.Answers = make(map[string]string, len(in.Answers))
+			for key, val := range in.Answers {
+				tk := key
+				tv := val
+				body.Answers[tk] = tv
 			}
 		}
 		body.Examples = make([]*ProposeChangeResultExampleItemTransport, len(in.Examples))
@@ -811,6 +1112,27 @@ func encodeAmbiguityQuestionToProposeChangeResultAmbiguityQuestionTransport(v *s
 	return res
 }
 
+func encodeC4ContainerItemToPreviewArchitectureResultC4ContainerItemTransport(v *scantle.C4ContainerItem) *PreviewArchitectureResultC4ContainerItemTransport {
+	res := &PreviewArchitectureResultC4ContainerItemTransport{
+		ID:          &v.ID,
+		Name:        &v.Name,
+		Kind:        &v.Kind,
+		Description: &v.Description,
+	}
+
+	return res
+}
+
+func encodeC4EdgeItemToPreviewArchitectureResultC4EdgeItemTransport(v *scantle.C4EdgeItem) *PreviewArchitectureResultC4EdgeItemTransport {
+	res := &PreviewArchitectureResultC4EdgeItemTransport{
+		FromID:   &v.FromID,
+		ToID:     &v.ToID,
+		Protocol: &v.Protocol,
+	}
+
+	return res
+}
+
 func encodeExampleItemToConfirmIntentResultExampleItemTransport(v *scantle.ExampleItem) *ConfirmIntentResultExampleItemTransport {
 	res := &ConfirmIntentResultExampleItemTransport{
 		ID:               &v.ID,
@@ -830,6 +1152,17 @@ func encodeExampleItemToProposeChangeResultExampleItemTransport(v *scantle.Examp
 		InputSummary:     &v.InputSummary,
 		ExpectedOutcome:  &v.ExpectedOutcome,
 		VerificationKind: &v.VerificationKind,
+	}
+
+	return res
+}
+
+func encodeGuardrailItemToPreviewArchitectureResultGuardrailItemTransport(v *scantle.GuardrailItem) *PreviewArchitectureResultGuardrailItemTransport {
+	res := &PreviewArchitectureResultGuardrailItemTransport{
+		MaxExecutionSeconds: &v.MaxExecutionSeconds,
+		MaxToolCalls:        &v.MaxToolCalls,
+		CompressAtTurns:     &v.CompressAtTurns,
+		KeepRecentTurns:     &v.KeepRecentTurns,
 	}
 
 	return res

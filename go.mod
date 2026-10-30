@@ -8,6 +8,7 @@ require (
 	go.opentelemetry.io/otel v1.47.0
 	goa.design/goa-ai v0.89.1-0.20261028052713-99d852887d11
 	goa.design/goa/v3 v3.35.1-0.20261023134129-12a5635f9dd0
+	golang.org/x/mod v0.42.0
 )
 
 require (
@@ -85,7 +86,6 @@ require (
 	goa.design/pulse v1.10.3-0.20261002205507-b34ad25e317d // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/image v0.46.0 // indirect
-	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect

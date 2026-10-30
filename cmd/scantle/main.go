@@ -17,6 +17,27 @@ import (
 	"github.com/goadesign/scantle/internal/controlplane"
 )
 
+type (
+	// fileCP1Analyzer loads a static or pre-recorded CP1SemanticAnalysis JSON
+	// document when -cp1-analysis-file is configured on `scantle serve`.
+	fileCP1Analyzer struct {
+		// path is the JSON file path containing a CP1SemanticAnalysis document.
+		path string
+	}
+)
+
+func (f fileCP1Analyzer) Analyze(_ context.Context, _, _ string) (controlplane.CP1SemanticAnalysis, error) {
+	raw, err := os.ReadFile(f.path)
+	if err != nil {
+		return controlplane.CP1SemanticAnalysis{}, fmt.Errorf("read cp1 analysis file: %w", err)
+	}
+	var out controlplane.CP1SemanticAnalysis
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return controlplane.CP1SemanticAnalysis{}, fmt.Errorf("decode cp1 analysis file: %w", err)
+	}
+	return out, nil
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "scantle: %v\n", err)
@@ -45,10 +66,15 @@ func run(args []string) error {
 func runServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	addr := fs.String("addr", "127.0.0.1:8090", "HTTP and MCP listen address")
+	cp1File := fs.String("cp1-analysis-file", "", "Optional path to a CP1SemanticAnalysis JSON file for CP1 propose_change")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	cp := controlplane.New(controlplane.Options{})
+	var opts controlplane.Options
+	if *cp1File != "" {
+		opts.Analyzer = fileCP1Analyzer{path: *cp1File}
+	}
+	cp := controlplane.New(opts)
 	srv := &http.Server{
 		Addr:              *addr,
 		Handler:           controlplane.NewHTTPHandler(cp),

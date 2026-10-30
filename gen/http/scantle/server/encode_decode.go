@@ -114,6 +114,48 @@ func DecodeConfirmIntentRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 	}
 }
 
+// EncodePreviewArchitectureResponse returns an encoder for responses returned
+// by the scantle preview_architecture endpoint.
+func EncodePreviewArchitectureResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*scantle.ArchitecturePreviewResult)
+		enc := encoder(ctx, w)
+		body := NewPreviewArchitectureResponseBody(res)
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
+// DecodePreviewArchitectureRequest returns a decoder for requests sent to the
+// scantle preview_architecture endpoint.
+func DecodePreviewArchitectureRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*scantle.PreviewArchitecturePayload, error) {
+	return func(r *http.Request) (*scantle.PreviewArchitecturePayload, error) {
+		var payload *scantle.PreviewArchitecturePayload
+		var (
+			body PreviewArchitectureRequestBody
+			err  error
+		)
+		err = decoder(r).Decode(&body)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return payload, goa.MissingPayloadError()
+			}
+			var gerr *goa.ServiceError
+			if errors.As(err, &gerr) {
+				return payload, gerr
+			}
+			return payload, goa.DecodePayloadError(err.Error())
+		}
+		err = ValidatePreviewArchitectureRequestBody(&body)
+		if err != nil {
+			return payload, err
+		}
+		payload = NewPreviewArchitecturePayload(&body)
+
+		return payload, nil
+	}
+}
+
 // EncodeDraftOverrideResponse returns an encoder for responses returned by the
 // scantle draft_override endpoint.
 func EncodeDraftOverrideResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
@@ -241,6 +283,45 @@ func unmarshalExampleItemRequestBodyToScantleExampleItem(v *ExampleItemRequestBo
 		InputSummary:     *v.InputSummary,
 		ExpectedOutcome:  *v.ExpectedOutcome,
 		VerificationKind: *v.VerificationKind,
+	}
+
+	return res
+}
+
+// marshalScantleC4ContainerItemToC4ContainerItemResponseBody builds a value of
+// type *C4ContainerItemResponseBody from a value of type
+// *scantle.C4ContainerItem.
+func marshalScantleC4ContainerItemToC4ContainerItemResponseBody(v *scantle.C4ContainerItem) *C4ContainerItemResponseBody {
+	res := &C4ContainerItemResponseBody{
+		ID:          v.ID,
+		Name:        v.Name,
+		Kind:        v.Kind,
+		Description: v.Description,
+	}
+
+	return res
+}
+
+// marshalScantleC4EdgeItemToC4EdgeItemResponseBody builds a value of type
+// *C4EdgeItemResponseBody from a value of type *scantle.C4EdgeItem.
+func marshalScantleC4EdgeItemToC4EdgeItemResponseBody(v *scantle.C4EdgeItem) *C4EdgeItemResponseBody {
+	res := &C4EdgeItemResponseBody{
+		FromID:   v.FromID,
+		ToID:     v.ToID,
+		Protocol: v.Protocol,
+	}
+
+	return res
+}
+
+// marshalScantleGuardrailItemToGuardrailItemResponseBody builds a value of
+// type *GuardrailItemResponseBody from a value of type *scantle.GuardrailItem.
+func marshalScantleGuardrailItemToGuardrailItemResponseBody(v *scantle.GuardrailItem) *GuardrailItemResponseBody {
+	res := &GuardrailItemResponseBody{
+		MaxExecutionSeconds: v.MaxExecutionSeconds,
+		MaxToolCalls:        v.MaxToolCalls,
+		CompressAtTurns:     v.CompressAtTurns,
+		KeepRecentTurns:     v.KeepRecentTurns,
 	}
 
 	return res

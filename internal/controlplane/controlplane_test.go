@@ -5,38 +5,28 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
 	genscantle "github.com/goadesign/scantle/gen/scantle"
-	genregistry "goa.design/goa-ai/registry/gen/registry"
-	genrunidentity "goa.design/goa-ai/registry/gen/runidentity"
-	"goa.design/goa-ai/runtime/agent"
-	"goa.design/goa-ai/runtime/agent/hooks"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/prompt"
-	"goa.design/goa-ai/runtime/agent/rawjson"
-	"goa.design/goa-ai/runtime/agent/runlog"
-	"goa.design/goa-ai/runtime/agent/session"
-	"goa.design/goa-ai/runtime/agent/storage"
-	storageinmem "goa.design/goa-ai/runtime/agent/storage/inmem"
-	"goa.design/goa-ai/runtime/agent/transcript"
 )
 
 type (
-	// stubModelClient implements model.Client for testing ModelCP1Analyzer.
+	// stubModelClient implements ModelCompleter for testing ModelCP1Analyzer.
 	stubModelClient struct {
 		// responseJSON is the structured JSON payload returned by Complete.
 		responseJSON string
 	}
 
-	// simTokenIssuer issues test bearer tokens for sim role-switching tests.
-	simTokenIssuer struct{}
+	// boundTargetPromptUpdater binds a target platform's prompt.Store to the
+	// TargetPromptUpdater contract for testing CP3 Fast Draft Mode.
+	boundTargetPromptUpdater struct {
+		// store is the target platform's prompt.Store.
+		store prompt.Store
+	}
 )
 
 func (s *stubModelClient) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
@@ -50,12 +40,22 @@ func (s *stubModelClient) Complete(_ context.Context, _ *model.Request) (*model.
 	}, nil
 }
 
-func (simTokenIssuer) IssueToken(_ context.Context, environment, role string) (string, error) {
-	return environment + "-token-for-" + role, nil
+func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, promptID, newContent string) (string, error) {
+	id := prompt.Ident(promptID)
+	if err := u.store.Set(ctx, id, prompt.Scope{}, newContent, map[string]string{"source": "cp3_fast_draft"}); err != nil {
+		return "", err
+	}
+	override, err := u.store.Resolve(ctx, id, prompt.Scope{})
+	if err != nil || override == nil {
+		return "", err
+	}
+	return override.Version, nil
 }
 
-func TestCP1AmbiguityResolutionViaModelAndConfirmationLock(t *testing.T) {
-	ctx := context.Background()
+func TestCP1AmbiguityResolutionStrictValidationOwnershipAndConfirmationLock(t *testing.T) {
+	aliceCtx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
+	bobCtx := WithPrincipal(context.Background(), Principal{ID: "bob@example.com"})
+
 	ambiguousAnalysis := CP1SemanticAnalysis{
 		Summary: "Auto-approve refunds under $50 and route larger refunds to manager approval.",
 		Ambiguities: []*genscantle.AmbiguityQuestion{
@@ -105,7 +105,16 @@ func TestCP1AmbiguityResolutionViaModelAndConfirmationLock(t *testing.T) {
 	})
 
 	designSrc := `package design // orders service`
-	proposed, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+	// Unauthenticated call must fail closed.
+	if _, err := cp.ProposeChange(context.Background(), &genscantle.ProposeChangePayload{
+		ChangeID:     "chg-refund-50",
+		Prompt:       "Refunds under $50 should be automatic, otherwise ask a manager.",
+		DesignSource: &designSrc,
+	}); err == nil {
+		t.Fatal("expected unauthenticated ProposeChange to fail")
+	}
+
+	proposed, err := cp.ProposeChange(aliceCtx, &genscantle.ProposeChangePayload{
 		ChangeID:     "chg-refund-50",
 		Prompt:       "Refunds under $50 should be automatic, otherwise ask a manager.",
 		DesignSource: &designSrc,
@@ -123,19 +132,50 @@ func TestCP1AmbiguityResolutionViaModelAndConfirmationLock(t *testing.T) {
 		t.Fatalf("unexpected examples: %+v", proposed.Examples)
 	}
 
-	// Attempting to confirm with missing answers must fail.
-	if _, err := cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{
+	// Non-owner principal cannot confirm Alice's Change Card.
+	if _, err := cp.ConfirmIntent(bobCtx, &genscantle.ConfirmIntentPayload{
 		ChangeID: "chg-refund-50",
-		Operator: "alice@example.com",
+		Answers: map[string]string{
+			"amount-basis":   "item_subtotal_cents",
+			"exact-boundary": "require_manager_at_5000",
+		},
+		Examples: proposed.Examples,
+	}); err == nil {
+		t.Fatal("expected ConfirmIntent by non-owner principal to be rejected")
+	}
+
+	// Missing answer, invalid option, or extra unknown ambiguity ID must fail.
+	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
+		ChangeID: "chg-refund-50",
 		Answers:  map[string]string{"amount-basis": "item_subtotal_cents"},
 		Examples: proposed.Examples,
 	}); err == nil {
 		t.Fatal("expected ConfirmIntent to reject incomplete ambiguity answers")
 	}
-
-	confirmed, err := cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{
+	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
 		ChangeID: "chg-refund-50",
-		Operator: "alice@example.com",
+		Answers: map[string]string{
+			"amount-basis":   "not-a-valid-option",
+			"exact-boundary": "require_manager_at_5000",
+		},
+		Examples: proposed.Examples,
+	}); err == nil {
+		t.Fatal("expected ConfirmIntent to reject option not in Ambiguities.Options")
+	}
+	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
+		ChangeID: "chg-refund-50",
+		Answers: map[string]string{
+			"amount-basis":   "item_subtotal_cents",
+			"exact-boundary": "require_manager_at_5000",
+			"extra-id":       "value",
+		},
+		Examples: proposed.Examples,
+	}); err == nil {
+		t.Fatal("expected ConfirmIntent to reject unknown ambiguity key")
+	}
+
+	confirmed, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
+		ChangeID: "chg-refund-50",
 		Answers: map[string]string{
 			"amount-basis":   "item_subtotal_cents",
 			"exact-boundary": "require_manager_at_5000",
@@ -148,16 +188,33 @@ func TestCP1AmbiguityResolutionViaModelAndConfirmationLock(t *testing.T) {
 	if confirmed.Status != StatusConfirmed {
 		t.Fatalf("expected status %q, got %q", StatusConfirmed, confirmed.Status)
 	}
-	if len(confirmed.Ambiguities) != 0 {
-		t.Fatalf("expected ambiguities to be cleared after confirmation, got %d", len(confirmed.Ambiguities))
+	if len(confirmed.Ambiguities) != 2 || len(confirmed.Answers) != 2 {
+		t.Fatalf("expected ambiguities and answers to be retained for audit, got %d ambiguities and %d answers", len(confirmed.Ambiguities), len(confirmed.Answers))
+	}
+	if confirmed.ConfirmedBy == nil || *confirmed.ConfirmedBy != "alice@example.com" {
+		t.Fatalf("expected ConfirmedBy alice@example.com, got %v", confirmed.ConfirmedBy)
 	}
 	if confirmed.RequestRevision == "" || confirmed.RequestRevision == proposed.RequestRevision {
 		t.Fatalf("expected new confirmed RequestRevision, got %q (proposed %q)", confirmed.RequestRevision, proposed.RequestRevision)
 	}
 }
 
-func TestCP1ClearRequestSkipsUnnecessaryConfirmationStop(t *testing.T) {
-	ctx := context.Background()
+func TestCP1RejectsMalformedModelAnalysis(t *testing.T) {
+	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
+	invalidKindAnalysis := `{"summary":"Valid summary","ambiguities":[],"examples":[{"scenario":"s","input_summary":"i","expected_outcome":"o","verification_kind":"bogus_kind"}],"preserved_behaviors":[]}`
+	cp := New(Options{
+		Analyzer: NewModelCP1Analyzer(&stubModelClient{responseJSON: invalidKindAnalysis}),
+	})
+	if _, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+		ChangeID: "chg-bad-kind",
+		Prompt:   "Test invalid verification_kind rejection",
+	}); err == nil {
+		t.Fatal("expected ProposeChange to reject invalid verification_kind")
+	}
+}
+
+func TestCP2PreviewArchitectureAndCP3FastDraftModeAndMCPAdapter(t *testing.T) {
+	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	clearAnalysis := CP1SemanticAnalysis{
 		Summary:     "Refunds with item_subtotal_cents < 5000 auto-approve; >= 5000 require manager approval.",
 		Ambiguities: nil,
@@ -173,13 +230,46 @@ func TestCP1ClearRequestSkipsUnnecessaryConfirmationStop(t *testing.T) {
 		PreservedBehaviors: []string{"Idempotency key refund/<tenant>/<order>"},
 	}
 	rawBytes, _ := json.Marshal(clearAnalysis)
+
+	targetStore := prompt.NewInMemoryStore()
 	cp := New(Options{
-		Analyzer: NewModelCP1Analyzer(&stubModelClient{responseJSON: string(rawBytes)}),
+		Analyzer:      NewModelCP1Analyzer(&stubModelClient{responseJSON: string(rawBytes)}),
+		TargetUpdater: &boundTargetPromptUpdater{store: targetStore},
 	})
 
+	candidateDesign := `package design
+
+import (
+	"time"
+	. "goa.design/goa/v3/dsl"
+	. "goa.design/goa-ai/dsl"
+)
+
+var _ = API("orders", func() {})
+
+var RefundTools = Toolset("refund_tools", func() {
+	Description("Order lookup and payment refund tools")
+	Tool("issue_refund", "Issue a payment refund", func() {})
+})
+
+var _ = Service("orders", func() {
+	Description("Public Orders HTTP and MCP service")
+	Agent("refund_agent", "Executes durable order refund workflows", func() {
+		Use(RefundTools)
+		RunPolicy(func() {
+			TimeBudget(2 * time.Minute)
+			MaxToolCalls(6)
+			History(func() {
+				Compress(20, 6)
+			})
+		})
+	})
+})
+`
 	card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
-		ChangeID: "chg-clear",
-		Prompt:   "Auto-approve when item_subtotal_cents < 5000; require manager when item_subtotal_cents >= 5000.",
+		ChangeID:     "chg-clear",
+		Prompt:       "Auto-approve when item_subtotal_cents < 5000; require manager when item_subtotal_cents >= 5000.",
+		DesignSource: &candidateDesign,
 	})
 	if err != nil {
 		t.Fatalf("ProposeChange failed: %v", err)
@@ -187,88 +277,33 @@ func TestCP1ClearRequestSkipsUnnecessaryConfirmationStop(t *testing.T) {
 	if card.Status != StatusConfirmed {
 		t.Fatalf("expected clear request to be immediately %q, got %q", StatusConfirmed, card.Status)
 	}
-}
 
-func TestCP2ArchitecturePreviewAndCP3SandboxRoleSwitcherAndFastDraftMode(t *testing.T) {
-	ctx := context.Background()
-	promptStore := prompt.NewInMemoryStore()
-	cp := New(Options{
-		PromptStore: promptStore,
-		TokenSource: simTokenIssuer{},
-	})
-
-	// CP2: C4 container topology + Goa-AI guardrails.
-	preview, err := cp.BuildArchitecturePreview(ArchitectureSpec{
-		SystemName: "orders",
-		Containers: []C4Container{
-			{ID: "orders-api", Name: "Orders HTTP/MCP Service", Kind: "service", Description: "Public Goa HTTP & MCP server"},
-			{ID: "orders-worker", Name: "Orders Goa-AI Worker", Kind: "worker", Description: "Executes RefundWorkflow and agent turns"},
-		},
-		Edges: []C4Edge{
-			{FromID: "orders-api", ToID: "orders-worker", Protocol: "Goa-AI Durable Workflow Engine"},
-		},
-		Guardrails: GuardrailSummary{
-			MaxExecutionTime:  2 * time.Minute,
-			MaxToolCalls:      6,
-			CompressThreshold: 16000,
-			RetainRecentTurns: 4,
-		},
+	// CP2: PreviewArchitecture extracts C4 topology, edges, and guardrails from the Goa design AST.
+	preview, err := cp.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
+		ChangeID:        card.ChangeID,
+		RequestRevision: card.RequestRevision,
+		DesignSource:    candidateDesign,
 	})
 	if err != nil {
-		t.Fatalf("BuildArchitecturePreview failed: %v", err)
+		t.Fatalf("PreviewArchitecture failed: %v", err)
 	}
-	if !strings.Contains(preview.Banner, "MaxToolCalls=6") || !strings.Contains(preview.Banner, "CompressThreshold=16000") {
-		t.Fatalf("unexpected CP2 banner: %q", preview.Banner)
+	if preview.SystemName != "orders" || len(preview.Containers) != 3 || len(preview.Edges) != 2 {
+		t.Fatalf("unexpected CP2 topology: system=%q containers=%d edges=%d", preview.SystemName, len(preview.Containers), len(preview.Edges))
 	}
-
-	// CP3: Sandbox environment banner & binary digest check.
-	env := SandboxEnvironment{
-		Profile:              "sim",
-		ExpectedBinaryDigest: "sha256:candidate-binary-v1",
-	}
-	if err := cp.VerifySandboxEnvironment(env, "sha256:candidate-binary-v1"); err != nil {
-		t.Fatalf("VerifySandboxEnvironment failed: %v", err)
-	}
-	if err := cp.VerifySandboxEnvironment(env, "sha256:stale-binary"); err == nil {
-		t.Fatal("expected VerifySandboxEnvironment to reject mismatched binary digest")
+	if preview.Guardrails.MaxExecutionSeconds != 120 || preview.Guardrails.MaxToolCalls != 6 || preview.Guardrails.CompressAtTurns != 20 || preview.Guardrails.KeepRecentTurns != 6 {
+		t.Fatalf("unexpected CP2 guardrails: %+v", preview.Guardrails)
 	}
 
-	// CP3: Role Switcher driving the candidate's real HTTP approval endpoint.
-	candidateSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		switch auth {
-		case "Bearer sim-token-for-customer":
-			http.Error(w, "forbidden: customer cannot approve refund", http.StatusForbidden)
-		case "Bearer sim-token-for-manager":
-			w.WriteHeader(http.StatusAccepted)
-			_, _ = io.WriteString(w, `{"status":"approved"}`)
-		default:
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-		}
-	}))
-	defer candidateSrv.Close()
-
-	reqCustomer, _ := http.NewRequestWithContext(ctx, http.MethodPost, candidateSrv.URL+"/orders/ord-1/approve", nil)
-	respCustomer, err := cp.SwitchRoleAndInvoke(ctx, env, "customer", reqCustomer)
-	if err != nil {
-		t.Fatalf("SwitchRoleAndInvoke(customer) failed: %v", err)
-	}
-	_ = respCustomer.Body.Close()
-	if respCustomer.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403 Forbidden for customer role, got %d", respCustomer.StatusCode)
+	// CP2 must reject mismatched request_revision or undeclared toolset references.
+	if _, err := cp.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
+		ChangeID:        card.ChangeID,
+		RequestRevision: "stale-revision",
+		DesignSource:    candidateDesign,
+	}); err == nil {
+		t.Fatal("expected PreviewArchitecture to reject stale request_revision")
 	}
 
-	reqManager, _ := http.NewRequestWithContext(ctx, http.MethodPost, candidateSrv.URL+"/orders/ord-1/approve", nil)
-	respManager, err := cp.SwitchRoleAndInvoke(ctx, env, "manager", reqManager)
-	if err != nil {
-		t.Fatalf("SwitchRoleAndInvoke(manager) failed: %v", err)
-	}
-	_ = respManager.Body.Close()
-	if respManager.StatusCode != http.StatusAccepted {
-		t.Fatalf("expected 202 Accepted for manager role, got %d", respManager.StatusCode)
-	}
-
-	// CP3: Fast Draft Mode (0s prompt.Store reload vs compiled Go business rule rejection).
+	// CP3: Fast Draft Mode updates the bound TargetPromptUpdater and rejects compiled_rule hacks.
 	promptID := "orders.refund.system"
 	draftPrompt, err := cp.DraftOverride(ctx, &genscantle.DraftOverridePayload{
 		TargetKind: TargetKindPromptTemplate,
@@ -281,9 +316,9 @@ func TestCP2ArchitecturePreviewAndCP3SandboxRoleSwitcherAndFastDraftMode(t *test
 	if !draftPrompt.AppliedInStore || draftPrompt.RequiresRebuild || draftPrompt.PromptVersion == nil || *draftPrompt.PromptVersion == "" {
 		t.Fatalf("unexpected prompt_template DraftOverrideResult: %+v", draftPrompt)
 	}
-	resolved, err := promptStore.Resolve(ctx, prompt.Ident(promptID), prompt.Scope{})
+	resolved, err := targetStore.Resolve(ctx, prompt.Ident(promptID), prompt.Scope{})
 	if err != nil || resolved == nil || resolved.Template != "You are a concise, empathetic refund specialist." {
-		t.Fatalf("expected prompt.Store to contain updated template, got %+v (err=%v)", resolved, err)
+		t.Fatalf("expected bound target prompt.Store to contain updated template, got %+v (err=%v)", resolved, err)
 	}
 
 	draftRule, err := cp.DraftOverride(ctx, &genscantle.DraftOverridePayload{
@@ -296,81 +331,12 @@ func TestCP2ArchitecturePreviewAndCP3SandboxRoleSwitcherAndFastDraftMode(t *test
 	if draftRule.AppliedInStore || !draftRule.RequiresRebuild {
 		t.Fatalf("expected compiled_rule override to require rebuild and not apply in store: %+v", draftRule)
 	}
-}
 
-func TestCP3PromoteRunToExampleAndMCPAdapter(t *testing.T) {
-	ctx := context.Background()
-	cp := New(Options{})
-
-	store := newTestRunLogStore(t, ctx, "run-refund-42")
-	payload, err := transcript.EncodeRunLogDelta([]*model.Message{
-		{
-			Role:  model.ConversationRoleUser,
-			Parts: []model.Part{model.TextPart{Text: "Please refund order ord-42 ($48 subtotal)."}},
-		},
-		{
-			Role: model.ConversationRoleAssistant,
-			Parts: []model.Part{
-				model.ToolUsePart{
-					ID:    "call-refund-1",
-					Name:  "orders.issue_refund",
-					Input: rawjson.Message(`{"order_id":"ord-42","amount_cents":4800}`),
-				},
-			},
-		},
-		{
-			Role: model.ConversationRoleUser,
-			Parts: []model.Part{
-				model.ToolResultPart{
-					ToolUseID: "call-refund-1",
-					Content:   map[string]any{"status": "refunded", "refund_id": "ref-1"},
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("EncodeRunLogDelta failed: %v", err)
-	}
-	_, err = store.AppendRunRecord(ctx, &runlog.Event{
-		EventKey:  "evt-1",
-		RunID:     "run-refund-42",
-		Subject:   genrunidentity.RunSubject{Executor: genrunidentity.NewRunExecutorAgent(genrunidentity.RunExecutorBranchAgent(agent.Ident("orders.refund_agent")))},
-		SessionID: "sess-1",
-		TurnID:    "turn-1",
-		Type:      transcript.RunLogMessagesAppended,
-		Payload:   payload,
-		Timestamp: time.Now().UTC().Truncate(time.Millisecond),
-	})
-	if err != nil {
-		t.Fatalf("AppendRunRecord failed: %v", err)
-	}
-
-	// Self-grading (empty humanConfirmedOutcome) must be rejected.
-	if _, err := cp.PromoteRunToExample(ctx, store, "run-refund-42", "scen-42", "Order ord-42 ($48 subtotal)", "", "deterministic"); err == nil {
-		t.Fatal("expected PromoteRunToExample to reject empty humanConfirmedOutcome")
-	}
-
-	promoted, err := cp.PromoteRunToExample(
-		ctx,
-		store,
-		"run-refund-42",
-		"scen-42",
-		"Order ord-42 ($48 subtotal)",
-		"Calls orders.issue_refund with 4800 cents and completes without manager approval",
-		"deterministic",
-	)
-	if err != nil {
-		t.Fatalf("PromoteRunToExample failed: %v", err)
-	}
-	if len(promoted.Transcript) != 3 {
-		t.Fatalf("expected 3 canonical messages in promoted transcript, got %d", len(promoted.Transcript))
-	}
-
-	// MCP Adapter ToolsList, ResourcesRead (ui://scantle/checkpoint), and ToolsCall (diff).
+	// MCP Adapter ToolsList (5 tools: propose_change, confirm_intent, preview_architecture, draft_override, diff) and ResourcesRead.
 	adapter := genmcpadapter.NewMCPAdapter(genscantle.NewEndpoints(cp), nil)
 	toolsRes, err := adapter.ToolsList(ctx, &genmcpadapter.ToolsListPayload{})
-	if err != nil || len(toolsRes.Tools) != 4 {
-		t.Fatalf("expected 4 MCP tools from ToolsList, got %+v (err=%v)", toolsRes, err)
+	if err != nil || len(toolsRes.Tools) != 5 {
+		t.Fatalf("expected 5 MCP tools from ToolsList, got %+v (err=%v)", toolsRes, err)
 	}
 	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://scantle/checkpoint"})
 	if err != nil {
@@ -380,69 +346,4 @@ func TestCP3PromoteRunToExampleAndMCPAdapter(t *testing.T) {
 	if !ok || len(completeRes.Contents) != 1 || completeRes.Contents[0].Text == nil || !strings.Contains(*completeRes.Contents[0].Text, "scantle-checkpoint-root") {
 		t.Fatalf("unexpected ResourcesRead content: %+v", resRead)
 	}
-}
-
-func newTestRunLogStore(t *testing.T, ctx context.Context, runID string) *storageinmem.Store {
-	t.Helper()
-	store := storageinmem.New()
-	now := time.Now().UTC().Truncate(time.Millisecond)
-	if _, err := store.CreateSession(ctx, "sess-1", now); err != nil {
-		t.Fatalf("CreateSession: %v", err)
-	}
-	subject := genrunidentity.RunSubject{
-		Executor: genrunidentity.NewRunExecutorAgent(genrunidentity.RunExecutorBranchAgent("orders.refund_agent")),
-	}
-	origin := genregistry.ExecutionInvocation{
-		Invocation: genregistry.NewExecutionInvocationKindRoot(&genregistry.RootInvocation{RunID: runID}),
-	}
-	if _, err := store.BeginRunPreparationOperation(ctx, storage.RunPreparationBegin{
-		Operation: storage.PreparationOperation{Subject: subject, RunID: runID, SessionID: "sess-1", CommandID: runID},
-		Origin:    origin,
-	}); err != nil {
-		t.Fatalf("BeginRunPreparationOperation: %v", err)
-	}
-	if _, err := store.BeginRunSeed(ctx, storage.SeedDeclaration{
-		Subject: subject, RunID: runID, SessionID: "sess-1", CommandID: runID, AttemptID: runID, Kind: storage.SeedLiteral,
-	}); err != nil {
-		t.Fatalf("BeginRunSeed: %v", err)
-	}
-	prepared := []byte(`{}`)
-	end, err := store.AppendRunSeed(ctx, storage.SeedAppend{
-		RunID:     runID,
-		AttemptID: runID,
-		Record:    storage.SeedRecord{Key: "prepared", PreviousID: storage.EmptySeedEndID, Prepared: prepared},
-	})
-	if err != nil {
-		t.Fatalf("AppendRunSeed: %v", err)
-	}
-	if err := store.PublishRunSeed(ctx, storage.SeedPublication{
-		RunID: runID, AttemptID: runID, SeedEndID: storage.EmptySeedEndID, EndID: end, PreparedBytes: int64(len(prepared)),
-	}); err != nil {
-		t.Fatalf("PublishRunSeed: %v", err)
-	}
-	input, err := hooks.EncodeToRecordInput(
-		hooks.NewRunStartedEvent(runID, subject, "sess-1", "", "", nil),
-		hooks.EncodeOptions{EventKey: "run-started", TimestampMS: now.UnixMilli()},
-	)
-	if err != nil {
-		t.Fatalf("EncodeToRecordInput: %v", err)
-	}
-	started := &runlog.Event{
-		EventKey:  input.EventKey,
-		RunID:     input.RunID,
-		Subject:   input.Subject,
-		SessionID: input.SessionID,
-		TurnID:    input.TurnID,
-		Type:      input.Type,
-		Payload:   input.Payload,
-		Timestamp: time.UnixMilli(input.TimestampMS).UTC(),
-	}
-	if _, err := store.StartRootRun(ctx, storage.RootRunStart{
-		RequestDigest: [32]byte{1},
-		Run:           session.RunStart{Subject: subject, RunID: runID, SessionID: "sess-1", SeedEndID: storage.EmptySeedEndID, StartedAt: now},
-		Started:       started,
-	}); err != nil {
-		t.Fatalf("StartRootRun: %v", err)
-	}
-	return store
 }

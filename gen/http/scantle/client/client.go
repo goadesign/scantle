@@ -29,6 +29,10 @@ type Client struct {
 	// confirm_intent endpoint.
 	ConfirmIntentDoer goahttp.Doer
 
+	// PreviewArchitecture Doer is the HTTP client used to make requests to the
+	// preview_architecture endpoint.
+	PreviewArchitectureDoer goahttp.Doer
+
 	// DraftOverride Doer is the HTTP client used to make requests to the
 	// draft_override endpoint.
 	DraftOverrideDoer goahttp.Doer
@@ -56,16 +60,17 @@ func NewClient(
 	restoreBody bool,
 ) *Client {
 	return &Client{
-		CheckpointUIDoer:    doer,
-		ProposeChangeDoer:   doer,
-		ConfirmIntentDoer:   doer,
-		DraftOverrideDoer:   doer,
-		DiffDoer:            doer,
-		RestoreResponseBody: restoreBody,
-		scheme:              scheme,
-		host:                host,
-		decoder:             dec,
-		encoder:             enc,
+		CheckpointUIDoer:        doer,
+		ProposeChangeDoer:       doer,
+		ConfirmIntentDoer:       doer,
+		PreviewArchitectureDoer: doer,
+		DraftOverrideDoer:       doer,
+		DiffDoer:                doer,
+		RestoreResponseBody:     restoreBody,
+		scheme:                  scheme,
+		host:                    host,
+		decoder:                 dec,
+		encoder:                 enc,
 	}
 }
 
@@ -131,6 +136,30 @@ func (c *Client) ConfirmIntent() goa.Endpoint {
 		resp, err := c.ConfirmIntentDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("scantle", "confirm_intent", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// PreviewArchitecture returns an endpoint that makes HTTP requests to the
+// scantle service preview_architecture server.
+func (c *Client) PreviewArchitecture() goa.Endpoint {
+	var (
+		encodeRequest  = EncodePreviewArchitectureRequest(c.encoder)
+		decodeResponse = DecodePreviewArchitectureResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildPreviewArchitectureRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		err = encodeRequest(req, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.PreviewArchitectureDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("scantle", "preview_architecture", err)
 		}
 		return decodeResponse(resp)
 	}

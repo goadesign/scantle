@@ -14,9 +14,6 @@ func ValidateConfirmIntentPayloadTransport(body *ConfirmIntentPayloadTransport) 
 	if body.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}
-	if body.Operator == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("operator", "body"))
-	}
 	if body.Answers == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("answers", "body"))
 	}
@@ -40,6 +37,9 @@ func ValidateConfirmIntentResultTransport(body *ConfirmIntentResultTransport) (e
 	}
 	if body.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if body.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -103,6 +103,9 @@ func ValidateDiffResultTransport(body *DiffResultTransport) (err error) {
 	if body.RemovedDeclarations == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("removed_declarations", "body"))
 	}
+	if body.ModifiedDeclarations == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("modified_declarations", "body"))
+	}
 	if body.VersionDeltas == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("version_deltas", "body"))
 	}
@@ -142,6 +145,68 @@ func ValidateDraftOverrideResultTransport(body *DraftOverrideResultTransport) (e
 	return
 }
 
+// ValidatePreviewArchitecturePayloadTransport runs the validations defined on PreviewArchitecturePayloadTransport.
+func ValidatePreviewArchitecturePayloadTransport(body *PreviewArchitecturePayloadTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.DesignSource == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
+	}
+	return
+}
+
+// ValidatePreviewArchitectureResultTransport runs the validations defined on PreviewArchitectureResultTransport.
+func ValidatePreviewArchitectureResultTransport(body *PreviewArchitectureResultTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.DesignDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design_digest", "body"))
+	}
+	if body.SystemName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("system_name", "body"))
+	}
+	if body.Containers == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("containers", "body"))
+	}
+	if body.Edges == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("edges", "body"))
+	}
+	if body.Guardrails == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("guardrails", "body"))
+	}
+	if body.Banner == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
+	}
+	for _, e := range body.Containers {
+		if e != nil {
+			if err2 := ValidateC4ContainerItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Edges {
+		if e != nil {
+			if err2 := ValidateC4EdgeItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	if body.Guardrails != nil {
+		if err2 := ValidateGuardrailItemTransport(body.Guardrails); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return
+}
+
 // ValidateProposeChangePayloadTransport runs the validations defined on ProposeChangePayloadTransport.
 func ValidateProposeChangePayloadTransport(body *ProposeChangePayloadTransport) (err error) {
 	if body.ChangeID == nil {
@@ -160,6 +225,9 @@ func ValidateProposeChangeResultTransport(body *ProposeChangeResultTransport) (e
 	}
 	if body.Status == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
 	}
 	if body.Summary == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
@@ -209,6 +277,42 @@ func ValidateAmbiguityQuestionTransport(body *AmbiguityQuestionTransport) (err e
 	return
 }
 
+// ValidateC4ContainerItemTransport runs the validations defined on C4ContainerItemTransport.
+func ValidateC4ContainerItemTransport(body *C4ContainerItemTransport) (err error) {
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if body.Description == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
+	}
+	if body.Kind != nil {
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "dependency") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset", "dependency"}))
+		}
+	}
+	return
+}
+
+// ValidateC4EdgeItemTransport runs the validations defined on C4EdgeItemTransport.
+func ValidateC4EdgeItemTransport(body *C4EdgeItemTransport) (err error) {
+	if body.FromID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("from_id", "body"))
+	}
+	if body.ToID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("to_id", "body"))
+	}
+	if body.Protocol == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("protocol", "body"))
+	}
+	return
+}
+
 // ValidateExampleItemTransport runs the validations defined on ExampleItemTransport.
 func ValidateExampleItemTransport(body *ExampleItemTransport) (err error) {
 	if body.ID == nil {
@@ -230,6 +334,23 @@ func ValidateExampleItemTransport(body *ExampleItemTransport) (err error) {
 		if !(*body.VerificationKind == "deterministic" || *body.VerificationKind == "model_judged") {
 			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.verification_kind", *body.VerificationKind, []any{"deterministic", "model_judged"}))
 		}
+	}
+	return
+}
+
+// ValidateGuardrailItemTransport runs the validations defined on GuardrailItemTransport.
+func ValidateGuardrailItemTransport(body *GuardrailItemTransport) (err error) {
+	if body.MaxExecutionSeconds == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_execution_seconds", "body"))
+	}
+	if body.MaxToolCalls == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("max_tool_calls", "body"))
+	}
+	if body.CompressAtTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("compress_at_turns", "body"))
+	}
+	if body.KeepRecentTurns == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("keep_recent_turns", "body"))
 	}
 	return
 }
