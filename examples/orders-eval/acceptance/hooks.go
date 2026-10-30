@@ -57,6 +57,7 @@ func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (res eval.Result, er
 		return eval.Result{}, err
 	}
 	defer sc.close(&err)
+	defer h.recordArtifacts(&res)
 	run, err := sc.chat(ctx, "Please refund order o-1")
 	if err != nil {
 		return eval.Result{}, err
@@ -85,6 +86,7 @@ func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (res eval.Result, er
 		return eval.Result{}, err
 	}
 	defer sc.close(&err)
+	defer h.recordArtifacts(&res)
 	run, err := sc.chat(ctx, "Please refund order o-2")
 	if err != nil {
 		return eval.Result{}, err
@@ -145,6 +147,7 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (res eval.Result,
 		return eval.Result{}, err
 	}
 	defer sc.close(&err)
+	defer h.recordArtifacts(&res)
 	accepted := sc.sim.HoldNextRefund()
 	run, err := sc.chat(ctx, "Please refund order o-1")
 	if err != nil {
@@ -187,6 +190,7 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result
 		return eval.Result{}, err
 	}
 	defer sc.close(&err)
+	defer h.recordArtifacts(&res)
 	run, err := sc.chat(ctx, "Please refund order o-9")
 	if err != nil {
 		return eval.Result{}, err
@@ -203,6 +207,17 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result
 		},
 		Output: deref(done.Reply),
 	}, nil
+}
+
+// recordArtifacts adds the digest of every candidate binary this run can
+// execute to the scenario result, as "candidate:<binary>" artifacts with
+// "sha256:<digest>" URIs, so the verifier can check the report used exactly
+// the binaries it bound.
+func (h *Hooks) recordArtifacts(res *eval.Result) {
+	res.Artifacts = append(res.Artifacts,
+		eval.Artifact{Name: "candidate:orders", URI: "sha256:" + h.env.Orders.Digest()},
+		eval.Artifact{Name: "candidate:orders-worker", URI: "sha256:" + h.env.Worker.Digest()},
+	)
 }
 
 // close tears the scenario's platform down before the hook returns, so no
