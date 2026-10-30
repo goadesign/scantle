@@ -17,10 +17,12 @@ import (
 )
 
 type (
-	// binaryTime stores a time.Time column as its UTC binary encoding plus,
-	// for any location other than UTC, the zone offset in seconds and the zone
-	// name. Every representable instant and offset round-trips; a non-UTC
-	// location is returned as a fixed zone with the same name and offset.
+	// binaryTime stores a time.Time column as a kind byte, the length of
+	// the UTC instant's MarshalBinary encoding and that encoding, followed for
+	// any location other than UTC by the zone offset in seconds as a varint
+	// and the zone name as the remaining bytes. Every offset and name a
+	// time.Time can hold round-trips; a non-UTC location is returned as a
+	// fixed zone with the same name and offset.
 	binaryTime time.Time
 )
 
@@ -38,46 +40,33 @@ func (v binaryTime) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, fmt.Errorf("encode time: %w", err)
 	}
+	data := append([]byte{timeUTC, byte(len(instant))}, instant...) //nolint:gosec // A UTC MarshalBinary encoding is at most 16 bytes.
 	if value.Location() == time.UTC {
-		return append([]byte{timeUTC}, instant...), nil
+		return data, nil
 	}
 	name, offset := value.Zone()
-	data := []byte{timeZoned}
-	data = binary.BigEndian.AppendUint32(data, uint32(int32(offset))) //nolint:gosec // Zone offsets fit in int32 seconds.
-	data = binary.BigEndian.AppendUint16(data, uint16(len(name)))     //nolint:gosec // Zone names are short abbreviations.
-	data = append(data, name...)
-	return append(data, instant...), nil
+	data[0] = timeZoned
+	data = binary.AppendVarint(data, int64(offset))
+	return append(data, name...), nil
 }
 
 // Scan decodes a column written by Value.
 func (v *binaryTime) Scan(src any) error {
 	data, ok := src.([]byte)
-	if !ok || len(data) == 0 {
+	if !ok || len(data) < 2 || len(data) < 2+int(data[1]) {
 		return fmt.Errorf("time column holds %T, want encoded bytes", src)
 	}
-	var (
-		zoned  = data[0] == timeZoned
-		name   string
-		offset int32
-	)
-	data = data[1:]
-	if zoned {
-		if len(data) < 6 {
-			return errors.New("time column zone is truncated")
-		}
-		offset = int32(binary.BigEndian.Uint32(data)) //nolint:gosec // Value wrote an int32 offset.
-		size := int(binary.BigEndian.Uint16(data[4:]))
-		if len(data) < 6+size {
-			return errors.New("time column zone name is truncated")
-		}
-		name, data = string(data[6:6+size]), data[6+size:]
-	}
+	zoned, instantBytes, rest := data[0] == timeZoned, data[2:2+int(data[1])], data[2+int(data[1]):]
 	var instant time.Time
-	if err := instant.UnmarshalBinary(data); err != nil {
+	if err := instant.UnmarshalBinary(instantBytes); err != nil {
 		return fmt.Errorf("decode time column: %w", err)
 	}
 	if zoned {
-		instant = instant.In(time.FixedZone(name, int(offset)))
+		offset, size := binary.Varint(rest)
+		if size <= 0 {
+			return errors.New("time column zone offset is invalid")
+		}
+		instant = instant.In(time.FixedZone(string(rest[size:]), int(offset)))
 	}
 	*v = binaryTime(instant)
 	return nil

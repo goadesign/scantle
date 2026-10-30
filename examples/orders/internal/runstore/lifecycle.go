@@ -7,6 +7,7 @@ package runstore
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
@@ -23,12 +24,13 @@ import (
 )
 
 type (
-	// recordSize is one stored record's position and payload length, read
-	// without its payload.
+	// recordSize is one stored record's position and the size its page
+	// budget counts, read without the record's content.
 	recordSize struct {
-		// seq is the record's run-scoped position.
+		// seq is the record's position within its run or upload attempt.
 		seq int64
-		// bytes is the record's payload length.
+		// bytes is the payload length of a run record, or the encoded JSON
+		// size of a seed record.
 		bytes int
 	}
 )
@@ -348,6 +350,23 @@ func isTranscriptType(typ runlog.Type) bool {
 	return typ == transcript.RunLogMessagesSeeded || typ == transcript.RunLogMessagesAppended
 }
 
+// scanSizes reads position and size pairs and closes rows.
+func scanSizes(rows *sql.Rows) ([]recordSize, error) {
+	defer rows.Close() //nolint:errcheck // rows.Err reports iteration failures.
+	var result []recordSize
+	for rows.Next() {
+		var size recordSize
+		if err := rows.Scan(&size.seq, &size.bytes); err != nil {
+			return nil, &dbError{err: fmt.Errorf("runstore: scan record size: %w", err)}
+		}
+		result = append(result, size)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, &dbError{err: fmt.Errorf("runstore: read record sizes: %w", err)}
+	}
+	return result, nil
+}
+
 // committedPosition returns the run sequence and type of an exact record ID,
 // or zero when no record of the run has that ID. It does not read the payload.
 func (t *txn) committedPosition(runID, recordID string) (int64, runlog.Type, error) {
@@ -373,19 +392,7 @@ func (t *txn) transcriptSizes(runID string, after, end int64, limit int) ([]reco
 	if err != nil {
 		return nil, &dbError{err: fmt.Errorf("runstore: query transcript sizes: %w", err)}
 	}
-	defer rows.Close() //nolint:errcheck // rows.Err reports iteration failures.
-	var result []recordSize
-	for rows.Next() {
-		var size recordSize
-		if err := rows.Scan(&size.seq, &size.bytes); err != nil {
-			return nil, &dbError{err: fmt.Errorf("runstore: scan transcript size: %w", err)}
-		}
-		result = append(result, size)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, &dbError{err: fmt.Errorf("runstore: read transcript sizes: %w", err)}
-	}
-	return result, nil
+	return scanSizes(rows)
 }
 
 // recordRunCancellation applies the write-once cancellation reason.
