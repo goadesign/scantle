@@ -25,6 +25,9 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
+
+	"github.com/goadesign/scantle/internal/procgroup"
 )
 
 type (
@@ -237,6 +240,10 @@ type BuildSpec struct {
 	LogFile string
 }
 
+// buildStopGrace bounds how long Build waits for its process group to exit
+// after it is killed.
+const buildStopGrace = 10 * time.Second
+
 // Build compiles candidate source in the build sandbox. The Go toolchain may
 // start its own compiler, assembler and linker, but the build can read only
 // the candidate module, the toolchain, the read-only module cache and system
@@ -288,8 +295,17 @@ func Build(ctx context.Context, spec BuildSpec) error {
 		"CGO_ENABLED=0",
 	}
 	cmd.Stdout, cmd.Stderr = logFile, logFile
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("sandboxed build of %s: %w", spec.Package, err)
+	procgroup.Own(cmd, syscall.SIGKILL, buildStopGrace)
+	runErr := cmd.Run()
+	if cmd.Process != nil {
+		// The compiler, assembler and linker run in the build's group; none
+		// may outlive Build, whatever ended it.
+		if err := procgroup.Stop(cmd.Process.Pid, buildStopGrace); err != nil {
+			return fmt.Errorf("stop build of %s: %w", spec.Package, err)
+		}
+	}
+	if runErr != nil {
+		return fmt.Errorf("sandboxed build of %s: %w", spec.Package, runErr)
 	}
 	return nil
 }

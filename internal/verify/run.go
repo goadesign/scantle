@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/goadesign/scantle/internal/procgroup"
 	"github.com/goadesign/scantle/verify/candidate"
 	"goa.design/goa-ai/eval"
 )
@@ -227,13 +228,11 @@ func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []
 	defer stderr.Close()
 	cmd := exec.CommandContext(ctx, suiteBin, artifactFlags...)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM) }
-	cmd.WaitDelay = suiteStopGrace
+	procgroup.Own(cmd, syscall.SIGTERM, suiteStopGrace)
 	runErr := cmd.Run()
 	if cmd.Process != nil {
-		if err := stopGroup(cmd.Process.Pid); err != nil {
-			return eval.Report{}, 0, err
+		if err := procgroup.Stop(cmd.Process.Pid, groupStopTimeout); err != nil {
+			return eval.Report{}, 0, fmt.Errorf("stop suite processes: %w", err)
 		}
 	}
 	var report eval.Report
@@ -253,28 +252,6 @@ func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []
 		return eval.Report{}, 0, fmt.Errorf("suite ended (%v) without a decodable report: %w%s", runErr, decodeErr, r.excerpt("suite"))
 	}
 	return report, exit, nil
-}
-
-// stopGroup kills every process remaining in the process group and waits, up
-// to groupStopTimeout, until the group no longer exists.
-func stopGroup(pgid int) error {
-	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
-		return fmt.Errorf("kill suite process group: %w", err)
-	}
-	deadline := time.Now().Add(groupStopTimeout)
-	for {
-		err := syscall.Kill(-pgid, 0)
-		if errors.Is(err, syscall.ESRCH) {
-			return nil
-		}
-		if err != nil && !errors.Is(err, syscall.EPERM) {
-			return fmt.Errorf("check suite process group: %w", err)
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("suite process group %d still has processes after %s", pgid, groupStopTimeout)
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
 }
 
 // run runs one command with its stdout and stderr in evidence files named by

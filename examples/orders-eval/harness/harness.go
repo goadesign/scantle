@@ -16,12 +16,12 @@
 package harness
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,7 +29,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	genordersclient "github.com/goadesign/scantle/examples/orders-eval/gen/http/orders/client"
@@ -88,15 +87,6 @@ type (
 		// closed records that Close already ran.
 		closed bool
 	}
-
-	// output is the single synchronized owner of a trusted helper process's
-	// combined output.
-	output struct {
-		// mu guards buf.
-		mu sync.Mutex
-		// buf accumulates output.
-		buf bytes.Buffer
-	}
 )
 
 // maxExcerptBytes bounds how much of one process's output a diagnostic shows.
@@ -139,6 +129,9 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	if err != nil {
 		return err
 	}
+	if p.logDir, err = os.MkdirTemp("", "orders-eval-logs-*"); err != nil {
+		return fmt.Errorf("create log directory: %w", err)
+	}
 	temporalAddr, temporalPort, err := p.startTemporal()
 	if err != nil {
 		return err
@@ -146,9 +139,6 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	workerState, err := p.newStateDir()
 	if err != nil {
 		return err
-	}
-	if p.logDir, err = os.MkdirTemp("", "orders-eval-logs-*"); err != nil {
-		return fmt.Errorf("create log directory: %w", err)
 	}
 	p.workerSpec = candidate.Spec{
 		Args:         []string{"--env", "sim", "--payments-url", depsURL, "--temporal", temporalAddr},
@@ -340,11 +330,16 @@ func (p *Platform) startTemporal() (string, int, error) {
 	if err != nil {
 		return "", 0, err
 	}
+	logPath := filepath.Join(p.logDir, "temporal.log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return "", 0, fmt.Errorf("create temporal log: %w", err)
+	}
+	defer logFile.Close()
 	ctx, stop := context.WithCancel(context.Background())
-	out := &output{}
 	cmd := exec.CommandContext(ctx, "temporal", "server", "start-dev", "--headless",
 		"--ip", "127.0.0.1", "--port", strconv.Itoa(port), "--ui-port", strconv.Itoa(uiPort), "--log-level", "error")
-	cmd.Stdout, cmd.Stderr = out, out
+	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Start(); err != nil {
 		stop()
 		return "", 0, fmt.Errorf("start temporal: %w", err)
@@ -358,7 +353,7 @@ func (p *Platform) startTemporal() (string, int, error) {
 	waitCtx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	if err := WaitListening(waitCtx, addr); err != nil {
-		return "", 0, fmt.Errorf("temporal never listened: %w\n%s", err, out.String())
+		return "", 0, fmt.Errorf("temporal never listened: %w\n%s", err, tailFile(logPath, maxExcerptBytes))
 	}
 	return addr, port, nil
 }
@@ -386,16 +381,22 @@ func freePort() (int, error) {
 	return port, ln.Close()
 }
 
-// Write appends p under the lock.
-func (o *output) Write(p []byte) (int, error) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.buf.Write(p)
-}
-
-// String returns a snapshot under the lock.
-func (o *output) String() string {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.buf.String()
+// tailFile returns at most the last maxBytes of a trusted helper's log file
+// for a diagnostic, naming the file that holds the full output.
+func tailFile(path string, maxBytes int64) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return "output unavailable: " + err.Error()
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return "output unavailable: " + err.Error()
+	}
+	start := max(info.Size()-maxBytes, 0)
+	b := make([]byte, info.Size()-start)
+	if _, err := f.ReadAt(b, start); err != nil && !errors.Is(err, io.EOF) {
+		return "output unavailable: " + err.Error()
+	}
+	return "last " + strconv.FormatInt(int64(len(b)), 10) + " bytes of " + path + ":\n" + string(b)
 }
