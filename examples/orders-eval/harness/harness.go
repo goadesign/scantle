@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -56,6 +57,9 @@ type (
 
 	// Platform is one running instance of the candidate.
 	Platform struct {
+		// logDir holds the candidate processes' output files; it is owned by
+		// the evaluator and lies outside every candidate state directory.
+		logDir string
 		// Client calls the candidate's public orders API.
 		Client *genorders.Client
 		// env is the environment the platform runs in.
@@ -77,6 +81,9 @@ type (
 		buf bytes.Buffer
 	}
 )
+
+// maxExcerptBytes bounds how much of one process's output a diagnostic shows.
+const maxExcerptBytes = 16 << 10
 
 // NewEnv returns an environment for the pinned candidate binaries with a fresh
 // test identity issuer key.
@@ -112,10 +119,15 @@ func (e *Env) Start(ctx context.Context, depsURL string) (*Platform, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &Platform{env: e, workerSpec: candidate.Spec{
+	logDir, err := os.MkdirTemp("", "orders-eval-logs-*")
+	if err != nil {
+		return nil, fmt.Errorf("create log directory: %w", err)
+	}
+	p := &Platform{env: e, logDir: logDir, workerSpec: candidate.Spec{
 		Args:         []string{"--env", "sim", "--payments-url", depsURL, "--temporal", temporalAddr},
 		StateDir:     workerState,
 		ConnectPorts: []int{temporalPort, depsPort},
+		LogFile:      filepath.Join(logDir, "worker.log"),
 	}}
 	if p.worker, err = candidate.Exec(ctx, e.Worker, p.workerSpec); err != nil {
 		return nil, fmt.Errorf("start refund worker: %w", err)
@@ -136,12 +148,13 @@ func (e *Env) Start(ctx context.Context, depsURL string) (*Platform, error) {
 		StateDir:     apiState,
 		ConnectPorts: []int{temporalPort, depsPort},
 		ListenPort:   apiPort,
+		LogFile:      filepath.Join(logDir, "orders.log"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("start orders API: %w", err)
 	}
 	if err := WaitListening(ctx, addr); err != nil {
-		return nil, fmt.Errorf("orders API never listened: %w\n%s", err, p.api.Output())
+		return nil, fmt.Errorf("orders API never listened: %w\n%s", err, excerpt("orders", p.api))
 	}
 	c := genordersclient.NewClient("http", addr, http.DefaultClient, goahttp.RequestEncoder, goahttp.ResponseDecoder, false)
 	p.Client = genorders.NewClient(c.Chat(), c.RunStatus(), c.ApproveRefund())
@@ -153,9 +166,12 @@ func (p *Platform) KillWorker() error {
 	return p.worker.Kill()
 }
 
-// RestartWorker starts a replacement refund worker with the same configuration.
+// RestartWorker starts a replacement refund worker with the same configuration,
+// logging to a new file so the crashed worker's output is kept.
 func (p *Platform) RestartWorker(ctx context.Context) error {
-	w, err := candidate.Exec(ctx, p.env.Worker, p.workerSpec)
+	spec := p.workerSpec
+	spec.LogFile = filepath.Join(p.logDir, "worker-restarted.log")
+	w, err := candidate.Exec(ctx, p.env.Worker, spec)
 	if err != nil {
 		return fmt.Errorf("restart refund worker: %w", err)
 	}
@@ -163,9 +179,10 @@ func (p *Platform) RestartWorker(ctx context.Context) error {
 	return nil
 }
 
-// Logs returns the candidate processes' output for diagnostics.
+// Logs returns bounded excerpts of the candidate processes' output for
+// diagnostics; full output stays in the evaluator-owned log directory.
 func (p *Platform) Logs() string {
-	return "orders:\n" + p.api.Output() + "\nworker:\n" + p.worker.Output()
+	return excerpt("orders", p.api) + "\n" + excerpt("worker", p.worker) + "\nfull logs: " + p.logDir
 }
 
 // WaitStatus polls a run until it reaches want or a terminal status, and
@@ -203,6 +220,18 @@ func WaitListening(ctx context.Context, addr string) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
+}
+
+// excerpt renders the end of one process's output, noting truncation.
+func excerpt(name string, p *candidate.Process) string {
+	text, truncated, err := p.Excerpt(maxExcerptBytes)
+	if err != nil {
+		return name + ": output unavailable: " + err.Error()
+	}
+	if truncated {
+		return name + " (last " + strconv.Itoa(maxExcerptBytes) + " bytes):\n" + text
+	}
+	return name + ":\n" + text
 }
 
 // startTemporal starts an in-memory Temporal dev server and returns its

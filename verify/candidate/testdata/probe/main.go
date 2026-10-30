@@ -3,7 +3,7 @@
 // per line reporting whether the operating system allowed it.
 //
 // Actions: read:<path>, write:<path>, env:<name>, connect:<host:port>,
-// listen:<host:port>, spawn.
+// listen:<host:port>, stat:<path>, spawn.
 package main
 
 import (
@@ -71,6 +71,9 @@ func attempt(kind, target string, r *result) error {
 			return err
 		}
 		return ln.Close()
+	case "stat":
+		_, err := os.Stat(target)
+		return err
 	case "spawn":
 		return exec.Command("/bin/echo", "spawned").Run()
 	default:

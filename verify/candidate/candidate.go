@@ -12,7 +12,6 @@
 package candidate
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -25,7 +24,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 )
 
@@ -54,27 +52,23 @@ type (
 		// ListenPort is the loopback TCP port the process may listen on, or
 		// zero when it must not listen.
 		ListenPort int
+		// LogFile receives the process's combined stdout and stderr. It is
+		// owned by the caller and must lie outside StateDir so the candidate
+		// cannot rewrite its own diagnostics. Exec creates or truncates it.
+		LogFile string
 	}
 
-	// Process is a running sandboxed candidate process.
+	// Process is a running sandboxed candidate process. Its output goes to
+	// the caller's log file; the verifier keeps none of it in memory.
 	Process struct {
 		// cmd is the started command.
 		cmd *exec.Cmd
-		// out owns the process's combined output.
-		out *output
+		// logFile is the path of the process's output file.
+		logFile string
 		// done is closed after the process exited.
 		done chan struct{}
 		// waitErr is the process's exit error, valid after done is closed.
 		waitErr error
-	}
-
-	// output is the single synchronized owner of a process's combined
-	// stdout and stderr: every write and every snapshot takes its lock.
-	output struct {
-		// mu guards buf.
-		mu sync.Mutex
-		// buf accumulates output.
-		buf bytes.Buffer
 	}
 )
 
@@ -126,18 +120,30 @@ func Exec(ctx context.Context, a Artifact, spec Spec) (*Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve binary: %w", err)
 	}
+	logPath, err := filepath.Abs(spec.LogFile)
+	if err != nil || spec.LogFile == "" {
+		return nil, fmt.Errorf("log file is required: %q", spec.LogFile)
+	}
+	if rel, err := filepath.Rel(stateDir, resolvedOrSelf(filepath.Dir(logPath))); err == nil && !strings.HasPrefix(rel, "..") {
+		return nil, fmt.Errorf("log file %s must lie outside the candidate state directory", logPath)
+	}
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open log file: %w", err)
+	}
 	profile := Profile(binary, stateDir, spec.ConnectPorts, spec.ListenPort)
-	out := &output{}
 	cmd := exec.CommandContext(ctx, sandboxExec, append([]string{"-p", profile, binary}, spec.Args...)...)
 	cmd.Env = append([]string{"HOME=" + stateDir, "TMPDIR=" + stateDir}, spec.Env...)
 	cmd.Dir = stateDir
-	cmd.Stdout, cmd.Stderr = out, out
+	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Start(); err != nil {
+		_ = logFile.Close()
 		return nil, fmt.Errorf("start candidate %s: %w", binary, err)
 	}
-	p := &Process{cmd: cmd, out: out, done: make(chan struct{})}
+	p := &Process{cmd: cmd, logFile: logPath, done: make(chan struct{})}
 	go func() {
 		p.waitErr = cmd.Wait()
+		_ = logFile.Close()
 		close(p.done)
 	}()
 	return p, nil
@@ -149,7 +155,9 @@ func Profile(binary, stateDir string, connectPorts []int, listenPort int) string
 	var b strings.Builder
 	b.WriteString("(version 1)\n(deny default)\n")
 	fmt.Fprintf(&b, "(allow process-exec (literal %s))\n", quote(binary))
-	b.WriteString("(allow sysctl-read)\n(allow file-read-metadata)\n")
+	// The standard macOS top-level symlinks must be resolvable so callers can
+	// use /var/... and /tmp/... paths; this reveals only that they exist.
+	b.WriteString("(allow sysctl-read)\n(allow file-read-metadata (literal \"/var\") (literal \"/tmp\") (literal \"/etc\"))\n")
 	fmt.Fprintf(&b, "(allow file-read* (literal \"/\") (literal %s) (subpath \"/usr/lib\") (subpath \"/System\") "+
 		"(subpath \"/private/var/db/dyld\") (subpath %s) (literal \"/dev/null\") (literal \"/dev/urandom\") (literal \"/dev/random\"))\n",
 		quote(binary), quote(stateDir))
@@ -191,9 +199,24 @@ func (p *Process) Done() <-chan struct{} {
 	return p.done
 }
 
-// Output returns a snapshot of the process's combined output so far.
-func (p *Process) Output() string {
-	return p.out.String()
+// Excerpt returns at most maxBytes from the end of the process's output so
+// far, and whether earlier output was left out.
+func (p *Process) Excerpt(maxBytes int64) (string, bool, error) {
+	f, err := os.Open(p.logFile)
+	if err != nil {
+		return "", false, fmt.Errorf("open log file: %w", err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return "", false, fmt.Errorf("stat log file: %w", err)
+	}
+	start := max(info.Size()-maxBytes, 0)
+	b := make([]byte, info.Size()-start)
+	if _, err := f.ReadAt(b, start); err != nil && !errors.Is(err, io.EOF) {
+		return "", false, fmt.Errorf("read log file: %w", err)
+	}
+	return string(b), start > 0, nil
 }
 
 // fileDigest returns the lowercase hex SHA-256 of the file's bytes.
@@ -210,21 +233,16 @@ func fileDigest(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// resolvedOrSelf resolves symlinks in path, or returns path unchanged when it
+// does not exist yet.
+func resolvedOrSelf(path string) string {
+	if r, err := filepath.EvalSymlinks(path); err == nil {
+		return r
+	}
+	return path
+}
+
 // quote renders s as a sandbox profile string literal.
 func quote(s string) string {
 	return strconv.Quote(s)
-}
-
-// Write appends p under the lock.
-func (o *output) Write(p []byte) (int, error) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.buf.Write(p)
-}
-
-// String returns a snapshot under the lock.
-func (o *output) String() string {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.buf.String()
 }

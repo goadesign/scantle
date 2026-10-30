@@ -54,17 +54,22 @@ func TestExecEnforcesTheSandbox(t *testing.T) {
 			fmt.Sprintf("listen:127.0.0.1:%d", freePort(t)),
 			"spawn",
 			"read:/etc/hosts",
+			"stat:" + secret,
+			"stat:" + filepath.Join(state, "ok.txt"),
 		},
 		Env:          []string{"GIVEN=explicit"},
 		StateDir:     state,
 		ConnectPorts: []int{allowed},
 		ListenPort:   listenPort,
+		LogFile:      filepath.Join(t.TempDir(), "probe.log"),
 	})
 	require.NoError(t, err)
-	require.NoError(t, p.Wait(), p.Output())
+	out, truncated, err := excerptAfterExit(p)
+	require.NoError(t, err)
+	require.False(t, truncated)
 
 	got := map[string]bool{}
-	sc := bufio.NewScanner(strings.NewReader(p.Output()))
+	sc := bufio.NewScanner(strings.NewReader(out))
 	for sc.Scan() {
 		var r probeResult
 		require.NoError(t, json.Unmarshal(sc.Bytes(), &r), sc.Text())
@@ -86,6 +91,8 @@ func TestExecEnforcesTheSandbox(t *testing.T) {
 		{"listen on its assigned port", fmt.Sprintf("listen:127.0.0.1:%d", listenPort), true},
 		{"spawn a child process", "spawn", false},
 		{"read other system files", "read:/etc/hosts", false},
+		{"learn whether a protected file exists", "stat:" + secret, false},
+		{"stat its own state", "stat:" + filepath.Join(state, "ok.txt"), true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -112,8 +119,48 @@ func TestExecRefusesAModifiedBinary(t *testing.T) {
 	}
 	probe := buildProbe(t)
 	probe.Digest = strings.Repeat("0", 64)
-	_, err := Exec(t.Context(), probe, Spec{StateDir: t.TempDir()})
+	_, err := Exec(t.Context(), probe, Spec{StateDir: t.TempDir(), LogFile: filepath.Join(t.TempDir(), "x.log")})
 	require.ErrorIs(t, err, ErrDigestMismatch)
+}
+
+func TestExcerptIsBoundedAndReportsTruncation(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	probe := buildProbe(t)
+	state := t.TempDir()
+	p, err := Exec(t.Context(), probe, Spec{
+		Args:     []string{"env:A", "env:B", "env:C"},
+		StateDir: state,
+		LogFile:  filepath.Join(t.TempDir(), "probe.log"),
+	})
+	require.NoError(t, err)
+	require.NoError(t, p.Wait(), "the probe reports failed lookups in its output and exits normally")
+	full, truncated, err := p.Excerpt(1 << 20)
+	require.NoError(t, err)
+	assert.False(t, truncated)
+	tail, truncated, err := p.Excerpt(20)
+	require.NoError(t, err)
+	assert.True(t, truncated)
+	assert.Len(t, tail, 20)
+	assert.True(t, strings.HasSuffix(full, tail))
+}
+
+func TestExecRejectsALogFileInsideTheState(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	state := t.TempDir()
+	_, err := Exec(t.Context(), buildProbe(t), Spec{StateDir: state, LogFile: filepath.Join(state, "probe.log")})
+	require.ErrorContains(t, err, "outside the candidate state directory")
+}
+
+// excerptAfterExit waits for the process and returns its whole output.
+func excerptAfterExit(p *Process) (string, bool, error) {
+	if err := p.Wait(); err != nil {
+		return "", false, err
+	}
+	return p.Excerpt(1 << 20)
 }
 
 // buildProbe builds the hostile probe and pins it.
