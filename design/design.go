@@ -158,6 +158,67 @@ var ToolContractItem = Type("ToolContractItem", func() {
 	)
 })
 
+// BuilderScopeItem defines an explicit file-ownership slice for one builder agent.
+var BuilderScopeItem = Type("BuilderScopeItem", func() {
+	Description("Explicit repository path ownership slice for a builder agent role.")
+	Attribute("name", String, "Human-readable builder scope name (for example, orders or api).")
+	Attribute("paths", ArrayOf(String), "Repository-relative path globs owned by this builder.")
+	Attribute("preferred_profile_id", String, "Optional preference selecting a server-configured authenticated profile ID.")
+	Required("name", "paths")
+})
+
+// SwarmRoleItem describes one proposed agent role assignment in a Scantle build swarm.
+var SwarmRoleItem = Type("SwarmRoleItem", func() {
+	Description("Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.")
+	Attribute("handle", String, "Deterministic Chorus agent handle (without leading '@', at most 32 characters).")
+	Attribute("role", String, "Assigned swarm role kind.", func() {
+		Enum("architect", "builder", "eval_author", "reviewer")
+	})
+	Attribute("scope_name", String, "Human-readable scope label for this assignment.")
+	Attribute("profile_id", String, "Assigned server-configured provider profile ID.")
+	Attribute("provider", String, "Assigned coding-agent provider name.")
+	Attribute("model", String, "Assigned model identifier.")
+	Attribute("family", String, "Canonical model family identifier.")
+	Attribute("owned_paths", ArrayOf(String), "Repository or workspace path globs owned by this role.")
+	Attribute("access_mode", String, "Workspace access boundary enforced by the job runner.", func() {
+		Enum("read_only_after_cp2", "read_write_worktree", "isolated_eval_workspace", "read_only_review")
+	})
+	Required(
+		"handle",
+		"role",
+		"scope_name",
+		"profile_id",
+		"provider",
+		"model",
+		"family",
+		"owned_paths",
+		"access_mode",
+	)
+})
+
+// SwarmPlanItem reports the proposed Chorus role roster and model-family routing at Checkpoint 2.
+var SwarmPlanItem = Type("SwarmPlanItem", func() {
+	Description("Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.")
+	Attribute("status", String, "Roster configuration status.", func() {
+		Enum("configured", "unconfigured", "missing_capability")
+	})
+	Attribute("assignments", ArrayOf(SwarmRoleItem), "Deterministic role assignments when status is configured.")
+	Attribute("cross_family_review", Boolean, "True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.")
+	Attribute("cross_family_eval", Boolean, "True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.")
+	Attribute("single_family", Boolean, "True when status is configured and all assigned roles share one model family.")
+	Attribute("missing_roles", ArrayOf(String), "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.")
+	Attribute("summary", String, "Plain-English summary of the proposed swarm roster and model-family posture.")
+	Attribute("manifest", String, "Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.")
+	Required(
+		"status",
+		"assignments",
+		"cross_family_review",
+		"cross_family_eval",
+		"single_family",
+		"summary",
+	)
+})
+
 // DesignSnapshot is an immutable copy of a Go module holding a Goa design.
 var DesignSnapshot = Type("DesignSnapshot", func() {
 	Description("Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.")
@@ -167,16 +228,17 @@ var DesignSnapshot = Type("DesignSnapshot", func() {
 
 // PreviewArchitecturePayload is the input to the CP2 preview_architecture tool.
 var PreviewArchitecturePayload = Type("PreviewArchitecturePayload", func() {
-	Description("Request to derive the Checkpoint 2 C4 topology and guardrails from a candidate Goa design bound to a confirmed Change Card.")
+	Description("Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.")
 	Attribute("change_id", String, "Confirmed Change Card identifier.")
 	Attribute("request_revision", String, "Expected CP1 request_revision digest.")
 	Attribute("design", DesignSnapshot, "Candidate module whose Goa and Goa-AI design is evaluated.")
+	Attribute("builders", ArrayOf(BuilderScopeItem), "Optional explicit builder path scopes for proposing the Chorus build roster.")
 	Required("change_id", "request_revision", "design")
 })
 
 // ArchitecturePreviewResult is the output of the CP2 preview_architecture tool.
 var ArchitecturePreviewResult = Type("ArchitecturePreviewResult", func() {
-	Description("Checkpoint 2 C4 container topology, tool contracts, and per-agent Goa-AI guardrails derived from the evaluated candidate design.")
+	Description("Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.")
 	Attribute("change_id", String, "Bound Change Card identifier.")
 	Attribute("request_revision", String, "Bound CP1 request_revision digest.")
 	Attribute("design_digest", String, "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).")
@@ -185,6 +247,7 @@ var ArchitecturePreviewResult = Type("ArchitecturePreviewResult", func() {
 	Attribute("edges", ArrayOf(C4EdgeItem), "Validated directed edges between declared containers.")
 	Attribute("agent_policies", ArrayOf(AgentPolicyItem), "Evaluated Goa-AI runtime policies per declared agent.")
 	Attribute("tools", ArrayOf(ToolContractItem), "Evaluated Goa-AI tool contracts.")
+	Attribute("swarm", SwarmPlanItem, "Proposed Chorus multi-agent role assignments and model-family routing.")
 	Attribute("banner", String, "Plain-English summary of topology and guardrails.")
 	Required(
 		"change_id",
@@ -195,6 +258,7 @@ var ArchitecturePreviewResult = Type("ArchitecturePreviewResult", func() {
 		"edges",
 		"agent_policies",
 		"tools",
+		"swarm",
 		"banner",
 	)
 })
@@ -258,6 +322,16 @@ var _ = Service("scantle", func() {
 		})
 	})
 
+	Method("golden_path", func() {
+		Description("Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.")
+		Result(String)
+		Resource("golden_path", "scantle://golden-path", "text/markdown")
+		HTTP(func() {
+			GET("/golden-path")
+			Response(StatusOK)
+		})
+	})
+
 	Method("propose_change", func() {
 		Description("Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.")
 		Payload(ProposeChangePayload)
@@ -285,10 +359,10 @@ var _ = Service("scantle", func() {
 	})
 
 	Method("preview_architecture", func() {
-		Description("Extract and validate the Checkpoint 2 C4 container topology, tool contracts, and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.")
+		Description("Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.")
 		Payload(PreviewArchitecturePayload)
 		Result(ArchitecturePreviewResult)
-		Tool("preview_architecture", "Preview Checkpoint 2 C4 container topology and Goa-AI guardrails for a confirmed Change Card.", func() {
+		Tool("preview_architecture", "Preview Checkpoint 2 C4 container topology, Goa-AI guardrails, and proposed Chorus swarm roster for a confirmed Change Card.", func() {
 			ToolUI("ui://scantle/checkpoint")
 		})
 		HTTP(func() {

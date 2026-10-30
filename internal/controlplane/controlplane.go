@@ -25,6 +25,8 @@ import (
 	genscantle "github.com/goadesign/scantle/gen/scantle"
 	"github.com/goadesign/scantle/internal/designeval"
 	"github.com/goadesign/scantle/internal/diff"
+	"github.com/goadesign/scantle/internal/goldenpath"
+	"github.com/goadesign/scantle/internal/swarm"
 	"goa.design/goa-ai/runtime/agent/model"
 	goahttp "goa.design/goa/v3/http"
 )
@@ -108,6 +110,9 @@ type (
 		Analyzer CP1Analyzer
 		// TargetUpdater applies CP3 Fast Draft Mode prompt overrides to the bound target platform.
 		TargetUpdater TargetPromptUpdater
+		// SwarmProfiles lists server-configured coding-agent provider profiles for
+		// proposing Chorus multi-agent role assignments at CP2.
+		SwarmProfiles []swarm.ProviderProfile
 	}
 
 	// storedChangeCard holds a versioned Change Card alongside its authenticated
@@ -166,6 +171,8 @@ type (
 		analyzer CP1Analyzer
 		// targetUpdater applies CP3 Fast Draft Mode prompt overrides to the target platform.
 		targetUpdater TargetPromptUpdater
+		// swarmProfiles stores server-configured coding-agent provider profiles.
+		swarmProfiles []swarm.ProviderProfile
 	}
 )
 
@@ -178,7 +185,7 @@ const (
 	TargetKindPromptTemplate = "prompt_template"
 	// TargetKindCompiledRule identifies a compiled Go business rule that cannot be overridden via prompt store.
 	TargetKindCompiledRule = "compiled_rule"
-	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML resource shell.
+	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML document host.
 	checkpointUIHTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -317,6 +324,7 @@ func New(opts Options) *ControlPlane {
 		cards:         make(map[string]storedChangeCard),
 		analyzer:      opts.Analyzer,
 		targetUpdater: opts.TargetUpdater,
+		swarmProfiles: opts.SwarmProfiles,
 	}
 }
 
@@ -377,7 +385,7 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 				Role: model.ConversationRoleSystem,
 				Parts: []model.Part{
 					model.TextPart{
-						Text: "Analyze the operator feature request against the Goa design source. Return structured JSON matching the cp1_change_card_analysis schema.",
+						Text: goldenpath.ArchitectSystemPrompt(),
 					},
 				},
 			},
@@ -418,6 +426,12 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 // CheckpointUI returns the interactive MCP Apps HTML host for `ui://scantle/checkpoint`.
 func (c *ControlPlane) CheckpointUI(_ context.Context) (string, error) {
 	return checkpointUIHTML, nil
+}
+
+// GoldenPath returns the Scantle Golden Path architecture playbook Markdown
+// for `scantle://golden-path`.
+func (c *ControlPlane) GoldenPath(_ context.Context) (string, error) {
+	return goldenpath.PlaybookMarkdown(), nil
 }
 
 // ProposeChange evaluates a feature request at Checkpoint 1 (CP1) via the
@@ -604,6 +618,10 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 	}
 
 	designDigest := designeval.SnapshotDigest(p.Design.Files)
+	swarmItem, err := planSwarmRoster(p.ChangeID, designDigest, c.swarmProfiles, p.Builders)
+	if err != nil {
+		return nil, err
+	}
 	banner := fmt.Sprintf(
 		"%s: %d container(s), %d boundary edge(s), %d agent policy(s), %d tool contract(s)",
 		evaluated.SystemName,
@@ -622,6 +640,7 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 		Edges:           evaluated.Edges,
 		AgentPolicies:   evaluated.AgentPolicies,
 		Tools:           evaluated.Tools,
+		Swarm:           swarmItem,
 		Banner:          banner,
 	}, nil
 }
@@ -890,4 +909,80 @@ func computeCanonicalRevision(card *genscantle.ChangeCardResult, owner, designSo
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// planSwarmRoster invokes swarm.Plan over server-owned provider profiles and
+// explicit builder path scopes and projects the result into a genscantle.SwarmPlanItem.
+func planSwarmRoster(
+	changeID, designDigest string,
+	profiles []swarm.ProviderProfile,
+	in []*genscantle.BuilderScopeItem,
+) (*genscantle.SwarmPlanItem, error) {
+	builders := make([]swarm.BuilderScope, 0, len(in))
+	for i, item := range in {
+		if item == nil {
+			return nil, fmt.Errorf("builders[%d] is nil", i)
+		}
+		var preferred string
+		if item.PreferredProfileID != nil {
+			preferred = *item.PreferredProfileID
+		}
+		builders = append(builders, swarm.BuilderScope{
+			Name:               item.Name,
+			Paths:              item.Paths,
+			PreferredProfileID: preferred,
+		})
+	}
+	plan, err := swarm.Plan(swarm.Request{
+		ChangeID:     changeID,
+		DesignDigest: designDigest,
+		Profiles:     profiles,
+		Builders:     builders,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("plan swarm roster: %w", err)
+	}
+
+	assignments := make([]*genscantle.SwarmRoleItem, 0, len(plan.Assignments))
+	for _, a := range plan.Assignments {
+		assignments = append(assignments, &genscantle.SwarmRoleItem{
+			Handle:     a.Handle,
+			Role:       string(a.Role),
+			ScopeName:  a.ScopeName,
+			ProfileID:  a.ProfileID,
+			Provider:   a.Provider,
+			Model:      a.Model,
+			Family:     a.Family,
+			OwnedPaths: a.OwnedPaths,
+			AccessMode: a.AccessMode,
+		})
+	}
+
+	var missingRoles []string
+	if len(plan.MissingRoles) > 0 {
+		missingRoles = make([]string, 0, len(plan.MissingRoles))
+		for _, r := range plan.MissingRoles {
+			missingRoles = append(missingRoles, string(r))
+		}
+	}
+
+	var manifestPtr *string
+	if plan.Status == swarm.StatusConfigured {
+		manifest, err := swarm.FormatManifest(changeID, designDigest, plan)
+		if err != nil {
+			return nil, fmt.Errorf("format swarm manifest: %w", err)
+		}
+		manifestPtr = &manifest
+	}
+
+	return &genscantle.SwarmPlanItem{
+		Status:            string(plan.Status),
+		Assignments:       assignments,
+		CrossFamilyReview: plan.CrossFamilyReview,
+		CrossFamilyEval:   plan.CrossFamilyEval,
+		SingleFamily:      plan.SingleFamily,
+		MissingRoles:      missingRoles,
+		Summary:           plan.Summary,
+		Manifest:          manifestPtr,
+	}, nil
 }

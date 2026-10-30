@@ -56,10 +56,13 @@ Scantle · Contract & Build Plan (Request rev #2, Base commit 8f41c02)
 Scope:    1 service (orders), 1 agent (refund), 1 human approval step
 Contract: orders.Refund (tenant_id & user_id injected by server; hidden from LLM)
           BoundedResult on orders.List; provider-supported prompt caching enabled
+Swarm:    @architect (Claude) · @builder-orders (Claude) · @eval-author (Gemini) · @reviewer (Codex, cross-family)
 Planned:  10 evaluator checks · Est. build ~4 min / ~$0.40 budget
 Map:      [Open C4 Architecture Diagram]   Diff: [View design/orders.go]
 Approval: Sign in as operator to start build → http://localhost:9400/approve/req-2
 ```
+- **Golden Path Architecture Playbook (`scantle://golden-path`):** Scantle guides the architect and builder agents with a compiled-contract-first Golden Path playbook (`internal/goldenpath/GOLDEN_PATH.md`)—separating the public HTTP/SSE/MCP edge gateway from internal Goa gRPC services, fronting multi-service LLM calls with a central stateless gRPC inference gateway (`goa-ai/features/model/gateway` + `middleware.NewAdaptiveRateLimiter` + `pulse`), binding caller identity server-side via `Inject`/`BindField`, keeping service methods concrete (`BindTo`) while wrapping semantic multi-step reasoning in child agents (`Use(AgentToolset(...))`), and persisting zero-wait human suspension checkpoints.
+- **Role-Based Chorus Swarm & Cross-Family Model Routing:** When multiple coding-agent model families are configured on the server, Scantle deterministically assigns `@architect`, `@builder-<scope>`, `@eval-author`, and `@reviewer` so evaluation authoring and zero-sunk-cost adversarial review run on model families disjoint from the builder's family (`cross_family_review=true`, `cross_family_eval=true`), coordinated in real time over a pinned **Chorus** manifest while enforcing evaluator independence through OS process and workspace isolation.
 
 ### 4. Try the real candidate yourself (`CP3` — Live Sandbox, Role Switcher & Fast Draft Mode)
 While the change waits for your merge decision, Scantle boots the exact candidate build (`commit a1b2c3f`) against isolated, stateful dependency simulators (or a `--env=staging` profile):

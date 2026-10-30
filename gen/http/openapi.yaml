@@ -51,7 +51,7 @@ paths:
             tags:
                 - scantle
             summary: preview_architecture scantle
-            description: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.
+            description: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.
             operationId: scantle#preview_architecture
             parameters:
                 - name: preview_architecture_request_body
@@ -77,6 +77,7 @@ paths:
                             - edges
                             - agent_policies
                             - tools
+                            - swarm
                             - banner
             schemes:
                 - http
@@ -139,6 +140,20 @@ paths:
                             - modified_declarations
                             - version_deltas
                             - summary
+            schemes:
+                - http
+    /golden-path:
+        get:
+            tags:
+                - scantle
+            summary: golden_path scantle
+            description: Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.
+            operationId: scantle#golden_path
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        type: string
             schemes:
                 - http
     /sandbox/draft:
@@ -366,6 +381,8 @@ definitions:
                 type: string
                 description: Bound CP1 request_revision digest.
                 example: Quos aperiam quia.
+            swarm:
+                $ref: '#/definitions/SwarmPlanItem'
             system_name:
                 type: string
                 description: API or primary service name declared in the design.
@@ -422,7 +439,7 @@ definitions:
                       return_schema: Omnis aut ab aliquam qui.
                       text_only_args_schema: Suscipit dignissimos ut.
                       toolset: Veniam aspernatur ad recusandae unde.
-        description: Checkpoint 2 C4 container topology, tool contracts, and per-agent Goa-AI guardrails derived from the evaluated candidate design.
+        description: Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.
         example:
             agent_policies:
                 - agent_id: Consectetur laudantium rem architecto aut molestias velit.
@@ -480,6 +497,63 @@ definitions:
                   protocol: Et dolor neque non molestias voluptas.
                   to_id: Non et dolor dolorum ipsa ullam.
             request_revision: Quos aperiam quia.
+            swarm:
+                assignments:
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                cross_family_eval: false
+                cross_family_review: true
+                manifest: Adipisci suscipit corporis doloremque et.
+                missing_roles:
+                    - Totam ab ex quod ea nesciunt nobis.
+                    - Qui vero quos blanditiis autem et.
+                    - Et blanditiis tenetur occaecati est maxime.
+                    - Quam dignissimos animi sed possimus.
+                single_family: false
+                status: missing_capability
+                summary: Blanditiis eligendi illo quia exercitationem voluptatem ut.
             system_name: Expedita vero et minima.
             tools:
                 - args_schema: Nisi vel iusto.
@@ -537,7 +611,39 @@ definitions:
             - edges
             - agent_policies
             - tools
+            - swarm
             - banner
+    BuilderScopeItem:
+        title: BuilderScopeItem
+        type: object
+        properties:
+            name:
+                type: string
+                description: Human-readable builder scope name (for example, orders or api).
+                example: Ut nulla.
+            paths:
+                type: array
+                items:
+                    type: string
+                    example: Tempora aut qui voluptatem iste exercitationem.
+                description: Repository-relative path globs owned by this builder.
+                example:
+                    - Tempora aut qui voluptatem iste exercitationem.
+                    - Sed quia et ullam libero et et.
+            preferred_profile_id:
+                type: string
+                description: Optional preference selecting a server-configured authenticated profile ID.
+                example: Accusamus et et qui ut deserunt.
+        description: Explicit repository path ownership slice for a builder agent role.
+        example:
+            name: Ut nulla.
+            paths:
+                - Tempora aut qui voluptatem iste exercitationem.
+                - Sed quia et ullam libero et et.
+            preferred_profile_id: Accusamus et et qui ut deserunt.
+        required:
+            - name
+            - paths
     C4ContainerItem:
         title: C4ContainerItem
         type: object
@@ -1047,6 +1153,32 @@ definitions:
         title: PreviewArchitecturePayload
         type: object
         properties:
+            builders:
+                type: array
+                items:
+                    $ref: '#/definitions/BuilderScopeItem'
+                description: Optional explicit builder path scopes for proposing the Chorus build roster.
+                example:
+                    - name: Ut nulla.
+                      paths:
+                        - Tempora aut qui voluptatem iste exercitationem.
+                        - Sed quia et ullam libero et et.
+                      preferred_profile_id: Accusamus et et qui ut deserunt.
+                    - name: Ut nulla.
+                      paths:
+                        - Tempora aut qui voluptatem iste exercitationem.
+                        - Sed quia et ullam libero et et.
+                      preferred_profile_id: Accusamus et et qui ut deserunt.
+                    - name: Ut nulla.
+                      paths:
+                        - Tempora aut qui voluptatem iste exercitationem.
+                        - Sed quia et ullam libero et et.
+                      preferred_profile_id: Accusamus et et qui ut deserunt.
+                    - name: Ut nulla.
+                      paths:
+                        - Tempora aut qui voluptatem iste exercitationem.
+                        - Sed quia et ullam libero et et.
+                      preferred_profile_id: Accusamus et et qui ut deserunt.
             change_id:
                 type: string
                 description: Confirmed Change Card identifier.
@@ -1058,6 +1190,27 @@ definitions:
                 description: Expected CP1 request_revision digest.
                 example: Et esse in incidunt repellendus in voluptate.
         example:
+            builders:
+                - name: Ut nulla.
+                  paths:
+                    - Tempora aut qui voluptatem iste exercitationem.
+                    - Sed quia et ullam libero et et.
+                  preferred_profile_id: Accusamus et et qui ut deserunt.
+                - name: Ut nulla.
+                  paths:
+                    - Tempora aut qui voluptatem iste exercitationem.
+                    - Sed quia et ullam libero et et.
+                  preferred_profile_id: Accusamus et et qui ut deserunt.
+                - name: Ut nulla.
+                  paths:
+                    - Tempora aut qui voluptatem iste exercitationem.
+                    - Sed quia et ullam libero et et.
+                  preferred_profile_id: Accusamus et et qui ut deserunt.
+                - name: Ut nulla.
+                  paths:
+                    - Tempora aut qui voluptatem iste exercitationem.
+                    - Sed quia et ullam libero et et.
+                  preferred_profile_id: Accusamus et et qui ut deserunt.
             change_id: Nam ut commodi.
             design:
                 files:
@@ -1092,6 +1245,242 @@ definitions:
         required:
             - change_id
             - prompt
+    SwarmPlanItem:
+        title: SwarmPlanItem
+        type: object
+        properties:
+            assignments:
+                type: array
+                items:
+                    $ref: '#/definitions/SwarmRoleItem'
+                description: Deterministic role assignments when status is configured.
+                example:
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - access_mode: read_write_worktree
+                      family: Voluptatibus commodi omnis odio odio voluptatibus.
+                      handle: Labore alias in ex enim explicabo.
+                      model: Qui ut quo nam aspernatur incidunt.
+                      owned_paths:
+                        - Dolore nulla.
+                        - Officia reprehenderit dolor labore earum perferendis.
+                      profile_id: Sint quis exercitationem.
+                      provider: Alias et ab consequatur cupiditate.
+                      role: eval_author
+                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
+            cross_family_eval:
+                type: boolean
+                description: True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.
+                example: false
+            cross_family_review:
+                type: boolean
+                description: True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.
+                example: true
+            manifest:
+                type: string
+                description: Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.
+                example: Adipisci suscipit corporis doloremque et.
+            missing_roles:
+                type: array
+                items:
+                    type: string
+                    example: Totam ab ex quod ea nesciunt nobis.
+                description: Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.
+                example:
+                    - Totam ab ex quod ea nesciunt nobis.
+                    - Qui vero quos blanditiis autem et.
+                    - Et blanditiis tenetur occaecati est maxime.
+                    - Quam dignissimos animi sed possimus.
+            single_family:
+                type: boolean
+                description: True when status is configured and all assigned roles share one model family.
+                example: false
+            status:
+                type: string
+                description: Roster configuration status.
+                example: missing_capability
+                enum:
+                    - configured
+                    - unconfigured
+                    - missing_capability
+            summary:
+                type: string
+                description: Plain-English summary of the proposed swarm roster and model-family posture.
+                example: Blanditiis eligendi illo quia exercitationem voluptatem ut.
+        description: Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.
+        example:
+            assignments:
+                - access_mode: read_write_worktree
+                  family: Voluptatibus commodi omnis odio odio voluptatibus.
+                  handle: Labore alias in ex enim explicabo.
+                  model: Qui ut quo nam aspernatur incidunt.
+                  owned_paths:
+                    - Dolore nulla.
+                    - Officia reprehenderit dolor labore earum perferendis.
+                  profile_id: Sint quis exercitationem.
+                  provider: Alias et ab consequatur cupiditate.
+                  role: eval_author
+                  scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                - access_mode: read_write_worktree
+                  family: Voluptatibus commodi omnis odio odio voluptatibus.
+                  handle: Labore alias in ex enim explicabo.
+                  model: Qui ut quo nam aspernatur incidunt.
+                  owned_paths:
+                    - Dolore nulla.
+                    - Officia reprehenderit dolor labore earum perferendis.
+                  profile_id: Sint quis exercitationem.
+                  provider: Alias et ab consequatur cupiditate.
+                  role: eval_author
+                  scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                - access_mode: read_write_worktree
+                  family: Voluptatibus commodi omnis odio odio voluptatibus.
+                  handle: Labore alias in ex enim explicabo.
+                  model: Qui ut quo nam aspernatur incidunt.
+                  owned_paths:
+                    - Dolore nulla.
+                    - Officia reprehenderit dolor labore earum perferendis.
+                  profile_id: Sint quis exercitationem.
+                  provider: Alias et ab consequatur cupiditate.
+                  role: eval_author
+                  scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                - access_mode: read_write_worktree
+                  family: Voluptatibus commodi omnis odio odio voluptatibus.
+                  handle: Labore alias in ex enim explicabo.
+                  model: Qui ut quo nam aspernatur incidunt.
+                  owned_paths:
+                    - Dolore nulla.
+                    - Officia reprehenderit dolor labore earum perferendis.
+                  profile_id: Sint quis exercitationem.
+                  provider: Alias et ab consequatur cupiditate.
+                  role: eval_author
+                  scope_name: Voluptatem consequatur modi fugit hic aut sint.
+            cross_family_eval: false
+            cross_family_review: true
+            manifest: Adipisci suscipit corporis doloremque et.
+            missing_roles:
+                - Totam ab ex quod ea nesciunt nobis.
+                - Qui vero quos blanditiis autem et.
+                - Et blanditiis tenetur occaecati est maxime.
+                - Quam dignissimos animi sed possimus.
+            single_family: false
+            status: missing_capability
+            summary: Blanditiis eligendi illo quia exercitationem voluptatem ut.
+        required:
+            - status
+            - assignments
+            - cross_family_review
+            - cross_family_eval
+            - single_family
+            - summary
+    SwarmRoleItem:
+        title: SwarmRoleItem
+        type: object
+        properties:
+            access_mode:
+                type: string
+                description: Workspace access boundary enforced by the job runner.
+                example: read_write_worktree
+                enum:
+                    - read_only_after_cp2
+                    - read_write_worktree
+                    - isolated_eval_workspace
+                    - read_only_review
+            family:
+                type: string
+                description: Canonical model family identifier.
+                example: Voluptatibus commodi omnis odio odio voluptatibus.
+            handle:
+                type: string
+                description: Deterministic Chorus agent handle (without leading '@', at most 32 characters).
+                example: Labore alias in ex enim explicabo.
+            model:
+                type: string
+                description: Assigned model identifier.
+                example: Qui ut quo nam aspernatur incidunt.
+            owned_paths:
+                type: array
+                items:
+                    type: string
+                    example: Dolore nulla.
+                description: Repository or workspace path globs owned by this role.
+                example:
+                    - Dolore nulla.
+                    - Officia reprehenderit dolor labore earum perferendis.
+            profile_id:
+                type: string
+                description: Assigned server-configured provider profile ID.
+                example: Sint quis exercitationem.
+            provider:
+                type: string
+                description: Assigned coding-agent provider name.
+                example: Alias et ab consequatur cupiditate.
+            role:
+                type: string
+                description: Assigned swarm role kind.
+                example: eval_author
+                enum:
+                    - architect
+                    - builder
+                    - eval_author
+                    - reviewer
+            scope_name:
+                type: string
+                description: Human-readable scope label for this assignment.
+                example: Voluptatem consequatur modi fugit hic aut sint.
+        description: Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.
+        example:
+            access_mode: read_write_worktree
+            family: Voluptatibus commodi omnis odio odio voluptatibus.
+            handle: Labore alias in ex enim explicabo.
+            model: Qui ut quo nam aspernatur incidunt.
+            owned_paths:
+                - Dolore nulla.
+                - Officia reprehenderit dolor labore earum perferendis.
+            profile_id: Sint quis exercitationem.
+            provider: Alias et ab consequatur cupiditate.
+            role: eval_author
+            scope_name: Voluptatem consequatur modi fugit hic aut sint.
+        required:
+            - handle
+            - role
+            - scope_name
+            - profile_id
+            - provider
+            - model
+            - family
+            - owned_paths
+            - access_mode
     ToolContractItem:
         title: ToolContractItem
         type: object

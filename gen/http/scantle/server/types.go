@@ -45,6 +45,8 @@ type PreviewArchitectureRequestBody struct {
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
 	// Candidate module whose Goa and Goa-AI design is evaluated.
 	Design *DesignSnapshotRequestBody `form:"design,omitempty" json:"design,omitempty" xml:"design,omitempty"`
+	// Optional explicit builder path scopes for proposing the Chorus build roster.
+	Builders []*BuilderScopeItemRequestBody `form:"builders,omitempty" json:"builders,omitempty" xml:"builders,omitempty"`
 }
 
 // DraftOverrideRequestBody is the type of the "scantle" service
@@ -137,6 +139,8 @@ type PreviewArchitectureResponseBody struct {
 	AgentPolicies []*AgentPolicyItemResponseBody `form:"agent_policies" json:"agent_policies" xml:"agent_policies"`
 	// Evaluated Goa-AI tool contracts.
 	Tools []*ToolContractItemResponseBody `form:"tools" json:"tools" xml:"tools"`
+	// Proposed Chorus multi-agent role assignments and model-family routing.
+	Swarm *SwarmPlanItemResponseBody `form:"swarm" json:"swarm" xml:"swarm"`
 	// Plain-English summary of topology and guardrails.
 	Banner string `form:"banner" json:"banner" xml:"banner"`
 }
@@ -285,6 +289,53 @@ type ToolInputBindingItemResponseBody struct {
 	InjectedFields []string `form:"injected_fields" json:"injected_fields" xml:"injected_fields"`
 }
 
+// SwarmPlanItemResponseBody is used to define fields on response body types.
+type SwarmPlanItemResponseBody struct {
+	// Roster configuration status.
+	Status string `form:"status" json:"status" xml:"status"`
+	// Deterministic role assignments when status is configured.
+	Assignments []*SwarmRoleItemResponseBody `form:"assignments" json:"assignments" xml:"assignments"`
+	// True if and only if status is configured and the reviewer model family is
+	// disjoint from every assigned builder model family.
+	CrossFamilyReview bool `form:"cross_family_review" json:"cross_family_review" xml:"cross_family_review"`
+	// True if and only if status is configured and the eval_author model family is
+	// disjoint from every assigned builder model family.
+	CrossFamilyEval bool `form:"cross_family_eval" json:"cross_family_eval" xml:"cross_family_eval"`
+	// True when status is configured and all assigned roles share one model family.
+	SingleFamily bool `form:"single_family" json:"single_family" xml:"single_family"`
+	// Required roles lacking an authenticated capable profile when status is
+	// unconfigured or missing_capability.
+	MissingRoles []string `form:"missing_roles,omitempty" json:"missing_roles,omitempty" xml:"missing_roles,omitempty"`
+	// Plain-English summary of the proposed swarm roster and model-family posture.
+	Summary string `form:"summary" json:"summary" xml:"summary"`
+	// Formatted Chorus collaboration manifest text when status is configured; does
+	// not claim publication until sent via Chorus.
+	Manifest *string `form:"manifest,omitempty" json:"manifest,omitempty" xml:"manifest,omitempty"`
+}
+
+// SwarmRoleItemResponseBody is used to define fields on response body types.
+type SwarmRoleItemResponseBody struct {
+	// Deterministic Chorus agent handle (without leading '@', at most 32
+	// characters).
+	Handle string `form:"handle" json:"handle" xml:"handle"`
+	// Assigned swarm role kind.
+	Role string `form:"role" json:"role" xml:"role"`
+	// Human-readable scope label for this assignment.
+	ScopeName string `form:"scope_name" json:"scope_name" xml:"scope_name"`
+	// Assigned server-configured provider profile ID.
+	ProfileID string `form:"profile_id" json:"profile_id" xml:"profile_id"`
+	// Assigned coding-agent provider name.
+	Provider string `form:"provider" json:"provider" xml:"provider"`
+	// Assigned model identifier.
+	Model string `form:"model" json:"model" xml:"model"`
+	// Canonical model family identifier.
+	Family string `form:"family" json:"family" xml:"family"`
+	// Repository or workspace path globs owned by this role.
+	OwnedPaths []string `form:"owned_paths" json:"owned_paths" xml:"owned_paths"`
+	// Workspace access boundary enforced by the job runner.
+	AccessMode string `form:"access_mode" json:"access_mode" xml:"access_mode"`
+}
+
 // ExampleItemRequestBody is used to define fields on request body types.
 type ExampleItemRequestBody struct {
 	// Code-assigned stable example identifier.
@@ -304,6 +355,16 @@ type DesignSnapshotRequestBody struct {
 	// File contents keyed by module-relative path, such as design/design.go or
 	// go.mod.
 	Files map[string]string `form:"files,omitempty" json:"files,omitempty" xml:"files,omitempty"`
+}
+
+// BuilderScopeItemRequestBody is used to define fields on request body types.
+type BuilderScopeItemRequestBody struct {
+	// Human-readable builder scope name (for example, orders or api).
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// Repository-relative path globs owned by this builder.
+	Paths []string `form:"paths,omitempty" json:"paths,omitempty" xml:"paths,omitempty"`
+	// Optional preference selecting a server-configured authenticated profile ID.
+	PreferredProfileID *string `form:"preferred_profile_id,omitempty" json:"preferred_profile_id,omitempty" xml:"preferred_profile_id,omitempty"`
 }
 
 // NewProposeChangeResponseBody builds the HTTP response body from the result
@@ -468,6 +529,9 @@ func NewPreviewArchitectureResponseBody(res *scantle.ArchitecturePreviewResult) 
 	} else {
 		body.Tools = []*ToolContractItemResponseBody{}
 	}
+	if res.Swarm != nil {
+		body.Swarm = marshalScantleSwarmPlanItemToSwarmPlanItemResponseBody(res.Swarm)
+	}
 	return body
 }
 
@@ -570,6 +634,16 @@ func NewPreviewArchitecturePayload(body *PreviewArchitectureRequestBody) *scantl
 		RequestRevision: *body.RequestRevision,
 	}
 	v.Design = unmarshalDesignSnapshotRequestBodyToScantleDesignSnapshot(body.Design)
+	if body.Builders != nil {
+		v.Builders = make([]*scantle.BuilderScopeItem, len(body.Builders))
+		for i, val := range body.Builders {
+			if val == nil {
+				v.Builders[i] = nil
+				continue
+			}
+			v.Builders[i] = unmarshalBuilderScopeItemRequestBodyToScantleBuilderScopeItem(val)
+		}
+	}
 
 	return v
 }
@@ -647,6 +721,13 @@ func ValidatePreviewArchitectureRequestBody(body *PreviewArchitectureRequestBody
 	if body.Design != nil {
 		if err2 := validateDesignSnapshotRequestBody(body.Design, "body.design"); err2 != nil {
 			err = goa.MergeErrors(err, err2)
+		}
+	}
+	for _, e := range body.Builders {
+		if e != nil {
+			if err2 := validateBuilderScopeItemRequestBody(e, "body.builders[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
 		}
 	}
 	return
@@ -755,6 +836,30 @@ func ValidateDesignSnapshotRequestBody(body *DesignSnapshotRequestBody) (err err
 func validateDesignSnapshotRequestBody(body *DesignSnapshotRequestBody, path string) (err error) {
 	if body.Files == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("files", path))
+	}
+	return
+}
+
+// ValidateBuilderScopeItemRequestBody runs the validations defined on
+// BuilderScopeItem
+func ValidateBuilderScopeItemRequestBody(body *BuilderScopeItemRequestBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.Paths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("paths", "body"))
+	}
+	return
+}
+
+// validateBuilderScopeItemRequestBody checks BuilderScopeItem and reports
+// errors using the path supplied by its caller
+func validateBuilderScopeItemRequestBody(body *BuilderScopeItemRequestBody, path string) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", path))
+	}
+	if body.Paths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("paths", path))
 	}
 	return
 }

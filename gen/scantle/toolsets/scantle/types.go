@@ -93,6 +93,8 @@ type (
 		RequestRevision string
 		// Candidate module whose Goa and Goa-AI design is evaluated.
 		Design *DesignSnapshot
+		// Optional explicit builder path scopes for proposing the Chorus build roster.
+		Builders []*BuilderScopeItem
 	}
 	// PreviewArchitectureResult defines the JSON result for the scantle.preview_architecture tool.
 	PreviewArchitectureResult = struct {
@@ -113,6 +115,8 @@ type (
 		AgentPolicies []*AgentPolicyItem
 		// Evaluated Goa-AI tool contracts.
 		Tools []*ToolContractItem
+		// Proposed Chorus multi-agent role assignments and model-family routing.
+		Swarm *SwarmPlanItem
 		// Plain-English summary of topology and guardrails.
 		Banner string
 	}
@@ -176,6 +180,15 @@ type (
 		// Concrete resolution choices.
 		Options []string
 	}
+	// BuilderScopeItem is a nested type used by the generated JSON contract.
+	BuilderScopeItem = struct {
+		// Human-readable builder scope name (for example, orders or api).
+		Name string
+		// Repository-relative path globs owned by this builder.
+		Paths []string
+		// Optional preference selecting a server-configured authenticated profile ID.
+		PreferredProfileID *string
+	}
 	// C4ContainerItem is a nested type used by the generated JSON contract.
 	C4ContainerItem = struct {
 		// Stable container identifier.
@@ -214,6 +227,51 @@ type (
 		ExpectedOutcome string
 		// Evaluator check classification (deterministic or model_judged).
 		VerificationKind string
+	}
+	// SwarmPlanItem is a nested type used by the generated JSON contract.
+	SwarmPlanItem = struct {
+		// Roster configuration status.
+		Status string
+		// Deterministic role assignments when status is configured.
+		Assignments []*SwarmRoleItem
+		// True if and only if status is configured and the reviewer model family is
+		// disjoint from every assigned builder model family.
+		CrossFamilyReview bool
+		// True if and only if status is configured and the eval_author model family is
+		// disjoint from every assigned builder model family.
+		CrossFamilyEval bool
+		// True when status is configured and all assigned roles share one model family.
+		SingleFamily bool
+		// Required roles lacking an authenticated capable profile when status is
+		// unconfigured or missing_capability.
+		MissingRoles []string
+		// Plain-English summary of the proposed swarm roster and model-family posture.
+		Summary string
+		// Formatted Chorus collaboration manifest text when status is configured; does
+		// not claim publication until sent via Chorus.
+		Manifest *string
+	}
+	// SwarmRoleItem is a nested type used by the generated JSON contract.
+	SwarmRoleItem = struct {
+		// Deterministic Chorus agent handle (without leading '@', at most 32
+		// characters).
+		Handle string
+		// Assigned swarm role kind.
+		Role string
+		// Human-readable scope label for this assignment.
+		ScopeName string
+		// Assigned server-configured provider profile ID.
+		ProfileID string
+		// Assigned coding-agent provider name.
+		Provider string
+		// Assigned model identifier.
+		Model string
+		// Canonical model family identifier.
+		Family string
+		// Repository or workspace path globs owned by this role.
+		OwnedPaths []string
+		// Workspace access boundary enforced by the job runner.
+		AccessMode string
 	}
 	// ToolContractItem is a nested type used by the generated JSON contract.
 	ToolContractItem = struct {

@@ -23,7 +23,7 @@ import (
 //	command (subcommand1|subcommand2|...)
 func UsageCommands() []string {
 	return []string{
-		"scantle (checkpoint-ui|propose-change|confirm-intent|preview-architecture|draft-override|diff)",
+		"scantle (checkpoint-ui|golden-path|propose-change|confirm-intent|preview-architecture|draft-override|diff)",
 	}
 }
 
@@ -66,6 +66,8 @@ func ParseEndpoint(
 
 		scantleCheckpointUIFlags = flag.NewFlagSet("checkpoint-ui", flag.ExitOnError)
 
+		scantleGoldenPathFlags = flag.NewFlagSet("golden-path", flag.ExitOnError)
+
 		scantleProposeChangeFlags    = flag.NewFlagSet("propose-change", flag.ExitOnError)
 		scantleProposeChangeBodyFlag = new(cliStringFlag)
 
@@ -89,6 +91,7 @@ func ParseEndpoint(
 
 	scantleFlags.Usage = scantleUsage
 	scantleCheckpointUIFlags.Usage = scantleCheckpointUIUsage
+	scantleGoldenPathFlags.Usage = scantleGoldenPathUsage
 	scantleProposeChangeFlags.Usage = scantleProposeChangeUsage
 	scantleConfirmIntentFlags.Usage = scantleConfirmIntentUsage
 	scantlePreviewArchitectureFlags.Usage = scantlePreviewArchitectureUsage
@@ -132,6 +135,9 @@ func ParseEndpoint(
 			case "checkpoint-ui":
 				epf = scantleCheckpointUIFlags
 
+			case "golden-path":
+				epf = scantleGoldenPathFlags
+
 			case "propose-change":
 				epf = scantleProposeChangeFlags
 
@@ -174,6 +180,8 @@ func ParseEndpoint(
 			switch epn {
 			case "checkpoint-ui":
 				endpoint = c.CheckpointUI()
+			case "golden-path":
+				endpoint = c.GoldenPath()
 			case "propose-change":
 				endpoint = c.ProposeChange()
 				data, err = scantlec.BuildProposeChangePayload(scantleProposeChangeBodyFlag.value)
@@ -205,9 +213,10 @@ func scantleUsage() {
 	fmt.Fprintf(os.Stderr, "Usage:\n    %s [globalflags] scantle COMMAND [flags]\n\n", os.Args[0])
 	fmt.Fprintln(os.Stderr, "COMMAND:")
 	fmt.Fprintln(os.Stderr, `    checkpoint-ui: Serve the interactive MCP Apps HTML host for Scantle checkpoints.`)
+	fmt.Fprintln(os.Stderr, `    golden-path: Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.`)
 	fmt.Fprintln(os.Stderr, `    propose-change: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.`)
 	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm Checkpoint 1 answers and examples to freeze the Change Card.`)
-	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.`)
+	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
 	fmt.Fprintln(os.Stderr, `    diff: Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.`)
 	fmt.Fprintln(os.Stderr)
@@ -228,6 +237,22 @@ func scantleCheckpointUIUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle checkpoint-ui")
+}
+
+func scantleGoldenPathUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] scantle golden-path", os.Args[0])
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.`)
+
+	// Flags list
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle golden-path")
 }
 
 func scantleProposeChangeUsage() {
@@ -274,14 +299,14 @@ func scantlePreviewArchitectureUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Extract and validate the Checkpoint 2 C4 container topology, tool contracts, and Goa-AI guardrails from a candidate Goa design bound to a confirmed Change Card.`)
+	fmt.Fprintln(os.Stderr, `Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle preview-architecture --body '{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle preview-architecture --body '{\n      \"builders\": [\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         },\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         },\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         },\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         }\n      ],\n      \"change_id\": \"Nam ut commodi.\",\n      \"design\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
 }
 
 func scantleDraftOverrideUsage() {

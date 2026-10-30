@@ -114,6 +114,8 @@ type (
 		RequestRevision *string `json:"request_revision"`
 		// Candidate module whose Goa and Goa-AI design is evaluated.
 		Design *DesignSnapshotTransport `json:"design"`
+		// Optional explicit builder path scopes for proposing the Chorus build roster.
+		Builders []*BuilderScopeItemTransport `json:"builders,omitempty"`
 	}
 	// PreviewArchitectureResultTransport is the internal JSON transport type for PreviewArchitectureResult.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -137,6 +139,8 @@ type (
 		AgentPolicies []*AgentPolicyItemTransport `json:"agent_policies"`
 		// Evaluated Goa-AI tool contracts.
 		Tools []*ToolContractItemTransport `json:"tools"`
+		// Proposed Chorus multi-agent role assignments and model-family routing.
+		Swarm *SwarmPlanItemTransport `json:"swarm"`
 		// Plain-English summary of topology and guardrails.
 		Banner *string `json:"banner"`
 	}
@@ -212,6 +216,18 @@ type (
 		// Concrete resolution choices.
 		Options []string `json:"options"`
 	}
+	// BuilderScopeItemTransport is the internal JSON transport type for BuilderScopeItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	BuilderScopeItemTransport struct {
+		// Human-readable builder scope name (for example, orders or api).
+		Name *string `json:"name"`
+		// Repository-relative path globs owned by this builder.
+		Paths []string `json:"paths"`
+		// Optional preference selecting a server-configured authenticated profile ID.
+		PreferredProfileID *string `json:"preferred_profile_id,omitempty"`
+	}
 	// C4ContainerItemTransport is the internal JSON transport type for C4ContainerItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
@@ -262,6 +278,57 @@ type (
 		ExpectedOutcome *string `json:"expected_outcome"`
 		// Evaluator check classification (deterministic or model_judged).
 		VerificationKind *string `json:"verification_kind"`
+	}
+	// SwarmPlanItemTransport is the internal JSON transport type for SwarmPlanItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	SwarmPlanItemTransport struct {
+		// Roster configuration status.
+		Status *string `json:"status"`
+		// Deterministic role assignments when status is configured.
+		Assignments []*SwarmRoleItemTransport `json:"assignments"`
+		// True if and only if status is configured and the reviewer model family is
+		// disjoint from every assigned builder model family.
+		CrossFamilyReview *bool `json:"cross_family_review"`
+		// True if and only if status is configured and the eval_author model family is
+		// disjoint from every assigned builder model family.
+		CrossFamilyEval *bool `json:"cross_family_eval"`
+		// True when status is configured and all assigned roles share one model family.
+		SingleFamily *bool `json:"single_family"`
+		// Required roles lacking an authenticated capable profile when status is
+		// unconfigured or missing_capability.
+		MissingRoles []string `json:"missing_roles,omitempty"`
+		// Plain-English summary of the proposed swarm roster and model-family posture.
+		Summary *string `json:"summary"`
+		// Formatted Chorus collaboration manifest text when status is configured; does
+		// not claim publication until sent via Chorus.
+		Manifest *string `json:"manifest,omitempty"`
+	}
+	// SwarmRoleItemTransport is the internal JSON transport type for SwarmRoleItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	SwarmRoleItemTransport struct {
+		// Deterministic Chorus agent handle (without leading '@', at most 32
+		// characters).
+		Handle *string `json:"handle"`
+		// Assigned swarm role kind.
+		Role *string `json:"role"`
+		// Human-readable scope label for this assignment.
+		ScopeName *string `json:"scope_name"`
+		// Assigned server-configured provider profile ID.
+		ProfileID *string `json:"profile_id"`
+		// Assigned coding-agent provider name.
+		Provider *string `json:"provider"`
+		// Assigned model identifier.
+		Model *string `json:"model"`
+		// Canonical model family identifier.
+		Family *string `json:"family"`
+		// Repository or workspace path globs owned by this role.
+		OwnedPaths []string `json:"owned_paths"`
+		// Workspace access boundary enforced by the job runner.
+		AccessMode *string `json:"access_mode"`
 	}
 	// ToolContractItemTransport is the internal JSON transport type for ToolContractItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON

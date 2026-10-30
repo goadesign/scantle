@@ -45,6 +45,8 @@ type PreviewArchitectureRequestBody struct {
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
 	// Candidate module whose Goa and Goa-AI design is evaluated.
 	Design *DesignSnapshotRequestBody `form:"design" json:"design" xml:"design"`
+	// Optional explicit builder path scopes for proposing the Chorus build roster.
+	Builders []*BuilderScopeItemRequestBody `form:"builders,omitempty" json:"builders,omitempty" xml:"builders,omitempty"`
 }
 
 // DraftOverrideRequestBody is the type of the "scantle" service
@@ -137,6 +139,8 @@ type PreviewArchitectureResponseBody struct {
 	AgentPolicies []*AgentPolicyItemResponseBody `form:"agent_policies,omitempty" json:"agent_policies,omitempty" xml:"agent_policies,omitempty"`
 	// Evaluated Goa-AI tool contracts.
 	Tools []*ToolContractItemResponseBody `form:"tools,omitempty" json:"tools,omitempty" xml:"tools,omitempty"`
+	// Proposed Chorus multi-agent role assignments and model-family routing.
+	Swarm *SwarmPlanItemResponseBody `form:"swarm,omitempty" json:"swarm,omitempty" xml:"swarm,omitempty"`
 	// Plain-English summary of topology and guardrails.
 	Banner *string `form:"banner,omitempty" json:"banner,omitempty" xml:"banner,omitempty"`
 }
@@ -285,6 +289,53 @@ type ToolInputBindingItemResponseBody struct {
 	InjectedFields []string `form:"injected_fields,omitempty" json:"injected_fields,omitempty" xml:"injected_fields,omitempty"`
 }
 
+// SwarmPlanItemResponseBody is used to define fields on response body types.
+type SwarmPlanItemResponseBody struct {
+	// Roster configuration status.
+	Status *string `form:"status,omitempty" json:"status,omitempty" xml:"status,omitempty"`
+	// Deterministic role assignments when status is configured.
+	Assignments []*SwarmRoleItemResponseBody `form:"assignments,omitempty" json:"assignments,omitempty" xml:"assignments,omitempty"`
+	// True if and only if status is configured and the reviewer model family is
+	// disjoint from every assigned builder model family.
+	CrossFamilyReview *bool `form:"cross_family_review,omitempty" json:"cross_family_review,omitempty" xml:"cross_family_review,omitempty"`
+	// True if and only if status is configured and the eval_author model family is
+	// disjoint from every assigned builder model family.
+	CrossFamilyEval *bool `form:"cross_family_eval,omitempty" json:"cross_family_eval,omitempty" xml:"cross_family_eval,omitempty"`
+	// True when status is configured and all assigned roles share one model family.
+	SingleFamily *bool `form:"single_family,omitempty" json:"single_family,omitempty" xml:"single_family,omitempty"`
+	// Required roles lacking an authenticated capable profile when status is
+	// unconfigured or missing_capability.
+	MissingRoles []string `form:"missing_roles,omitempty" json:"missing_roles,omitempty" xml:"missing_roles,omitempty"`
+	// Plain-English summary of the proposed swarm roster and model-family posture.
+	Summary *string `form:"summary,omitempty" json:"summary,omitempty" xml:"summary,omitempty"`
+	// Formatted Chorus collaboration manifest text when status is configured; does
+	// not claim publication until sent via Chorus.
+	Manifest *string `form:"manifest,omitempty" json:"manifest,omitempty" xml:"manifest,omitempty"`
+}
+
+// SwarmRoleItemResponseBody is used to define fields on response body types.
+type SwarmRoleItemResponseBody struct {
+	// Deterministic Chorus agent handle (without leading '@', at most 32
+	// characters).
+	Handle *string `form:"handle,omitempty" json:"handle,omitempty" xml:"handle,omitempty"`
+	// Assigned swarm role kind.
+	Role *string `form:"role,omitempty" json:"role,omitempty" xml:"role,omitempty"`
+	// Human-readable scope label for this assignment.
+	ScopeName *string `form:"scope_name,omitempty" json:"scope_name,omitempty" xml:"scope_name,omitempty"`
+	// Assigned server-configured provider profile ID.
+	ProfileID *string `form:"profile_id,omitempty" json:"profile_id,omitempty" xml:"profile_id,omitempty"`
+	// Assigned coding-agent provider name.
+	Provider *string `form:"provider,omitempty" json:"provider,omitempty" xml:"provider,omitempty"`
+	// Assigned model identifier.
+	Model *string `form:"model,omitempty" json:"model,omitempty" xml:"model,omitempty"`
+	// Canonical model family identifier.
+	Family *string `form:"family,omitempty" json:"family,omitempty" xml:"family,omitempty"`
+	// Repository or workspace path globs owned by this role.
+	OwnedPaths []string `form:"owned_paths,omitempty" json:"owned_paths,omitempty" xml:"owned_paths,omitempty"`
+	// Workspace access boundary enforced by the job runner.
+	AccessMode *string `form:"access_mode,omitempty" json:"access_mode,omitempty" xml:"access_mode,omitempty"`
+}
+
 // ExampleItemRequestBody is used to define fields on request body types.
 type ExampleItemRequestBody struct {
 	// Code-assigned stable example identifier.
@@ -304,6 +355,16 @@ type DesignSnapshotRequestBody struct {
 	// File contents keyed by module-relative path, such as design/design.go or
 	// go.mod.
 	Files map[string]string `form:"files" json:"files" xml:"files"`
+}
+
+// BuilderScopeItemRequestBody is used to define fields on request body types.
+type BuilderScopeItemRequestBody struct {
+	// Human-readable builder scope name (for example, orders or api).
+	Name string `form:"name" json:"name" xml:"name"`
+	// Repository-relative path globs owned by this builder.
+	Paths []string `form:"paths" json:"paths" xml:"paths"`
+	// Optional preference selecting a server-configured authenticated profile ID.
+	PreferredProfileID *string `form:"preferred_profile_id,omitempty" json:"preferred_profile_id,omitempty" xml:"preferred_profile_id,omitempty"`
 }
 
 // NewProposeChangeRequestBody builds the HTTP request body from the payload of
@@ -356,6 +417,16 @@ func NewPreviewArchitectureRequestBody(p *scantle.PreviewArchitecturePayload) *P
 	}
 	if p.Design != nil {
 		body.Design = marshalScantleDesignSnapshotToDesignSnapshotRequestBody(p.Design)
+	}
+	if p.Builders != nil {
+		body.Builders = make([]*BuilderScopeItemRequestBody, len(p.Builders))
+		for i, val := range p.Builders {
+			if val == nil {
+				body.Builders[i] = nil
+				continue
+			}
+			body.Builders[i] = marshalScantleBuilderScopeItemToBuilderScopeItemRequestBody(val)
+		}
 	}
 	return body
 }
@@ -516,6 +587,7 @@ func NewPreviewArchitectureArchitecturePreviewResultOK(body *PreviewArchitecture
 		}
 		v.Tools[i] = unmarshalToolContractItemResponseBodyToScantleToolContractItem(val)
 	}
+	v.Swarm = unmarshalSwarmPlanItemResponseBodyToScantleSwarmPlanItem(body.Swarm)
 
 	return v
 }
@@ -679,6 +751,9 @@ func ValidatePreviewArchitectureResponseBody(body *PreviewArchitectureResponseBo
 	if body.Tools == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
 	}
+	if body.Swarm == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("swarm", "body"))
+	}
 	if body.Banner == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
 	}
@@ -708,6 +783,11 @@ func ValidatePreviewArchitectureResponseBody(body *PreviewArchitectureResponseBo
 			if err2 := validateToolContractItemResponseBody(e, "body.tools[*]"); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if body.Swarm != nil {
+		if err2 := validateSwarmPlanItemResponseBody(body.Swarm, "body.swarm"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return
@@ -1073,6 +1153,164 @@ func validateToolInputBindingItemResponseBody(body *ToolInputBindingItemResponse
 	return
 }
 
+// ValidateSwarmPlanItemResponseBody runs the validations defined on
+// SwarmPlanItem
+func ValidateSwarmPlanItemResponseBody(body *SwarmPlanItemResponseBody) (err error) {
+	if body.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Assignments == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("assignments", "body"))
+	}
+	if body.CrossFamilyReview == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cross_family_review", "body"))
+	}
+	if body.CrossFamilyEval == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cross_family_eval", "body"))
+	}
+	if body.SingleFamily == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("single_family", "body"))
+	}
+	if body.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if body.Status != nil {
+		if !(*body.Status == "configured" || *body.Status == "unconfigured" || *body.Status == "missing_capability") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *body.Status, []any{"configured", "unconfigured", "missing_capability"}))
+		}
+	}
+	for _, e := range body.Assignments {
+		if e != nil {
+			if err2 := validateSwarmRoleItemResponseBody(e, "body.assignments[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return
+}
+
+// validateSwarmPlanItemResponseBody checks SwarmPlanItem and reports errors
+// using the path supplied by its caller
+func validateSwarmPlanItemResponseBody(body *SwarmPlanItemResponseBody, path string) (err error) {
+	if body.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", path))
+	}
+	if body.Assignments == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("assignments", path))
+	}
+	if body.CrossFamilyReview == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cross_family_review", path))
+	}
+	if body.CrossFamilyEval == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cross_family_eval", path))
+	}
+	if body.SingleFamily == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("single_family", path))
+	}
+	if body.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", path))
+	}
+	if body.Status != nil {
+		if !(*body.Status == "configured" || *body.Status == "unconfigured" || *body.Status == "missing_capability") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".status", *body.Status, []any{"configured", "unconfigured", "missing_capability"}))
+		}
+	}
+	for _, e := range body.Assignments {
+		if e != nil {
+			if err2 := validateSwarmRoleItemResponseBody(e, path+".assignments[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return
+}
+
+// ValidateSwarmRoleItemResponseBody runs the validations defined on
+// SwarmRoleItem
+func ValidateSwarmRoleItemResponseBody(body *SwarmRoleItemResponseBody) (err error) {
+	if body.Handle == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("handle", "body"))
+	}
+	if body.Role == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("role", "body"))
+	}
+	if body.ScopeName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scope_name", "body"))
+	}
+	if body.ProfileID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("profile_id", "body"))
+	}
+	if body.Provider == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("provider", "body"))
+	}
+	if body.Model == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("model", "body"))
+	}
+	if body.Family == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("family", "body"))
+	}
+	if body.OwnedPaths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("owned_paths", "body"))
+	}
+	if body.AccessMode == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("access_mode", "body"))
+	}
+	if body.Role != nil {
+		if !(*body.Role == "architect" || *body.Role == "builder" || *body.Role == "eval_author" || *body.Role == "reviewer") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.role", *body.Role, []any{"architect", "builder", "eval_author", "reviewer"}))
+		}
+	}
+	if body.AccessMode != nil {
+		if !(*body.AccessMode == "read_only_after_cp2" || *body.AccessMode == "read_write_worktree" || *body.AccessMode == "isolated_eval_workspace" || *body.AccessMode == "read_only_review") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.access_mode", *body.AccessMode, []any{"read_only_after_cp2", "read_write_worktree", "isolated_eval_workspace", "read_only_review"}))
+		}
+	}
+	return
+}
+
+// validateSwarmRoleItemResponseBody checks SwarmRoleItem and reports errors
+// using the path supplied by its caller
+func validateSwarmRoleItemResponseBody(body *SwarmRoleItemResponseBody, path string) (err error) {
+	if body.Handle == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("handle", path))
+	}
+	if body.Role == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("role", path))
+	}
+	if body.ScopeName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scope_name", path))
+	}
+	if body.ProfileID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("profile_id", path))
+	}
+	if body.Provider == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("provider", path))
+	}
+	if body.Model == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("model", path))
+	}
+	if body.Family == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("family", path))
+	}
+	if body.OwnedPaths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("owned_paths", path))
+	}
+	if body.AccessMode == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("access_mode", path))
+	}
+	if body.Role != nil {
+		if !(*body.Role == "architect" || *body.Role == "builder" || *body.Role == "eval_author" || *body.Role == "reviewer") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".role", *body.Role, []any{"architect", "builder", "eval_author", "reviewer"}))
+		}
+	}
+	if body.AccessMode != nil {
+		if !(*body.AccessMode == "read_only_after_cp2" || *body.AccessMode == "read_write_worktree" || *body.AccessMode == "isolated_eval_workspace" || *body.AccessMode == "read_only_review") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".access_mode", *body.AccessMode, []any{"read_only_after_cp2", "read_write_worktree", "isolated_eval_workspace", "read_only_review"}))
+		}
+	}
+	return
+}
+
 // ValidateExampleItemRequestBody runs the validations defined on ExampleItem
 func ValidateExampleItemRequestBody(body *ExampleItemRequestBody) (err error) {
 	if !(body.VerificationKind == "deterministic" || body.VerificationKind == "model_judged") {
@@ -1104,6 +1342,24 @@ func ValidateDesignSnapshotRequestBody(body *DesignSnapshotRequestBody) (err err
 func validateDesignSnapshotRequestBody(body *DesignSnapshotRequestBody, path string) (err error) {
 	if body.Files == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("files", path))
+	}
+	return
+}
+
+// ValidateBuilderScopeItemRequestBody runs the validations defined on
+// BuilderScopeItem
+func ValidateBuilderScopeItemRequestBody(body *BuilderScopeItemRequestBody) (err error) {
+	if body.Paths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("paths", "body"))
+	}
+	return
+}
+
+// validateBuilderScopeItemRequestBody checks BuilderScopeItem and reports
+// errors using the path supplied by its caller
+func validateBuilderScopeItemRequestBody(body *BuilderScopeItemRequestBody, path string) (err error) {
+	if body.Paths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("paths", path))
 	}
 	return
 }

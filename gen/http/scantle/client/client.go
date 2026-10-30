@@ -21,6 +21,10 @@ type Client struct {
 	// checkpoint_ui endpoint.
 	CheckpointUIDoer goahttp.Doer
 
+	// GoldenPath Doer is the HTTP client used to make requests to the golden_path
+	// endpoint.
+	GoldenPathDoer goahttp.Doer
+
 	// ProposeChange Doer is the HTTP client used to make requests to the
 	// propose_change endpoint.
 	ProposeChangeDoer goahttp.Doer
@@ -61,6 +65,7 @@ func NewClient(
 ) *Client {
 	return &Client{
 		CheckpointUIDoer:        doer,
+		GoldenPathDoer:          doer,
 		ProposeChangeDoer:       doer,
 		ConfirmIntentDoer:       doer,
 		PreviewArchitectureDoer: doer,
@@ -88,6 +93,25 @@ func (c *Client) CheckpointUI() goa.Endpoint {
 		resp, err := c.CheckpointUIDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("scantle", "checkpoint_ui", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// GoldenPath returns an endpoint that makes HTTP requests to the scantle
+// service golden_path server.
+func (c *Client) GoldenPath() goa.Endpoint {
+	var (
+		decodeResponse = DecodeGoldenPathResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildGoldenPathRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.GoldenPathDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("scantle", "golden_path", err)
 		}
 		return decodeResponse(resp)
 	}

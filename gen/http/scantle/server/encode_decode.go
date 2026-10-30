@@ -30,6 +30,18 @@ func EncodeCheckpointUIResponse(encoder func(context.Context, http.ResponseWrite
 	}
 }
 
+// EncodeGoldenPathResponse returns an encoder for responses returned by the
+// scantle golden_path endpoint.
+func EncodeGoldenPathResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(string)
+		enc := encoder(ctx, w)
+		body := res
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
 // EncodeProposeChangeResponse returns an encoder for responses returned by the
 // scantle propose_change endpoint.
 func EncodeProposeChangeResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
@@ -302,6 +314,22 @@ func unmarshalDesignSnapshotRequestBodyToScantleDesignSnapshot(v *DesignSnapshot
 	return res
 }
 
+// unmarshalBuilderScopeItemRequestBodyToScantleBuilderScopeItem builds a value
+// of type *scantle.BuilderScopeItem from a value of type
+// *BuilderScopeItemRequestBody.
+func unmarshalBuilderScopeItemRequestBodyToScantleBuilderScopeItem(v *BuilderScopeItemRequestBody) *scantle.BuilderScopeItem {
+	res := &scantle.BuilderScopeItem{
+		Name:               *v.Name,
+		PreferredProfileID: v.PreferredProfileID,
+	}
+	res.Paths = make([]string, len(v.Paths))
+	for i, val := range v.Paths {
+		res.Paths[i] = val
+	}
+
+	return res
+}
+
 // marshalScantleC4ContainerItemToC4ContainerItemResponseBody builds a value of
 // type *C4ContainerItemResponseBody from a value of type
 // *scantle.C4ContainerItem.
@@ -394,6 +422,64 @@ func marshalScantleToolInputBindingItemToToolInputBindingItemResponseBody(v *sca
 		}
 	} else {
 		res.InjectedFields = []string{}
+	}
+
+	return res
+}
+
+// marshalScantleSwarmPlanItemToSwarmPlanItemResponseBody builds a value of
+// type *SwarmPlanItemResponseBody from a value of type *scantle.SwarmPlanItem.
+func marshalScantleSwarmPlanItemToSwarmPlanItemResponseBody(v *scantle.SwarmPlanItem) *SwarmPlanItemResponseBody {
+	res := &SwarmPlanItemResponseBody{
+		Status:            v.Status,
+		CrossFamilyReview: v.CrossFamilyReview,
+		CrossFamilyEval:   v.CrossFamilyEval,
+		SingleFamily:      v.SingleFamily,
+		Summary:           v.Summary,
+		Manifest:          v.Manifest,
+	}
+	if v.Assignments != nil {
+		res.Assignments = make([]*SwarmRoleItemResponseBody, len(v.Assignments))
+		for i, val := range v.Assignments {
+			if val == nil {
+				res.Assignments[i] = nil
+				continue
+			}
+			res.Assignments[i] = marshalScantleSwarmRoleItemToSwarmRoleItemResponseBody(val)
+		}
+	} else {
+		res.Assignments = []*SwarmRoleItemResponseBody{}
+	}
+	if v.MissingRoles != nil {
+		res.MissingRoles = make([]string, len(v.MissingRoles))
+		for i, val := range v.MissingRoles {
+			res.MissingRoles[i] = val
+		}
+	}
+
+	return res
+}
+
+// marshalScantleSwarmRoleItemToSwarmRoleItemResponseBody builds a value of
+// type *SwarmRoleItemResponseBody from a value of type *scantle.SwarmRoleItem.
+func marshalScantleSwarmRoleItemToSwarmRoleItemResponseBody(v *scantle.SwarmRoleItem) *SwarmRoleItemResponseBody {
+	res := &SwarmRoleItemResponseBody{
+		Handle:     v.Handle,
+		Role:       v.Role,
+		ScopeName:  v.ScopeName,
+		ProfileID:  v.ProfileID,
+		Provider:   v.Provider,
+		Model:      v.Model,
+		Family:     v.Family,
+		AccessMode: v.AccessMode,
+	}
+	if v.OwnedPaths != nil {
+		res.OwnedPaths = make([]string, len(v.OwnedPaths))
+		for i, val := range v.OwnedPaths {
+			res.OwnedPaths[i] = val
+		}
+	} else {
+		res.OwnedPaths = []string{}
 	}
 
 	return res

@@ -26,7 +26,7 @@ func ToolSchema(name tools.Ident) (*genregistry.ToolSchema, bool) {
 	case "scantle.preview_architecture":
 		return declarations.schema99(), true
 	case "scantle.propose_change":
-		return declarations.schema163(), true
+		return declarations.schema196(), true
 	default:
 		return nil, false
 	}

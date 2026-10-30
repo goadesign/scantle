@@ -13,6 +13,8 @@ import (
 
 	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
 	genscantle "github.com/goadesign/scantle/gen/scantle"
+	"github.com/goadesign/scantle/internal/goldenpath"
+	"github.com/goadesign/scantle/internal/swarm"
 	"github.com/goadesign/scantle/internal/testmodule"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/prompt"
@@ -34,6 +36,7 @@ type (
 	}
 )
 
+// Complete returns the preconfigured JSON payload as an assistant TextPart.
 func (s *stubProvider) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
 	return &model.Response{
 		Content: []model.Message{
@@ -46,19 +49,12 @@ func (s *stubProvider) Complete(_ context.Context, _ *model.Request) (*model.Res
 	}, nil
 }
 
+// Stream returns an error because ModelCP1Analyzer uses synchronous Complete calls.
 func (s *stubProvider) Stream(_ context.Context, _ *model.Request) (model.Streamer, error) {
 	return nil, errors.New("streaming not used by CP1 analyzer")
 }
 
-func newStubModelClient(t *testing.T, responseJSON string) model.Client {
-	t.Helper()
-	client, err := model.NewClient(&stubProvider{responseJSON: responseJSON})
-	if err != nil {
-		t.Fatalf("model.NewClient: %v", err)
-	}
-	return client
-}
-
+// ApplyPromptOverride writes newContent into the target prompt.Store and returns the resolved version.
 func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, promptID, newContent string) (string, error) {
 	id := prompt.Ident(promptID)
 	if err := u.store.Set(ctx, id, prompt.Scope{}, newContent, map[string]string{"source": "cp3_fast_draft"}); err != nil {
@@ -71,6 +67,9 @@ func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, prom
 	return override.Version, nil
 }
 
+// TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock verifies
+// CP1 ambiguity detection, code-owned question/check IDs, authenticated owner
+// binding, and canonical revision locking.
 func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testing.T) {
 	aliceCtx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	bobCtx := WithPrincipal(context.Background(), Principal{ID: "bob@example.com"})
@@ -216,6 +215,9 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 }
 
+// TestCP1RejectsMalformedOrUnknownFieldsViaStructuredOutput verifies that
+// invalid enum values, unknown fields, and model-supplied IDs are rejected at
+// the CP1 model boundary.
 func TestCP1RejectsMalformedOrUnknownFieldsViaStructuredOutput(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	cases := []struct {
@@ -250,6 +252,9 @@ func TestCP1RejectsMalformedOrUnknownFieldsViaStructuredOutput(t *testing.T) {
 	}
 }
 
+// TestCP2EvaluatedArchitecturePreviewCP3FastDraftAndTokenAuthenticator verifies
+// CP2 design evaluation, Golden Path MCP resource serving, proposed swarm
+// planning, CP3 Fast Draft Mode prompt overrides, and bearer-token authentication.
 func TestCP2EvaluatedArchitecturePreviewCP3FastDraftAndTokenAuthenticator(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	clearAnalysis := CP1SemanticAnalysis{
@@ -358,6 +363,9 @@ var _ = Service("orders", func() {
 	if len(preview.Tools) != 1 || !preview.Tools[0].RequiresConfirmation || len(preview.Tools[0].InjectedFields) != 1 || preview.Tools[0].InjectedFields[0] != "tenant_id" {
 		t.Fatalf("unexpected evaluated ToolContractItem: %+v", preview.Tools)
 	}
+	if preview.Swarm == nil || preview.Swarm.Status != string(swarm.StatusUnconfigured) || len(preview.Swarm.MissingRoles) != 4 || preview.Swarm.Manifest != nil {
+		t.Fatalf("expected unconfigured swarm plan when no SwarmProfiles are configured, got %+v", preview.Swarm)
+	}
 
 	// CP3: Fast Draft Mode updates the bound TargetPromptUpdater and rejects compiled_rule hacks.
 	promptID := "orders.refund.system"
@@ -421,4 +429,97 @@ var _ = Service("orders", func() {
 	if !ok || len(completeRes.Contents) != 1 || completeRes.Contents[0].Text == nil || !strings.Contains(*completeRes.Contents[0].Text, "scantle-checkpoint-root") {
 		t.Fatalf("unexpected ResourcesRead content: %+v", resRead)
 	}
+
+	goldenRes, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: goldenpath.ResourceURI})
+	if err != nil {
+		t.Fatalf("ResourcesRead(%s) failed: %v", goldenpath.ResourceURI, err)
+	}
+	goldenComplete, ok := goldenRes.Outcome.AsComplete()
+	if !ok || len(goldenComplete.Contents) != 1 || goldenComplete.Contents[0].Text == nil || *goldenComplete.Contents[0].Text != goldenpath.PlaybookMarkdown() {
+		t.Fatalf("unexpected scantle://golden-path content: %+v", goldenRes)
+	}
+
+	// CP2 with server-configured multi-family provider profiles proposes cross-family swarm roster.
+	cpWithSwarm := New(Options{
+		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(rawBytes))),
+		SwarmProfiles: []swarm.ProviderProfile{
+			{
+				ID:            "claude-opus",
+				Provider:      "claude",
+				Model:         "claude-opus-4-6",
+				Family:        "anthropic",
+				Authenticated: true,
+				Capabilities: []swarm.RoleKind{
+					swarm.RoleArchitect,
+					swarm.RoleBuilder,
+					swarm.RoleEvalAuthor,
+					swarm.RoleReviewer,
+				},
+			},
+			{
+				ID:            "codex-gpt5",
+				Provider:      "codex",
+				Model:         "gpt-5.4",
+				Family:        "openai",
+				Authenticated: true,
+				Capabilities: []swarm.RoleKind{
+					swarm.RoleBuilder,
+					swarm.RoleEvalAuthor,
+					swarm.RoleReviewer,
+				},
+			},
+			{
+				ID:            "gemini-pro",
+				Provider:      "gemini",
+				Model:         "gemini-3.1-pro",
+				Family:        "google",
+				Authenticated: true,
+				Capabilities: []swarm.RoleKind{
+					swarm.RoleArchitect,
+					swarm.RoleEvalAuthor,
+					swarm.RoleReviewer,
+				},
+			},
+		},
+	})
+	cardSwarm, err := cpWithSwarm.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+		ChangeID:     "chg-swarm",
+		Prompt:       "Auto-approve when item_subtotal_cents < 5000; require manager when item_subtotal_cents >= 5000.",
+		DesignSource: &candidateDesign,
+	})
+	if err != nil {
+		t.Fatalf("ProposeChange(chg-swarm) failed: %v", err)
+	}
+	previewSwarm, err := cpWithSwarm.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
+		ChangeID:        cardSwarm.ChangeID,
+		RequestRevision: cardSwarm.RequestRevision,
+		Design:          &genscantle.DesignSnapshot{Files: testmodule.Snapshot(t, "", candidateDesign)},
+		Builders: []*genscantle.BuilderScopeItem{
+			{Name: "orders", Paths: []string{"internal/orders/**"}},
+			{Name: "api", Paths: []string{"cmd/orders-api/**"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("PreviewArchitecture(chg-swarm) failed: %v", err)
+	}
+	if previewSwarm.Swarm == nil ||
+		previewSwarm.Swarm.Status != string(swarm.StatusConfigured) ||
+		!previewSwarm.Swarm.CrossFamilyReview ||
+		!previewSwarm.Swarm.CrossFamilyEval ||
+		previewSwarm.Swarm.SingleFamily ||
+		len(previewSwarm.Swarm.Assignments) != 5 ||
+		previewSwarm.Swarm.Manifest == nil ||
+		!strings.Contains(*previewSwarm.Swarm.Manifest, previewSwarm.DesignDigest) {
+		t.Fatalf("unexpected configured previewSwarm.Swarm: %+v", previewSwarm.Swarm)
+	}
+}
+
+// newStubModelClient wraps a stubProvider in a goa-ai model.Client.
+func newStubModelClient(t *testing.T, responseJSON string) model.Client {
+	t.Helper()
+	client, err := model.NewClient(&stubProvider{responseJSON: responseJSON})
+	if err != nil {
+		t.Fatalf("model.NewClient: %v", err)
+	}
+	return client
 }

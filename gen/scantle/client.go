@@ -16,6 +16,7 @@ import (
 // Client is the "scantle" service client.
 type Client struct {
 	CheckpointUIEndpoint        goa.Endpoint
+	GoldenPathEndpoint          goa.Endpoint
 	ProposeChangeEndpoint       goa.Endpoint
 	ConfirmIntentEndpoint       goa.Endpoint
 	PreviewArchitectureEndpoint goa.Endpoint
@@ -24,9 +25,10 @@ type Client struct {
 }
 
 // NewClient initializes a "scantle" service client given the endpoints.
-func NewClient(checkpointUI, proposeChange, confirmIntent, previewArchitecture, draftOverride, diff goa.Endpoint) *Client {
+func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, previewArchitecture, draftOverride, diff goa.Endpoint) *Client {
 	return &Client{
 		CheckpointUIEndpoint:        checkpointUI,
+		GoldenPathEndpoint:          goldenPath,
 		ProposeChangeEndpoint:       proposeChange,
 		ConfirmIntentEndpoint:       confirmIntent,
 		PreviewArchitectureEndpoint: previewArchitecture,
@@ -39,6 +41,16 @@ func NewClient(checkpointUI, proposeChange, confirmIntent, previewArchitecture, 
 func (c *Client) CheckpointUI(ctx context.Context) (res string, err error) {
 	var ires any
 	ires, err = c.CheckpointUIEndpoint(ctx, nil)
+	if err != nil {
+		return
+	}
+	return ires.(string), nil
+}
+
+// GoldenPath calls the "golden_path" endpoint of the "scantle" service.
+func (c *Client) GoldenPath(ctx context.Context) (res string, err error) {
+	var ires any
+	ires, err = c.GoldenPathEndpoint(ctx, nil)
 	if err != nil {
 		return
 	}

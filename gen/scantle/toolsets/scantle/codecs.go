@@ -558,7 +558,7 @@ var draftOverrideResultFields = []tools.FieldMetadata{
 var previewArchitecturePayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Request to derive the Checkpoint 2 C4 topology and guardrails from a candidate Goa design bound to a confirmed Change Card.",
+		Description: "Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
@@ -585,11 +585,41 @@ var previewArchitecturePayloadFields = []tools.FieldMetadata{
 		JSONType:    "string",
 		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
 	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("builders")},
+		JSONType:    "array",
+		Description: "Optional explicit builder path scopes for proposing the Chorus build roster.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("builders"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Optional explicit builder path scopes for proposing the Chorus build roster.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("builders"), tools.DynamicField{}, tools.FixedField("name")},
+		JSONType:    "string",
+		Description: "Human-readable builder scope name (for example, orders or api).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("builders"), tools.DynamicField{}, tools.FixedField("paths")},
+		JSONType:    "array",
+		Description: "Repository-relative path globs owned by this builder.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("builders"), tools.DynamicField{}, tools.FixedField("paths"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Repository-relative path globs owned by this builder.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("builders"), tools.DynamicField{}, tools.FixedField("preferred_profile_id")},
+		JSONType:    "string",
+		Description: "Optional preference selecting a server-configured authenticated profile ID.",
+	},
 }
 var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Checkpoint 2 C4 container topology, tool contracts, and per-agent Goa-AI guardrails derived from the evaluated candidate design.",
+		Description: "Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
@@ -820,6 +850,111 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("bounded_result")},
 		JSONType:    "boolean",
 		Description: "True when the tool declares a BoundedResult cursor/truncation contract.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm")},
+		JSONType:    "object",
+		Description: "Proposed Chorus multi-agent role assignments and model-family routing.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("status")},
+		JSONType:    "string",
+		Description: "Roster configuration status.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments")},
+		JSONType:    "array",
+		Description: "Deterministic role assignments when status is configured.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Deterministic role assignments when status is configured.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("handle")},
+		JSONType:    "string",
+		Description: "Deterministic Chorus agent handle (without leading '@', at most 32 characters).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("role")},
+		JSONType:    "string",
+		Description: "Assigned swarm role kind.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("scope_name")},
+		JSONType:    "string",
+		Description: "Human-readable scope label for this assignment.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("profile_id")},
+		JSONType:    "string",
+		Description: "Assigned server-configured provider profile ID.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("provider")},
+		JSONType:    "string",
+		Description: "Assigned coding-agent provider name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("model")},
+		JSONType:    "string",
+		Description: "Assigned model identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("family")},
+		JSONType:    "string",
+		Description: "Canonical model family identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("owned_paths")},
+		JSONType:    "array",
+		Description: "Repository or workspace path globs owned by this role.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("owned_paths"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Repository or workspace path globs owned by this role.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("access_mode")},
+		JSONType:    "string",
+		Description: "Workspace access boundary enforced by the job runner.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("cross_family_review")},
+		JSONType:    "boolean",
+		Description: "True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("cross_family_eval")},
+		JSONType:    "boolean",
+		Description: "True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("single_family")},
+		JSONType:    "boolean",
+		Description: "True when status is configured and all assigned roles share one model family.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("missing_roles")},
+		JSONType:    "array",
+		Description: "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("missing_roles"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("summary")},
+		JSONType:    "string",
+		Description: "Plain-English summary of the proposed swarm roster and model-family posture.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("manifest")},
+		JSONType:    "string",
+		Description: "Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("banner")},
@@ -1879,6 +2014,16 @@ func MarshalPreviewArchitecturePayload(v *PreviewArchitecturePayload) ([]byte, e
 		RequestRevision: &in.RequestRevision,
 	}
 	out.Design = encodeDesignSnapshotToDesignSnapshotTransport(in.Design)
+	if in.Builders != nil {
+		out.Builders = make([]*toolhttp.BuilderScopeItemTransport, len(in.Builders))
+		for i, val := range in.Builders {
+			if val == nil {
+				out.Builders[i] = nil
+				continue
+			}
+			out.Builders[i] = encodeBuilderScopeItemToBuilderScopeItemTransport(val)
+		}
+	}
 	return json.Marshal(out)
 }
 
@@ -1907,6 +2052,16 @@ func UnmarshalPreviewArchitecturePayload(data []byte) (*PreviewArchitecturePaylo
 		RequestRevision: *in.RequestRevision,
 	}
 	out.Design = decodeDesignSnapshotTransportToDesignSnapshot(in.Design)
+	if in.Builders != nil {
+		out.Builders = make([]*BuilderScopeItem, len(in.Builders))
+		for i, val := range in.Builders {
+			if val == nil {
+				out.Builders[i] = nil
+				continue
+			}
+			out.Builders[i] = decodeBuilderScopeItemTransportToBuilderScopeItem(val)
+		}
+	}
 	return out, nil
 }
 
@@ -1957,6 +2112,7 @@ func MarshalPreviewArchitectureResult(v *PreviewArchitectureResult) ([]byte, err
 		}
 		out.Tools[i] = encodeToolContractItemToToolContractItemTransport(val)
 	}
+	out.Swarm = encodeSwarmPlanItemToSwarmPlanItemTransport(in.Swarm)
 	return json.Marshal(out)
 }
 
@@ -2019,6 +2175,7 @@ func UnmarshalPreviewArchitectureResult(data []byte) (*PreviewArchitectureResult
 		}
 		out.Tools[i] = decodeToolContractItemTransportToToolContractItem(val)
 	}
+	out.Swarm = decodeSwarmPlanItemTransportToSwarmPlanItem(in.Swarm)
 	return out, nil
 }
 
@@ -2865,6 +3022,13 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 	sort.Strings(keys)
 	for _, key := range keys {
 		switch key {
+		case "builders":
+			if err := validatePreviewArchitecturePayloadRootBuildersJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Optional explicit builder path scopes for proposing the Chorus build roster.",
+			); err != nil {
+				return err
+			}
 		case "change_id":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
@@ -2888,9 +3052,86 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
+				"builders",
 				"change_id",
 				"design",
 				"request_revision",
+			})
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitecturePayloadRootBuildersJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitecturePayloadRootBuildersJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validatePreviewArchitecturePayloadBuilderScopeItemTransportJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitecturePayloadBuilderScopeItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitecturePayloadBuilderScopeItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "name":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Human-readable builder scope name (for example, orders or api).",
+			); err != nil {
+				return err
+			}
+		case "paths":
+			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Repository-relative path globs owned by this builder.",
+			); err != nil {
+				return err
+			}
+		case "preferred_profile_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Optional preference selecting a server-configured authenticated profile ID.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"name",
+				"paths",
+				"preferred_profile_id",
 			})
 		}
 	}
@@ -3002,6 +3243,13 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 			); err != nil {
 				return err
 			}
+		case "swarm":
+			if err := validatePreviewArchitectureResultSwarmPlanItemTransportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Proposed Chorus multi-agent role assignments and model-family routing.",
+			); err != nil {
+				return err
+			}
 		case "system_name":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
@@ -3025,6 +3273,7 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 				"design_digest",
 				"edges",
 				"request_revision",
+				"swarm",
 				"system_name",
 				"tools",
 			})
@@ -3338,6 +3587,222 @@ func validatePreviewArchitectureResultC4EdgeItemTransportJSONValue(path string, 
 				"from_id",
 				"protocol",
 				"to_id",
+			})
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultSwarmPlanItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultSwarmPlanItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "assignments":
+			if err := validatePreviewArchitectureResultSwarmPlanItemTransportAssignmentsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Deterministic role assignments when status is configured.",
+			); err != nil {
+				return err
+			}
+		case "cross_family_eval":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.",
+			); err != nil {
+				return err
+			}
+		case "cross_family_review":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.",
+			); err != nil {
+				return err
+			}
+		case "manifest":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.",
+			); err != nil {
+				return err
+			}
+		case "missing_roles":
+			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.",
+			); err != nil {
+				return err
+			}
+		case "single_family":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when status is configured and all assigned roles share one model family.",
+			); err != nil {
+				return err
+			}
+		case "status":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Roster configuration status.",
+			); err != nil {
+				return err
+			}
+		case "summary":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Plain-English summary of the proposed swarm roster and model-family posture.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"assignments",
+				"cross_family_eval",
+				"cross_family_review",
+				"manifest",
+				"missing_roles",
+				"single_family",
+				"status",
+				"summary",
+			})
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultSwarmPlanItemTransportAssignmentsJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultSwarmPlanItemTransportAssignmentsJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validatePreviewArchitectureResultSwarmRoleItemTransportJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultSwarmRoleItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultSwarmRoleItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "access_mode":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Workspace access boundary enforced by the job runner.",
+			); err != nil {
+				return err
+			}
+		case "family":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Canonical model family identifier.",
+			); err != nil {
+				return err
+			}
+		case "handle":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Deterministic Chorus agent handle (without leading '@', at most 32 characters).",
+			); err != nil {
+				return err
+			}
+		case "model":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Assigned model identifier.",
+			); err != nil {
+				return err
+			}
+		case "owned_paths":
+			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Repository or workspace path globs owned by this role.",
+			); err != nil {
+				return err
+			}
+		case "profile_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Assigned server-configured provider profile ID.",
+			); err != nil {
+				return err
+			}
+		case "provider":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Assigned coding-agent provider name.",
+			); err != nil {
+				return err
+			}
+		case "role":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Assigned swarm role kind.",
+			); err != nil {
+				return err
+			}
+		case "scope_name":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Human-readable scope label for this assignment.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"access_mode",
+				"family",
+				"handle",
+				"model",
+				"owned_paths",
+				"profile_id",
+				"provider",
+				"role",
+				"scope_name",
 			})
 		}
 	}
@@ -3963,6 +4428,30 @@ func encodeDesignSnapshotToDesignSnapshotTransport(v *DesignSnapshot) *toolhttp.
 
 	return res
 }
+func decodeBuilderScopeItemTransportToBuilderScopeItem(v *toolhttp.BuilderScopeItemTransport) *BuilderScopeItem {
+	res := &BuilderScopeItem{
+		Name:               *v.Name,
+		PreferredProfileID: v.PreferredProfileID,
+	}
+	res.Paths = make([]string, len(v.Paths))
+	for i, val := range v.Paths {
+		res.Paths[i] = val
+	}
+
+	return res
+}
+func encodeBuilderScopeItemToBuilderScopeItemTransport(v *BuilderScopeItem) *toolhttp.BuilderScopeItemTransport {
+	res := &toolhttp.BuilderScopeItemTransport{
+		Name:               &v.Name,
+		PreferredProfileID: v.PreferredProfileID,
+	}
+	res.Paths = make([]string, len(v.Paths))
+	for i, val := range v.Paths {
+		res.Paths[i] = val
+	}
+
+	return res
+}
 func decodeC4ContainerItemTransportToC4ContainerItem(v *toolhttp.C4ContainerItemTransport) *C4ContainerItem {
 	res := &C4ContainerItem{
 		ID:          *v.ID,
@@ -4033,6 +4522,50 @@ func decodeToolInputBindingItemTransportToToolInputBindingItem(v *toolhttp.ToolI
 
 	return res
 }
+func decodeSwarmPlanItemTransportToSwarmPlanItem(v *toolhttp.SwarmPlanItemTransport) *SwarmPlanItem {
+	res := &SwarmPlanItem{
+		Status:            *v.Status,
+		CrossFamilyReview: *v.CrossFamilyReview,
+		CrossFamilyEval:   *v.CrossFamilyEval,
+		SingleFamily:      *v.SingleFamily,
+		Summary:           *v.Summary,
+		Manifest:          v.Manifest,
+	}
+	res.Assignments = make([]*SwarmRoleItem, len(v.Assignments))
+	for i, val := range v.Assignments {
+		if val == nil {
+			res.Assignments[i] = nil
+			continue
+		}
+		res.Assignments[i] = decodeSwarmRoleItemTransportToSwarmRoleItem(val)
+	}
+	if v.MissingRoles != nil {
+		res.MissingRoles = make([]string, len(v.MissingRoles))
+		for i, val := range v.MissingRoles {
+			res.MissingRoles[i] = val
+		}
+	}
+
+	return res
+}
+func decodeSwarmRoleItemTransportToSwarmRoleItem(v *toolhttp.SwarmRoleItemTransport) *SwarmRoleItem {
+	res := &SwarmRoleItem{
+		Handle:     *v.Handle,
+		Role:       *v.Role,
+		ScopeName:  *v.ScopeName,
+		ProfileID:  *v.ProfileID,
+		Provider:   *v.Provider,
+		Model:      *v.Model,
+		Family:     *v.Family,
+		AccessMode: *v.AccessMode,
+	}
+	res.OwnedPaths = make([]string, len(v.OwnedPaths))
+	for i, val := range v.OwnedPaths {
+		res.OwnedPaths[i] = val
+	}
+
+	return res
+}
 func encodeC4ContainerItemToC4ContainerItemTransport(v *C4ContainerItem) *toolhttp.C4ContainerItemTransport {
 	res := &toolhttp.C4ContainerItemTransport{
 		ID:          &v.ID,
@@ -4099,6 +4632,50 @@ func encodeToolInputBindingItemToToolInputBindingItemTransport(v *ToolInputBindi
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
 		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+func encodeSwarmPlanItemToSwarmPlanItemTransport(v *SwarmPlanItem) *toolhttp.SwarmPlanItemTransport {
+	res := &toolhttp.SwarmPlanItemTransport{
+		Status:            &v.Status,
+		CrossFamilyReview: &v.CrossFamilyReview,
+		CrossFamilyEval:   &v.CrossFamilyEval,
+		SingleFamily:      &v.SingleFamily,
+		Summary:           &v.Summary,
+		Manifest:          v.Manifest,
+	}
+	res.Assignments = make([]*toolhttp.SwarmRoleItemTransport, len(v.Assignments))
+	for i, val := range v.Assignments {
+		if val == nil {
+			res.Assignments[i] = nil
+			continue
+		}
+		res.Assignments[i] = encodeSwarmRoleItemToSwarmRoleItemTransport(val)
+	}
+	if v.MissingRoles != nil {
+		res.MissingRoles = make([]string, len(v.MissingRoles))
+		for i, val := range v.MissingRoles {
+			res.MissingRoles[i] = val
+		}
+	}
+
+	return res
+}
+func encodeSwarmRoleItemToSwarmRoleItemTransport(v *SwarmRoleItem) *toolhttp.SwarmRoleItemTransport {
+	res := &toolhttp.SwarmRoleItemTransport{
+		Handle:     &v.Handle,
+		Role:       &v.Role,
+		ScopeName:  &v.ScopeName,
+		ProfileID:  &v.ProfileID,
+		Provider:   &v.Provider,
+		Model:      &v.Model,
+		Family:     &v.Family,
+		AccessMode: &v.AccessMode,
+	}
+	res.OwnedPaths = make([]string, len(v.OwnedPaths))
+	for i, val := range v.OwnedPaths {
+		res.OwnedPaths[i] = val
 	}
 
 	return res

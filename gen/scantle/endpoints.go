@@ -16,6 +16,7 @@ import (
 // Endpoints wraps the "scantle" service endpoints.
 type Endpoints struct {
 	CheckpointUI        goa.Endpoint
+	GoldenPath          goa.Endpoint
 	ProposeChange       goa.Endpoint
 	ConfirmIntent       goa.Endpoint
 	PreviewArchitecture goa.Endpoint
@@ -27,6 +28,7 @@ type Endpoints struct {
 func NewEndpoints(s Service) *Endpoints {
 	return &Endpoints{
 		CheckpointUI:        NewCheckpointUIEndpoint(s),
+		GoldenPath:          NewGoldenPathEndpoint(s),
 		ProposeChange:       NewProposeChangeEndpoint(s),
 		ConfirmIntent:       NewConfirmIntentEndpoint(s),
 		PreviewArchitecture: NewPreviewArchitectureEndpoint(s),
@@ -38,6 +40,7 @@ func NewEndpoints(s Service) *Endpoints {
 // Use applies the given middleware to all the "scantle" service endpoints.
 func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 	e.CheckpointUI = m(e.CheckpointUI)
+	e.GoldenPath = m(e.GoldenPath)
 	e.ProposeChange = m(e.ProposeChange)
 	e.ConfirmIntent = m(e.ConfirmIntent)
 	e.PreviewArchitecture = m(e.PreviewArchitecture)
@@ -50,6 +53,14 @@ func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 func NewCheckpointUIEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
 		return s.CheckpointUI(ctx)
+	}
+}
+
+// NewGoldenPathEndpoint returns an endpoint function that calls the method
+// "golden_path" of service "scantle".
+func NewGoldenPathEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		return s.GoldenPath(ctx)
 	}
 }
 

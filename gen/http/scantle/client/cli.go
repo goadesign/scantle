@@ -107,7 +107,7 @@ func BuildPreviewArchitecturePayload(scantlePreviewArchitectureBody *string) (*s
 		}
 		err = json.Unmarshal([]byte(*scantlePreviewArchitectureBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"builders\": [\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         },\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         },\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         },\n         {\n            \"name\": \"Ut nulla.\",\n            \"paths\": [\n               \"Tempora aut qui voluptatem iste exercitationem.\",\n               \"Sed quia et ullam libero et et.\"\n            ],\n            \"preferred_profile_id\": \"Accusamus et et qui ut deserunt.\"\n         }\n      ],\n      \"change_id\": \"Nam ut commodi.\",\n      \"design\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
 		}
 		if body.Design == nil {
 			err = goa.MergeErrors(err, goa.MissingFieldError("design", "body"))
@@ -115,6 +115,13 @@ func BuildPreviewArchitecturePayload(scantlePreviewArchitectureBody *string) (*s
 		if body.Design != nil {
 			if err2 := validateDesignSnapshotRequestBody(body.Design, "body.design"); err2 != nil {
 				err = goa.MergeErrors(err, err2)
+			}
+		}
+		for _, e := range body.Builders {
+			if e != nil {
+				if err2 := validateBuilderScopeItemRequestBody(e, "body.builders[*]"); err2 != nil {
+					err = goa.MergeErrors(err, err2)
+				}
 			}
 		}
 		if err != nil {
@@ -127,6 +134,16 @@ func BuildPreviewArchitecturePayload(scantlePreviewArchitectureBody *string) (*s
 	}
 	if body.Design != nil {
 		v.Design = marshalDesignSnapshotRequestBodyToScantleDesignSnapshot(body.Design)
+	}
+	if body.Builders != nil {
+		v.Builders = make([]*scantle.BuilderScopeItem, len(body.Builders))
+		for i, val := range body.Builders {
+			if val == nil {
+				v.Builders[i] = nil
+				continue
+			}
+			v.Builders[i] = marshalBuilderScopeItemRequestBodyToScantleBuilderScopeItem(val)
+		}
 	}
 
 	return v, nil

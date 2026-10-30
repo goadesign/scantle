@@ -12,6 +12,11 @@ func CheckpointUIScantlePath() string {
 	return "/ui/checkpoint"
 }
 
+// GoldenPathScantlePath returns the URL path to the scantle service golden_path HTTP endpoint.
+func GoldenPathScantlePath() string {
+	return "/golden-path"
+}
+
 // ProposeChangeScantlePath returns the URL path to the scantle service propose_change HTTP endpoint.
 func ProposeChangeScantlePath() string {
 	return "/changes/propose"

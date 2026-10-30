@@ -390,6 +390,30 @@ func ValidateDraftOverrideResultTransport(value *DraftOverrideResultTransport) (
 	return err
 }
 
+// PreviewArchitecturePayloadBuilderScopeItemTransport stores JSON fields until they have been validated.
+type PreviewArchitecturePayloadBuilderScopeItemTransport struct {
+	// Human-readable builder scope name (for example, orders or api).
+	Name *string `json:"name"`
+	// Repository-relative path globs owned by this builder.
+	Paths []string `json:"paths"`
+	// Optional preference selecting a server-configured authenticated profile ID.
+	PreferredProfileID *string `json:"preferred_profile_id,omitempty"`
+}
+
+// ValidatePreviewArchitecturePayloadBuilderScopeItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitecturePayloadBuilderScopeItemTransport(value *PreviewArchitecturePayloadBuilderScopeItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Paths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("paths", "body"))
+	}
+	return err
+}
+
 // PreviewArchitecturePayloadDesignSnapshotTransport stores JSON fields until they have been validated.
 type PreviewArchitecturePayloadDesignSnapshotTransport struct {
 	// File contents keyed by module-relative path, such as design/design.go or
@@ -416,6 +440,8 @@ type PreviewArchitecturePayloadTransport struct {
 	RequestRevision *string `json:"request_revision"`
 	// Candidate module whose Goa and Goa-AI design is evaluated.
 	Design *PreviewArchitecturePayloadDesignSnapshotTransport `json:"design"`
+	// Optional explicit builder path scopes for proposing the Chorus build roster.
+	Builders []*PreviewArchitecturePayloadBuilderScopeItemTransport `json:"builders,omitempty"`
 }
 
 // ValidatePreviewArchitecturePayloadTransport checks decoded JSON before it becomes a service value.
@@ -435,6 +461,13 @@ func ValidatePreviewArchitecturePayloadTransport(value *PreviewArchitecturePaylo
 	if value.Design != nil {
 		if err2 := ValidatePreviewArchitecturePayloadDesignSnapshotTransport(value.Design); err2 != nil {
 			err = goa.MergeErrors(err, err2)
+		}
+	}
+	for _, e := range value.Builders {
+		if e != nil {
+			if err2 := ValidatePreviewArchitecturePayloadBuilderScopeItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
 		}
 	}
 	return err
@@ -552,6 +585,136 @@ func ValidatePreviewArchitectureResultC4EdgeItemTransport(value *PreviewArchitec
 	}
 	if value.Protocol == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("protocol", "body"))
+	}
+	return err
+}
+
+// PreviewArchitectureResultSwarmPlanItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultSwarmPlanItemTransport struct {
+	// Roster configuration status.
+	Status *string `json:"status"`
+	// Deterministic role assignments when status is configured.
+	Assignments []*PreviewArchitectureResultSwarmRoleItemTransport `json:"assignments"`
+	// True if and only if status is configured and the reviewer model family is
+	// disjoint from every assigned builder model family.
+	CrossFamilyReview *bool `json:"cross_family_review"`
+	// True if and only if status is configured and the eval_author model family is
+	// disjoint from every assigned builder model family.
+	CrossFamilyEval *bool `json:"cross_family_eval"`
+	// True when status is configured and all assigned roles share one model family.
+	SingleFamily *bool `json:"single_family"`
+	// Required roles lacking an authenticated capable profile when status is
+	// unconfigured or missing_capability.
+	MissingRoles []string `json:"missing_roles,omitempty"`
+	// Plain-English summary of the proposed swarm roster and model-family posture.
+	Summary *string `json:"summary"`
+	// Formatted Chorus collaboration manifest text when status is configured; does
+	// not claim publication until sent via Chorus.
+	Manifest *string `json:"manifest,omitempty"`
+}
+
+// ValidatePreviewArchitectureResultSwarmPlanItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultSwarmPlanItemTransport(value *PreviewArchitectureResultSwarmPlanItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if value.Assignments == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("assignments", "body"))
+	}
+	if value.CrossFamilyReview == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cross_family_review", "body"))
+	}
+	if value.CrossFamilyEval == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("cross_family_eval", "body"))
+	}
+	if value.SingleFamily == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("single_family", "body"))
+	}
+	if value.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if value.Status != nil {
+		if !(*value.Status == "configured" || *value.Status == "unconfigured" || *value.Status == "missing_capability") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *value.Status, []any{"configured", "unconfigured", "missing_capability"}))
+		}
+	}
+	for _, e := range value.Assignments {
+		if e != nil {
+			if err2 := ValidatePreviewArchitectureResultSwarmRoleItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// PreviewArchitectureResultSwarmRoleItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultSwarmRoleItemTransport struct {
+	// Deterministic Chorus agent handle (without leading '@', at most 32
+	// characters).
+	Handle *string `json:"handle"`
+	// Assigned swarm role kind.
+	Role *string `json:"role"`
+	// Human-readable scope label for this assignment.
+	ScopeName *string `json:"scope_name"`
+	// Assigned server-configured provider profile ID.
+	ProfileID *string `json:"profile_id"`
+	// Assigned coding-agent provider name.
+	Provider *string `json:"provider"`
+	// Assigned model identifier.
+	Model *string `json:"model"`
+	// Canonical model family identifier.
+	Family *string `json:"family"`
+	// Repository or workspace path globs owned by this role.
+	OwnedPaths []string `json:"owned_paths"`
+	// Workspace access boundary enforced by the job runner.
+	AccessMode *string `json:"access_mode"`
+}
+
+// ValidatePreviewArchitectureResultSwarmRoleItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultSwarmRoleItemTransport(value *PreviewArchitectureResultSwarmRoleItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Handle == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("handle", "body"))
+	}
+	if value.Role == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("role", "body"))
+	}
+	if value.ScopeName == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scope_name", "body"))
+	}
+	if value.ProfileID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("profile_id", "body"))
+	}
+	if value.Provider == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("provider", "body"))
+	}
+	if value.Model == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("model", "body"))
+	}
+	if value.Family == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("family", "body"))
+	}
+	if value.OwnedPaths == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("owned_paths", "body"))
+	}
+	if value.AccessMode == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("access_mode", "body"))
+	}
+	if value.Role != nil {
+		if !(*value.Role == "architect" || *value.Role == "builder" || *value.Role == "eval_author" || *value.Role == "reviewer") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.role", *value.Role, []any{"architect", "builder", "eval_author", "reviewer"}))
+		}
+	}
+	if value.AccessMode != nil {
+		if !(*value.AccessMode == "read_only_after_cp2" || *value.AccessMode == "read_write_worktree" || *value.AccessMode == "isolated_eval_workspace" || *value.AccessMode == "read_only_review") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.access_mode", *value.AccessMode, []any{"read_only_after_cp2", "read_write_worktree", "isolated_eval_workspace", "read_only_review"}))
+		}
 	}
 	return err
 }
@@ -677,6 +840,8 @@ type PreviewArchitectureResultTransport struct {
 	AgentPolicies []*PreviewArchitectureResultAgentPolicyItemTransport `json:"agent_policies"`
 	// Evaluated Goa-AI tool contracts.
 	Tools []*PreviewArchitectureResultToolContractItemTransport `json:"tools"`
+	// Proposed Chorus multi-agent role assignments and model-family routing.
+	Swarm *PreviewArchitectureResultSwarmPlanItemTransport `json:"swarm"`
 	// Plain-English summary of topology and guardrails.
 	Banner *string `json:"banner"`
 }
@@ -710,6 +875,9 @@ func ValidatePreviewArchitectureResultTransport(value *PreviewArchitectureResult
 	if value.Tools == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("tools", "body"))
 	}
+	if value.Swarm == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("swarm", "body"))
+	}
 	if value.Banner == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("banner", "body"))
 	}
@@ -739,6 +907,11 @@ func ValidatePreviewArchitectureResultTransport(value *PreviewArchitectureResult
 			if err2 := ValidatePreviewArchitectureResultToolContractItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if value.Swarm != nil {
+		if err2 := ValidatePreviewArchitectureResultSwarmPlanItemTransport(value.Swarm); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return err
@@ -1133,6 +1306,16 @@ func DecodePreviewArchitecturePayload(data []byte) (out *scantle.PreviewArchitec
 			RequestRevision: *body.RequestRevision,
 		}
 		out.Design = decodePreviewArchitecturePayloadDesignSnapshotTransportToDesignSnapshot(body.Design)
+		if body.Builders != nil {
+			out.Builders = make([]*scantle.BuilderScopeItem, len(body.Builders))
+			for i, val := range body.Builders {
+				if val == nil {
+					out.Builders[i] = nil
+					continue
+				}
+				out.Builders[i] = decodePreviewArchitecturePayloadBuilderScopeItemTransportToBuilderScopeItem(val)
+			}
+		}
 	}
 	return out, nil
 }
@@ -1180,6 +1363,7 @@ func EncodePreviewArchitectureResult(in *scantle.ArchitecturePreviewResult) ([]b
 			}
 			body.Tools[i] = encodeToolContractItemToPreviewArchitectureResultToolContractItemTransport(val)
 		}
+		body.Swarm = encodeSwarmPlanItemToPreviewArchitectureResultSwarmPlanItemTransport(in.Swarm)
 	}
 	if err := ValidatePreviewArchitectureResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate PreviewArchitectureResult JSON: %w", err)
@@ -1307,6 +1491,19 @@ func decodeDiffPayloadDesignSnapshotTransportToDesignSnapshot2(v *DiffPayloadDes
 	return res
 }
 
+func decodePreviewArchitecturePayloadBuilderScopeItemTransportToBuilderScopeItem(v *PreviewArchitecturePayloadBuilderScopeItemTransport) *scantle.BuilderScopeItem {
+	res := &scantle.BuilderScopeItem{
+		Name:               *v.Name,
+		PreferredProfileID: v.PreferredProfileID,
+	}
+	res.Paths = make([]string, len(v.Paths))
+	for i, val := range v.Paths {
+		res.Paths[i] = val
+	}
+
+	return res
+}
+
 func decodePreviewArchitecturePayloadDesignSnapshotTransportToDesignSnapshot(v *PreviewArchitecturePayloadDesignSnapshotTransport) *scantle.DesignSnapshot {
 	res := &scantle.DesignSnapshot{}
 	res.Files = make(map[string]string, len(v.Files))
@@ -1400,6 +1597,52 @@ func encodeExampleItemToProposeChangeResultExampleItemTransport(v *scantle.Examp
 		InputSummary:     &v.InputSummary,
 		ExpectedOutcome:  &v.ExpectedOutcome,
 		VerificationKind: &v.VerificationKind,
+	}
+
+	return res
+}
+
+func encodeSwarmPlanItemToPreviewArchitectureResultSwarmPlanItemTransport(v *scantle.SwarmPlanItem) *PreviewArchitectureResultSwarmPlanItemTransport {
+	res := &PreviewArchitectureResultSwarmPlanItemTransport{
+		Status:            &v.Status,
+		CrossFamilyReview: &v.CrossFamilyReview,
+		CrossFamilyEval:   &v.CrossFamilyEval,
+		SingleFamily:      &v.SingleFamily,
+		Summary:           &v.Summary,
+		Manifest:          v.Manifest,
+	}
+	res.Assignments = make([]*PreviewArchitectureResultSwarmRoleItemTransport, len(v.Assignments))
+	for i, val := range v.Assignments {
+		if val == nil {
+			res.Assignments[i] = nil
+			continue
+		}
+		res.Assignments[i] = encodeSwarmRoleItemToPreviewArchitectureResultSwarmRoleItemTransport(val)
+	}
+	if v.MissingRoles != nil {
+		res.MissingRoles = make([]string, len(v.MissingRoles))
+		for i, val := range v.MissingRoles {
+			res.MissingRoles[i] = val
+		}
+	}
+
+	return res
+}
+
+func encodeSwarmRoleItemToPreviewArchitectureResultSwarmRoleItemTransport(v *scantle.SwarmRoleItem) *PreviewArchitectureResultSwarmRoleItemTransport {
+	res := &PreviewArchitectureResultSwarmRoleItemTransport{
+		Handle:     &v.Handle,
+		Role:       &v.Role,
+		ScopeName:  &v.ScopeName,
+		ProfileID:  &v.ProfileID,
+		Provider:   &v.Provider,
+		Model:      &v.Model,
+		Family:     &v.Family,
+		AccessMode: &v.AccessMode,
+	}
+	res.OwnedPaths = make([]string, len(v.OwnedPaths))
+	for i, val := range v.OwnedPaths {
+		res.OwnedPaths[i] = val
 	}
 
 	return res

@@ -20,6 +20,7 @@ import (
 type Server struct {
 	Mounts              []*MountPoint
 	CheckpointUI        http.Handler
+	GoldenPath          http.Handler
 	ProposeChange       http.Handler
 	ConfirmIntent       http.Handler
 	PreviewArchitecture http.Handler
@@ -55,6 +56,7 @@ func New(
 	return &Server{
 		Mounts: []*MountPoint{
 			{"CheckpointUI", "GET", "/ui/checkpoint"},
+			{"GoldenPath", "GET", "/golden-path"},
 			{"ProposeChange", "POST", "/changes/propose"},
 			{"ConfirmIntent", "POST", "/changes/confirm"},
 			{"PreviewArchitecture", "POST", "/changes/preview"},
@@ -62,6 +64,7 @@ func New(
 			{"Diff", "POST", "/diff"},
 		},
 		CheckpointUI:        NewCheckpointUIHandler(e.CheckpointUI, mux, decoder, encoder, errhandler, formatter),
+		GoldenPath:          NewGoldenPathHandler(e.GoldenPath, mux, decoder, encoder, errhandler, formatter),
 		ProposeChange:       NewProposeChangeHandler(e.ProposeChange, mux, decoder, encoder, errhandler, formatter),
 		ConfirmIntent:       NewConfirmIntentHandler(e.ConfirmIntent, mux, decoder, encoder, errhandler, formatter),
 		PreviewArchitecture: NewPreviewArchitectureHandler(e.PreviewArchitecture, mux, decoder, encoder, errhandler, formatter),
@@ -76,6 +79,7 @@ func (s *Server) Service() string { return "scantle" }
 // Use wraps the server handlers with the given middleware.
 func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.CheckpointUI = m(s.CheckpointUI)
+	s.GoldenPath = m(s.GoldenPath)
 	s.ProposeChange = m(s.ProposeChange)
 	s.ConfirmIntent = m(s.ConfirmIntent)
 	s.PreviewArchitecture = m(s.PreviewArchitecture)
@@ -89,6 +93,7 @@ func (s *Server) MethodNames() []string { return scantle.MethodNames[:] }
 // Mount configures the mux to serve the scantle endpoints.
 func Mount(mux goahttp.Muxer, h *Server) {
 	MountCheckpointUIHandler(mux, h.CheckpointUI)
+	MountGoldenPathHandler(mux, h.GoldenPath)
 	MountProposeChangeHandler(mux, h.ProposeChange)
 	MountConfirmIntentHandler(mux, h.ConfirmIntent)
 	MountPreviewArchitectureHandler(mux, h.PreviewArchitecture)
@@ -130,6 +135,52 @@ func NewCheckpointUIHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "checkpoint_ui")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
+		var err error
+		res, err := endpoint(ctx, nil)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountGoldenPathHandler configures the mux to serve the "scantle" service
+// "golden_path" endpoint.
+func MountGoldenPathHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("GET", "/golden-path", f)
+}
+
+// NewGoldenPathHandler creates a HTTP handler which loads the HTTP request and
+// calls the "scantle" service "golden_path" endpoint.
+func NewGoldenPathHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		encodeResponse = EncodeGoldenPathResponse(encoder)
+		encodeError    = goahttp.ErrorEncoder(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "golden_path")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 		var err error
 		res, err := endpoint(ctx, nil)

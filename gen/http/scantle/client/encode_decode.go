@@ -78,6 +78,65 @@ func DecodeCheckpointUIResponse(decoder func(*http.Response) goahttp.Decoder, re
 	}
 }
 
+// BuildGoldenPathRequest instantiates a HTTP request object with method and
+// path set to call the "scantle" service "golden_path" endpoint
+func (c *Client) BuildGoldenPathRequest(ctx context.Context, v any) (*http.Request, error) {
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: GoldenPathScantlePath()}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, goahttp.ErrInvalidURL("scantle", "golden_path", u.String(), err)
+	}
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	return req, nil
+}
+
+// DecodeGoldenPathResponse returns a decoder for responses returned by the
+// scantle golden_path endpoint. restoreBody controls whether the response body
+// should be restored after having been read.
+func DecodeGoldenPathResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
+	return func(resp *http.Response) (result any, decodeErr error) {
+		responseBody := resp.Body
+		if restoreBody {
+			b, readErr := io.ReadAll(responseBody)
+			closeErr := responseBody.Close()
+			if err := errors.Join(readErr, closeErr); err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "golden_path", err)
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			defer func() {
+				resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			}()
+		} else {
+			defer func() {
+				if err := responseBody.Close(); err != nil {
+					decodeErr = errors.Join(decodeErr, goahttp.ErrDecodingError("scantle", "golden_path", err))
+				}
+			}()
+		}
+		switch resp.StatusCode {
+		case http.StatusOK:
+			var (
+				body string
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "golden_path", err)
+			}
+			return body, nil
+		default:
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "golden_path", err)
+			}
+			return nil, goahttp.ErrInvalidResponse("scantle", "golden_path", resp.StatusCode, string(body))
+		}
+	}
+}
+
 // BuildProposeChangeRequest instantiates a HTTP request object with method and
 // path set to call the "scantle" service "propose_change" endpoint
 func (c *Client) BuildProposeChangeRequest(ctx context.Context, v any) (*http.Request, error) {
@@ -553,6 +612,26 @@ func marshalScantleDesignSnapshotToDesignSnapshotRequestBody(v *scantle.DesignSn
 	return res
 }
 
+// marshalScantleBuilderScopeItemToBuilderScopeItemRequestBody builds a value
+// of type *BuilderScopeItemRequestBody from a value of type
+// *scantle.BuilderScopeItem.
+func marshalScantleBuilderScopeItemToBuilderScopeItemRequestBody(v *scantle.BuilderScopeItem) *BuilderScopeItemRequestBody {
+	res := &BuilderScopeItemRequestBody{
+		Name:               v.Name,
+		PreferredProfileID: v.PreferredProfileID,
+	}
+	if v.Paths != nil {
+		res.Paths = make([]string, len(v.Paths))
+		for i, val := range v.Paths {
+			res.Paths[i] = val
+		}
+	} else {
+		res.Paths = []string{}
+	}
+
+	return res
+}
+
 // marshalDesignSnapshotRequestBodyToScantleDesignSnapshot builds a value of
 // type *scantle.DesignSnapshot from a value of type *DesignSnapshotRequestBody.
 func marshalDesignSnapshotRequestBodyToScantleDesignSnapshot(v *DesignSnapshotRequestBody) *scantle.DesignSnapshot {
@@ -564,6 +643,26 @@ func marshalDesignSnapshotRequestBodyToScantleDesignSnapshot(v *DesignSnapshotRe
 			tv := val
 			res.Files[tk] = tv
 		}
+	}
+
+	return res
+}
+
+// marshalBuilderScopeItemRequestBodyToScantleBuilderScopeItem builds a value
+// of type *scantle.BuilderScopeItem from a value of type
+// *BuilderScopeItemRequestBody.
+func marshalBuilderScopeItemRequestBodyToScantleBuilderScopeItem(v *BuilderScopeItemRequestBody) *scantle.BuilderScopeItem {
+	res := &scantle.BuilderScopeItem{
+		Name:               v.Name,
+		PreferredProfileID: v.PreferredProfileID,
+	}
+	if v.Paths != nil {
+		res.Paths = make([]string, len(v.Paths))
+		for i, val := range v.Paths {
+			res.Paths[i] = val
+		}
+	} else {
+		res.Paths = []string{}
 	}
 
 	return res
@@ -653,6 +752,56 @@ func unmarshalToolInputBindingItemResponseBodyToScantleToolInputBindingItem(v *T
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
 		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+// unmarshalSwarmPlanItemResponseBodyToScantleSwarmPlanItem builds a value of
+// type *scantle.SwarmPlanItem from a value of type *SwarmPlanItemResponseBody.
+func unmarshalSwarmPlanItemResponseBodyToScantleSwarmPlanItem(v *SwarmPlanItemResponseBody) *scantle.SwarmPlanItem {
+	res := &scantle.SwarmPlanItem{
+		Status:            *v.Status,
+		CrossFamilyReview: *v.CrossFamilyReview,
+		CrossFamilyEval:   *v.CrossFamilyEval,
+		SingleFamily:      *v.SingleFamily,
+		Summary:           *v.Summary,
+		Manifest:          v.Manifest,
+	}
+	res.Assignments = make([]*scantle.SwarmRoleItem, len(v.Assignments))
+	for i, val := range v.Assignments {
+		if val == nil {
+			res.Assignments[i] = nil
+			continue
+		}
+		res.Assignments[i] = unmarshalSwarmRoleItemResponseBodyToScantleSwarmRoleItem(val)
+	}
+	if v.MissingRoles != nil {
+		res.MissingRoles = make([]string, len(v.MissingRoles))
+		for i, val := range v.MissingRoles {
+			res.MissingRoles[i] = val
+		}
+	}
+
+	return res
+}
+
+// unmarshalSwarmRoleItemResponseBodyToScantleSwarmRoleItem builds a value of
+// type *scantle.SwarmRoleItem from a value of type *SwarmRoleItemResponseBody.
+func unmarshalSwarmRoleItemResponseBodyToScantleSwarmRoleItem(v *SwarmRoleItemResponseBody) *scantle.SwarmRoleItem {
+	res := &scantle.SwarmRoleItem{
+		Handle:     *v.Handle,
+		Role:       *v.Role,
+		ScopeName:  *v.ScopeName,
+		ProfileID:  *v.ProfileID,
+		Provider:   *v.Provider,
+		Model:      *v.Model,
+		Family:     *v.Family,
+		AccessMode: *v.AccessMode,
+	}
+	res.OwnedPaths = make([]string, len(v.OwnedPaths))
+	for i, val := range v.OwnedPaths {
+		res.OwnedPaths[i] = val
 	}
 
 	return res
