@@ -1,6 +1,6 @@
 # Golden Path
 
-Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Every rule is a requirement unless marked "prefer". When a rule conflicts with a request, stop and say which rule and why.
+Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Rules under "Never" are hard invariants: if a request would break one, say which and why before acting. Every other rule is the default; an explicit task, or the contract of the service that owns the behavior, overrides it.
 
 ## 0. Loop
 
@@ -12,7 +12,7 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Ever
 
 ## 1. Contract
 
-- Describe every method once, independent of transport, then map it to `HTTP`, `GRPC` and `JSONRPC`. One method with one set of types serves every transport.
+- Describe every method once, independent of transport, then map it to the transports its callers need (`HTTP`, `GRPC`, `JSONRPC`). One method with one set of types serves all of them. Not every streaming shape is valid on every transport; `goa gen` rejects invalid combinations.
 - Put structural validation in the design: `Required`, `MinLength`, `MaxLength`, `Pattern`, `Format`, `Minimum`, `Maximum`, `Enum`. Generated decoders enforce it. Never validate it again in handlers.
 - Keep authorization and business rules in the service that owns them, not in the design.
 - `Required` accepts `[]`. Add `MinLength(1)` to forbid an empty collection. Use `ArrayOfRequired` to forbid null elements.
@@ -32,16 +32,16 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Ever
 - Exactly one service owns each piece of durable state. Other services call its API and never read or write its tables, collections or keys.
 - The service struct implements the generated interface. Pass every dependency into its constructor as an interface.
 - Construct clients, connections and timeouts in `main` and pass them in. Runtime packages never take addresses or transport settings.
-- Use one client package per downstream service, exposing only the methods you use, built on the generated client.
+- Call downstream services through their generated clients, behind the narrow interface the caller needs. Add a wrapper package only when it owns behavior or translation.
 - Set a timeout on every outbound call. Pass `ctx` through every call.
 - When work spans more than one service or transaction, finish it on the server in a durable workflow. Never depend on a client to retry for correctness.
 
 ## 3. Errors
 
 - Declare every error a caller must tell apart with `Error("descriptive_name", …)` and a `Description`.
-- Use `ErrorResult` unless the error needs extra fields. Mark errors with `Temporary()`, `Timeout()` and `Fault()`.
+- Use `ErrorResult` unless the error needs extra fields. Set `Temporary()`, `Timeout()` or `Fault()` only when that fact is true: a permanent business rejection is none of them.
 - Map each error per transport: `Response("name", StatusX)` in `HTTP`, `Response("name", CodeX)` in `GRPC`.
-- Return errors with the generated `Make<Name>(err)` helpers. Map dependency errors to designed errors in the service layer.
+- Return `ErrorResult` errors with the generated `Make<Name>(err)` helpers, and custom error types as generated values. Map dependency errors to designed errors in the service layer.
 - Wrap with `%w` and inspect with `errors.Is` or `errors.As`. Never discard an error with `_`.
 - Never put internal detail in an error response. Record it on the trace.
 
@@ -50,46 +50,46 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Ever
 - Declare `Security(...)` at the API level and mark public methods explicitly with `NoSecurity()`.
 - Implement the generated `Auther` methods: verify the credential, call `scheme.Validate(scopes)`, and return a context carrying the principal.
 - Authenticate and authorize once, where a request or workflow enters the system. Never re-check inside internal loops.
-- Deny by default. Check that the principal owns each resource it names.
+- Deny by default. Check each requested action against the owning service's policy for that resource. Ownership is the rule only where the domain says so; delegated and shared access can be valid.
 - Use `JWTSecurity` only for JWTs. Use `BearerSecurity` for opaque tokens.
 - Read secrets at runtime from a secret store and fail at startup if one is missing. Never log secrets, tokens or personal data.
 - Never build a query from field names or operators the user controls.
 
 ## 5. Agents and tools
 
-- Bind a tool to an existing method with `BindTo("Method")` or `BindTo("Service", "Method")`. Write an inline executor only to orchestrate several calls or for pure computation.
+- Prefer binding a tool to the method that already holds its logic: `BindTo("Method")` or `BindTo("Service", "Method")`. Use a custom executor when there is no such method, for example to call an external MCP server or orchestrate several calls.
 - Reuse service types in `Args` and `Return`. Describe when to use each tool, what it returns, and every field. Never maintain a second tool schema.
-- Fill every value the model must not choose with `Inject(...)` from the authenticated request: tenant, user, session and run IDs, and credentials. The model never supplies identity or scope.
+- Code supplies the authenticated caller, its scope and the run context: inject them with `Inject(...)` (required strings) or `BindField`/`BindInput` for structured values. The model may choose which authorized resource to act on, such as a target ID or a lookup key.
 - In a hand-written executor, decode with the generated `Decode<Tool>(payload, meta, labels)`. The raw JSON codec leaves injected fields empty.
-- Read run, session, turn and call IDs from `ToolCallMeta`, never from `context.Context`.
+- Read the runtime's run, session, turn and call IDs from `ToolCallMeta`, never from `context.Context`.
 - Mark large, paged or truncated results with `BoundedResult()`. The service sets `Returned` and `Truncated` on every success, and sets `Total` only when it is known.
 - Keep `Return` to domain fields. Never add `returned`, `total`, `truncated` or `next_cursor` to it.
 - Prefer `BoundedResult(func() { ContinueWith("continue_x", "cursor"); NextCursor("next_cursor") })`. The runtime holds the cursor and the model calls the continuation with `{}`.
 - Put data that is too large for the model, or meant for a UI, in `ServerData`, never in `Return`.
-- Declare `Confirmation(...)` on tools that write, delete or command. Key the UI on the pending confirmation, never on a tool name.
-- Return `planner.ToolFailure` with a `Recovery` (`RecoveryCorrectCall`, `RecoveryReplan` or `RecoveryFinish`). Never return a bare error or panic from a tool.
+- Declare `Confirmation(...)` on a tool when the domain requires a person to approve each call before it runs. Do not add it where the action is already authorized. Key the UI on the pending confirmation, never on a tool name.
+- Report expected tool failures as a classified `Failure` on the tool result (`RecoveryCorrectCall`, `RecoveryReplan` or `RecoveryFinish`), so the planner can recover. Return ordinary errors for unexpected failures; the runtime classifies them. Never panic.
 - Give every agent a `RunPolicy` with `DefaultCaps(MaxToolCalls(n), MaxRecoveryTurns(n))` and a `TimeBudget`, or a `Timing` block.
 - Register every toolset and agent, then call `rt.Seal(ctx)` before the first run.
 - Create the session in the host service before `Start`. Let the runtime own conversation history; keep no second copy.
-- Mechanical decisions belong in code: identity, auth, IDs, cursors, pagination, valid transitions. Leave only semantic choices to the model.
+- Decisions code can derive belong in code: the authenticated caller, authorization, runtime IDs, cursors, pagination, valid state transitions. Leave semantic choices to the model.
 
 ## 6. Durability
 
 - Agent turns and multi-step work run as durable workflows. Activities retry, so every side effect is idempotent. Key it by a stable ID such as the tool call ID or a domain key.
 - Pass downstream calls an idempotency key derived from the domain, for example `refund/<tenant>/<order>`.
 - Never retry a whole workflow. That repeats completed side effects.
-- Store results larger than 1 MiB in application storage and return a typed reference.
+- Each encoded tool call, with its result, bounds, server data and metadata, must fit the engine's payload limit (1 MiB). Keep large domain data in application storage and return a typed reference.
 - One host service owns the runtime store. Workers reach it through that service's typed API.
 - Never set a Temporal `DataConverter`. The engine installs its own.
-- Version workers with immutable build IDs and keep old versions running until their work drains.
-- Ship an incompatible generated-contract change as one release: regenerate, drain old work, then deploy runtime, workers and callers together.
+- Version workers with immutable build IDs. Keep old versions running until the executions pinned to them finish.
+- Before changing a generated contract, check compatibility with running executions and saved suspensions. A continued run starts a new workflow, so a saved checkpoint must still decode, or needs its own cutover.
 
 ## 7. Events and streams
 
 - Use events when several consumers need the same fact, or when the producer must not wait for consumers. Never use events for a step that must commit or fail atomically.
 - Define event payloads as typed types in the design. Decide up front which events must never be lost.
-- Delivery is at least once: make every handler idempotent, and acknowledge only after processing.
-- Use Pulse readers when every consumer sees every event, sinks when each event goes to one consumer, and pools for throttled jobs that move off a dead worker. Bound streams with a maximum length.
+- Choose each consumer's delivery guarantee explicitly. Work that must not be lost needs retained events and acknowledged consumption with redelivery; make those handlers idempotent and acknowledge after processing.
+- Pulse readers give each reader every event from its own position, without acknowledgement; sinks spread events across consumers; pools run jobs and move them off failed nodes. Never trim a stream by count if trimming could delete unfinished work.
 
 ## 8. Observability
 
@@ -118,7 +118,7 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Ever
 ## 11. Change and rollout
 
 - Keep each change small and focused on one concern, and deployable. Update the design, code, model and docs together.
-- Ship a deployable shell first, with the generated interface, stubbed results and instrumentation, and keep it deployable at every step.
+- Ship a minimal deployable service first, with the generated interface, stubbed results and instrumentation, and keep it deployable at every step.
 - Pin every version; never use `latest`. Promote through each environment in order. Have a rollback before deploying.
 - A change is done only when it runs in every target environment, not when it merges.
 
@@ -126,8 +126,8 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Ever
 
 - Edit `gen/`.
 - Duplicate a contract: no second schema, no copied generated type, no second validation pass.
-- Let the model supply identity or scope.
-- Read IDs from `context.Context`, or fall back silently to a default.
+- Let the model supply the authenticated caller, its scope or credentials.
+- Read the runtime's run, session, turn or call IDs from `context.Context`, or fall back silently to a default value.
 - Share durable state between services.
 - Depend on client retries for correctness.
 - Hide failures: no discarded errors, no unrecorded error paths, no filtered telemetry.
