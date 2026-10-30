@@ -225,9 +225,9 @@
         typeof d.request_revision === "string" &&
         Array.isArray(d.examples) && d.examples.every(isValidExample) &&
         isStringArray(d.preserved_behaviors) &&
-        (d.ambiguities == null || (Array.isArray(d.ambiguities) && d.ambiguities.every(isValidAmbiguity))) &&
-        (d.answers == null || isStringMap(d.answers)) &&
-        (d.confirmed_by == null || typeof d.confirmed_by === "string");
+        (d.ambiguities === undefined || (Array.isArray(d.ambiguities) && d.ambiguities.every(isValidAmbiguity))) &&
+        (d.answers === undefined || isStringMap(d.answers)) &&
+        (d.confirmed_by === undefined || typeof d.confirmed_by === "string");
     }
 
     function isValidContainer(c) {
@@ -292,8 +292,8 @@
         typeof s.cross_family_eval === "boolean" &&
         typeof s.single_family === "boolean" &&
         typeof s.summary === "string" &&
-        (s.missing_roles == null || isStringArray(s.missing_roles)) &&
-        (s.manifest == null || typeof s.manifest === "string");
+        (s.missing_roles === undefined || isStringArray(s.missing_roles)) &&
+        (s.manifest === undefined || typeof s.manifest === "string");
     }
 
     function isValidArchitecturePreview(d) {
@@ -315,7 +315,7 @@
         typeof d.applied_in_store === "boolean" &&
         typeof d.requires_rebuild === "boolean" &&
         typeof d.message === "string" &&
-        (d.prompt_version == null || typeof d.prompt_version === "string");
+        (d.prompt_version === undefined || typeof d.prompt_version === "string");
     }
 
     function renderChangeCard(card) {
@@ -518,28 +518,6 @@
       replaceChildren(viewEl, [el("div", { className: "scantle-meta" }, rows)]);
     }
 
-    function extractPayloadFromToolResult(params) {
-      if (isPlainObject(params.structuredContent)) {
-        return { ok: true, value: params.structuredContent };
-      }
-      if (Array.isArray(params.content)) {
-        for (var i = 0; i < params.content.length; i++) {
-          var item = params.content[i];
-          if (isPlainObject(item) && item.type === "text" && typeof item.text === "string") {
-            try {
-              var parsed = JSON.parse(item.text);
-              if (isPlainObject(parsed)) {
-                return { ok: true, value: parsed };
-              }
-            } catch (_) {
-              // Ignore non-JSON text blocks and continue inspecting content items.
-            }
-          }
-        }
-      }
-      return { ok: false, error: "Tool result is missing structuredContent object." };
-    }
-
     function extractErrorText(params) {
       if (Array.isArray(params.content)) {
         for (var i = 0; i < params.content.length; i++) {
@@ -561,12 +539,11 @@
         renderError(extractErrorText(params));
         return;
       }
-      var extracted = extractPayloadFromToolResult(params);
-      if (!extracted.ok) {
-        renderError(extracted.error);
+      if (!isPlainObject(params.structuredContent)) {
+        renderError("Tool result is missing structuredContent object.");
         return;
       }
-      var payload = extracted.value;
+      var payload = params.structuredContent;
       if (isValidArchitecturePreview(payload)) {
         renderArchitecturePreview(payload);
         return;
@@ -623,7 +600,7 @@
           return;
         }
         if (msg.method === "ui/notifications/tool-input") {
-          if (msg.params != null && !isPlainObject(msg.params)) {
+          if (msg.params !== undefined && !isPlainObject(msg.params)) {
             renderError("Malformed ui/notifications/tool-input notification.");
             return;
           }
@@ -631,7 +608,7 @@
           return;
         }
         if (msg.method === "ui/notifications/tool-cancelled") {
-          if (msg.params != null && !isPlainObject(msg.params)) {
+          if (msg.params !== undefined && !isPlainObject(msg.params)) {
             renderError("Malformed ui/notifications/tool-cancelled notification.");
             return;
           }

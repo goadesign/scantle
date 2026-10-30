@@ -445,13 +445,13 @@ if (!cp2Text.includes(input.wantCP2Revision) ||
   throw new Error("CP2 view missing expected digests or guardrails: " + cp2Text);
 }
 
-// 5. Deliver CP3 DraftOverrideResult (including null optional prompt_version) -> replaces CP2 view.
+// 5. Deliver CP3 DraftOverrideResult -> replaces CP2 view.
 messageListener({
   source: parentWindow,
   data: {
     jsonrpc: "2.0",
     method: "ui/notifications/tool-result",
-    params: { structuredContent: Object.assign({}, input.cp3Structured, { prompt_version: null }) }
+    params: { structuredContent: input.cp3Structured }
   }
 });
 const cp3Text = renderText(viewEl);
