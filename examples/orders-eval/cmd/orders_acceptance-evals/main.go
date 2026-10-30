@@ -3,8 +3,9 @@
 //
 // It follows Scantle's suite command contract:
 //
-//   - --describe prints the suite declaration as JSON ({"id", "scenarios":
-//     [{"id", "tags"}]}) and exits; it needs no artifacts.
+//   - --describe prints the suite declaration as JSON ({"id", "environment",
+//     "scenarios": [{"id", "tags"}]}) and exits; it needs no artifacts. The
+//     environment is the dependency profile candidates run with.
 //   - Otherwise every candidate binary is passed as --artifact name=path. The
 //     suite pins each one, runs the selected scenarios, and writes the
 //     eval.Report as JSON to standard output. Each scenario result records
@@ -39,6 +40,9 @@ type (
 	declaration struct {
 		// ID is the suite identifier.
 		ID string `json:"id"`
+		// Environment is the dependency profile the suite runs candidates
+		// with.
+		Environment string `json:"environment"`
 		// Scenarios lists every declared scenario in declaration order.
 		Scenarios []declaredScenario `json:"scenarios"`
 	}
@@ -93,7 +97,7 @@ func printDeclaration() error {
 	if err != nil {
 		return err
 	}
-	d := declaration{ID: suite.ID}
+	d := declaration{ID: suite.ID, Environment: harness.Environment}
 	for _, s := range suite.Scenarios {
 		d.Scenarios = append(d.Scenarios, declaredScenario{ID: s.ID, Tags: s.Tags})
 	}

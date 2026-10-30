@@ -36,7 +36,6 @@ func TestRunVerifiesTheOrdersReference(t *testing.T) {
 		SuiteModule:     "examples/orders-eval",
 		SuiteCommand:    "./cmd/orders_acceptance-evals",
 		RequestRevision: "rev-test",
-		Environment:     "sim",
 		WorkDir:         filepath.Join(work, "work"),
 		ReportDir:       filepath.Join(work, "reports"),
 	})
@@ -50,6 +49,7 @@ func TestRunVerifiesTheOrdersReference(t *testing.T) {
 	assert.True(t, report.Passed, "%+v", report.Counts)
 	assert.Equal(t, Counts{Required: 5, Passed: 5}, report.Counts)
 	assert.Equal(t, "orders_acceptance", report.Binding.SuiteID)
+	assert.Equal(t, "sim", report.Binding.Environment, "the environment is what the suite declares it ran")
 	assert.Len(t, report.Binding.Artifacts, 2)
 	assert.FileExists(t, filepath.Join(work, "reports", report.Digest+".json"))
 	require.NoError(t, Approve(report.Binding, report))

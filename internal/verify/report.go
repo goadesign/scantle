@@ -46,7 +46,8 @@ type (
 		// Artifacts maps each candidate binary name to the SHA-256 digest of
 		// the binary verify built and expects the suite to execute.
 		Artifacts map[string]string `json:"artifacts"`
-		// Environment names the dependency profile, such as "sim".
+		// Environment is the dependency profile the suite declares it runs
+		// candidates with, such as "sim".
 		Environment string `json:"environment"`
 	}
 
@@ -55,6 +56,9 @@ type (
 	Suite struct {
 		// ID is the suite identifier.
 		ID string `json:"id"`
+		// Environment is the dependency profile the suite runs candidates
+		// with.
+		Environment string `json:"environment"`
 		// Scenarios lists every declared scenario in declaration order.
 		Scenarios []Scenario `json:"scenarios"`
 	}
@@ -323,6 +327,10 @@ func validate(binding Binding, suite Suite, evidence eval.Report) error {
 	if evidence.SuiteID != suite.ID || binding.SuiteID != suite.ID {
 		return fmt.Errorf("report suite %q, binding suite %q, declared suite %q differ",
 			evidence.SuiteID, binding.SuiteID, suite.ID)
+	}
+	if suite.Environment == "" || binding.Environment != suite.Environment {
+		return fmt.Errorf("binding environment %q does not match the declared environment %q",
+			binding.Environment, suite.Environment)
 	}
 	if len(suite.Scenarios) == 0 {
 		return errors.New("suite declares no scenarios")

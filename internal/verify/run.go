@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -29,7 +30,8 @@ type (
 	Plan struct {
 		// CandidateRepo is the git repository holding the candidate.
 		CandidateRepo string
-		// CandidateCommit is the exact commit to build.
+		// CandidateCommit is the full 40-hex SHA-1 of the commit to build.
+		// Branch names and other revision expressions are rejected.
 		CandidateCommit string
 		// CandidateModule is the Go module directory inside the candidate
 		// repository that the binaries are built from.
@@ -39,7 +41,7 @@ type (
 		Binaries map[string]string
 		// SuiteRepo is the git repository holding the evaluator suite.
 		SuiteRepo string
-		// SuiteCommit is the exact suite commit to run.
+		// SuiteCommit is the full 40-hex SHA-1 of the suite commit to run.
 		SuiteCommit string
 		// SuiteModule is the suite's Go module directory inside SuiteRepo.
 		SuiteModule string
@@ -48,8 +50,6 @@ type (
 		SuiteCommand string
 		// RequestRevision identifies the confirmed request being verified.
 		RequestRevision string
-		// Environment names the dependency profile, such as "sim".
-		Environment string
 		// WorkDir is a private directory for clones, builds and evidence. It
 		// must not be shared with the candidate's builder.
 		WorkDir string
@@ -61,6 +61,8 @@ type (
 	declaration struct {
 		// ID is the suite identifier.
 		ID string `json:"id"`
+		// Environment is the dependency profile the suite runs with.
+		Environment string `json:"environment"`
 		// Scenarios lists every declared scenario.
 		Scenarios []struct {
 			// ID is the scenario identifier.
@@ -70,6 +72,10 @@ type (
 		} `json:"scenarios"`
 	}
 )
+
+// commitID matches a full SHA-1 commit ID, the only revision form a binding
+// accepts.
+var commitID = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 const (
 	// holdoutTag marks a scenario whose details builders must never see.
@@ -100,6 +106,11 @@ const (
 // failed, or that exited abnormally after writing partial results, yields a
 // report that does not pass.
 func Run(ctx context.Context, p Plan) (Report, error) {
+	for name, commit := range map[string]string{"candidate": p.CandidateCommit, "suite": p.SuiteCommit} {
+		if !commitID.MatchString(commit) {
+			return Report{}, fmt.Errorf("%s commit %q is not a full commit ID", name, commit)
+		}
+	}
 	evidenceDir := filepath.Join(p.WorkDir, "evidence")
 	binDir := filepath.Join(p.WorkDir, "bin")
 	for _, dir := range []string{evidenceDir, binDir} {
@@ -113,7 +124,6 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		RequestRevision: p.RequestRevision,
 		SuiteCommit:     p.SuiteCommit,
 		Artifacts:       map[string]string{},
-		Environment:     p.Environment,
 	}
 
 	candidateDir := filepath.Join(p.WorkDir, "candidate")
@@ -156,7 +166,7 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	binding.SuiteID = suite.ID
+	binding.SuiteID, binding.Environment = suite.ID, suite.Environment
 	evidence, exit, err := r.runSuite(ctx, suiteBin, artifactFlags)
 	if err != nil {
 		return Report{}, err
@@ -185,8 +195,18 @@ func (r *runner) checkout(ctx context.Context, label, repo, commit, dir string) 
 		return fmt.Errorf("check out %s: %w", label, err)
 	}
 	if err := r.run(ctx, "checkout-"+label, dir, nil, "git", "-c", "core.hooksPath=/dev/null",
-		"-c", "advice.detachedHead=false", "checkout", "--quiet", "--detach", commit); err != nil {
+		"-c", "advice.detachedHead=false", "checkout", "--quiet", "--detach", commit+"^{commit}"); err != nil {
 		return fmt.Errorf("check out %s: %w", label, err)
+	}
+	if err := r.run(ctx, "head-"+label, dir, nil, "git", "rev-parse", "HEAD"); err != nil {
+		return fmt.Errorf("check out %s: %w", label, err)
+	}
+	head, err := os.ReadFile(filepath.Join(r.evidenceDir, "head-"+label+".stdout"))
+	if err != nil {
+		return fmt.Errorf("read %s head: %w", label, err)
+	}
+	if got := strings.TrimSpace(string(head)); got != commit {
+		return fmt.Errorf("check out %s: HEAD is %s, want %s", label, got, commit)
 	}
 	return nil
 }
@@ -201,7 +221,7 @@ func (r *runner) describe(ctx context.Context, suiteBin string) (Suite, error) {
 	if err := decodeFile(filepath.Join(r.evidenceDir, "describe.stdout"), &d); err != nil {
 		return Suite{}, fmt.Errorf("decode suite declaration: %w", err)
 	}
-	s := Suite{ID: d.ID}
+	s := Suite{ID: d.ID, Environment: d.Environment}
 	for _, sc := range d.Scenarios {
 		s.Scenarios = append(s.Scenarios, Scenario{ID: sc.ID, Holdout: slices.Contains(sc.Tags, holdoutTag)})
 	}

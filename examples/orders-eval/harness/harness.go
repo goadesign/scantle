@@ -89,6 +89,11 @@ type (
 	}
 )
 
+// Environment is the dependency profile every platform runs the candidate
+// with: simulated commerce and payments. The suite declares it, so reports
+// name the profile that actually ran.
+const Environment = "sim"
+
 // maxExcerptBytes bounds how much of one process's output a diagnostic shows.
 const maxExcerptBytes = 16 << 10
 
@@ -141,7 +146,7 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 		return err
 	}
 	p.workerSpec = candidate.Spec{
-		Args:         []string{"--env", "sim", "--payments-url", depsURL, "--temporal", temporalAddr},
+		Args:         []string{"--env", Environment, "--payments-url", depsURL, "--temporal", temporalAddr},
 		StateDir:     workerState,
 		ConnectPorts: []int{temporalPort, depsPort},
 		LogFile:      filepath.Join(p.logDir, "worker.log"),
@@ -159,7 +164,7 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	}
 	addr := "127.0.0.1:" + strconv.Itoa(apiPort)
 	p.apiSpec = candidate.Spec{
-		Args: []string{"--env", "sim", "--commerce-url", depsURL, "--temporal", temporalAddr,
+		Args: []string{"--env", Environment, "--commerce-url", depsURL, "--temporal", temporalAddr,
 			"--listen", addr, "--model-provider", "scripted", "--state-dir", apiState},
 		Env:          []string{"ORDERS_JWT_KEY=" + e.signingKey},
 		StateDir:     apiState,

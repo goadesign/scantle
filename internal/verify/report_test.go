@@ -66,9 +66,11 @@ func TestAssembleRejectsMalformedInput(t *testing.T) {
 		suite    Suite
 		evidence []eval.ScenarioReport
 	}{
-		{"empty suite", Suite{ID: "orders_acceptance"}, nil},
-		{"empty scenario ID", Suite{ID: "orders_acceptance", Scenarios: []Scenario{{ID: ""}}}, nil},
-		{"duplicate declared ID", Suite{ID: "orders_acceptance", Scenarios: []Scenario{{ID: "a"}, {ID: "a"}}}, nil},
+		{"empty suite", Suite{ID: "orders_acceptance", Environment: "sim"}, nil},
+		{"empty scenario ID", Suite{ID: "orders_acceptance", Environment: "sim", Scenarios: []Scenario{{ID: ""}}}, nil},
+		{"duplicate declared ID", Suite{ID: "orders_acceptance", Environment: "sim", Scenarios: []Scenario{{ID: "a"}, {ID: "a"}}}, nil},
+		{"binding names an environment the suite did not run", Suite{ID: "orders_acceptance", Environment: "staging", Scenarios: []Scenario{{ID: "a"}}}, nil},
+		{"suite declares no environment", Suite{ID: "orders_acceptance", Scenarios: []Scenario{{ID: "a"}}}, nil},
 		{"duplicate result ID", testSuite(), []eval.ScenarioReport{scenario("a", true, both), scenario("a", false, both)}},
 		{"undeclared result ID", testSuite(), []eval.ScenarioReport{scenario("zzz", true, both)}},
 	}
@@ -174,7 +176,7 @@ func testBinding() Binding {
 
 // testSuite declares two repair scenarios and one holdout.
 func testSuite() Suite {
-	return Suite{ID: "orders_acceptance", Scenarios: []Scenario{{ID: "a"}, {ID: "b"}, {ID: "h", Holdout: true}}}
+	return Suite{ID: "orders_acceptance", Environment: "sim", Scenarios: []Scenario{{ID: "a"}, {ID: "b"}, {ID: "h", Holdout: true}}}
 }
 
 // scenario builds a started scenario report that reports executing the given
