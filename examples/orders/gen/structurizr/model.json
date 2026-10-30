@@ -1,0 +1,275 @@
+{
+    "name": "Orders platform",
+    "description": "Refund assistant for a merchant's customers.",
+    "model": {
+        "people": [
+            {
+                "id": "2reqex",
+                "name": "Customer",
+                "description": "Shopper asking for a refund on their own orders.",
+                "tags": "Element,Person",
+                "relationships": [
+                    {
+                        "id": "15c9zdn",
+                        "description": "Asks for refunds and reads the outcome",
+                        "tags": "Relationship",
+                        "sourceId": "2reqex",
+                        "destinationId": "8yeoer",
+                        "technology": "HTTPS, JSON",
+                        "interactionStyle": "Synchronous"
+                    }
+                ]
+            },
+            {
+                "id": "1u11j70",
+                "name": "Manager",
+                "description": "Merchant staff who approve refunds over $50.00.",
+                "tags": "Element,Person",
+                "relationships": [
+                    {
+                        "id": "1fasg4m",
+                        "description": "Approves or denies card refunds",
+                        "tags": "Relationship",
+                        "sourceId": "1u11j70",
+                        "destinationId": "8yeoer",
+                        "technology": "HTTPS, JSON",
+                        "interactionStyle": "Synchronous"
+                    }
+                ]
+            }
+        ],
+        "softwareSystems": [
+            {
+                "id": "1w0b3t3",
+                "name": "Commerce system",
+                "description": "The merchant's order records.",
+                "tags": "Element,Software System",
+                "location": "External"
+            },
+            {
+                "id": "1tdum8m",
+                "name": "Language model",
+                "description": "Hosted model the refund agent uses to choose tools.",
+                "tags": "Element,Software System",
+                "location": "External"
+            },
+            {
+                "id": "1ejbp07",
+                "name": "Orders platform",
+                "description": "Refund assistant and the durable refund flow behind it.",
+                "tags": "Element,Software System",
+                "containers": [
+                    {
+                        "id": "8yeoer",
+                        "name": "Orders API",
+                        "description": "Public HTTP API and refund agent. Authenticates every call, runs agent turns, and owns runs, transcripts and pending approvals.",
+                        "technology": "Go, Goa, Goa-AI",
+                        "tags": "Element,Container",
+                        "relationships": [
+                            {
+                                "id": "15uhmke",
+                                "description": "Plans the next tool call",
+                                "tags": "Relationship",
+                                "sourceId": "8yeoer",
+                                "destinationId": "1tdum8m",
+                                "technology": "HTTPS",
+                                "interactionStyle": "Synchronous"
+                            },
+                            {
+                                "id": "1kmmtoo",
+                                "description": "Saves runs, transcripts and pending approvals",
+                                "tags": "Relationship",
+                                "sourceId": "8yeoer",
+                                "destinationId": "1r473xm",
+                                "technology": "SQLite",
+                                "interactionStyle": "Synchronous"
+                            },
+                            {
+                                "id": "7r3hpb",
+                                "description": "Runs agent turns and starts one refund workflow per order",
+                                "tags": "Relationship",
+                                "sourceId": "8yeoer",
+                                "destinationId": "1ypetm7",
+                                "technology": "Temporal, gRPC",
+                                "interactionStyle": "Synchronous"
+                            },
+                            {
+                                "id": "fjw60w",
+                                "description": "Lists and reads the customer's orders",
+                                "tags": "Relationship",
+                                "sourceId": "8yeoer",
+                                "destinationId": "1w0b3t3",
+                                "technology": "HTTPS, JSON",
+                                "interactionStyle": "Synchronous"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "1ujaygu",
+                        "name": "Refund worker",
+                        "description": "Completes each refund exactly once, retrying after crashes with the same idempotency key.",
+                        "technology": "Go, Temporal",
+                        "tags": "Element,Container",
+                        "relationships": [
+                            {
+                                "id": "1mpvio5",
+                                "description": "Issues the refund, keyed by tenant and order",
+                                "tags": "Relationship",
+                                "sourceId": "1ujaygu",
+                                "destinationId": "1su28mq",
+                                "technology": "HTTPS, JSON",
+                                "interactionStyle": "Synchronous"
+                            },
+                            {
+                                "id": "v1i4oj",
+                                "description": "Polls for refund workflows",
+                                "tags": "Relationship",
+                                "sourceId": "1ujaygu",
+                                "destinationId": "1ypetm7",
+                                "technology": "Temporal, gRPC",
+                                "interactionStyle": "Synchronous"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "1r473xm",
+                        "name": "Run store",
+                        "description": "Durable agent state owned by the Orders API alone.",
+                        "technology": "SQLite",
+                        "tags": "Element,Container,Database"
+                    },
+                    {
+                        "id": "1ypetm7",
+                        "name": "Workflow engine",
+                        "description": "Durable execution for agent turns and refund workflows.",
+                        "technology": "Temporal",
+                        "tags": "Element,Container"
+                    }
+                ]
+            },
+            {
+                "id": "1su28mq",
+                "name": "Payment provider",
+                "description": "Moves money for refunds; honors idempotency keys.",
+                "tags": "Element,Software System",
+                "location": "External"
+            }
+        ]
+    },
+    "views": {
+        "systemContextViews": [
+            {
+                "description": "Who uses the orders platform and what it depends on.",
+                "key": "Context",
+                "order": 0,
+                "automaticLayout": {
+                    "implementation": "Dagre",
+                    "rankDirection": "LeftRight",
+                    "rankSeparation": 300,
+                    "nodeSeparation": 600,
+                    "edgeSeparation": 200
+                },
+                "elements": [
+                    {
+                        "id": "1ejbp07"
+                    },
+                    {
+                        "id": "1su28mq"
+                    },
+                    {
+                        "id": "1tdum8m"
+                    },
+                    {
+                        "id": "1u11j70"
+                    },
+                    {
+                        "id": "1w0b3t3"
+                    },
+                    {
+                        "id": "2reqex"
+                    }
+                ],
+                "softwareSystemId": "1ejbp07"
+            }
+        ],
+        "containerViews": [
+            {
+                "description": "The orders platform's processes and the state each one owns.",
+                "key": "Containers",
+                "order": 0,
+                "automaticLayout": {
+                    "implementation": "Dagre",
+                    "rankDirection": "LeftRight",
+                    "rankSeparation": 300,
+                    "nodeSeparation": 600,
+                    "edgeSeparation": 200
+                },
+                "elements": [
+                    {
+                        "id": "1r473xm"
+                    },
+                    {
+                        "id": "1su28mq"
+                    },
+                    {
+                        "id": "1tdum8m"
+                    },
+                    {
+                        "id": "1u11j70"
+                    },
+                    {
+                        "id": "1ujaygu"
+                    },
+                    {
+                        "id": "1w0b3t3"
+                    },
+                    {
+                        "id": "1ypetm7"
+                    },
+                    {
+                        "id": "2reqex"
+                    },
+                    {
+                        "id": "8yeoer"
+                    }
+                ],
+                "relationships": [
+                    {
+                        "id": "15c9zdn",
+                        "description": "Asks for refunds and reads the outcome"
+                    },
+                    {
+                        "id": "15uhmke",
+                        "description": "Plans the next tool call"
+                    },
+                    {
+                        "id": "1fasg4m",
+                        "description": "Approves or denies card refunds"
+                    },
+                    {
+                        "id": "1kmmtoo",
+                        "description": "Saves runs, transcripts and pending approvals"
+                    },
+                    {
+                        "id": "1mpvio5",
+                        "description": "Issues the refund, keyed by tenant and order"
+                    },
+                    {
+                        "id": "7r3hpb",
+                        "description": "Runs agent turns and starts one refund workflow per order"
+                    },
+                    {
+                        "id": "fjw60w",
+                        "description": "Lists and reads the customer's orders"
+                    },
+                    {
+                        "id": "v1i4oj",
+                        "description": "Polls for refund workflows"
+                    }
+                ],
+                "softwareSystemId": "1ejbp07"
+            }
+        ],
+        "configuration": {}
+    }
+}
