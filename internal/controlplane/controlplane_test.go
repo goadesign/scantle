@@ -298,7 +298,7 @@ func TestCP2ArchitecturePreviewAndCP3SandboxRoleSwitcherAndFastDraftMode(t *test
 	}
 }
 
-func TestCP3PromoteRunToExampleAndValidateToolUIComposition(t *testing.T) {
+func TestCP3PromoteRunToExampleAndMCPAdapter(t *testing.T) {
 	ctx := context.Background()
 	cp := New(Options{})
 
@@ -364,26 +364,6 @@ func TestCP3PromoteRunToExampleAndValidateToolUIComposition(t *testing.T) {
 	}
 	if len(promoted.Transcript) != 3 {
 		t.Fatalf("expected 3 canonical messages in promoted transcript, got %d", len(promoted.Transcript))
-	}
-
-	// ToolUI / OpenUI completed-composition validation.
-	validUI := cp.ValidateToolUIComposition(
-		[]byte(`{"schema":"openui.v1","component":"RefundApprovalCard","props":{"order_id":"ord-50","subtotal_cents":5000},"actions":[{"id":"approve","label":"Approve Refund"}]}`),
-		"Order ord-50 ($50.00) is awaiting manager approval.",
-	)
-	if !validUI.Valid || !validUI.ActionDispatchEnabled || validUI.FallbackText == "" {
-		t.Fatalf("expected valid ToolUI composition to enable action dispatch: %+v", validUI)
-	}
-
-	invalidUI := cp.ValidateToolUIComposition(
-		[]byte(`{"schema":"openui.v1","component":"RefundApprovalCard","props":{"order_id":"ord-50"},"actions":[]}`),
-		"Order ord-50 ($50.00) is awaiting manager approval.",
-	)
-	if invalidUI.Valid || invalidUI.ActionDispatchEnabled {
-		t.Fatalf("expected incomplete ToolUI composition to disable action dispatch: %+v", invalidUI)
-	}
-	if invalidUI.FallbackText != "Order ord-50 ($50.00) is awaiting manager approval." {
-		t.Fatalf("expected ordinary text result to be preserved when ToolUI validation fails, got %q", invalidUI.FallbackText)
 	}
 
 	// MCP Adapter ToolsList, ResourcesRead (ui://scantle/checkpoint), and ToolsCall (diff).

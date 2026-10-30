@@ -1,8 +1,8 @@
 // Package controlplane implements the Scantle MCP software factory control
 // plane across Checkpoints 1 through 3 (CP1–CP3): intent & ambiguity
 // resolution, C4 architecture & cost/safety guardrail preview, interactive
-// sandbox role-switching, Fast Draft Mode prompt overrides, run-log example
-// promotion, and ToolUI/OpenUI completed-composition gating.
+// sandbox role-switching, Fast Draft Mode prompt overrides, and run-log example
+// promotion.
 package controlplane
 
 import (
@@ -165,43 +165,6 @@ type (
 		Transcript []*model.Message
 	}
 
-	// ToolUIAction describes one interactive button or action inside a
-	// completed OpenUI/ToolUI composition.
-	ToolUIAction struct {
-		// ID is the stable action identifier.
-		ID string `json:"id"`
-		// Label is the human-readable button label.
-		Label string `json:"label"`
-	}
-
-	// ToolUIComposition is the completed JSON payload validated before an MCP
-	// Apps (`ui://`) host enables interactive action dispatch.
-	ToolUIComposition struct {
-		// Schema identifies the UI composition schema ("openui.v1").
-		Schema string `json:"schema"`
-		// Component names the root UI widget to render.
-		Component string `json:"component"`
-		// Props holds the structured properties passed to Component.
-		Props map[string]any `json:"props"`
-		// Actions lists the interactive actions exposed by the widget.
-		Actions []ToolUIAction `json:"actions"`
-	}
-
-	// ToolUIValidationResult reports whether a ToolUI/OpenUI composition passed
-	// completed-JSON validation while always preserving the ordinary text result.
-	ToolUIValidationResult struct {
-		// Valid is true when the JSON composition conforms to openui.v1.
-		Valid bool
-		// ActionDispatchEnabled is true only when Valid is true.
-		ActionDispatchEnabled bool
-		// Composition is the parsed composition when Valid is true.
-		Composition *ToolUIComposition
-		// FallbackText is the ordinary text result preserved whether or not UI validation succeeds.
-		FallbackText string
-		// ValidationError records why ActionDispatchEnabled was blocked when Valid is false.
-		ValidationError string
-	}
-
 	// Options configures a ControlPlane instance.
 	Options struct {
 		// Analyzer performs CP1 semantic analysis via a model call.
@@ -241,8 +204,6 @@ const (
 	TargetKindPromptTemplate = "prompt_template"
 	// TargetKindCompiledRule identifies a compiled Go business rule that cannot be overridden via prompt.Store.
 	TargetKindCompiledRule = "compiled_rule"
-	// OpenUISchemaV1 is the required schema identifier for completed ToolUI/OpenUI compositions.
-	OpenUISchemaV1 = "openui.v1"
 	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML resource shell.
 	checkpointUIHTML = `<!doctype html>
 <html lang="en">
@@ -251,7 +212,7 @@ const (
   <title>Scantle Checkpoint Host</title>
 </head>
 <body>
-  <main id="scantle-checkpoint-root" data-profile="mcp-app" data-schema="openui.v1">
+  <main id="scantle-checkpoint-root" data-profile="mcp-app">
     <h1>Scantle Interactive Checkpoint</h1>
     <p>Renders validated CP1 Change Cards and CP3 Sandbox controls while preserving ordinary text fallback.</p>
   </main>
@@ -622,52 +583,6 @@ func (c *ControlPlane) PromoteRunToExample(
 	}, nil
 }
 
-// ValidateToolUIComposition validates a completed OpenUI/ToolUI JSON payload
-// before enabling interactive action dispatch, while always preserving the
-// ordinary fallbackText for non-UI or failed-UI hosts.
-func (c *ControlPlane) ValidateToolUIComposition(rawJSON []byte, fallbackText string) ToolUIValidationResult {
-	res := ToolUIValidationResult{
-		FallbackText: fallbackText,
-	}
-	if len(bytesTrimSpace(rawJSON)) == 0 {
-		res.ValidationError = "empty ToolUI composition JSON"
-		return res
-	}
-	var comp ToolUIComposition
-	dec := json.NewDecoder(strings.NewReader(string(rawJSON)))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&comp); err != nil {
-		res.ValidationError = fmt.Sprintf("invalid ToolUI composition JSON: %v", err)
-		return res
-	}
-	if comp.Schema != OpenUISchemaV1 {
-		res.ValidationError = fmt.Sprintf("unsupported ToolUI schema %q (want %q)", comp.Schema, OpenUISchemaV1)
-		return res
-	}
-	if strings.TrimSpace(comp.Component) == "" {
-		res.ValidationError = "ToolUI composition requires a non-empty component name"
-		return res
-	}
-	if comp.Props == nil {
-		res.ValidationError = "ToolUI composition requires a props object"
-		return res
-	}
-	if len(comp.Actions) == 0 {
-		res.ValidationError = "ToolUI composition requires at least one interactive action"
-		return res
-	}
-	for i, act := range comp.Actions {
-		if strings.TrimSpace(act.ID) == "" || strings.TrimSpace(act.Label) == "" {
-			res.ValidationError = fmt.Sprintf("ToolUI action[%d] requires non-empty id and label", i)
-			return res
-		}
-	}
-	res.Valid = true
-	res.ActionDispatchEnabled = true
-	res.Composition = &comp
-	return res
-}
-
 // extractAssistantText concatenates TextPart payloads from a model.Response.
 func extractAssistantText(resp *model.Response) string {
 	if resp == nil {
@@ -775,9 +690,4 @@ func computeChangeCardRevision(card *genscantle.ChangeCardResult, answers map[st
 		_, _ = fmt.Fprintf(h, "ans:%s=%s\n", k, answers[k])
 	}
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-// bytesTrimSpace trims ASCII whitespace from a byte slice without allocating.
-func bytesTrimSpace(b []byte) []byte {
-	return []byte(strings.TrimSpace(string(b)))
 }
