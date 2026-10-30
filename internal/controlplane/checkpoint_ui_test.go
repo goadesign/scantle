@@ -262,6 +262,51 @@ var _ = Service("orders", func() {
 		t.Fatalf("unexpected draft_override outcome: %+v", draftCall)
 	}
 
+	staleConfirmCall, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      "confirm_intent",
+		Arguments: confirmArgs,
+	})
+	if err != nil {
+		t.Fatalf("ToolsCall(confirm_intent stale): %v", err)
+	}
+	staleConfirmOut, ok := staleConfirmCall.Outcome.AsComplete()
+	if !ok || staleConfirmOut.IsError == nil || !*staleConfirmOut.IsError || len(staleConfirmOut.Content) == 0 || staleConfirmOut.Content[0].Text == nil {
+		t.Fatalf("expected stale confirm_intent tool error outcome, got: %+v", staleConfirmCall)
+	}
+
+	baselineDesign := `package design
+
+import . "goa.design/goa/v3/dsl"
+
+var _ = API("orders", func() {})
+
+var _ = Service("orders", func() {
+	Description("Baseline Orders service")
+})
+`
+	diffArgs, err := json.Marshal(map[string]any{
+		"old": map[string]any{
+			"files": testmodule.Snapshot(t, "", baselineDesign),
+		},
+		"new": map[string]any{
+			"files": testmodule.Snapshot(t, "", candidateDesign),
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal diffArgs: %v", err)
+	}
+	diffCall, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      "diff",
+		Arguments: diffArgs,
+	})
+	if err != nil {
+		t.Fatalf("ToolsCall(diff): %v", err)
+	}
+	diffOut, ok := diffCall.Outcome.AsComplete()
+	if !ok || len(diffOut.StructuredContent) == 0 {
+		t.Fatalf("unexpected diff outcome: %+v", diffCall)
+	}
+
 	nodePath, err := exec.LookPath("node")
 	if err != nil {
 		return
@@ -269,14 +314,17 @@ var _ = Service("orders", func() {
 
 	scriptBody := extractCheckpointScript(t, htmlDoc)
 	harnessInput, err := json.Marshal(map[string]any{
-		"script":            scriptBody,
-		"cp1Structured":     json.RawMessage(proposeOut.StructuredContent),
-		"cp2Structured":     json.RawMessage(previewOut.StructuredContent),
-		"cp3Structured":     json.RawMessage(draftOut.StructuredContent),
-		"wantCP1Revision":   proposedWire.RequestRevision,
-		"wantCP2Revision":   confirmedWire.RequestRevision,
-		"wantDesignDigest":  previewWire.DesignDigest,
-		"wantAmbiguityText": "Does the $50 limit include tax?",
+		"script":                 scriptBody,
+		"cp1Structured":          json.RawMessage(proposeOut.StructuredContent),
+		"cp1ConfirmedStructured": json.RawMessage(confirmOut.StructuredContent),
+		"cp2Structured":          json.RawMessage(previewOut.StructuredContent),
+		"diffStructured":         json.RawMessage(diffOut.StructuredContent),
+		"cp3Structured":          json.RawMessage(draftOut.StructuredContent),
+		"staleErrorText":         *staleConfirmOut.Content[0].Text,
+		"wantCP1Revision":        proposedWire.RequestRevision,
+		"wantCP2Revision":        confirmedWire.RequestRevision,
+		"wantDesignDigest":       previewWire.DesignDigest,
+		"wantAmbiguityText":      "Does the $50 limit include tax?",
 	})
 	if err != nil {
 		t.Fatalf("marshal harnessInput: %v", err)
@@ -287,19 +335,30 @@ const fs = require("fs");
 const vm = require("vm");
 const input = JSON.parse(fs.readFileSync(0, "utf8"));
 
-function makeElement(tag) {
+function makeElement(tag, ns) {
   return {
     tagName: String(tag).toUpperCase(),
+    namespaceURI: ns || "",
     className: "",
     textContent: "",
+    value: "",
     dataset: {},
     attributes: {},
+    listeners: {},
     children: [],
     get firstChild() {
       return this.children.length > 0 ? this.children[0] : null;
     },
     setAttribute(k, v) {
       this.attributes[k] = String(v);
+    },
+    addEventListener(type, fn) {
+      if (!this.listeners[type]) this.listeners[type] = [];
+      this.listeners[type].push(fn);
+    },
+    dispatch(type, evt) {
+      const list = this.listeners[type] || [];
+      list.forEach((fn) => fn(evt || { target: this }));
     },
     appendChild(child) {
       this.children.push(child);
@@ -311,6 +370,14 @@ function makeElement(tag) {
       return child;
     }
   };
+}
+
+function findAll(node, pred, acc) {
+  const out = acc || [];
+  if (!node || node.nodeType === 3) return out;
+  if (pred(node)) out.push(node);
+  (node.children || []).forEach((c) => findAll(c, pred, out));
+  return out;
 }
 
 function renderText(node) {
@@ -348,7 +415,10 @@ const documentObj = {
     return null;
   },
   createElement(tag) {
-    return makeElement(tag);
+    return makeElement(tag, "");
+  },
+  createElementNS(ns, tag) {
+    return makeElement(tag, ns);
   },
   createTextNode(text) {
     return { nodeType: 3, textContent: String(text) };
@@ -403,7 +473,7 @@ if (root.dataset.initialized !== "true") {
   throw new Error("expected root.dataset.initialized === 'true'");
 }
 
-// 3. Deliver CP1 ChangeCardResult via ui/notifications/tool-result.
+// 3. Deliver CP1 ChangeCardResult via ui/notifications/tool-result and exercise interactive confirm_intent form.
 messageListener({
   source: parentWindow,
   data: {
@@ -420,7 +490,128 @@ if (!cp1Text.includes(input.wantCP1Revision) || !cp1Text.includes(input.wantAmbi
   throw new Error("CP1 view missing revision or ambiguity question: " + cp1Text);
 }
 
-// 4. Deliver CP2 ArchitecturePreviewResult -> must replace CP1 view completely.
+// 3a. Click an ambiguity option pill, edit an example outcome input, and submit confirm_intent via tools/call.
+const optionPills = findAll(viewEl, (n) => n.attributes["data-ambiguity-id"] === "chg-ui-test-ambiguity-01" && n.attributes["data-option"] === "subtotal_only");
+if (optionPills.length !== 1) {
+  throw new Error("expected ambiguity option pill button, got: " + optionPills.length);
+}
+optionPills[0].dispatch("click");
+const outcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
+if (outcomeInputs.length !== 1) {
+  throw new Error("expected example expected_outcome input, got: " + outcomeInputs.length);
+}
+outcomeInputs[0].value = "Instant store credit up to $50.00";
+outcomeInputs[0].dispatch("input", { target: outcomeInputs[0] });
+const submitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
+if (submitBtns.length !== 1) {
+  throw new Error("expected #scantle-confirm-submit button");
+}
+const msgCountBeforeConfirm = hostMessages.length;
+submitBtns[0].dispatch("click");
+if (hostMessages.length !== msgCountBeforeConfirm + 1) {
+  throw new Error("expected tools/call request after clicking confirm submit");
+}
+const confirmReq = hostMessages[msgCountBeforeConfirm].msg;
+if (confirmReq.method !== "tools/call" ||
+    confirmReq.params.name !== "confirm_intent" ||
+    confirmReq.params.arguments.request_revision !== input.wantCP1Revision ||
+    confirmReq.params.arguments.answers["chg-ui-test-ambiguity-01"] !== "subtotal_only" ||
+    confirmReq.params.arguments.examples[0].expected_outcome !== "Instant store credit up to $50.00") {
+  throw new Error("unexpected confirm_intent tools/call payload: " + JSON.stringify(confirmReq));
+}
+
+// Host replies with confirmed ChangeCardResult -> guest transitions to confirmed revision.
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    id: confirmReq.id,
+    result: {
+      content: [],
+      structuredContent: input.cp1ConfirmedStructured
+    }
+  }
+});
+if (root.dataset.state !== "cp1-change-card" || root.dataset.requestRevision !== input.wantCP2Revision) {
+  throw new Error("expected confirmed CP1 revision after tools/call reply, got: " + JSON.stringify(root.dataset));
+}
+
+// 3b. Exercise stale-revision CP1 form submission: render older rev1 card, edit example, submit, receive server stale-revision error -> edits preserved and recovery guidance displayed.
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: { structuredContent: input.cp1Structured }
+  }
+});
+const stalePills = findAll(viewEl, (n) => n.attributes["data-ambiguity-id"] === "chg-ui-test-ambiguity-01" && n.attributes["data-option"] === "total_with_tax");
+stalePills[0].dispatch("click");
+const staleOutcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
+staleOutcomeInputs[0].value = "Edited outcome preserved across stale error";
+staleOutcomeInputs[0].dispatch("input", { target: staleOutcomeInputs[0] });
+const staleSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
+const msgCountBeforeStale = hostMessages.length;
+staleSubmitBtns[0].dispatch("click");
+const staleReq = hostMessages[msgCountBeforeStale].msg;
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    id: staleReq.id,
+    result: {
+      isError: true,
+      content: [{ type: "text", text: input.staleErrorText }]
+    }
+  }
+});
+const staleViewText = renderText(viewEl);
+if (root.dataset.state !== "cp1-change-card" ||
+    !staleViewText.includes(input.staleErrorText) ||
+    !staleViewText.includes("Your edited answers and examples remain in this form") ||
+    staleOutcomeInputs[0].value !== "Edited outcome preserved across stale error") {
+  throw new Error("stale form submission did not preserve edits or show recovery guidance: " + staleViewText);
+}
+
+// 3c. Click #scantle-load-latest-card after stale error -> guest calls get_change and renders latest card alongside #scantle-preserved-draft.
+const loadLatestBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-load-latest-card");
+if (loadLatestBtns.length !== 1) {
+  throw new Error("expected #scantle-load-latest-card button after stale error");
+}
+const msgCountBeforeGetChange = hostMessages.length;
+loadLatestBtns[0].dispatch("click");
+if (hostMessages.length !== msgCountBeforeGetChange + 1) {
+  throw new Error("expected tools/call get_change request after clicking load latest card");
+}
+const getChangeReq = hostMessages[msgCountBeforeGetChange].msg;
+if (getChangeReq.method !== "tools/call" ||
+    getChangeReq.params.name !== "get_change" ||
+    getChangeReq.params.arguments.change_id !== "chg-ui-test") {
+  throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
+}
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    id: getChangeReq.id,
+    result: {
+      content: [],
+      structuredContent: input.cp1ConfirmedStructured
+    }
+  }
+});
+const recoveredViewText = renderText(viewEl);
+const preservedPanels = findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft");
+if (root.dataset.state !== "cp1-change-card" ||
+    root.dataset.requestRevision !== input.wantCP2Revision ||
+    preservedPanels.length !== 1 ||
+    !recoveredViewText.includes("Preserved Unsaved Draft Edits") ||
+    !recoveredViewText.includes("total_with_tax") ||
+    !recoveredViewText.includes("Edited outcome preserved across stale error")) {
+  throw new Error("get_change recovery did not render latest card + preserved draft panel: " + recoveredViewText);
+}
+
+// 4. Deliver CP2 ArchitecturePreviewResult -> must replace CP1 view completely and render both SVG graph and inspectable list.
 messageListener({
   source: parentWindow,
   data: {
@@ -443,6 +634,68 @@ if (!cp2Text.includes(input.wantCP2Revision) ||
     !cp2Text.includes("Inject: tenant_id") ||
     !cp2Text.includes("Confirmation")) {
   throw new Error("CP2 view missing expected digests or guardrails: " + cp2Text);
+}
+const cp2Svg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
+const cp2SvgNodes = findAll(viewEl, (n) => n.className === "scantle-svg-node");
+if (cp2Svg.length !== 1 || cp2SvgNodes.length !== input.cp2Structured.containers.length) {
+  throw new Error("expected CP2 SVG graph with all containers, got svg=" + cp2Svg.length + " nodes=" + cp2SvgNodes.length);
+}
+
+// 4a. Deliver 15-node cyclic + colliding-name + self-loop CP2 fixture -> no node cutoff, all 15 nodes and cyclic/self-loop edges rendered alongside inspectable list.
+const largeContainers = [];
+for (let i = 1; i <= 15; i++) {
+  largeContainers.push({
+    id: "node-" + i,
+    name: i <= 3 ? "Duplicate Display Name" : "Container " + i,
+    kind: i === 1 ? "person" : (i <= 8 ? "service" : "container"),
+    description: "Description for node-" + i
+  });
+}
+const cyclicEdges = [
+  { from_id: "node-1", to_id: "node-2", protocol: "HTTPS" },
+  { from_id: "node-2", to_id: "node-3", protocol: "gRPC" },
+  { from_id: "node-3", to_id: "node-2", protocol: "Callback gRPC" },
+  { from_id: "node-2", to_id: "node-2", protocol: "Self Loop" },
+  { from_id: "node-8", to_id: "node-15", protocol: "SQLite" }
+];
+const largePreview = Object.assign({}, input.cp2Structured, {
+  containers: largeContainers,
+  edges: cyclicEdges
+});
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: { structuredContent: largePreview }
+  }
+});
+const largeSvgNodes = findAll(viewEl, (n) => n.className === "scantle-svg-node");
+const largeSvgEdges = findAll(viewEl, (n) => n.className === "scantle-svg-edge");
+const largeText = renderText(viewEl);
+if (largeSvgNodes.length !== 15 || largeSvgEdges.length !== 5 || !largeText.includes("node-15") || !largeText.includes("Self Loop")) {
+  throw new Error("expected 15 SVG nodes and 5 cyclic/self-loop edges with inspectable list, got nodes=" + largeSvgNodes.length + " edges=" + largeSvgEdges.length);
+}
+
+// 4b. Deliver CP2 DiffResult from MCP diff codec -> renders unbound structural diff and clears CP1/CP2 dataset keys.
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: { structuredContent: input.diffStructured }
+  }
+});
+const diffText = renderText(viewEl);
+if (root.dataset.state !== "cp2-diff" ||
+    root.dataset.hasChanges !== "true" ||
+    root.dataset.changeId !== undefined ||
+    root.dataset.requestRevision !== undefined ||
+    root.dataset.designDigest !== undefined) {
+  throw new Error("unexpected cp2-diff dataset: " + JSON.stringify(root.dataset));
+}
+if (!diffText.includes("Standalone structural comparison") || !diffText.includes("refund_agent")) {
+  throw new Error("cp2-diff view missing unbound label or added declaration: " + diffText);
 }
 
 // 5. Deliver CP3 DraftOverrideResult -> replaces CP2 view.

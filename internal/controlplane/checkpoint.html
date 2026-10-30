@@ -10,83 +10,60 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       line-height: 1.45;
     }
-    body {
-      margin: 0;
-      padding: 1rem 1.25rem;
-    }
-    header {
-      border-bottom: 1px solid rgba(127, 127, 127, 0.35);
-      padding-bottom: 0.75rem;
-      margin-bottom: 1rem;
-    }
-    h1 {
-      font-size: 1.25rem;
-      margin: 0 0 0.35rem 0;
-    }
-    h2 {
-      font-size: 1.05rem;
-      margin: 0 0 0.5rem 0;
-    }
-    h3 {
-      font-size: 0.95rem;
-      margin: 0.85rem 0 0.35rem 0;
-    }
-    p {
-      margin: 0.25rem 0;
-    }
-    code, pre {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 0.85rem;
-    }
-    code {
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
+    body { margin: 0; padding: 1rem 1.25rem; }
+    header { border-bottom: 1px solid rgba(127, 127, 127, 0.35); padding-bottom: 0.75rem; margin-bottom: 1rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 0.35rem 0; }
+    h2 { font-size: 1.05rem; margin: 0 0 0.5rem 0; }
+    h3 { font-size: 0.95rem; margin: 0.85rem 0 0.35rem 0; }
+    p { margin: 0.25rem 0; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }
+    code { overflow-wrap: anywhere; word-break: break-word; }
     pre {
-      padding: 0.65rem;
-      border-radius: 6px;
-      border: 1px solid rgba(127, 127, 127, 0.35);
-      overflow-x: auto;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+      padding: 0.65rem; border-radius: 6px; border: 1px solid rgba(127, 127, 127, 0.35);
+      overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
     }
     .scantle-meta, .scantle-card {
-      border: 1px solid rgba(127, 127, 127, 0.35);
-      border-radius: 6px;
-      padding: 0.75rem;
-      margin-bottom: 0.75rem;
-      overflow-wrap: anywhere;
+      border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 6px;
+      padding: 0.75rem; margin-bottom: 0.75rem; overflow-wrap: anywhere;
     }
     .scantle-badge {
-      display: inline-block;
-      padding: 0.1rem 0.45rem;
-      border-radius: 4px;
-      border: 1px solid rgba(127, 127, 127, 0.5);
-      font-size: 0.8rem;
-      font-weight: 600;
-      margin-right: 0.4rem;
+      display: inline-block; padding: 0.1rem 0.45rem; border-radius: 4px;
+      border: 1px solid rgba(127, 127, 127, 0.5); font-size: 0.8rem;
+      font-weight: 600; margin-right: 0.4rem;
+    }
+    .scantle-pill, .scantle-btn {
+      display: inline-block; padding: 0.25rem 0.65rem; margin: 0.2rem 0.35rem 0.2rem 0;
+      border-radius: 999px; border: 1px solid rgba(127, 127, 127, 0.55);
+      background: transparent; color: inherit; cursor: pointer; font-size: 0.85rem;
+    }
+    .scantle-pill[aria-pressed="true"], .scantle-btn-primary {
+      border-color: #2563eb; background: rgba(37, 99, 235, 0.16); font-weight: 600;
+    }
+    .scantle-field-row {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0;
+    }
+    .scantle-input {
+      padding: 0.25rem 0.45rem; border-radius: 4px;
+      border: 1px solid rgba(127, 127, 127, 0.5); background: transparent;
+      color: inherit; font-size: 0.85rem; flex: 1 1 10rem;
+    }
+    .scantle-graph-wrap {
+      overflow: auto; border: 1px solid rgba(127, 127, 127, 0.35);
+      border-radius: 6px; padding: 0.5rem; margin: 0.5rem 0 0.75rem 0;
     }
     .scantle-error {
-      border: 2px solid #c62828;
-      border-radius: 6px;
-      padding: 0.75rem;
-      margin-top: 0.5rem;
+      border: 2px solid #c62828; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;
     }
-    ul {
-      margin: 0.35rem 0;
-      padding-left: 1.25rem;
-    }
-    li {
-      margin-bottom: 0.25rem;
-    }
+    ul { margin: 0.35rem 0; padding-left: 1.25rem; }
+    li { margin-bottom: 0.35rem; }
   </style>
 </head>
 <body>
   <main id="scantle-checkpoint-root" data-profile="mcp-app" data-state="waiting">
     <header>
       <h1>Scantle Checkpoint Viewer</h1>
-      <p>Displays validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Fast Draft Override results from structured MCP tool outputs.</p>
-      <p><small>Visual inspection does not grant approval authority; invoke <code>confirm_intent</code>, <code>preview_architecture</code>, <code>draft_override</code>, or <code>scantle verify</code> through your MCP host or CLI to advance the workflow.</small></p>
+      <p>Displays and refines CP1 Change Cards, CP2 C4 Architecture Previews and Structural Diffs, and CP3 Fast Draft Override results from structured MCP tool outputs.</p>
+      <p><small>Submitting CP1 edits dispatches <code>confirm_intent</code> through the MCP Apps host; server authentication and <code>request_revision</code> checks remain authoritative.</small></p>
     </header>
     <p id="scantle-checkpoint-status" role="status" aria-live="polite">Awaiting MCP Apps host initialization and checkpoint tool result...</p>
     <section id="scantle-checkpoint-view" aria-label="Checkpoint Payload"></section>
@@ -97,7 +74,10 @@
 
     var INIT_REQUEST_ID = 1;
     var PROTOCOL_VERSION = "2026-01-26";
+    var SVG_NS = "http://www.w3.org/2000/svg";
     var initPending = false;
+    var nextRequestId = 2;
+    var pendingToolRequest = null;
     var root = document.getElementById("scantle-checkpoint-root");
     var statusEl = document.getElementById("scantle-checkpoint-status");
     var viewEl = document.getElementById("scantle-checkpoint-view");
@@ -107,52 +87,67 @@
     }
 
     function isStringArray(v) {
-      return Array.isArray(v) && v.every(function (item) {
-        return typeof item === "string";
-      });
+      return Array.isArray(v) && v.every(function (item) { return typeof item === "string"; });
     }
 
     function isStringMap(v) {
-      if (!isPlainObject(v)) {
-        return false;
-      }
-      return Object.keys(v).every(function (k) {
-        return typeof v[k] === "string";
+      return isPlainObject(v) && Object.keys(v).every(function (k) { return typeof v[k] === "string"; });
+    }
+
+    function applyAttrs(node, attrs) {
+      if (!isPlainObject(attrs)) { return; }
+      Object.keys(attrs).forEach(function (k) {
+        if (k === "className") {
+          node.className = attrs[k];
+        } else if (k === "textContent") {
+          node.textContent = String(attrs[k]);
+        } else if (k === "value" && "value" in node) {
+          node.value = String(attrs[k]);
+        } else if (k.indexOf("on") === 0 && typeof attrs[k] === "function") {
+          var evtName = k.slice(2).toLowerCase();
+          if (typeof node.addEventListener === "function") {
+            node.addEventListener(evtName, attrs[k]);
+          }
+        } else {
+          node.setAttribute(k, String(attrs[k]));
+        }
+      });
+    }
+
+    function appendChildren(node, children) {
+      if (!Array.isArray(children)) { return; }
+      children.forEach(function (child) {
+        if (child === null || child === undefined) { return; }
+        if (typeof child === "string" || typeof child === "number" || typeof child === "boolean") {
+          node.appendChild(document.createTextNode(String(child)));
+        } else {
+          node.appendChild(child);
+        }
       });
     }
 
     function el(tag, attrs, children) {
       var node = document.createElement(tag);
-      if (isPlainObject(attrs)) {
-        Object.keys(attrs).forEach(function (k) {
-          if (k === "className") {
-            node.className = attrs[k];
-          } else if (k === "textContent") {
-            node.textContent = String(attrs[k]);
-          } else {
-            node.setAttribute(k, String(attrs[k]));
-          }
-        });
-      }
-      if (Array.isArray(children)) {
-        children.forEach(function (child) {
-          if (child === null || child === undefined) {
-            return;
-          }
-          if (typeof child === "string" || typeof child === "number" || typeof child === "boolean") {
-            node.appendChild(document.createTextNode(String(child)));
-          } else {
-            node.appendChild(child);
-          }
-        });
-      }
+      applyAttrs(node, attrs);
+      appendChildren(node, children);
+      return node;
+    }
+
+    function svgEl(tag, attrs, children) {
+      var node = typeof document.createElementNS === "function"
+        ? document.createElementNS(SVG_NS, tag)
+        : document.createElement(tag);
+      applyAttrs(node, attrs);
+      appendChildren(node, children);
       return node;
     }
 
     function clearDatasetKeys() {
+      pendingToolRequest = null;
       delete root.dataset.changeId;
       delete root.dataset.requestRevision;
       delete root.dataset.designDigest;
+      delete root.dataset.hasChanges;
     }
 
     function replaceChildren(container, nodes) {
@@ -160,9 +155,7 @@
         container.removeChild(container.firstChild);
       }
       nodes.forEach(function (n) {
-        if (n) {
-          container.appendChild(n);
-        }
+        if (n) { container.appendChild(n); }
       });
     }
 
@@ -182,8 +175,7 @@
         : "Tool call was cancelled before completion. Re-run the Scantle checkpoint tool to inspect a fresh result.";
       replaceChildren(viewEl, [
         el("div", { className: "scantle-meta", role: "status" }, [
-          el("strong", { textContent: "Cancelled: " }),
-          detail
+          el("strong", { textContent: "Cancelled: " }), detail
         ])
       ]);
     }
@@ -194,34 +186,27 @@
       statusEl.textContent = "Checkpoint payload error";
       replaceChildren(viewEl, [
         el("div", { className: "scantle-error", role: "alert" }, [
-          el("strong", { textContent: "Error: " }),
-          String(message)
+          el("strong", { textContent: "Error: " }), String(message)
         ])
       ]);
     }
 
     function isValidAmbiguity(a) {
-      return isPlainObject(a) &&
-        typeof a.id === "string" &&
-        typeof a.question === "string" &&
-        isStringArray(a.options);
+      return isPlainObject(a) && typeof a.id === "string" &&
+        typeof a.question === "string" && isStringArray(a.options);
     }
 
     function isValidExample(ex) {
-      return isPlainObject(ex) &&
-        typeof ex.id === "string" &&
-        typeof ex.scenario === "string" &&
-        typeof ex.input_summary === "string" &&
+      return isPlainObject(ex) && typeof ex.id === "string" &&
+        typeof ex.scenario === "string" && typeof ex.input_summary === "string" &&
         typeof ex.expected_outcome === "string" &&
         (ex.verification_kind === "deterministic" || ex.verification_kind === "model_judged");
     }
 
     function isValidChangeCard(d) {
-      return isPlainObject(d) &&
-        typeof d.change_id === "string" &&
+      return isPlainObject(d) && typeof d.change_id === "string" &&
         (d.status === "needs_confirmation" || d.status === "confirmed") &&
-        typeof d.prompt === "string" &&
-        typeof d.summary === "string" &&
+        typeof d.prompt === "string" && typeof d.summary === "string" &&
         typeof d.request_revision === "string" &&
         Array.isArray(d.examples) && d.examples.every(isValidExample) &&
         isStringArray(d.preserved_behaviors) &&
@@ -231,78 +216,54 @@
     }
 
     function isValidContainer(c) {
-      return isPlainObject(c) &&
-        typeof c.id === "string" &&
-        typeof c.name === "string" &&
-        typeof c.kind === "string" &&
-        typeof c.description === "string";
+      return isPlainObject(c) && typeof c.id === "string" &&
+        typeof c.name === "string" && typeof c.kind === "string" && typeof c.description === "string";
     }
 
     function isValidEdge(e) {
-      return isPlainObject(e) &&
-        typeof e.from_id === "string" &&
-        typeof e.to_id === "string" &&
-        typeof e.protocol === "string";
+      return isPlainObject(e) && typeof e.from_id === "string" &&
+        typeof e.to_id === "string" && typeof e.protocol === "string";
     }
 
     function isValidAgentPolicy(p) {
-      return isPlainObject(p) &&
-        typeof p.agent_id === "string" &&
-        typeof p.max_execution_seconds === "number" &&
-        typeof p.max_tool_calls === "number" &&
-        typeof p.max_recovery_turns === "number" &&
-        typeof p.compress_at_turns === "number" &&
-        typeof p.keep_recent_turns === "number" &&
-        typeof p.cache_after_system === "boolean" &&
+      return isPlainObject(p) && typeof p.agent_id === "string" &&
+        typeof p.max_execution_seconds === "number" && typeof p.max_tool_calls === "number" &&
+        typeof p.max_recovery_turns === "number" && typeof p.compress_at_turns === "number" &&
+        typeof p.keep_recent_turns === "number" && typeof p.cache_after_system === "boolean" &&
         typeof p.cache_after_tools === "boolean";
     }
 
     function isValidTool(t) {
-      return isPlainObject(t) &&
-        typeof t.id === "string" &&
-        typeof t.toolset === "string" &&
-        typeof t.name === "string" &&
-        typeof t.description === "string" &&
-        typeof t.args_schema === "string" &&
-        typeof t.return_schema === "string" &&
-        isStringArray(t.injected_fields) &&
-        typeof t.requires_ui === "boolean" &&
-        typeof t.requires_confirmation === "boolean" &&
+      return isPlainObject(t) && typeof t.id === "string" &&
+        typeof t.toolset === "string" && typeof t.name === "string" &&
+        typeof t.description === "string" && typeof t.args_schema === "string" &&
+        typeof t.return_schema === "string" && isStringArray(t.injected_fields) &&
+        typeof t.requires_ui === "boolean" && typeof t.requires_confirmation === "boolean" &&
         typeof t.bounded_result === "boolean";
     }
 
     function isValidSwarmRole(r) {
-      return isPlainObject(r) &&
-        typeof r.handle === "string" &&
-        typeof r.role === "string" &&
-        typeof r.scope_name === "string" &&
-        typeof r.profile_id === "string" &&
-        typeof r.provider === "string" &&
-        typeof r.model === "string" &&
-        typeof r.family === "string" &&
-        isStringArray(r.owned_paths) &&
-        typeof r.access_mode === "string";
+      return isPlainObject(r) && typeof r.handle === "string" &&
+        typeof r.role === "string" && typeof r.scope_name === "string" &&
+        typeof r.profile_id === "string" && typeof r.provider === "string" &&
+        typeof r.model === "string" && typeof r.family === "string" &&
+        isStringArray(r.owned_paths) && typeof r.access_mode === "string";
     }
 
     function isValidSwarm(s) {
       return isPlainObject(s) &&
         (s.status === "configured" || s.status === "unconfigured" || s.status === "missing_capability") &&
         Array.isArray(s.assignments) && s.assignments.every(isValidSwarmRole) &&
-        typeof s.cross_family_review === "boolean" &&
-        typeof s.cross_family_eval === "boolean" &&
-        typeof s.single_family === "boolean" &&
-        typeof s.summary === "string" &&
+        typeof s.cross_family_review === "boolean" && typeof s.cross_family_eval === "boolean" &&
+        typeof s.single_family === "boolean" && typeof s.summary === "string" &&
         (s.missing_roles === undefined || isStringArray(s.missing_roles)) &&
         (s.manifest === undefined || typeof s.manifest === "string");
     }
 
     function isValidArchitecturePreview(d) {
-      return isPlainObject(d) &&
-        typeof d.change_id === "string" &&
-        typeof d.request_revision === "string" &&
-        typeof d.design_digest === "string" &&
-        typeof d.system_name === "string" &&
-        typeof d.banner === "string" &&
+      return isPlainObject(d) && typeof d.change_id === "string" &&
+        typeof d.request_revision === "string" && typeof d.design_digest === "string" &&
+        typeof d.system_name === "string" && typeof d.banner === "string" &&
         Array.isArray(d.containers) && d.containers.every(isValidContainer) &&
         Array.isArray(d.edges) && d.edges.every(isValidEdge) &&
         Array.isArray(d.agent_policies) && d.agent_policies.every(isValidAgentPolicy) &&
@@ -310,20 +271,80 @@
         isValidSwarm(d.swarm);
     }
 
+    function isValidDiffResult(d) {
+      return isPlainObject(d) && typeof d.has_changes === "boolean" &&
+        isStringArray(d.added_declarations) && isStringArray(d.removed_declarations) &&
+        isStringArray(d.modified_declarations) && isStringArray(d.version_deltas) &&
+        typeof d.summary === "string";
+    }
+
     function isValidDraftOverride(d) {
-      return isPlainObject(d) &&
-        typeof d.applied_in_store === "boolean" &&
-        typeof d.requires_rebuild === "boolean" &&
-        typeof d.message === "string" &&
+      return isPlainObject(d) && typeof d.applied_in_store === "boolean" &&
+        typeof d.requires_rebuild === "boolean" && typeof d.message === "string" &&
         (d.prompt_version === undefined || typeof d.prompt_version === "string");
     }
 
-    function renderChangeCard(card) {
+    function callServerTool(toolName, args, onSuccess, onError) {
+      if (!window.parent || window.parent === window) {
+        onError("Cannot invoke " + toolName + ": no MCP Apps host frame is attached.");
+        return;
+      }
+      var reqId = nextRequestId++;
+      pendingToolRequest = { id: reqId, onSuccess: onSuccess, onError: onError };
+      window.parent.postMessage({
+        jsonrpc: "2.0",
+        id: reqId,
+        method: "tools/call",
+        params: { name: toolName, arguments: args }
+      }, "*");
+    }
+
+    function renderChangeCard(card, preservedDraft) {
       clearDatasetKeys();
       root.dataset.state = "cp1-change-card";
       root.dataset.changeId = card.change_id;
       root.dataset.requestRevision = card.request_revision;
       statusEl.textContent = "Rendered Checkpoint 1 Change Card (" + card.status + ")";
+
+      var ambiguities = Array.isArray(card.ambiguities) ? card.ambiguities : [];
+      var draftAnswers = isPlainObject(card.answers) ? Object.assign({}, card.answers) : {};
+      var draftExamples = card.examples.map(function (ex) {
+        return {
+          id: ex.id,
+          scenario: ex.scenario,
+          input_summary: ex.input_summary,
+          expected_outcome: ex.expected_outcome,
+          verification_kind: ex.verification_kind
+        };
+      });
+      var feedbackEl = el("div", { id: "scantle-confirm-feedback" }, []);
+
+      function showFormError(msg) {
+        var loadLatestBtn = el("button", {
+          type: "button",
+          id: "scantle-load-latest-card",
+          className: "scantle-btn",
+          textContent: "Load Latest Card (get_change)",
+          onClick: function () {
+            statusEl.textContent = "Loading latest Change Card via get_change...";
+            callServerTool("get_change", { change_id: card.change_id }, function (latestCard) {
+              renderChangeCard(latestCard, {
+                priorRevision: card.request_revision,
+                answers: Object.assign({}, draftAnswers),
+                examples: draftExamples.map(function (item) { return Object.assign({}, item); })
+              });
+            }, showFormError);
+          }
+        });
+        replaceChildren(feedbackEl, [
+          el("div", { className: "scantle-error", role: "alert" }, [
+            el("strong", { textContent: "Confirm Intent Error: " }),
+            String(msg),
+            " — Your edited answers and examples remain in this form. Use Load Latest Card (get_change) to inspect the current saved Change Card alongside your unsaved edits before resubmitting.",
+            el("div", { className: "scantle-field-row" }, [loadLatestBtn])
+          ])
+        ]);
+      }
 
       var metaRows = [
         el("h2", { textContent: "CP1 Change Card: " + card.change_id }),
@@ -339,30 +360,72 @@
         metaRows.push(el("p", {}, [el("strong", { textContent: "Confirmed by: " }), card.confirmed_by]));
       }
 
-      var ambiguities = Array.isArray(card.ambiguities) ? card.ambiguities : [];
-      var answers = isPlainObject(card.answers) ? card.answers : {};
       var ambItems = ambiguities.map(function (amb) {
-        var answerText = answers[amb.id] ? " [Confirmed answer: " + answers[amb.id] + "]" : "";
+        var pillGroup = el("div", { role: "group", "aria-label": amb.question }, []);
+        function rebuildPills() {
+          replaceChildren(pillGroup, amb.options.map(function (opt) {
+            var selected = draftAnswers[amb.id] === opt;
+            return el("button", {
+              type: "button",
+              className: "scantle-pill",
+              "data-ambiguity-id": amb.id,
+              "data-option": opt,
+              "aria-pressed": selected ? "true" : "false",
+              onClick: function () {
+                draftAnswers[amb.id] = opt;
+                rebuildPills();
+              },
+              textContent: opt
+            });
+          }));
+        }
+        rebuildPills();
+        var answerText = draftAnswers[amb.id] ? " [Confirmed answer: " + draftAnswers[amb.id] + "]" : "";
         return el("li", {}, [
-          el("code", { textContent: amb.id }),
-          ": ",
-          amb.question,
-          " (options: " + amb.options.join(", ") + ")",
-          answerText
+          el("code", { textContent: amb.id }), ": ", amb.question,
+          " (options: " + amb.options.join(", ") + ")", answerText, pillGroup
         ]);
       });
 
-      var exampleItems = card.examples.map(function (ex) {
-        return el("li", {}, [
-          el("code", { textContent: ex.id }),
-          " [",
-          ex.verification_kind,
-          "] ",
-          el("strong", { textContent: ex.scenario }),
-          " — Input: ",
-          ex.input_summary,
-          " -> Expected: ",
-          ex.expected_outcome
+      var exampleItems = draftExamples.map(function (ex, idx) {
+        function makeFieldInput(field, label) {
+          return el("input", {
+            type: "text",
+            className: "scantle-input",
+            "aria-label": ex.id + " " + label,
+            "data-example-id": ex.id,
+            "data-field": field,
+            value: ex[field],
+            onInput: function (evt) {
+              if (evt && evt.target && typeof evt.target.value === "string") {
+                ex[field] = evt.target.value;
+              }
+            }
+          });
+        }
+        var kindBtn = el("button", {
+          type: "button",
+          className: "scantle-pill",
+          "data-example-id": ex.id,
+          "data-field": "verification_kind",
+          textContent: "Kind: " + ex.verification_kind,
+          onClick: function () {
+            ex.verification_kind = ex.verification_kind === "deterministic" ? "model_judged" : "deterministic";
+            kindBtn.textContent = "Kind: " + ex.verification_kind;
+          }
+        });
+        return el("li", { "data-example-index": String(idx) }, [
+          el("div", {}, [
+            el("code", { textContent: ex.id }), " [", ex.verification_kind, "] ",
+            el("strong", { textContent: ex.scenario }), " — Input: ", ex.input_summary,
+            " -> Expected: ", ex.expected_outcome
+          ]),
+          el("div", { className: "scantle-field-row" }, [
+            makeFieldInput("scenario", "scenario"),
+            makeFieldInput("input_summary", "input_summary"),
+            makeFieldInput("expected_outcome", "expected_outcome"),
+            kindBtn
+          ])
         ]);
       });
 
@@ -370,16 +433,167 @@
         return el("li", { textContent: pb });
       });
 
-      replaceChildren(viewEl, [
-        el("div", { className: "scantle-meta" }, metaRows),
-        el("div", { className: "scantle-card" }, [
-          el("h3", { textContent: "Ambiguities (" + ambiguities.length + ")" }),
-          ambItems.length > 0 ? el("ul", {}, ambItems) : el("p", { textContent: "No open domain ambiguities." }),
-          el("h3", { textContent: "Concrete Examples (" + card.examples.length + ")" }),
-          el("ul", {}, exampleItems),
-          el("h3", { textContent: "Preserved Contract Invariants (" + card.preserved_behaviors.length + ")" }),
-          preservedItems.length > 0 ? el("ul", {}, preservedItems) : el("p", { textContent: "None declared." })
-        ])
+      var submitBtn = el("button", {
+        type: "button",
+        id: "scantle-confirm-submit",
+        className: "scantle-btn scantle-btn-primary",
+        textContent: card.status === "needs_confirmation" ? "Confirm Intent & Lock Examples" : "Refine Confirmed Answers & Examples",
+        onClick: function () {
+          for (var i = 0; i < ambiguities.length; i++) {
+            if (!draftAnswers[ambiguities[i].id]) {
+              showFormError("Select an option for ambiguity " + ambiguities[i].id + " before confirming.");
+              return;
+            }
+          }
+          for (var j = 0; j < draftExamples.length; j++) {
+            var item = draftExamples[j];
+            if (!item.scenario.trim() || !item.input_summary.trim() || !item.expected_outcome.trim()) {
+              showFormError("Example " + item.id + " requires non-empty scenario, input_summary, and expected_outcome.");
+              return;
+            }
+          }
+          replaceChildren(feedbackEl, []);
+          statusEl.textContent = "Submitting confirm_intent to MCP Apps host...";
+          callServerTool("confirm_intent", {
+            change_id: card.change_id,
+            request_revision: card.request_revision,
+            answers: Object.assign({}, draftAnswers),
+            examples: draftExamples.map(function (item) {
+              return {
+                id: item.id,
+                scenario: item.scenario.trim(),
+                input_summary: item.input_summary.trim(),
+                expected_outcome: item.expected_outcome.trim(),
+                verification_kind: item.verification_kind
+              };
+            })
+          }, function (updatedCard) {
+            renderChangeCard(updatedCard, null);
+          }, showFormError);
+        }
+      });
+
+      var viewBlocks = [
+        el("div", { className: "scantle-meta" }, metaRows)
+      ];
+      if (isPlainObject(preservedDraft)) {
+        var draftSummaryLines = Object.keys(preservedDraft.answers || {}).map(function (k) {
+          return k + "=" + preservedDraft.answers[k];
+        }).concat((preservedDraft.examples || []).map(function (ex) {
+          return ex.id + ": " + ex.scenario + " | " + ex.input_summary + " -> " + ex.expected_outcome + " [" + ex.verification_kind + "]";
+        }));
+        viewBlocks.push(el("div", { id: "scantle-preserved-draft", className: "scantle-card", role: "region", "aria-label": "Preserved Unsaved Draft Edits" }, [
+          el("h3", { textContent: "Preserved Unsaved Draft Edits (from superseded revision " + preservedDraft.priorRevision + ")" }),
+          el("p", { textContent: "Review the latest saved Change Card below before re-applying any of your unsaved edits:" }),
+          el("ul", {}, draftSummaryLines.map(function (line) { return el("li", { textContent: line }); }))
+        ]));
+      }
+      viewBlocks.push(el("div", { className: "scantle-card" }, [
+        el("h3", { textContent: "Ambiguities (" + ambiguities.length + ")" }),
+        ambItems.length > 0 ? el("ul", {}, ambItems) : el("p", { textContent: "No open domain ambiguities." }),
+        el("h3", { textContent: "Concrete Examples (" + draftExamples.length + ")" }),
+        el("ul", {}, exampleItems),
+        el("h3", { textContent: "Preserved Contract Invariants (" + card.preserved_behaviors.length + ")" }),
+        preservedItems.length > 0 ? el("ul", {}, preservedItems) : el("p", { textContent: "None declared." }),
+        el("div", { className: "scantle-field-row" }, [submitBtn]),
+        feedbackEl
+      ]));
+      replaceChildren(viewEl, viewBlocks);
+    }
+
+    function columnForKind(kind) {
+      if (kind === "person") { return 0; }
+      if (kind === "service" || kind === "agent" || kind === "component") { return 1; }
+      return 2;
+    }
+
+    function renderC4GraphSVG(containers, edges) {
+      var colRows = [0, 0, 0];
+      var colX = [20, 290, 560];
+      var boxW = 210;
+      var boxH = 54;
+      var rowStep = 76;
+      var posById = {};
+
+      containers.forEach(function (c) {
+        var col = columnForKind(c.kind);
+        var row = colRows[col]++;
+        posById[c.id] = { id: c.id, name: c.name, kind: c.kind, col: col, row: row, x: colX[col], y: 24 + row * rowStep };
+      });
+
+      var maxRows = Math.max(1, colRows[0], colRows[1], colRows[2]);
+      var svgWidth = 800;
+      var svgHeight = Math.max(140, maxRows * rowStep + 36);
+
+      var defs = svgEl("defs", {}, [
+        svgEl("marker", {
+          id: "scantle-arrow", viewBox: "0 0 10 10", refX: "9", refY: "5",
+          markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse"
+        }, [svgEl("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "currentColor" }, [])])
+      ]);
+
+      var pairCounts = {};
+      var edgeElements = [];
+      edges.forEach(function (e, idx) {
+        var src = posById[e.from_id];
+        var dst = posById[e.to_id];
+        if (!src || !dst) { return; }
+        var pairKey = e.from_id < e.to_id ? e.from_id + "::" + e.to_id : e.to_id + "::" + e.from_id;
+        var seen = pairCounts[pairKey] || 0;
+        pairCounts[pairKey] = seen + 1;
+        var curveOffset = (seen % 2 === 0 ? 1 : -1) * (12 + seen * 10);
+
+        var pathD = "";
+        var labelX = 0;
+        var labelY = 0;
+        if (e.from_id === e.to_id) {
+          var sx = src.x + boxW;
+          var sy = src.y + boxH / 2;
+          pathD = "M " + sx + " " + (sy - 10) + " C " + (sx + 44) + " " + (sy - 32) + ", " + (sx + 44) + " " + (sy + 32) + ", " + sx + " " + (sy + 10);
+          labelX = sx + 24;
+          labelY = sy;
+        } else {
+          var x1 = src.x <= dst.x ? src.x + boxW : src.x;
+          var y1 = src.y + boxH / 2;
+          var x2 = src.x <= dst.x ? dst.x : dst.x + boxW;
+          var y2 = dst.y + boxH / 2;
+          if (src.col === dst.col) {
+            x1 = src.x + boxW;
+            x2 = dst.x + boxW;
+          }
+          var mx = (x1 + x2) / 2;
+          var my = (y1 + y2) / 2 + curveOffset;
+          pathD = "M " + x1 + " " + y1 + " Q " + mx + " " + my + " " + x2 + " " + y2;
+          labelX = mx;
+          labelY = my - 4;
+        }
+
+        edgeElements.push(svgEl("g", {
+          className: "scantle-svg-edge", "data-from-id": e.from_id, "data-to-id": e.to_id, "data-edge-index": String(idx)
+        }, [
+          svgEl("path", { d: pathD, fill: "none", stroke: "currentColor", "stroke-width": "1.5", "marker-end": "url(#scantle-arrow)" }, []),
+          svgEl("text", { x: String(Math.round(labelX)), y: String(Math.round(labelY)), "text-anchor": "middle", "font-size": "11", textContent: e.protocol }, [])
+        ]));
+      });
+
+      var nodeElements = containers.map(function (c) {
+        var pos = posById[c.id];
+        return svgEl("g", {
+          className: "scantle-svg-node", "data-container-id": c.id, "data-container-kind": c.kind,
+          transform: "translate(" + pos.x + "," + pos.y + ")"
+        }, [
+          svgEl("rect", { width: String(boxW), height: String(boxH), rx: "6", ry: "6", fill: "none", stroke: "currentColor", "stroke-width": "1.5" }, []),
+          svgEl("text", { x: "10", y: "21", "font-size": "12", "font-weight": "600", textContent: c.name }, []),
+          svgEl("text", { x: "10", y: "40", "font-size": "11", textContent: "[" + c.kind + "] " + c.id }, [])
+        ]);
+      });
+
+      return el("div", { className: "scantle-graph-wrap" }, [
+        svgEl("svg", {
+          id: "scantle-c4-svg", role: "img",
+          "aria-label": "C4 Architecture Directed Graph (" + containers.length + " containers, " + edges.length + " edges)",
+          viewBox: "0 0 " + svgWidth + " " + svgHeight, width: String(svgWidth), height: String(svgHeight)
+        }, [defs].concat(edgeElements).concat(nodeElements))
       ]);
     }
 
@@ -394,22 +608,13 @@
       var containerItems = preview.containers.map(function (c) {
         return el("li", {}, [
           el("span", { className: "scantle-badge", textContent: c.kind }),
-          el("code", { textContent: c.id }),
-          " (",
-          c.name,
-          "): ",
-          c.description
+          el("code", { textContent: c.id }), " (", c.name, "): ", c.description
         ]);
       });
 
       var edgeItems = preview.edges.map(function (e) {
         return el("li", {}, [
-          el("code", { textContent: e.from_id }),
-          " -> ",
-          el("code", { textContent: e.to_id }),
-          " [",
-          e.protocol,
-          "]"
+          el("code", { textContent: e.from_id }), " -> ", el("code", { textContent: e.to_id }), " [", e.protocol, "]"
         ]);
       });
 
@@ -429,35 +634,18 @@
         if (t.injected_fields.length > 0) {
           badges.push(el("span", { className: "scantle-badge", textContent: "Inject: " + t.injected_fields.join(", ") }));
         }
-        if (t.requires_confirmation) {
-          badges.push(el("span", { className: "scantle-badge", textContent: "Confirmation" }));
-        }
-        if (t.bounded_result) {
-          badges.push(el("span", { className: "scantle-badge", textContent: "BoundedResult" }));
-        }
-        if (t.requires_ui) {
-          badges.push(el("span", { className: "scantle-badge", textContent: "UI required" }));
-        }
+        if (t.requires_confirmation) { badges.push(el("span", { className: "scantle-badge", textContent: "Confirmation" })); }
+        if (t.bounded_result) { badges.push(el("span", { className: "scantle-badge", textContent: "BoundedResult" })); }
+        if (t.requires_ui) { badges.push(el("span", { className: "scantle-badge", textContent: "UI required" })); }
         return el("li", {}, [
-          el("code", { textContent: t.id }),
-          " (",
-          t.toolset,
-          "): ",
-          t.description,
-          " "
+          el("code", { textContent: t.id }), " (", t.toolset, "): ", t.description, " "
         ].concat(badges));
       });
 
       var swarmRoleItems = preview.swarm.assignments.map(function (r) {
         return el("li", {}, [
-          el("code", { textContent: "@" + r.handle }),
-          " [",
-          r.role,
-          " / ",
-          r.scope_name,
-          "] -> ",
-          r.provider + ":" + r.model + " (" + r.family + "), access=" + r.access_mode +
-          ", paths=" + r.owned_paths.join(", ")
+          el("code", { textContent: "@" + r.handle }), " [", r.role, " / ", r.scope_name, "] -> ",
+          r.provider + ":" + r.model + " (" + r.family + "), access=" + r.access_mode + ", paths=" + r.owned_paths.join(", ")
         ]);
       });
 
@@ -470,12 +658,8 @@
           el("span", { className: "scantle-badge", textContent: "single_family=" + preview.swarm.single_family })
         ])
       ];
-      if (swarmRoleItems.length > 0) {
-        swarmNodes.push(el("ul", {}, swarmRoleItems));
-      }
-      if (preview.swarm.manifest) {
-        swarmNodes.push(el("pre", { textContent: preview.swarm.manifest }));
-      }
+      if (swarmRoleItems.length > 0) { swarmNodes.push(el("ul", {}, swarmRoleItems)); }
+      if (preview.swarm.manifest) { swarmNodes.push(el("pre", { textContent: preview.swarm.manifest })); }
 
       replaceChildren(viewEl, [
         el("div", { className: "scantle-meta" }, [
@@ -486,6 +670,8 @@
           el("p", {}, ["design_digest: ", el("code", { textContent: preview.design_digest })])
         ]),
         el("div", { className: "scantle-card" }, [
+          el("h3", { textContent: "C4 Directed Graph (" + preview.containers.length + " nodes, " + preview.edges.length + " edges)" }),
+          renderC4GraphSVG(preview.containers, preview.edges),
           el("h3", { textContent: "C4 Containers (" + preview.containers.length + ")" }),
           el("ul", {}, containerItems),
           el("h3", { textContent: "Directed Contract Edges (" + preview.edges.length + ")" }),
@@ -496,6 +682,38 @@
           el("ul", {}, toolItems)
         ]),
         el("div", { className: "scantle-card" }, swarmNodes)
+      ]);
+    }
+
+    function renderDiffList(prefix, items, emptyText) {
+      if (items.length === 0) { return el("p", { textContent: emptyText }); }
+      return el("ul", {}, items.map(function (decl) {
+        return el("li", {}, [el("span", { className: "scantle-badge", textContent: prefix }), el("code", { textContent: decl })]);
+      }));
+    }
+
+    function renderDiffResult(diff) {
+      clearDatasetKeys();
+      root.dataset.state = "cp2-diff";
+      root.dataset.hasChanges = String(diff.has_changes);
+      statusEl.textContent = "Rendered Structural Design Diff (has_changes=" + diff.has_changes + ")";
+
+      replaceChildren(viewEl, [
+        el("div", { className: "scantle-meta" }, [
+          el("h2", { textContent: "Structural Goa & Goa-AI Design Diff" }),
+          el("p", { textContent: "Standalone structural comparison (unbound to a CP1 Change Card or request_revision)." }),
+          el("p", {}, [el("span", { className: "scantle-badge", textContent: "has_changes=" + diff.has_changes }), diff.summary])
+        ]),
+        el("div", { className: "scantle-card" }, [
+          el("h3", { textContent: "Added Declarations (" + diff.added_declarations.length + ")" }),
+          renderDiffList("+", diff.added_declarations, "No added declarations."),
+          el("h3", { textContent: "Modified Declarations (" + diff.modified_declarations.length + ")" }),
+          renderDiffList("~", diff.modified_declarations, "No modified declarations."),
+          el("h3", { textContent: "Removed Declarations (" + diff.removed_declarations.length + ")" }),
+          renderDiffList("-", diff.removed_declarations, "No removed declarations."),
+          el("h3", { textContent: "Module Version Deltas (" + diff.version_deltas.length + ")" }),
+          renderDiffList("go.mod", diff.version_deltas, "No go.mod directive changes.")
+        ])
       ]);
     }
 
@@ -549,7 +767,11 @@
         return;
       }
       if (isValidChangeCard(payload)) {
-        renderChangeCard(payload);
+        renderChangeCard(payload, null);
+        return;
+      }
+      if (isValidDiffResult(payload)) {
+        renderDiffResult(payload);
         return;
       }
       if (isValidDraftOverride(payload)) {
@@ -560,13 +782,9 @@
     }
 
     function handleMessage(event) {
-      if (!event || event.source !== window.parent) {
-        return;
-      }
+      if (!event || event.source !== window.parent) { return; }
       var msg = event.data;
-      if (!isPlainObject(msg) || msg.jsonrpc !== "2.0") {
-        return;
-      }
+      if (!isPlainObject(msg) || msg.jsonrpc !== "2.0") { return; }
       if (typeof msg.method === "string") {
         if (msg.id !== undefined && msg.id !== null) {
           if (msg.method === "ui/resource-teardown") {
@@ -574,28 +792,15 @@
             root.dataset.state = "terminated";
             statusEl.textContent = "Checkpoint resource torn down.";
             replaceChildren(viewEl, []);
-            window.parent.postMessage({
-              jsonrpc: "2.0",
-              id: msg.id,
-              result: {}
-            }, "*");
+            window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
             return;
           }
           if (msg.method === "ping") {
-            window.parent.postMessage({
-              jsonrpc: "2.0",
-              id: msg.id,
-              result: {}
-            }, "*");
+            window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
             return;
           }
           window.parent.postMessage({
-            jsonrpc: "2.0",
-            id: msg.id,
-            error: {
-              code: -32601,
-              message: "Method not found: " + msg.method
-            }
+            jsonrpc: "2.0", id: msg.id, error: { code: -32601, message: "Method not found: " + msg.method }
           }, "*");
           return;
         }
@@ -612,15 +817,38 @@
             renderError("Malformed ui/notifications/tool-cancelled notification.");
             return;
           }
-          var cancelReason = isPlainObject(msg.params) && typeof msg.params.reason === "string"
-            ? msg.params.reason
-            : "";
+          var cancelReason = isPlainObject(msg.params) && typeof msg.params.reason === "string" ? msg.params.reason : "";
           renderCancelled(cancelReason);
           return;
         }
         if (msg.method === "ui/notifications/tool-result") {
           handleToolResult(msg.params);
         }
+        return;
+      }
+      if (pendingToolRequest && msg.id === pendingToolRequest.id) {
+        var activeReq = pendingToolRequest;
+        pendingToolRequest = null;
+        if (msg.error) {
+          var rpcErr = isPlainObject(msg.error) && typeof msg.error.message === "string"
+            ? msg.error.message
+            : "Host rejected tool call.";
+          activeReq.onError(rpcErr);
+          return;
+        }
+        if (!isPlainObject(msg.result)) {
+          activeReq.onError("Host returned malformed tools/call result.");
+          return;
+        }
+        if (msg.result.isError === true) {
+          activeReq.onError(extractErrorText(msg.result));
+          return;
+        }
+        if (!isPlainObject(msg.result.structuredContent) || !isValidChangeCard(msg.result.structuredContent)) {
+          activeReq.onError("Tool response is missing a valid ChangeCardResult.");
+          return;
+        }
+        activeReq.onSuccess(msg.result.structuredContent);
         return;
       }
       if (initPending && msg.id === INIT_REQUEST_ID) {
@@ -638,11 +866,7 @@
         }
         root.dataset.initialized = "true";
         statusEl.textContent = "MCP Apps handshake complete; awaiting checkpoint tool result...";
-        window.parent.postMessage({
-          jsonrpc: "2.0",
-          method: "ui/notifications/initialized",
-          params: {}
-        }, "*");
+        window.parent.postMessage({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} }, "*");
       }
     }
 
@@ -651,15 +875,10 @@
     if (window.parent && window.parent !== window) {
       initPending = true;
       window.parent.postMessage({
-        jsonrpc: "2.0",
-        id: INIT_REQUEST_ID,
-        method: "ui/initialize",
+        jsonrpc: "2.0", id: INIT_REQUEST_ID, method: "ui/initialize",
         params: {
           protocolVersion: PROTOCOL_VERSION,
-          appInfo: {
-            name: "scantle-checkpoint",
-            version: "1.0.0"
-          },
+          appInfo: { name: "scantle-checkpoint", version: "1.0.0" },
           appCapabilities: {}
         }
       }, "*");
