@@ -7,7 +7,7 @@
 ## Quickstart & MCP Configuration
 
 ### Prerequisites
-- **Go 1.26+** and the **Goa CLI** (`go install goa.design/goa/v3/cmd/goa@latest`)
+- **Go 1.27.3+**, matching the repository's `go.mod` files, and the **Goa CLI** (`go install goa.design/goa/v3/cmd/goa@latest`)
 - **macOS** (`sandbox-exec` is used by `verify/candidate` to isolate candidate builds and processes; non-macOS hosts fail closed with `ErrIsolationUnavailable`)
 - **Temporal CLI** (`brew install temporal`) for running the end-to-end durable workflow crash and replay verification suites
 
@@ -96,13 +96,21 @@ Scantle ships with a complete reference platform and isolated evaluator so you c
 
 ### [`examples/orders-eval`](../examples/orders-eval/) — The Isolated Evaluator
 - **[`acceptance/acceptance_test.go`](../examples/orders-eval/acceptance/acceptance_test.go)**: Compiles and boots the candidate inside `verify/candidate`'s macOS `sandbox-exec` jail against stateful commerce and payment simulators ([`sim/`](../examples/orders-eval/sim/)) and a scripted model gateway ([`scriptedmodel/`](../examples/orders-eval/scriptedmodel/)).
-- Exercises five acceptance scenarios (instant store credit, manager approval across an API restart, Temporal worker `kill -9` crash recovery, manager decline, and a holdout cross-customer refund refusal) plus `TestBloatedOrderPageFailsTokenBudget`.
+- Exercises five acceptance scenarios (instant store credit, manager approval across an API restart, Temporal worker `kill -9` crash recovery, manager decline, and a holdout cross-customer refund refusal) plus `TestSeededPayloadBloatFailsTheBudget`.
+
+Run the unit and race checks across all three modules:
 
 ```bash
-# Run all unit, race, and sandboxed acceptance suites across the repository
 go test -race ./...
 (cd examples/orders && go test -race ./...)
 (cd examples/orders-eval && go test -race ./...)
+```
+
+The end-to-end tests require the `e2e` build tag, macOS, and the Temporal CLI. Run the five acceptance scenarios and the seeded token-budget regression, then the verifier's complete `Run` → report → `Approve` test:
+
+```bash
+(cd examples/orders-eval && go test -race -tags e2e ./acceptance)
+go test -race -tags e2e ./internal/verify
 ```
 
 ---
