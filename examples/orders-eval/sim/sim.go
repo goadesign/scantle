@@ -46,6 +46,10 @@ type (
 		calls int
 		// srv serves the simulator's HTTP APIs once Serve ran.
 		srv *http.Server
+		// shutdown runs the server's graceful shutdown exactly once.
+		shutdown sync.Once
+		// stopped is closed once every accepted request finished.
+		stopped chan struct{}
 		// hold, when set, receives the order ID of the next new refund after
 		// it is recorded; the simulator then withholds that response until
 		// the caller disconnects. It is disarmed after one use.
@@ -143,26 +147,40 @@ func (s *Sim) Serve(ctx context.Context) (string, error) {
 	srv := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	s.mu.Lock()
 	s.srv = srv
+	s.stopped = make(chan struct{})
 	s.mu.Unlock()
 	go func() { _ = srv.Serve(ln) }()
 	go func() {
 		<-ctx.Done()
-		_ = srv.Close()
+		s.beginShutdown()
 	}()
 	return "http://" + ln.Addr().String(), nil
 }
 
 // Stop stops accepting requests and waits until every request already
 // accepted has finished, so a following Refunds call sees every refund the
-// simulator will ever issue for this scenario.
+// simulator will ever issue for this scenario. Stop and the end of Serve's
+// context share one graceful shutdown; neither closes connections under an
+// accepted request.
 func (s *Sim) Stop(ctx context.Context) error {
-	s.mu.Lock()
-	srv := s.srv
-	s.mu.Unlock()
-	if err := srv.Shutdown(ctx); err != nil {
-		return fmt.Errorf("stop simulator: %w", err)
+	s.beginShutdown()
+	select {
+	case <-s.stopped:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("stop simulator: accepted requests still running: %w", ctx.Err())
 	}
-	return nil
+}
+
+// beginShutdown starts the one graceful shutdown, which closes stopped once
+// every accepted request returned.
+func (s *Sim) beginShutdown() {
+	s.shutdown.Do(func() {
+		go func() {
+			_ = s.srv.Shutdown(context.Background())
+			close(s.stopped)
+		}()
+	})
 }
 
 // ListOrders returns one page of the customer's orders. The cursor is the
