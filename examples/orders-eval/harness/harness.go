@@ -205,11 +205,18 @@ func startTemporal(ctx context.Context) (string, error) {
 	return addr, nil
 }
 
-// launch starts a process that is killed when ctx ends.
+// launch starts a process that is killed when ctx ends. The process receives
+// only PATH, a private HOME and TMPDIR, and the variables in env: it never
+// inherits the evaluator's environment, so evaluator credentials cannot reach
+// candidate code.
 func launch(ctx context.Context, name string, env []string, args ...string) (*process, error) {
+	home, err := os.MkdirTemp("", "orders-eval-home-*")
+	if err != nil {
+		return nil, fmt.Errorf("create private home: %w", err)
+	}
 	out := &bytes.Buffer{}
 	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Env = append(os.Environ(), env...)
+	cmd.Env = append([]string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "TMPDIR=" + home}, env...)
 	cmd.Stdout, cmd.Stderr = &lockedWriter{w: out}, &lockedWriter{w: out}
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", name, err)
@@ -217,6 +224,7 @@ func launch(ctx context.Context, name string, env []string, args ...string) (*pr
 	p := &process{cmd: cmd, out: out, done: make(chan struct{})}
 	go func() {
 		_ = cmd.Wait()
+		_ = os.RemoveAll(home)
 		close(p.done)
 	}()
 	return p, nil
