@@ -66,7 +66,10 @@ func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (res eval.Result, er
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, _ := sc.sim.Refunds()
+	ledger, _, err := sc.finalLedger()
+	if err != nil {
+		return eval.Result{}, err
+	}
 	return eval.Result{
 		Checks: []eval.Check{
 			check("run_completed_without_approval", done.Status == "completed", "run ended %s", done.Status),
@@ -129,7 +132,10 @@ func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (res eval.Result, er
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	after, _ := sc.sim.Refunds()
+	after, _, err := sc.finalLedger()
+	if err != nil {
+		return eval.Result{}, err
+	}
 	checks = append(checks,
 		check("run_completed_after_approval", done.Status == "completed", "run ended %s", done.Status),
 		expectRefunds("refunded_o2_total_to_card", after, refund("o-2", "card", 5400)),
@@ -170,7 +176,10 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (res eval.Result,
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, calls := sc.sim.Refunds()
+	ledger, calls, err := sc.finalLedger()
+	if err != nil {
+		return eval.Result{}, err
+	}
 	return eval.Result{
 		Checks: []eval.Check{
 			check("run_completed_after_crash", done.Status == "completed", "run ended %s", done.Status),
@@ -231,7 +240,10 @@ func (h *Hooks) PendingApprovalSurvivesAPIRestart(ctx context.Context) (res eval
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, _ := sc.sim.Refunds()
+	ledger, _, err := sc.finalLedger()
+	if err != nil {
+		return eval.Result{}, err
+	}
 	checks = append(checks,
 		check("run_completed_after_restart", done.Status == "completed", "run ended %s", done.Status),
 		expectRefunds("refunded_o2_total_to_card_once", ledger, refund("o-2", "card", 5400)),
@@ -257,7 +269,10 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result
 	if err != nil {
 		return eval.Result{}, fmt.Errorf("%w\n%s", err, sc.platform.Logs())
 	}
-	ledger, _ := sc.sim.Refunds()
+	ledger, _, err := sc.finalLedger()
+	if err != nil {
+		return eval.Result{}, err
+	}
 	return eval.Result{
 		Checks: []eval.Check{
 			check("run_finished", done.Status == "completed" || done.Status == "failed", "run is %s", done.Status),
@@ -276,6 +291,17 @@ func (h *Hooks) recordArtifacts(res *eval.Result) {
 		eval.Artifact{Name: "candidate:orders", URI: "sha256:" + h.env.Orders.Digest()},
 		eval.Artifact{Name: "candidate:orders-worker", URI: "sha256:" + h.env.Worker.Digest()},
 	)
+}
+
+// finalLedger stops and awaits every candidate process before reading the
+// simulator ledger, so no candidate can issue a refund after the scenario's
+// verdict is taken. It returns the distinct refunds and the request count.
+func (sc *scenario) finalLedger() ([]genpayments.Receipt, int, error) {
+	if err := sc.platform.Close(); err != nil {
+		return nil, 0, fmt.Errorf("stop candidate before reading the ledger: %w", err)
+	}
+	ledger, calls := sc.sim.Refunds()
+	return ledger, calls, nil
 }
 
 // close tears the scenario's platform down before the hook returns, so no

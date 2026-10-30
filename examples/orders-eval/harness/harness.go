@@ -85,6 +85,8 @@ type (
 		temporalDone chan struct{}
 		// stopTemporal stops the Temporal server.
 		stopTemporal context.CancelFunc
+		// closed records that Close already ran.
+		closed bool
 	}
 
 	// output is the single synchronized owner of a trusted helper process's
@@ -190,8 +192,13 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 
 // Close kills every candidate process the platform started, stops its
 // Temporal server, waits until all of them exited, and then removes the
-// candidate state directories. Logs are kept as evidence.
+// candidate state directories. Logs are kept as evidence. Calling Close again
+// does nothing.
 func (p *Platform) Close() error {
+	if p.closed {
+		return nil
+	}
+	p.closed = true
 	var errs []error
 	for _, proc := range p.started {
 		errs = append(errs, proc.Kill())
