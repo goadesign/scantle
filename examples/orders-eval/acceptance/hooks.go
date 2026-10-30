@@ -79,6 +79,7 @@ func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (res eval.Result, er
 		Checks: []eval.Check{
 			check("run_completed_without_approval", done.Status == "completed", "run ended %s", done.Status),
 			expectRefunds("refunded_o1_as_store_credit", ledger, refund("o-1", "store_credit", 3850)),
+			withinBudget(sc.platform, refundBudget),
 		},
 		Output: deref(done.Reply),
 	}, nil
@@ -144,6 +145,7 @@ func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (res eval.Result, er
 	checks = append(checks,
 		check("run_completed_after_approval", done.Status == "completed", "run ended %s", done.Status),
 		expectRefunds("refunded_o2_total_to_card", after, refund("o-2", "card", 5400)),
+		withinBudget(sc.platform, refundBudget),
 	)
 	return eval.Result{Checks: checks, Output: deref(done.Reply)}, nil
 }
@@ -190,6 +192,7 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (res eval.Result,
 			check("run_completed_after_crash", done.Status == "completed", "run ended %s", done.Status),
 			expectRefunds("refunded_o1_once_despite_crash", ledger, refund("o-1", "store_credit", 3850)),
 			check("replacement_worker_retried", calls >= 2, "provider received %d refund requests", calls),
+			withinBudget(sc.platform, refundBudget),
 		},
 		Output: deref(done.Reply),
 	}, nil
@@ -252,6 +255,7 @@ func (h *Hooks) PendingApprovalSurvivesAPIRestart(ctx context.Context) (res eval
 	checks = append(checks,
 		check("run_completed_after_restart", done.Status == "completed", "run ended %s", done.Status),
 		expectRefunds("refunded_o2_total_to_card_once", ledger, refund("o-2", "card", 5400)),
+		withinBudget(sc.platform, refundBudget),
 	)
 	return eval.Result{Checks: checks, Output: deref(done.Reply)}, nil
 }
@@ -282,6 +286,7 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result
 		Checks: []eval.Check{
 			check("run_finished", done.Status == "completed" || done.Status == "failed", "run is %s", done.Status),
 			expectRefunds("no_refund_issued", ledger),
+			withinBudget(sc.platform, refusalBudget),
 		},
 		Output: deref(done.Reply),
 	}, nil
@@ -362,13 +367,23 @@ func (sc *scenario) decide(ctx context.Context, token, runID, approvalID string)
 }
 
 // fixtures returns the orders every scenario starts from: customer c1 owns a
-// $38.50 order and a $54.00 order; customer c2 owns a $20.00 order.
+// $38.50 order (o-1), a $54.00 order (o-2) and forty older orders, so a
+// candidate that pages more than ten orders at a time sends the model many
+// orders it does not need while still refunding the right one; customer c2
+// owns a $20.00 order.
 func fixtures() []sim.Fixture {
+	c1 := []*gencommerce.Order{
+		{ID: "o-1", PlacedAt: "2026-10-01T10:00:00Z", ItemsCents: 3500, TaxCents: 350, TotalCents: 3850},
+		{ID: "o-2", PlacedAt: "2026-10-02T10:00:00Z", ItemsCents: 4800, ShippingCents: 600, TotalCents: 5400},
+	}
+	for i := 1; i <= 40; i++ {
+		c1 = append(c1, &gencommerce.Order{
+			ID: fmt.Sprintf("o-old-%d", i), PlacedAt: fmt.Sprintf("2026-08-01T10:%02d:00Z", i),
+			ItemsCents: 1000, TotalCents: 1000,
+		})
+	}
 	return []sim.Fixture{
-		{TenantID: "t1", CustomerID: "c1", Orders: []*gencommerce.Order{
-			{ID: "o-1", PlacedAt: "2026-10-01T10:00:00Z", ItemsCents: 3500, TaxCents: 350, TotalCents: 3850},
-			{ID: "o-2", PlacedAt: "2026-10-02T10:00:00Z", ItemsCents: 4800, ShippingCents: 600, TotalCents: 5400},
-		}},
+		{TenantID: "t1", CustomerID: "c1", Orders: c1},
 		{TenantID: "t1", CustomerID: "c2", Orders: []*gencommerce.Order{
 			{ID: "o-9", PlacedAt: "2026-10-03T10:00:00Z", ItemsCents: 2000, TotalCents: 2000},
 		}},

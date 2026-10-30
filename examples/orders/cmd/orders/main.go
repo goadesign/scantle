@@ -36,10 +36,13 @@ import (
 	"github.com/goadesign/scantle/examples/orders/internal/scriptedmodel"
 	"go.temporal.io/sdk/client"
 	"goa.design/goa-ai/features/model/anthropic"
+	"goa.design/goa-ai/features/model/gateway"
 	temporalengine "goa.design/goa-ai/runtime/agent/engine/temporal"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/runtime"
 	goahttp "goa.design/goa/v3/http"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // config holds the command's flags and environment.
@@ -56,9 +59,13 @@ type config struct {
 	refundQueue string
 	// stateDir is the directory holding the runtime store database.
 	stateDir string
-	// modelProvider selects the refund agent's model: "anthropic" or
-	// "scripted", the deterministic zero-key demo stand-in.
+	// modelProvider selects the refund agent's model: "anthropic",
+	// "gateway" (a goa-ai model gateway reached over gRPC), or "scripted",
+	// the deterministic zero-key demo stand-in.
 	modelProvider string
+	// modelGateway is the gRPC address of the model gateway used with
+	// --model-provider=gateway.
+	modelGateway string
 	// model is the Anthropic model the refund agent uses.
 	model string
 	// anthropicKey authenticates to Anthropic.
@@ -174,7 +181,8 @@ func parseConfig() (config, error) {
 	flag.StringVar(&cfg.temporalAddr, "temporal", "localhost:7233", "Temporal frontend address")
 	flag.StringVar(&cfg.refundQueue, "refund-queue", "orders.refunds", "task queue of the refund worker")
 	flag.StringVar(&cfg.stateDir, "state-dir", ".scantle/state", "directory of the durable runtime store ("+runtimeDatabase+")")
-	flag.StringVar(&cfg.modelProvider, "model-provider", "anthropic", `refund agent model: "anthropic", or "scripted" for the zero-key demo`)
+	flag.StringVar(&cfg.modelProvider, "model-provider", "anthropic", `refund agent model: "anthropic", "gateway", or "scripted" for the zero-key demo`)
+	flag.StringVar(&cfg.modelGateway, "model-gateway", "", "gRPC address of the goa-ai model gateway (with --model-provider=gateway)")
 	flag.StringVar(&cfg.model, "model", "claude-sonnet-5-5", "Anthropic model used by the refund agent")
 	flag.Parse()
 	if cfg.env != "sim" && cfg.env != "staging" {
@@ -189,9 +197,13 @@ func parseConfig() (config, error) {
 		if cfg.anthropicKey == "" {
 			return config{}, errors.New("ANTHROPIC_API_KEY is required with --model-provider=anthropic")
 		}
+	case "gateway":
+		if cfg.modelGateway == "" {
+			return config{}, errors.New("--model-gateway is required with --model-provider=gateway")
+		}
 	case "scripted":
 	default:
-		return config{}, errors.New(`--model-provider must be "anthropic" or "scripted"`)
+		return config{}, errors.New(`--model-provider must be "anthropic", "gateway" or "scripted"`)
 	}
 	cfg.signingKey = []byte(os.Getenv("ORDERS_JWT_KEY"))
 	if len(cfg.signingKey) == 0 {
@@ -200,13 +212,22 @@ func parseConfig() (config, error) {
 	return cfg, nil
 }
 
-// newModelClient returns the refund agent's model client. The scripted client
-// is a deterministic demo stand-in, not a language model.
+// newModelClient returns the refund agent's model client. The gateway client
+// sends every model call to a goa-ai model gateway, which owns the provider.
+// The scripted client is a deterministic demo stand-in, not a language model.
 func newModelClient(cfg config) (model.Client, error) {
-	if cfg.modelProvider == "scripted" {
+	switch cfg.modelProvider {
+	case "gateway":
+		conn, err := grpc.NewClient(cfg.modelGateway, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return nil, fmt.Errorf("connect to model gateway %s: %w", cfg.modelGateway, err)
+		}
+		return gateway.NewGRPCClient(conn)
+	case "scripted":
 		return scriptedmodel.New()
+	default:
+		return anthropic.NewFromAPIKey(cfg.anthropicKey, cfg.model)
 	}
-	return anthropic.NewFromAPIKey(cfg.anthropicKey, cfg.model)
 }
 
 // newCommerceClient returns the generated commerce client for baseURL.

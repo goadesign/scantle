@@ -73,6 +73,13 @@ type (
 		worker *candidate.Process
 		// api is the orders API process.
 		api *candidate.Process
+		// gateway serves and measures every model call the candidate makes.
+		gateway *modelGateway
+		// usage is the gateway's final measurement, set by Close.
+		usage Usage
+		// usageFinal records that Close settled every gateway call, so usage
+		// is complete.
+		usageFinal bool
 		// started holds every candidate process started, including replaced
 		// workers, so Close can await them all.
 		started []*candidate.Process
@@ -105,6 +112,16 @@ func NewEnv(orders, worker candidate.Artifact) (*Env, error) {
 		return nil, fmt.Errorf("generate test issuer key: %w", err)
 	}
 	return &Env{Orders: orders, Worker: worker, signingKey: hex.EncodeToString(key)}, nil
+}
+
+// Usage returns the token usage of every model call the candidate made. It is
+// final only after Close stopped the candidate and settled every gateway call;
+// before that, or if a call never settled, it is an error.
+func (p *Platform) Usage() (Usage, error) {
+	if !p.usageFinal {
+		return Usage{}, errors.New("model usage is not final: the platform is still running or a gateway call never settled")
+	}
+	return p.usage, nil
 }
 
 // Token signs a test bearer token for the tenant, subject and space-separated
@@ -141,6 +158,9 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	if err != nil {
 		return err
 	}
+	if p.gateway, err = startGateway(); err != nil {
+		return err
+	}
 	workerState, err := p.newStateDir()
 	if err != nil {
 		return err
@@ -165,10 +185,11 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	addr := "127.0.0.1:" + strconv.Itoa(apiPort)
 	p.apiSpec = candidate.Spec{
 		Args: []string{"--env", Environment, "--commerce-url", depsURL, "--temporal", temporalAddr,
-			"--listen", addr, "--model-provider", "scripted", "--state-dir", apiState},
+			"--listen", addr, "--model-provider", "gateway", "--model-gateway", p.gateway.addr,
+			"--state-dir", apiState},
 		Env:          []string{"ORDERS_JWT_KEY=" + e.signingKey},
 		StateDir:     apiState,
-		ConnectPorts: []int{temporalPort, depsPort},
+		ConnectPorts: []int{temporalPort, depsPort, p.gateway.port},
 		ListenPort:   apiPort,
 		LogFile:      filepath.Join(p.logDir, "orders.log"),
 	}
@@ -185,9 +206,9 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	return nil
 }
 
-// Close kills every candidate process the platform started, stops its
-// Temporal server, waits until all of them exited, and then removes the
-// candidate state directories. Logs are kept as evidence. Calling Close again
+// Close kills every candidate process the platform started, stops its model
+// gateway once every call in flight returned, stops its Temporal server, waits
+// until all of them exited, and then removes the candidate state directories. Logs are kept as evidence. Calling Close again
 // does nothing.
 func (p *Platform) Close() error {
 	if p.closed {
@@ -197,6 +218,11 @@ func (p *Platform) Close() error {
 	var errs []error
 	for _, proc := range p.started {
 		errs = append(errs, proc.Kill())
+	}
+	if p.gateway != nil {
+		err := p.gateway.stop()
+		errs = append(errs, err)
+		p.usage, p.usageFinal = p.gateway.meter.total(), err == nil
 	}
 	if p.stopTemporal != nil {
 		p.stopTemporal()

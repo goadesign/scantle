@@ -8,6 +8,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	goa.design/goa-ai v0.89.1-0.20261030123849-b047a42c444f
 	goa.design/goa/v3 v3.35.1-0.20261023134129-12a5635f9dd0
+	google.golang.org/grpc v1.84.0
 )
 
 require (
@@ -41,7 +42,6 @@ require (
 	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
-	google.golang.org/grpc v1.84.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
