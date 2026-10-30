@@ -224,7 +224,7 @@ type (
 		ID *string `json:"id"`
 		// Human-readable container name.
 		Name *string `json:"name"`
-		// Container role (service, agent, or toolset).
+		// Declared service, agent, toolset, person, system, container, or component.
 		Kind *string `json:"kind"`
 		// Summary of the container's responsibility.
 		Description *string `json:"description"`

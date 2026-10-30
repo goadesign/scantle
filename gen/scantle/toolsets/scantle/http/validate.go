@@ -336,8 +336,8 @@ func ValidateC4ContainerItemTransport(body *C4ContainerItemTransport) (err error
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if body.Kind != nil {
-		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset"}))
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "person" || *body.Kind == "system" || *body.Kind == "container" || *body.Kind == "component") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset", "person", "system", "container", "component"}))
 		}
 	}
 	return

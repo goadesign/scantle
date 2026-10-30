@@ -206,7 +206,7 @@ type C4ContainerItemResponseBody struct {
 	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
 	// Human-readable container name.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// Container role (service, agent, or toolset).
+	// Declared service, agent, toolset, person, system, container, or component.
 	Kind *string `form:"kind,omitempty" json:"kind,omitempty" xml:"kind,omitempty"`
 	// Summary of the container's responsibility.
 	Description *string `form:"description,omitempty" json:"description,omitempty" xml:"description,omitempty"`
@@ -817,8 +817,8 @@ func ValidateC4ContainerItemResponseBody(body *C4ContainerItemResponseBody) (err
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if body.Kind != nil {
-		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset"}))
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "person" || *body.Kind == "system" || *body.Kind == "container" || *body.Kind == "component") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *body.Kind, []any{"service", "agent", "toolset", "person", "system", "container", "component"}))
 		}
 	}
 	return
@@ -840,8 +840,8 @@ func validateC4ContainerItemResponseBody(body *C4ContainerItemResponseBody, path
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", path))
 	}
 	if body.Kind != nil {
-		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".kind", *body.Kind, []any{"service", "agent", "toolset"}))
+		if !(*body.Kind == "service" || *body.Kind == "agent" || *body.Kind == "toolset" || *body.Kind == "person" || *body.Kind == "system" || *body.Kind == "container" || *body.Kind == "component") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".kind", *body.Kind, []any{"service", "agent", "toolset", "person", "system", "container", "component"}))
 		}
 	}
 	return

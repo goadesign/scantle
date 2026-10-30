@@ -762,7 +762,9 @@ func describeErrors(api *goaexpr.APIExpr, errs []*goaexpr.ErrorExpr) []errorDecl
 	return out
 }
 
-func describeModelElement(kind string, el *modelexpr.Element, addEdge func(c4Edge), fromID string) modelElementDecl {
+// describeModelElement records Model's resolved relationship identities, which
+// are shared by the graph nodes and distinguish equal names in different scopes.
+func describeModelElement(kind string, el *modelexpr.Element, addEdge func(c4Edge)) modelElementDecl {
 	if el == nil {
 		return modelElementDecl{Kind: kind}
 	}
@@ -771,10 +773,7 @@ func describeModelElement(kind string, el *modelexpr.Element, addEdge func(c4Edg
 		if r == nil {
 			continue
 		}
-		dest := r.DestinationPath
-		if r.Destination != nil && r.Destination.Name != "" {
-			dest = r.Destination.Name
-		}
+		dest := "model:" + r.Destination.ID
 		rels = append(rels, modelRelDecl{
 			Destination:     dest,
 			Description:     r.Description,
@@ -782,20 +781,18 @@ func describeModelElement(kind string, el *modelexpr.Element, addEdge func(c4Edg
 			InteractionKind: int(r.InteractionStyle),
 			Tags:            r.Tags,
 		})
-		if fromID != "" && dest != "" {
-			proto := r.Technology
-			if proto == "" {
-				proto = r.Description
-			}
-			if proto == "" {
-				proto = "C4 Uses"
-			}
-			addEdge(c4Edge{
-				FromID:   fromID,
-				ToID:     "model:" + dest,
-				Protocol: proto,
-			})
+		proto := r.Technology
+		if proto == "" {
+			proto = r.Description
 		}
+		if proto == "" {
+			proto = "C4 Uses"
+		}
+		addEdge(c4Edge{
+			FromID:   "model:" + el.ID,
+			ToID:     dest,
+			Protocol: proto,
+		})
 	}
 	slices.SortFunc(rels, func(a, b modelRelDecl) int {
 		if a.Destination != b.Destination {
@@ -815,6 +812,8 @@ func describeModelElement(kind string, el *modelexpr.Element, addEdge func(c4Edg
 	}
 }
 
+// recordModelRoot uses each evaluated Model ID for every node and relationship;
+// Model owns parent scoping and has already resolved each destination.
 func recordModelRoot(out *output, addContainer func(c4Container), addEdge func(c4Edge)) {
 	if modelexpr.Root == nil || modelexpr.Root.Model == nil {
 		return
@@ -824,14 +823,14 @@ func recordModelRoot(out *output, addContainer func(c4Container), addEdge func(c
 		if p == nil || p.Element == nil {
 			continue
 		}
-		id := "person:" + p.Name
+		id := "model:" + p.ID
 		addContainer(c4Container{
 			ID:          id,
 			Name:        p.Name,
 			Kind:        "person",
 			Description: p.Description,
 		})
-		out.Declarations["Model:Person:"+p.Name] = mustJSON(describeModelElement("person", p.Element, addEdge, id))
+		out.Declarations["Model:Person:"+p.Name] = mustJSON(describeModelElement("person", p.Element, addEdge))
 	}
 	for _, sys := range m.Systems {
 		if sys == nil || sys.Element == nil {
@@ -840,7 +839,7 @@ func recordModelRoot(out *output, addContainer func(c4Container), addEdge func(c
 		if out.SystemName == "" {
 			out.SystemName = sys.Name
 		}
-		sysID := "system:" + sys.Name
+		sysID := "model:" + sys.ID
 		addContainer(c4Container{
 			ID:          sysID,
 			Name:        sys.Name,
@@ -848,12 +847,12 @@ func recordModelRoot(out *output, addContainer func(c4Container), addEdge func(c
 			Description: sys.Description,
 		})
 		sysKey := "Model:System:" + sys.Name
-		out.Declarations[sysKey] = mustJSON(describeModelElement("system", sys.Element, addEdge, sysID))
+		out.Declarations[sysKey] = mustJSON(describeModelElement("system", sys.Element, addEdge))
 		for _, c := range sys.Containers {
 			if c == nil || c.Element == nil {
 				continue
 			}
-			cID := fmt.Sprintf("container:%s.%s", sys.Name, c.Name)
+			cID := "model:" + c.ID
 			addContainer(c4Container{
 				ID:          cID,
 				Name:        c.Name,
@@ -861,13 +860,19 @@ func recordModelRoot(out *output, addContainer func(c4Container), addEdge func(c
 				Description: c.Description,
 			})
 			cKey := fmt.Sprintf("%s/Container:%s", sysKey, c.Name)
-			out.Declarations[cKey] = mustJSON(describeModelElement("container", c.Element, addEdge, cID))
+			out.Declarations[cKey] = mustJSON(describeModelElement("container", c.Element, addEdge))
 			for _, cmp := range c.Components {
 				if cmp == nil || cmp.Element == nil {
 					continue
 				}
 				cmpKey := fmt.Sprintf("%s/Component:%s", cKey, cmp.Name)
-				out.Declarations[cmpKey] = mustJSON(describeModelElement("component", cmp.Element, addEdge, ""))
+				addContainer(c4Container{
+					ID:          "model:" + cmp.ID,
+					Name:        cmp.Name,
+					Kind:        "component",
+					Description: cmp.Description,
+				})
+				out.Declarations[cmpKey] = mustJSON(describeModelElement("component", cmp.Element, addEdge))
 			}
 		}
 	}
