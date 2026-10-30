@@ -140,14 +140,15 @@ func (m *meter) stream(next gateway.StreamHandler) gateway.StreamHandler {
 }
 
 // record adds one finished call. A successful call counts only usage the
-// provider explicitly reported; a failed call counts usage carried by its
-// error. A call with no reported usage is counted as unreported, never as zero.
+// provider explicitly reported as complete; a failed call counts usage carried
+// by its error. A call with no reported usage, or with partial usage, is
+// counted as unreported, never as zero or as an undercount.
 func (m *meter) record(resp *model.Response, err error) {
 	var usage *model.TokenUsage
 	switch {
 	case err != nil:
 		usage = model.UsageFromError(err)
-	case resp.HasUsage():
+	case resp.HasUsage() && !resp.UsageIncomplete:
 		usage = &resp.Usage
 	}
 	m.mu.Lock()
