@@ -10,7 +10,7 @@
 
 Solo coding agents—and most multi-agent "team" wrappers—still ask LLMs to hand-write every line of HTTP routing, auth middleware, workflow plumbing, and tests from scratch. That works on day one and collapses by feature three: the codebase drifts into an inconsistent maze that burns more tokens on every edit, and the agent writing the code writes tests that rubber-stamp its own bugs.
 
-**Scantle** pairs mixed-model agent teams (combining frontier reasoners and fast coding models across **Claude, Codex, Gemini, and Cursor**) with a deterministic compiler stack. Because [Goa](https://github.com/goadesign/goa) generates transports, schemas, and validation at **0 LLM tokens**, and [Goa-AI](https://github.com/goadesign/goa-ai) provides built-in durable workflows, tool guardrails, and isolated evaluation, your agents only write compact contracts and pure domain logic—verified in an OS sandbox before you merge.
+**Scantle** pairs mixed-model agent teams (combining frontier reasoners and fast coding models across **Claude, Codex, and Gemini**) with a deterministic compiler stack. Because [Goa](https://github.com/goadesign/goa) generates transports, schemas, and validation at **0 LLM tokens**, and [Goa-AI](https://github.com/goadesign/goa-ai) provides built-in durable workflows, tool guardrails, and isolated evaluation, your agents only write compact contracts and pure domain logic—verified in an OS sandbox before you merge.
 
 ```text
 You: "Add a refund assistant to our orders service. Refunds up to $50 get
@@ -43,14 +43,14 @@ Most AI-built codebases rot after a few weeks because every prompt invents a new
 - **Production patterns by default:** One HTTP/MCP edge gateway, internal gRPC services, a central LLM gateway with rate limiting and cost tracking, durable Temporal workflows, and server-injected `tenant_id`/`user_id` fields that the LLM can never spoof.
 
 ### 3. Mixed-model teams where the builder never grades its own homework
-Scantle routes each role to the right model family and class—frontier reasoning models for architecture and security review, fast coding models for scoped implementation, and a **disjoint model family** for test authoring. Final verification runs inside an **OS sandbox** the builder cannot touch:
-- **Unseen holdout tests:** Hidden scenarios verify security and edge cases without exposing test details to the builder, making "teaching to the test" impossible.
-- **Real `kill -9` crash & budget proof:** The verifier kills the worker mid-transaction (`kill -9`), restarts the API during paused approvals, and fails the build if a change blows past your runtime LLM token budget.
+When configured with provider profiles (`-swarm-profiles`) and explicit builder path scopes, Scantle routes each role to the right model family and class—frontier reasoning models for architecture and security review, fast coding models for scoped implementation, and a **disjoint model family** for test authoring. Final verification (`internal/verify`) runs inside an **OS sandbox** (`verify/candidate`) the builder cannot touch:
+- **Unseen holdout tests:** Hidden scenarios verify security and edge cases while [`Report.ForBuilders()`](internal/verify/report.go) strips holdout names, inputs, and logs from the builder's view, making "teaching to the test" impossible.
+- **Real `kill -9` crash & budget proof:** The included [`examples/orders-eval`](examples/orders-eval/) reference suite kills the Temporal worker mid-transaction (`kill -9`), restarts the API during paused approvals, and fails the build when seeded payload bloat blows past the scenario's runtime LLM token budget (`go test -race -tags e2e`).
 
-### 4. Poke the live system yourself instead of reading a 2,000-line diff
-Before you merge, Scantle boots the candidate build in an interactive sandbox backed by stateful dependency simulators:
-- **Switch roles in one click:** Test a `\$54.00` refund as a **Customer**, then switch to **Approving Manager** to approve or decline the paused workflow through the real API.
-- **Iterate in 0 seconds:** Tweak prompt wording with instant hot-reload (while Scantle blocks any attempt to sneak hard business rules into soft prompts), or turn any live chat turn into a permanent regression test with one click.
+### 4. Fast draft overrides and live role-switched testing
+Instead of reading a 2,000-line diff blindly, Scantle separates fast prompt tuning from compiled business rules and ships stateful dependency simulators in [`examples/orders-eval`](examples/orders-eval/):
+- **Test across real auth boundaries:** In the reference platform, trigger a `\$54.00` refund as a **Customer**, verify that customer credentials cannot approve it (`403 Forbidden`), and switch to **Approving Manager** to approve or decline the paused workflow through the real HTTP API.
+- **Iterate on prompts in 0 seconds:** Use `draft_override` (`POST /sandbox/draft`) to hot-reload prompt wording on a bound target's `prompt.Store` in **0 seconds**—while Scantle refuses any attempt to override compiled Go business rules (`target_kind: "compiled_rule"`, `requires_rebuild: true`). *(The `ui://scantle/checkpoint` MCP Apps resource currently serves the baseline HTML host shell; interactive role-switcher, replay, and OpenUI controls in the checkpoint web view are described in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md#checkpoint-3-cp3-poke-the-live-sandbox-switch-roles--iterate-in-0s).)*
 
 > **Why the name "Scantle"?** A *scantle* is a slater’s gauge rod, notched once so every slate on a roof is measured against the same hard edge. In Scantle, `design/*.go` is that gauge rod—one compiled contract every builder works to, and an independent verifier measures against.
 
@@ -61,16 +61,21 @@ Before you merge, Scantle boots the candidate build in an interactive sandbox ba
 Start the Scantle control plane, connect your coding assistant, and watch it evolve the included [`examples/orders`](examples/orders/) platform:
 
 ```bash
-# 1. Start the Scantle MCP & HTTP control plane
+# 1. Start the Scantle MCP & HTTP control plane with a CP1 model provider
 export SCANTLE_AUTH_TOKEN="dev-secret-token"
-go run ./cmd/scantle serve -addr 127.0.0.1:8090 -principal operator@example.com
+export ANTHROPIC_API_KEY="sk-ant-..."
+go run ./cmd/scantle serve \
+  -addr 127.0.0.1:8090 \
+  -principal operator@example.com \
+  -model-provider anthropic \
+  -model-name claude-opus-4-6
 ```
 
-Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` setup](docs/REFERENCE.md#quickstart--mcp-configuration)) and prompt your agent:
+Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` and `-swarm-profiles` setup](docs/REFERENCE.md#quickstart--mcp-configuration)) and prompt your agent:
 
-> *"Using Scantle, propose a change to `examples/orders` so VIP customers get instant store-credit refunds up to \$150, then preview the compiled C4 architecture and Chorus swarm plan."*
+> *"Using Scantle, propose a change to `examples/orders` so VIP customers get instant store-credit refunds up to \$150, then preview the compiled C4 architecture and Chorus swarm plan for builder scope `orders` (`internal/**`)."*
 
-Your agent will surface the Change Card at `http://127.0.0.1:8090/ui/checkpoint`, compile the new Goa contract at **0 tokens**, and preview the updated C4 topology, tool guardrails, and multi-model build roster.
+Your agent will create and confirm the Change Card (`propose_change` → `confirm_intent`), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and Chorus build roster (pass `-swarm-profiles <path.json>` on `scantle serve` to populate cross-family model assignments).
 
 ---
 
