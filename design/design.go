@@ -142,13 +142,20 @@ var ToolContractItem = Type("ToolContractItem", func() {
 	)
 })
 
+// DesignSnapshot is an immutable copy of a Go module holding a Goa design.
+var DesignSnapshot = Type("DesignSnapshot", func() {
+	Description("Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.")
+	Attribute("files", MapOf(String, String), "File contents keyed by module-relative path, such as design/design.go or go.mod.")
+	Required("files")
+})
+
 // PreviewArchitecturePayload is the input to the CP2 preview_architecture tool.
 var PreviewArchitecturePayload = Type("PreviewArchitecturePayload", func() {
 	Description("Request to derive the Checkpoint 2 C4 topology and guardrails from a candidate Goa design bound to a confirmed Change Card.")
 	Attribute("change_id", String, "Confirmed Change Card identifier.")
 	Attribute("request_revision", String, "Expected CP1 request_revision digest.")
-	Attribute("design_source", String, "Candidate Goa and Goa-AI design source to evaluate.")
-	Required("change_id", "request_revision", "design_source")
+	Attribute("design", DesignSnapshot, "Candidate module whose Goa and Goa-AI design is evaluated.")
+	Required("change_id", "request_revision", "design")
 })
 
 // ArchitecturePreviewResult is the output of the CP2 preview_architecture tool.
@@ -156,7 +163,7 @@ var ArchitecturePreviewResult = Type("ArchitecturePreviewResult", func() {
 	Description("Checkpoint 2 C4 container topology, tool contracts, and per-agent Goa-AI guardrails derived from the evaluated candidate design.")
 	Attribute("change_id", String, "Bound Change Card identifier.")
 	Attribute("request_revision", String, "Bound CP1 request_revision digest.")
-	Attribute("design_digest", String, "SHA-256 digest of the evaluated Goa design source.")
+	Attribute("design_digest", String, "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).")
 	Attribute("system_name", String, "API or primary service name declared in the design.")
 	Attribute("containers", ArrayOf(C4ContainerItem), "Derived C4 containers.")
 	Attribute("edges", ArrayOf(C4EdgeItem), "Validated directed edges between declared containers.")
@@ -199,12 +206,10 @@ var DraftOverrideResult = Type("DraftOverrideResult", func() {
 
 // DiffPayload is the input to the structural design and module diff tool.
 var DiffPayload = Type("DiffPayload", func() {
-	Description("Pair of Goa design sources and go.mod files to compare structurally.")
-	Attribute("old_design", String, "Previous Go/Goa design source.")
-	Attribute("new_design", String, "Candidate Go/Goa design source.")
-	Attribute("old_gomod", String, "Previous go.mod file contents.")
-	Attribute("new_gomod", String, "Candidate go.mod file contents.")
-	Required("old_design", "new_design", "old_gomod", "new_gomod")
+	Description("Previous and candidate design modules to compare structurally, each evaluated with its own go.mod dependencies.")
+	Attribute("old", DesignSnapshot, "Previous design module.")
+	Attribute("new", DesignSnapshot, "Candidate design module.")
+	Required("old", "new")
 })
 
 // DiffResult reports structural declaration and go.mod version deltas without a blanket compatibility claim.

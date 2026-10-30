@@ -44,14 +44,10 @@ type (
 	}
 	// DiffPayload defines the JSON payload for the scantle.diff tool.
 	DiffPayload = struct {
-		// Previous Go/Goa design source.
-		OldDesign string
-		// Candidate Go/Goa design source.
-		NewDesign string
-		// Previous go.mod file contents.
-		OldGomod string
-		// Candidate go.mod file contents.
-		NewGomod string
+		// Previous design module.
+		Old *DesignSnapshot
+		// Candidate design module.
+		New *DesignSnapshot
 	}
 	// DiffResult defines the JSON result for the scantle.diff tool.
 	DiffResult = struct {
@@ -95,8 +91,8 @@ type (
 		ChangeID string
 		// Expected CP1 request_revision digest.
 		RequestRevision string
-		// Candidate Goa and Goa-AI design source to evaluate.
-		DesignSource string
+		// Candidate module whose Goa and Goa-AI design is evaluated.
+		Design *DesignSnapshot
 	}
 	// PreviewArchitectureResult defines the JSON result for the scantle.preview_architecture tool.
 	PreviewArchitectureResult = struct {
@@ -104,7 +100,8 @@ type (
 		ChangeID string
 		// Bound CP1 request_revision digest.
 		RequestRevision string
-		// SHA-256 digest of the evaluated Goa design source.
+		// SHA-256 digest of the evaluated design snapshot (sorted path and content
+		// pairs).
 		DesignDigest string
 		// API or primary service name declared in the design.
 		SystemName string
@@ -198,6 +195,12 @@ type (
 		ToID string
 		// Contract or transport relationship.
 		Protocol string
+	}
+	// DesignSnapshot is a nested type used by the generated JSON contract.
+	DesignSnapshot = struct {
+		// File contents keyed by module-relative path, such as design/design.go or
+		// go.mod.
+		Files map[string]string
 	}
 	// ExampleItem is a nested type used by the generated JSON contract.
 	ExampleItem = struct {

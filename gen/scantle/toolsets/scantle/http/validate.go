@@ -80,17 +80,21 @@ func ValidateConfirmIntentResultTransport(body *ConfirmIntentResultTransport) (e
 
 // ValidateDiffPayloadTransport runs the validations defined on DiffPayloadTransport.
 func ValidateDiffPayloadTransport(body *DiffPayloadTransport) (err error) {
-	if body.OldDesign == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("old_design", "body"))
+	if body.Old == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("old", "body"))
 	}
-	if body.NewDesign == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("new_design", "body"))
+	if body.New == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("new", "body"))
 	}
-	if body.OldGomod == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("old_gomod", "body"))
+	if body.Old != nil {
+		if err2 := ValidateDesignSnapshotTransport(body.Old); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
-	if body.NewGomod == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("new_gomod", "body"))
+	if body.New != nil {
+		if err2 := ValidateDesignSnapshotTransport(body.New); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return
 }
@@ -156,8 +160,13 @@ func ValidatePreviewArchitecturePayloadTransport(body *PreviewArchitecturePayloa
 	if body.RequestRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
 	}
-	if body.DesignSource == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
+	if body.Design == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design", "body"))
+	}
+	if body.Design != nil {
+		if err2 := ValidateDesignSnapshotTransport(body.Design); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return
 }
@@ -353,6 +362,14 @@ func ValidateC4EdgeItemTransport(body *C4EdgeItemTransport) (err error) {
 	}
 	if body.Protocol == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("protocol", "body"))
+	}
+	return
+}
+
+// ValidateDesignSnapshotTransport runs the validations defined on DesignSnapshotTransport.
+func ValidateDesignSnapshotTransport(body *DesignSnapshotTransport) (err error) {
+	if body.Files == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("files", "body"))
 	}
 	return
 }

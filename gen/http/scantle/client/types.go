@@ -43,8 +43,8 @@ type PreviewArchitectureRequestBody struct {
 	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
 	// Expected CP1 request_revision digest.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
-	// Candidate Goa and Goa-AI design source to evaluate.
-	DesignSource string `form:"design_source" json:"design_source" xml:"design_source"`
+	// Candidate module whose Goa and Goa-AI design is evaluated.
+	Design *DesignSnapshotRequestBody `form:"design" json:"design" xml:"design"`
 }
 
 // DraftOverrideRequestBody is the type of the "scantle" service
@@ -61,14 +61,10 @@ type DraftOverrideRequestBody struct {
 // DiffRequestBody is the type of the "scantle" service "diff" endpoint HTTP
 // request body.
 type DiffRequestBody struct {
-	// Previous Go/Goa design source.
-	OldDesign string `form:"old_design" json:"old_design" xml:"old_design"`
-	// Candidate Go/Goa design source.
-	NewDesign string `form:"new_design" json:"new_design" xml:"new_design"`
-	// Previous go.mod file contents.
-	OldGomod string `form:"old_gomod" json:"old_gomod" xml:"old_gomod"`
-	// Candidate go.mod file contents.
-	NewGomod string `form:"new_gomod" json:"new_gomod" xml:"new_gomod"`
+	// Previous design module.
+	Old *DesignSnapshotRequestBody `form:"old" json:"old" xml:"old"`
+	// Candidate design module.
+	New *DesignSnapshotRequestBody `form:"new" json:"new" xml:"new"`
 }
 
 // ProposeChangeResponseBody is the type of the "scantle" service
@@ -128,7 +124,8 @@ type PreviewArchitectureResponseBody struct {
 	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
 	// Bound CP1 request_revision digest.
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
-	// SHA-256 digest of the evaluated Goa design source.
+	// SHA-256 digest of the evaluated design snapshot (sorted path and content
+	// pairs).
 	DesignDigest *string `form:"design_digest,omitempty" json:"design_digest,omitempty" xml:"design_digest,omitempty"`
 	// API or primary service name declared in the design.
 	SystemName *string `form:"system_name,omitempty" json:"system_name,omitempty" xml:"system_name,omitempty"`
@@ -278,6 +275,13 @@ type ExampleItemRequestBody struct {
 	VerificationKind string `form:"verification_kind" json:"verification_kind" xml:"verification_kind"`
 }
 
+// DesignSnapshotRequestBody is used to define fields on request body types.
+type DesignSnapshotRequestBody struct {
+	// File contents keyed by module-relative path, such as design/design.go or
+	// go.mod.
+	Files map[string]string `form:"files" json:"files" xml:"files"`
+}
+
 // NewProposeChangeRequestBody builds the HTTP request body from the payload of
 // the "propose_change" endpoint of the "scantle" service.
 func NewProposeChangeRequestBody(p *scantle.ProposeChangePayload) *ProposeChangeRequestBody {
@@ -325,7 +329,9 @@ func NewPreviewArchitectureRequestBody(p *scantle.PreviewArchitecturePayload) *P
 	body := &PreviewArchitectureRequestBody{
 		ChangeID:        p.ChangeID,
 		RequestRevision: p.RequestRevision,
-		DesignSource:    p.DesignSource,
+	}
+	if p.Design != nil {
+		body.Design = marshalScantleDesignSnapshotToDesignSnapshotRequestBody(p.Design)
 	}
 	return body
 }
@@ -344,11 +350,12 @@ func NewDraftOverrideRequestBody(p *scantle.DraftOverridePayload) *DraftOverride
 // NewDiffRequestBody builds the HTTP request body from the payload of the
 // "diff" endpoint of the "scantle" service.
 func NewDiffRequestBody(p *scantle.DiffPayload) *DiffRequestBody {
-	body := &DiffRequestBody{
-		OldDesign: p.OldDesign,
-		NewDesign: p.NewDesign,
-		OldGomod:  p.OldGomod,
-		NewGomod:  p.NewGomod,
+	body := &DiffRequestBody{}
+	if p.Old != nil {
+		body.Old = marshalScantleDesignSnapshotToDesignSnapshotRequestBody(p.Old)
+	}
+	if p.New != nil {
+		body.New = marshalScantleDesignSnapshotToDesignSnapshotRequestBody(p.New)
 	}
 	return body
 }
@@ -1015,6 +1022,24 @@ func ValidateExampleItemRequestBody(body *ExampleItemRequestBody) (err error) {
 func validateExampleItemRequestBody(body *ExampleItemRequestBody, path string) (err error) {
 	if !(body.VerificationKind == "deterministic" || body.VerificationKind == "model_judged") {
 		err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".verification_kind", body.VerificationKind, []any{"deterministic", "model_judged"}))
+	}
+	return
+}
+
+// ValidateDesignSnapshotRequestBody runs the validations defined on
+// DesignSnapshot
+func ValidateDesignSnapshotRequestBody(body *DesignSnapshotRequestBody) (err error) {
+	if body.Files == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("files", "body"))
+	}
+	return
+}
+
+// validateDesignSnapshotRequestBody checks DesignSnapshot and reports errors
+// using the path supplied by its caller
+func validateDesignSnapshotRequestBody(body *DesignSnapshotRequestBody, path string) (err error) {
+	if body.Files == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("files", path))
 	}
 	return
 }

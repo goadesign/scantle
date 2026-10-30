@@ -561,7 +561,7 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	return confirmed, nil
 }
 
-// PreviewArchitecture evaluates the candidate Goa/Goa-AI design source via the
+// PreviewArchitecture evaluates the candidate design module snapshot via the
 // real Goa evaluation engine (`designeval.Evaluate`) bound to a confirmed CP1
 // Change Card and returns the validated C4 topology, directed edges, per-agent
 // runtime policies, and tool contracts.
@@ -572,9 +572,6 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 	}
 	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.RequestRevision) == "" {
 		return nil, errors.New("change_id and request_revision are required")
-	}
-	if strings.TrimSpace(p.DesignSource) == "" {
-		return nil, errors.New("design_source is required")
 	}
 
 	c.mu.RLock()
@@ -593,12 +590,12 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
 	}
 
-	evaluated, err := designeval.Evaluate(ctx, p.DesignSource)
+	evaluated, err := designeval.Evaluate(ctx, p.Design.Files)
 	if err != nil {
 		return nil, err
 	}
 	if evaluated.SystemName == "" || len(evaluated.Containers) == 0 {
-		return nil, errors.New("design_source must declare at least one Goa API or Service container")
+		return nil, errors.New("design must declare at least one Goa API or Service container")
 	}
 	for _, pol := range evaluated.AgentPolicies {
 		if pol.MaxExecutionSeconds <= 0 || pol.MaxToolCalls <= 0 {
@@ -606,8 +603,7 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 		}
 	}
 
-	sum := sha256.Sum256([]byte(p.DesignSource))
-	designDigest := hex.EncodeToString(sum[:])
+	designDigest := designeval.SnapshotDigest(p.Design.Files)
 	banner := fmt.Sprintf(
 		"%s: %d container(s), %d boundary edge(s), %d agent policy(s), %d tool contract(s)",
 		evaluated.SystemName,
@@ -682,7 +678,7 @@ func (c *ControlPlane) Diff(ctx context.Context, p *genscantle.DiffPayload) (*ge
 	if p == nil {
 		return nil, errors.New("diff payload is required")
 	}
-	rep, err := diff.Compare(ctx, p.OldDesign, p.NewDesign, p.OldGomod, p.NewGomod)
+	rep, err := diff.Compare(ctx, p.Old.Files, p.New.Files)
 	if err != nil {
 		return nil, err
 	}

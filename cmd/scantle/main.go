@@ -8,9 +8,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -87,34 +90,27 @@ func runServe(args []string) error {
 	}
 }
 
-// runDiff compares two Goa design files and two go.mod files and writes the
-// structured diff JSON report to stdout.
+// runDiff compares two design modules on disk, each read into a snapshot with
+// readModuleSnapshot, and writes the structured diff JSON report to stdout.
 func runDiff(args []string) error {
 	fs := flag.NewFlagSet("diff", flag.ContinueOnError)
-	oldDesignPath := fs.String("old-design", "", "Path to old Goa design.go")
-	newDesignPath := fs.String("new-design", "", "Path to new Goa design.go")
-	oldModPath := fs.String("old-gomod", "", "Path to old go.mod")
-	newModPath := fs.String("new-gomod", "", "Path to new go.mod")
+	oldDir := fs.String("old-dir", "", "root directory of the previous design module (holding go.mod and design/)")
+	newDir := fs.String("new-dir", "", "root directory of the candidate design module (holding go.mod and design/)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	oldDesign, err := readOptionalFile(*oldDesignPath)
+	if *oldDir == "" || *newDir == "" {
+		return errors.New("--old-dir and --new-dir are required")
+	}
+	oldFiles, err := readModuleSnapshot(*oldDir)
 	if err != nil {
 		return err
 	}
-	newDesign, err := readOptionalFile(*newDesignPath)
+	newFiles, err := readModuleSnapshot(*newDir)
 	if err != nil {
 		return err
 	}
-	oldMod, err := readOptionalFile(*oldModPath)
-	if err != nil {
-		return err
-	}
-	newMod, err := readOptionalFile(*newModPath)
-	if err != nil {
-		return err
-	}
-	rep, err := diff.Compare(context.Background(), oldDesign, newDesign, oldMod, newMod)
+	rep, err := diff.Compare(context.Background(), oldFiles, newFiles)
 	if err != nil {
 		return err
 	}
@@ -131,14 +127,62 @@ func runDiff(args []string) error {
 	return enc.Encode(res)
 }
 
-// readOptionalFile reads path when non-empty or returns an empty string.
-func readOptionalFile(path string) (string, error) {
-	if path == "" {
-		return "", nil
-	}
-	b, err := os.ReadFile(path)
+// readModuleSnapshot reads the module rooted at dir into a design snapshot:
+// its go.mod, go.sum and every non-test .go file, keyed by slash-separated
+// path relative to dir. Hidden, vendor and testdata directories and nested
+// modules are skipped. A symbolic link anywhere in the module is an error, and
+// files are opened without following links, so the snapshot holds only files
+// that really are inside dir.
+func readModuleSnapshot(dir string) (map[string]string, error) {
+	root, err := filepath.Abs(dir)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(b), nil
+	files := map[string]string{}
+	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("%s is a symbolic link; a design snapshot holds only regular files", p)
+		}
+		if d.IsDir() {
+			name := d.Name()
+			switch {
+			case rel == ".":
+				return nil
+			case strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata":
+				return filepath.SkipDir
+			}
+			if _, err := os.Lstat(filepath.Join(p, "go.mod")); err == nil {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		slash := filepath.ToSlash(rel)
+		keep := slash == "go.mod" || slash == "go.sum" ||
+			(strings.HasSuffix(slash, ".go") && !strings.HasSuffix(slash, "_test.go"))
+		if !keep || !d.Type().IsRegular() {
+			return nil
+		}
+		f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", p, err)
+		}
+		defer f.Close()
+		b, err := io.ReadAll(f)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", p, err)
+		}
+		files[slash] = string(b)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return files, nil
 }

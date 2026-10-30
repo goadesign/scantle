@@ -113,7 +113,11 @@ paths:
                             $ref: '#/components/schemas/PreviewArchitecturePayload'
                         example:
                             change_id: Nam ut commodi.
-                            design_source: Eligendi voluptates vitae voluptatem ut illum.
+                            design:
+                                files:
+                                    Amet qui.: Et ut dolore est.
+                                    Beatae quia.: Impedit laboriosam repellendus nisi.
+                                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
                             request_revision: Et esse in incidunt repellendus in voluptate.
             responses:
                 "200":
@@ -294,10 +298,16 @@ paths:
                         schema:
                             $ref: '#/components/schemas/DiffPayload'
                         example:
-                            new_design: Voluptatem distinctio numquam.
-                            new_gomod: Libero vel fugiat.
-                            old_design: Consequatur et vel iure quas.
-                            old_gomod: Dolorum quis et ipsum rerum.
+                            new:
+                                files:
+                                    Amet qui.: Et ut dolore est.
+                                    Beatae quia.: Impedit laboriosam repellendus nisi.
+                                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                            old:
+                                files:
+                                    Amet qui.: Et ut dolore est.
+                                    Beatae quia.: Impedit laboriosam repellendus nisi.
+                                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
             responses:
                 "200":
                     description: OK response.
@@ -532,7 +542,7 @@ components:
                           name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                 design_digest:
                     type: string
-                    description: SHA-256 digest of the evaluated Goa design source.
+                    description: SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).
                     example: Perferendis molestias nisi cupiditate in.
                 edges:
                     type: array
@@ -962,36 +972,49 @@ components:
                 - request_revision
                 - answers
                 - examples
+        DesignSnapshot:
+            type: object
+            properties:
+                files:
+                    type: object
+                    description: File contents keyed by module-relative path, such as design/design.go or go.mod.
+                    example:
+                        Amet qui.: Et ut dolore est.
+                        Beatae quia.: Impedit laboriosam repellendus nisi.
+                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                    additionalProperties:
+                        type: string
+                        example: Et ut dolore est.
+            description: Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.
+            example:
+                files:
+                    Amet qui.: Et ut dolore est.
+                    Beatae quia.: Impedit laboriosam repellendus nisi.
+                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+            required:
+                - files
         DiffPayload:
             type: object
             properties:
-                new_design:
-                    type: string
-                    description: Candidate Go/Goa design source.
-                    example: Voluptatem distinctio numquam.
-                new_gomod:
-                    type: string
-                    description: Candidate go.mod file contents.
-                    example: Libero vel fugiat.
-                old_design:
-                    type: string
-                    description: Previous Go/Goa design source.
-                    example: Consequatur et vel iure quas.
-                old_gomod:
-                    type: string
-                    description: Previous go.mod file contents.
-                    example: Dolorum quis et ipsum rerum.
+                new:
+                    $ref: '#/components/schemas/DesignSnapshot'
+                old:
+                    $ref: '#/components/schemas/DesignSnapshot'
             description: Request body for diff.
             example:
-                new_design: Voluptatem distinctio numquam.
-                new_gomod: Libero vel fugiat.
-                old_design: Consequatur et vel iure quas.
-                old_gomod: Dolorum quis et ipsum rerum.
+                new:
+                    files:
+                        Amet qui.: Et ut dolore est.
+                        Beatae quia.: Impedit laboriosam repellendus nisi.
+                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                old:
+                    files:
+                        Amet qui.: Et ut dolore est.
+                        Beatae quia.: Impedit laboriosam repellendus nisi.
+                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
             required:
-                - old_design
-                - new_design
-                - old_gomod
-                - new_gomod
+                - old
+                - new
         DiffResult:
             type: object
             properties:
@@ -1173,10 +1196,8 @@ components:
                     type: string
                     description: Confirmed Change Card identifier.
                     example: Nam ut commodi.
-                design_source:
-                    type: string
-                    description: Candidate Goa and Goa-AI design source to evaluate.
-                    example: Eligendi voluptates vitae voluptatem ut illum.
+                design:
+                    $ref: '#/components/schemas/DesignSnapshot'
                 request_revision:
                     type: string
                     description: Expected CP1 request_revision digest.
@@ -1184,12 +1205,16 @@ components:
             description: Request body for preview_architecture.
             example:
                 change_id: Nam ut commodi.
-                design_source: Eligendi voluptates vitae voluptatem ut illum.
+                design:
+                    files:
+                        Amet qui.: Et ut dolore est.
+                        Beatae quia.: Impedit laboriosam repellendus nisi.
+                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
                 request_revision: Et esse in incidunt repellendus in voluptate.
             required:
                 - change_id
                 - request_revision
-                - design_source
+                - design
         ProposeChangePayload:
             type: object
             properties:

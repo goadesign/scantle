@@ -281,7 +281,7 @@ func scantlePreviewArchitectureUsage() {
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle preview-architecture --body '{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design_source\": \"Eligendi voluptates vitae voluptatem ut illum.\",\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle preview-architecture --body '{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
 }
 
 func scantleDraftOverrideUsage() {
@@ -317,5 +317,5 @@ func scantleDiffUsage() {
 
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
-	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle diff --body '{\n      \"new_design\": \"Voluptatem distinctio numquam.\",\n      \"new_gomod\": \"Libero vel fugiat.\",\n      \"old_design\": \"Consequatur et vel iure quas.\",\n      \"old_gomod\": \"Dolorum quis et ipsum rerum.\"\n   }'")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle diff --body '{\n      \"new\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"old\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      }\n   }'")
 }

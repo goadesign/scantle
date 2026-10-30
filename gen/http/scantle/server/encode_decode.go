@@ -288,6 +288,20 @@ func unmarshalExampleItemRequestBodyToScantleExampleItem(v *ExampleItemRequestBo
 	return res
 }
 
+// unmarshalDesignSnapshotRequestBodyToScantleDesignSnapshot builds a value of
+// type *scantle.DesignSnapshot from a value of type *DesignSnapshotRequestBody.
+func unmarshalDesignSnapshotRequestBodyToScantleDesignSnapshot(v *DesignSnapshotRequestBody) *scantle.DesignSnapshot {
+	res := &scantle.DesignSnapshot{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
+	}
+
+	return res
+}
+
 // marshalScantleC4ContainerItemToC4ContainerItemResponseBody builds a value of
 // type *C4ContainerItemResponseBody from a value of type
 // *scantle.C4ContainerItem.

@@ -107,13 +107,26 @@ func BuildPreviewArchitecturePayload(scantlePreviewArchitectureBody *string) (*s
 		}
 		err = json.Unmarshal([]byte(*scantlePreviewArchitectureBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design_source\": \"Eligendi voluptates vitae voluptatem ut illum.\",\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"change_id\": \"Nam ut commodi.\",\n      \"design\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"request_revision\": \"Et esse in incidunt repellendus in voluptate.\"\n   }'")
+		}
+		if body.Design == nil {
+			err = goa.MergeErrors(err, goa.MissingFieldError("design", "body"))
+		}
+		if body.Design != nil {
+			if err2 := validateDesignSnapshotRequestBody(body.Design, "body.design"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 	v := &scantle.PreviewArchitecturePayload{
 		ChangeID:        body.ChangeID,
 		RequestRevision: body.RequestRevision,
-		DesignSource:    body.DesignSource,
+	}
+	if body.Design != nil {
+		v.Design = marshalDesignSnapshotRequestBodyToScantleDesignSnapshot(body.Design)
 	}
 
 	return v, nil
@@ -159,14 +172,34 @@ func BuildDiffPayload(scantleDiffBody *string) (*scantle.DiffPayload, error) {
 		}
 		err = json.Unmarshal([]byte(*scantleDiffBody), &body)
 		if err != nil {
-			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"new_design\": \"Voluptatem distinctio numquam.\",\n      \"new_gomod\": \"Libero vel fugiat.\",\n      \"old_design\": \"Consequatur et vel iure quas.\",\n      \"old_gomod\": \"Dolorum quis et ipsum rerum.\"\n   }'")
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"new\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      },\n      \"old\": {\n         \"files\": {\n            \"Amet qui.\": \"Et ut dolore est.\",\n            \"Beatae quia.\": \"Impedit laboriosam repellendus nisi.\",\n            \"Impedit pariatur illum qui vel ut excepturi.\": \"Est deleniti eos ipsa quis.\"\n         }\n      }\n   }'")
+		}
+		if body.Old == nil {
+			err = goa.MergeErrors(err, goa.MissingFieldError("old", "body"))
+		}
+		if body.New == nil {
+			err = goa.MergeErrors(err, goa.MissingFieldError("new", "body"))
+		}
+		if body.Old != nil {
+			if err2 := validateDesignSnapshotRequestBody(body.Old, "body.old"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+		if body.New != nil {
+			if err2 := validateDesignSnapshotRequestBody(body.New, "body.new"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
-	v := &scantle.DiffPayload{
-		OldDesign: body.OldDesign,
-		NewDesign: body.NewDesign,
-		OldGomod:  body.OldGomod,
-		NewGomod:  body.NewGomod,
+	v := &scantle.DiffPayload{}
+	if body.Old != nil {
+		v.Old = marshalDesignSnapshotRequestBodyToScantleDesignSnapshot(body.Old)
+	}
+	if body.New != nil {
+		v.New = marshalDesignSnapshotRequestBodyToScantleDesignSnapshot(body.New)
 	}
 
 	return v, nil

@@ -13,6 +13,7 @@ import (
 
 	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
 	genscantle "github.com/goadesign/scantle/gen/scantle"
+	"github.com/goadesign/scantle/internal/testmodule"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/prompt"
 )
@@ -339,7 +340,7 @@ var _ = Service("orders", func() {
 	preview, err := cp.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
 		ChangeID:        card.ChangeID,
 		RequestRevision: card.RequestRevision,
-		DesignSource:    candidateDesign,
+		Design:          &genscantle.DesignSnapshot{Files: testmodule.Snapshot(t, "", candidateDesign)},
 	})
 	if err != nil {
 		t.Fatalf("PreviewArchitecture failed: %v", err)

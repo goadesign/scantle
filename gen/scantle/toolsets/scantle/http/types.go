@@ -53,14 +53,10 @@ type (
 	// decode + validation (missing-field detection) before transforming into
 	// the public tool type.
 	DiffPayloadTransport struct {
-		// Previous Go/Goa design source.
-		OldDesign *string `json:"old_design"`
-		// Candidate Go/Goa design source.
-		NewDesign *string `json:"new_design"`
-		// Previous go.mod file contents.
-		OldGomod *string `json:"old_gomod"`
-		// Candidate go.mod file contents.
-		NewGomod *string `json:"new_gomod"`
+		// Previous design module.
+		Old *DesignSnapshotTransport `json:"old"`
+		// Candidate design module.
+		New *DesignSnapshotTransport `json:"new"`
 	}
 	// DiffResultTransport is the internal JSON transport type for DiffResult.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -116,8 +112,8 @@ type (
 		ChangeID *string `json:"change_id"`
 		// Expected CP1 request_revision digest.
 		RequestRevision *string `json:"request_revision"`
-		// Candidate Goa and Goa-AI design source to evaluate.
-		DesignSource *string `json:"design_source"`
+		// Candidate module whose Goa and Goa-AI design is evaluated.
+		Design *DesignSnapshotTransport `json:"design"`
 	}
 	// PreviewArchitectureResultTransport is the internal JSON transport type for PreviewArchitectureResult.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -128,7 +124,8 @@ type (
 		ChangeID *string `json:"change_id"`
 		// Bound CP1 request_revision digest.
 		RequestRevision *string `json:"request_revision"`
-		// SHA-256 digest of the evaluated Goa design source.
+		// SHA-256 digest of the evaluated design snapshot (sorted path and content
+		// pairs).
 		DesignDigest *string `json:"design_digest"`
 		// API or primary service name declared in the design.
 		SystemName *string `json:"system_name"`
@@ -240,6 +237,15 @@ type (
 		ToID *string `json:"to_id"`
 		// Contract or transport relationship.
 		Protocol *string `json:"protocol"`
+	}
+	// DesignSnapshotTransport is the internal JSON transport type for DesignSnapshotTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	DesignSnapshotTransport struct {
+		// File contents keyed by module-relative path, such as design/design.go or
+		// go.mod.
+		Files map[string]string `json:"files"`
 	}
 	// ExampleItemTransport is the internal JSON transport type for ExampleItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON

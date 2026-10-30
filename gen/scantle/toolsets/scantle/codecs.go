@@ -419,27 +419,37 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 var diffPayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
-		Description: "Pair of Goa design sources and go.mod files to compare structurally.",
+		Description: "Previous and candidate design modules to compare structurally, each evaluated with its own go.mod dependencies.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("old_design")},
-		JSONType:    "string",
-		Description: "Previous Go/Goa design source.",
+		Path:        []tools.FieldPathSegment{tools.FixedField("old")},
+		JSONType:    "object",
+		Description: "Previous design module.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("new_design")},
-		JSONType:    "string",
-		Description: "Candidate Go/Goa design source.",
+		Path:        []tools.FieldPathSegment{tools.FixedField("old"), tools.FixedField("files")},
+		JSONType:    "object",
+		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("old_gomod")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("old"), tools.FixedField("files"), tools.DynamicField{}},
 		JSONType:    "string",
-		Description: "Previous go.mod file contents.",
+		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("new_gomod")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("new")},
+		JSONType:    "object",
+		Description: "Candidate design module.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("new"), tools.FixedField("files")},
+		JSONType:    "object",
+		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("new"), tools.FixedField("files"), tools.DynamicField{}},
 		JSONType:    "string",
-		Description: "Candidate go.mod file contents.",
+		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
 	},
 }
 var diffResultFields = []tools.FieldMetadata{
@@ -561,9 +571,19 @@ var previewArchitecturePayloadFields = []tools.FieldMetadata{
 		Description: "Expected CP1 request_revision digest.",
 	},
 	{
-		Path:        []tools.FieldPathSegment{tools.FixedField("design_source")},
+		Path:        []tools.FieldPathSegment{tools.FixedField("design")},
+		JSONType:    "object",
+		Description: "Candidate module whose Goa and Goa-AI design is evaluated.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("design"), tools.FixedField("files")},
+		JSONType:    "object",
+		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("design"), tools.FixedField("files"), tools.DynamicField{}},
 		JSONType:    "string",
-		Description: "Candidate Goa and Goa-AI design source to evaluate.",
+		Description: "File contents keyed by module-relative path, such as design/design.go or go.mod.",
 	},
 }
 var previewArchitectureResultFields = []tools.FieldMetadata{
@@ -584,7 +604,7 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("design_digest")},
 		JSONType:    "string",
-		Description: "SHA-256 digest of the evaluated Goa design source.",
+		Description: "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("system_name")},
@@ -1605,12 +1625,9 @@ func MarshalDiffPayload(v *DiffPayload) ([]byte, error) {
 	in := v
 	_ = in
 	var out *toolhttp.DiffPayloadTransport
-	out = &toolhttp.DiffPayloadTransport{
-		OldDesign: &in.OldDesign,
-		NewDesign: &in.NewDesign,
-		OldGomod:  &in.OldGomod,
-		NewGomod:  &in.NewGomod,
-	}
+	out = &toolhttp.DiffPayloadTransport{}
+	out.Old = encodeDesignSnapshotToDesignSnapshotTransport(in.Old)
+	out.New = encodeDesignSnapshotToDesignSnapshotTransport(in.New)
 	return json.Marshal(out)
 }
 
@@ -1634,12 +1651,9 @@ func UnmarshalDiffPayload(data []byte) (*DiffPayload, error) {
 	in := &tv
 	_ = in
 	var out *DiffPayload
-	out = &DiffPayload{
-		OldDesign: *in.OldDesign,
-		NewDesign: *in.NewDesign,
-		OldGomod:  *in.OldGomod,
-		NewGomod:  *in.NewGomod,
-	}
+	out = &DiffPayload{}
+	out.Old = decodeDesignSnapshotTransportToDesignSnapshot(in.Old)
+	out.New = decodeDesignSnapshotTransportToDesignSnapshot(in.New)
 	return out, nil
 }
 
@@ -1818,8 +1832,8 @@ func MarshalPreviewArchitecturePayload(v *PreviewArchitecturePayload) ([]byte, e
 	out = &toolhttp.PreviewArchitecturePayloadTransport{
 		ChangeID:        &in.ChangeID,
 		RequestRevision: &in.RequestRevision,
-		DesignSource:    &in.DesignSource,
 	}
+	out.Design = encodeDesignSnapshotToDesignSnapshotTransport(in.Design)
 	return json.Marshal(out)
 }
 
@@ -1846,8 +1860,8 @@ func UnmarshalPreviewArchitecturePayload(data []byte) (*PreviewArchitecturePaylo
 	out = &PreviewArchitecturePayload{
 		ChangeID:        *in.ChangeID,
 		RequestRevision: *in.RequestRevision,
-		DesignSource:    *in.DesignSource,
 	}
+	out.Design = decodeDesignSnapshotTransportToDesignSnapshot(in.Design)
 	return out, nil
 }
 
@@ -2813,10 +2827,10 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 			); err != nil {
 				return err
 			}
-		case "design_source":
-			if err := validateStringJSONValue(
+		case "design":
+			if err := validatePreviewArchitecturePayloadDesignSnapshotTransportJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate Goa and Goa-AI design source to evaluate.",
+				typed[key], "Candidate module whose Goa and Goa-AI design is evaluated.",
 			); err != nil {
 				return err
 			}
@@ -2830,8 +2844,44 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"change_id",
-				"design_source",
+				"design",
 				"request_revision",
+			})
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitecturePayloadDesignSnapshotTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitecturePayloadDesignSnapshotTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "files":
+			if err := validateProposeChangeResultRootAnswersJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "File contents keyed by module-relative path, such as design/design.go or go.mod.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"files",
 			})
 		}
 	}
@@ -2889,7 +2939,7 @@ func validatePreviewArchitectureResultJSONValue(path string, value any, descript
 		case "design_digest":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "SHA-256 digest of the evaluated Goa design source.",
+				typed[key], "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).",
 			); err != nil {
 				return err
 			}
@@ -3505,40 +3555,24 @@ func validateDiffPayloadJSONValue(path string, value any, description string) er
 	sort.Strings(keys)
 	for _, key := range keys {
 		switch key {
-		case "new_design":
-			if err := validateStringJSONValue(
+		case "new":
+			if err := validatePreviewArchitecturePayloadDesignSnapshotTransportJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate Go/Goa design source.",
+				typed[key], "Candidate design module.",
 			); err != nil {
 				return err
 			}
-		case "new_gomod":
-			if err := validateStringJSONValue(
+		case "old":
+			if err := validatePreviewArchitecturePayloadDesignSnapshotTransportJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate go.mod file contents.",
-			); err != nil {
-				return err
-			}
-		case "old_design":
-			if err := validateStringJSONValue(
-				generatedJSONChildPath(path, key, false),
-				typed[key], "Previous Go/Goa design source.",
-			); err != nil {
-				return err
-			}
-		case "old_gomod":
-			if err := validateStringJSONValue(
-				generatedJSONChildPath(path, key, false),
-				typed[key], "Previous go.mod file contents.",
+				typed[key], "Previous design module.",
 			); err != nil {
 				return err
 			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
-				"new_design",
-				"new_gomod",
-				"old_design",
-				"old_gomod",
+				"new",
+				"old",
 			})
 		}
 	}
@@ -3766,6 +3800,28 @@ func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *
 	res.Options = make([]string, len(v.Options))
 	for i, val := range v.Options {
 		res.Options[i] = val
+	}
+
+	return res
+}
+func decodeDesignSnapshotTransportToDesignSnapshot(v *toolhttp.DesignSnapshotTransport) *DesignSnapshot {
+	res := &DesignSnapshot{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
+	}
+
+	return res
+}
+func encodeDesignSnapshotToDesignSnapshotTransport(v *DesignSnapshot) *toolhttp.DesignSnapshotTransport {
+	res := &toolhttp.DesignSnapshotTransport{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
 	}
 
 	return res

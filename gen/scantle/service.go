@@ -95,7 +95,8 @@ type ArchitecturePreviewResult struct {
 	ChangeID string
 	// Bound CP1 request_revision digest.
 	RequestRevision string
-	// SHA-256 digest of the evaluated Goa design source.
+	// SHA-256 digest of the evaluated design snapshot (sorted path and content
+	// pairs).
 	DesignDigest string
 	// API or primary service name declared in the design.
 	SystemName string
@@ -171,16 +172,23 @@ type ConfirmIntentPayload struct {
 	Examples []*ExampleItem
 }
 
+// Exact files of one Go module containing a Goa/Goa-AI design package at
+// design/. Paths are clean, relative to the module root, and name only .go,
+// go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file
+// are required. The evaluator stages exactly these bytes, resolves
+// dependencies only from go.mod and go.sum, and never reads host paths.
+type DesignSnapshot struct {
+	// File contents keyed by module-relative path, such as design/design.go or
+	// go.mod.
+	Files map[string]string
+}
+
 // DiffPayload is the payload type of the scantle service diff method.
 type DiffPayload struct {
-	// Previous Go/Goa design source.
-	OldDesign string
-	// Candidate Go/Goa design source.
-	NewDesign string
-	// Previous go.mod file contents.
-	OldGomod string
-	// Candidate go.mod file contents.
-	NewGomod string
+	// Previous design module.
+	Old *DesignSnapshot
+	// Candidate design module.
+	New *DesignSnapshot
 }
 
 // DiffResult is the result type of the scantle service diff method.
@@ -245,8 +253,8 @@ type PreviewArchitecturePayload struct {
 	ChangeID string
 	// Expected CP1 request_revision digest.
 	RequestRevision string
-	// Candidate Goa and Goa-AI design source to evaluate.
-	DesignSource string
+	// Candidate module whose Goa and Goa-AI design is evaluated.
+	Design *DesignSnapshot
 }
 
 // ProposeChangePayload is the payload type of the scantle service
@@ -387,7 +395,8 @@ type jsonArchitecturePreviewResultTransport struct {
 	ChangeID *string `json:"change_id"`
 	// Bound CP1 request_revision digest.
 	RequestRevision *string `json:"request_revision"`
-	// SHA-256 digest of the evaluated Goa design source.
+	// SHA-256 digest of the evaluated design snapshot (sorted path and content
+	// pairs).
 	DesignDigest *string `json:"design_digest"`
 	// API or primary service name declared in the design.
 	SystemName *string `json:"system_name"`
@@ -641,16 +650,30 @@ func validatejsonConfirmIntentPayloadTransport(value *jsonConfirmIntentPayloadTr
 	return err
 }
 
+// jsonDesignSnapshotTransport stores JSON fields until they have been validated.
+type jsonDesignSnapshotTransport struct {
+	// File contents keyed by module-relative path, such as design/design.go or
+	// go.mod.
+	Files map[string]string `json:"files"`
+}
+
+// validatejsonDesignSnapshotTransport checks decoded JSON before it becomes a service value.
+func validatejsonDesignSnapshotTransport(value *jsonDesignSnapshotTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Files == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("files", "body"))
+	}
+	return err
+}
+
 // jsonDiffPayloadTransport stores JSON fields until they have been validated.
 type jsonDiffPayloadTransport struct {
-	// Previous Go/Goa design source.
-	OldDesign *string `json:"old_design"`
-	// Candidate Go/Goa design source.
-	NewDesign *string `json:"new_design"`
-	// Previous go.mod file contents.
-	OldGomod *string `json:"old_gomod"`
-	// Candidate go.mod file contents.
-	NewGomod *string `json:"new_gomod"`
+	// Previous design module.
+	Old *jsonDesignSnapshotTransport `json:"old"`
+	// Candidate design module.
+	New *jsonDesignSnapshotTransport `json:"new"`
 }
 
 // validatejsonDiffPayloadTransport checks decoded JSON before it becomes a service value.
@@ -658,17 +681,21 @@ func validatejsonDiffPayloadTransport(value *jsonDiffPayloadTransport) (err erro
 	if value == nil {
 		return goa.MissingFieldError("body", "JSON value")
 	}
-	if value.OldDesign == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("old_design", "body"))
+	if value.Old == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("old", "body"))
 	}
-	if value.NewDesign == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("new_design", "body"))
+	if value.New == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("new", "body"))
 	}
-	if value.OldGomod == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("old_gomod", "body"))
+	if value.Old != nil {
+		if err2 := validatejsonDesignSnapshotTransport(value.Old); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
-	if value.NewGomod == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("new_gomod", "body"))
+	if value.New != nil {
+		if err2 := validatejsonDesignSnapshotTransport(value.New); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return err
 }
@@ -822,8 +849,8 @@ type jsonPreviewArchitecturePayloadTransport struct {
 	ChangeID *string `json:"change_id"`
 	// Expected CP1 request_revision digest.
 	RequestRevision *string `json:"request_revision"`
-	// Candidate Goa and Goa-AI design source to evaluate.
-	DesignSource *string `json:"design_source"`
+	// Candidate module whose Goa and Goa-AI design is evaluated.
+	Design *jsonDesignSnapshotTransport `json:"design"`
 }
 
 // validatejsonPreviewArchitecturePayloadTransport checks decoded JSON before it becomes a service value.
@@ -837,8 +864,13 @@ func validatejsonPreviewArchitecturePayloadTransport(value *jsonPreviewArchitect
 	if value.RequestRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
 	}
-	if value.DesignSource == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("design_source", "body"))
+	if value.Design == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design", "body"))
+	}
+	if value.Design != nil {
+		if err2 := validatejsonDesignSnapshotTransport(value.Design); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return err
 }
@@ -1033,6 +1065,35 @@ func validateConfirmIntentPayloadOriginal(value *ConfirmIntentPayload) (err erro
 	return err
 }
 
+// validateDesignSnapshotOriginal checks the original typed value before JSON conversion.
+func validateDesignSnapshotOriginal(value *DesignSnapshot) (err error) {
+	if value.Files == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("files", "value"))
+	}
+	return err
+}
+
+// validateDiffPayloadOriginal checks the original typed value before JSON conversion.
+func validateDiffPayloadOriginal(value *DiffPayload) (err error) {
+	if value.Old == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("old", "value"))
+	}
+	if value.New == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("new", "value"))
+	}
+	if value.Old != nil {
+		if err2 := validateDesignSnapshotOriginal(value.Old); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if value.New != nil {
+		if err2 := validateDesignSnapshotOriginal(value.New); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
 // validateDiffResultOriginal checks the original typed value before JSON conversion.
 func validateDiffResultOriginal(value *DiffResult) (err error) {
 	if value.AddedDeclarations == nil {
@@ -1054,6 +1115,19 @@ func validateDiffResultOriginal(value *DiffResult) (err error) {
 func validateDraftOverridePayloadOriginal(value *DraftOverridePayload) (err error) {
 	if !(value.TargetKind == "prompt_template" || value.TargetKind == "compiled_rule") {
 		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.target_kind", value.TargetKind, []any{"prompt_template", "compiled_rule"}))
+	}
+	return err
+}
+
+// validatePreviewArchitecturePayloadOriginal checks the original typed value before JSON conversion.
+func validatePreviewArchitecturePayloadOriginal(value *PreviewArchitecturePayload) (err error) {
+	if value.Design == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("design", "value"))
+	}
+	if value.Design != nil {
+		if err2 := validateDesignSnapshotOriginal(value.Design); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return err
 }
@@ -1946,19 +2020,114 @@ func DecodeConfirmIntentPayload(data []byte) (out *ConfirmIntentPayload, err err
 	return out, nil
 }
 
+// EncodeDesignSnapshot turns a service value into JSON using the field names in the Goa design.
+func EncodeDesignSnapshot(in *DesignSnapshot) ([]byte, error) {
+	if err := checkDesignSnapshotValue(in); err != nil {
+		return nil, fmt.Errorf("encode DesignSnapshot JSON: %w", err)
+	}
+	if err := validateDesignSnapshotOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate DesignSnapshot value: %w", err)
+	}
+	var body *jsonDesignSnapshotTransport
+	{
+		body = &jsonDesignSnapshotTransport{}
+		body.Files = make(map[string]string, len(in.Files))
+		for key, val := range in.Files {
+			tk := key
+			tv := val
+			body.Files[tk] = tv
+		}
+	}
+	if err := validatejsonDesignSnapshotTransport(body); err != nil {
+		return nil, fmt.Errorf("validate DesignSnapshot JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode DesignSnapshot JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateDesignSnapshotValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateDesignSnapshotValue(in *DesignSnapshot) error {
+	if err := checkDesignSnapshotValue(in); err != nil {
+		return fmt.Errorf("validate DesignSnapshot value: %w", err)
+	}
+	if err := validateDesignSnapshotOriginal(in); err != nil {
+		return fmt.Errorf("validate DesignSnapshot value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "DesignSnapshot")
+	}
+
+	var body *jsonDesignSnapshotTransport
+	{
+		body = &jsonDesignSnapshotTransport{}
+		body.Files = make(map[string]string, len(in.Files))
+		for key, val := range in.Files {
+			tk := key
+			tv := val
+			body.Files[tk] = tv
+		}
+	}
+	if err := validatejsonDesignSnapshotTransport(body); err != nil {
+		return fmt.Errorf("validate DesignSnapshot value: %w", err)
+	}
+	return nil
+}
+
+// DecodeDesignSnapshot checks JSON field names from the Goa design and returns a service value.
+func DecodeDesignSnapshot(data []byte) (out *DesignSnapshot, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode DesignSnapshot JSON: %w", err)
+	}
+	if err := validateDesignSnapshotJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode DesignSnapshot JSON: %w", err)
+	}
+	var body *jsonDesignSnapshotTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode DesignSnapshot JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode DesignSnapshot JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode DesignSnapshot JSON after first value: %w", err)
+	}
+	if err := validatejsonDesignSnapshotTransport(body); err != nil {
+		return out, fmt.Errorf("validate DesignSnapshot JSON: %w", err)
+	}
+	{
+		out = &DesignSnapshot{}
+		out.Files = make(map[string]string, len(body.Files))
+		for key, val := range body.Files {
+			tk := key
+			tv := val
+			out.Files[tk] = tv
+		}
+	}
+	return out, nil
+}
+
 // EncodeDiffPayload turns a service value into JSON using the field names in the Goa design.
 func EncodeDiffPayload(in *DiffPayload) ([]byte, error) {
 	if err := checkDiffPayloadValue(in); err != nil {
 		return nil, fmt.Errorf("encode DiffPayload JSON: %w", err)
 	}
+	if err := validateDiffPayloadOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate DiffPayload value: %w", err)
+	}
 	var body *jsonDiffPayloadTransport
 	{
-		body = &jsonDiffPayloadTransport{
-			OldDesign: &in.OldDesign,
-			NewDesign: &in.NewDesign,
-			OldGomod:  &in.OldGomod,
-			NewGomod:  &in.NewGomod,
-		}
+		body = &jsonDiffPayloadTransport{}
+		body.Old = encodeDesignSnapshotToDesignSnapshotTransport2(in.Old)
+		body.New = encodeDesignSnapshotToDesignSnapshotTransport(in.New)
 	}
 	if err := validatejsonDiffPayloadTransport(body); err != nil {
 		return nil, fmt.Errorf("validate DiffPayload JSON: %w", err)
@@ -1977,6 +2146,9 @@ func ValidateDiffPayloadValue(in *DiffPayload) error {
 	if err := checkDiffPayloadValue(in); err != nil {
 		return fmt.Errorf("validate DiffPayload value: %w", err)
 	}
+	if err := validateDiffPayloadOriginal(in); err != nil {
+		return fmt.Errorf("validate DiffPayload value: %w", err)
+	}
 
 	if in == nil {
 		return goa.MissingFieldError("result", "DiffPayload")
@@ -1984,12 +2156,9 @@ func ValidateDiffPayloadValue(in *DiffPayload) error {
 
 	var body *jsonDiffPayloadTransport
 	{
-		body = &jsonDiffPayloadTransport{
-			OldDesign: &in.OldDesign,
-			NewDesign: &in.NewDesign,
-			OldGomod:  &in.OldGomod,
-			NewGomod:  &in.NewGomod,
-		}
+		body = &jsonDiffPayloadTransport{}
+		body.Old = encodeDesignSnapshotToDesignSnapshotTransport2(in.Old)
+		body.New = encodeDesignSnapshotToDesignSnapshotTransport(in.New)
 	}
 	if err := validatejsonDiffPayloadTransport(body); err != nil {
 		return fmt.Errorf("validate DiffPayload value: %w", err)
@@ -2022,12 +2191,9 @@ func DecodeDiffPayload(data []byte) (out *DiffPayload, err error) {
 		return out, fmt.Errorf("validate DiffPayload JSON: %w", err)
 	}
 	{
-		out = &DiffPayload{
-			OldDesign: *body.OldDesign,
-			NewDesign: *body.NewDesign,
-			OldGomod:  *body.OldGomod,
-			NewGomod:  *body.NewGomod,
-		}
+		out = &DiffPayload{}
+		out.Old = decodeDesignSnapshotTransportToDesignSnapshot(body.Old)
+		out.New = decodeDesignSnapshotTransportToDesignSnapshot(body.New)
 	}
 	return out, nil
 }
@@ -2441,13 +2607,16 @@ func EncodePreviewArchitecturePayload(in *PreviewArchitecturePayload) ([]byte, e
 	if err := checkPreviewArchitecturePayloadValue(in); err != nil {
 		return nil, fmt.Errorf("encode PreviewArchitecturePayload JSON: %w", err)
 	}
+	if err := validatePreviewArchitecturePayloadOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate PreviewArchitecturePayload value: %w", err)
+	}
 	var body *jsonPreviewArchitecturePayloadTransport
 	{
 		body = &jsonPreviewArchitecturePayloadTransport{
 			ChangeID:        &in.ChangeID,
 			RequestRevision: &in.RequestRevision,
-			DesignSource:    &in.DesignSource,
 		}
+		body.Design = encodeDesignSnapshotToDesignSnapshotTransport3(in.Design)
 	}
 	if err := validatejsonPreviewArchitecturePayloadTransport(body); err != nil {
 		return nil, fmt.Errorf("validate PreviewArchitecturePayload JSON: %w", err)
@@ -2466,6 +2635,9 @@ func ValidatePreviewArchitecturePayloadValue(in *PreviewArchitecturePayload) err
 	if err := checkPreviewArchitecturePayloadValue(in); err != nil {
 		return fmt.Errorf("validate PreviewArchitecturePayload value: %w", err)
 	}
+	if err := validatePreviewArchitecturePayloadOriginal(in); err != nil {
+		return fmt.Errorf("validate PreviewArchitecturePayload value: %w", err)
+	}
 
 	if in == nil {
 		return goa.MissingFieldError("result", "PreviewArchitecturePayload")
@@ -2476,8 +2648,8 @@ func ValidatePreviewArchitecturePayloadValue(in *PreviewArchitecturePayload) err
 		body = &jsonPreviewArchitecturePayloadTransport{
 			ChangeID:        &in.ChangeID,
 			RequestRevision: &in.RequestRevision,
-			DesignSource:    &in.DesignSource,
 		}
+		body.Design = encodeDesignSnapshotToDesignSnapshotTransport3(in.Design)
 	}
 	if err := validatejsonPreviewArchitecturePayloadTransport(body); err != nil {
 		return fmt.Errorf("validate PreviewArchitecturePayload value: %w", err)
@@ -2513,8 +2685,8 @@ func DecodePreviewArchitecturePayload(data []byte) (out *PreviewArchitecturePayl
 		out = &PreviewArchitecturePayload{
 			ChangeID:        *body.ChangeID,
 			RequestRevision: *body.RequestRevision,
-			DesignSource:    *body.DesignSource,
 		}
+		out.Design = decodeDesignSnapshotTransportToDesignSnapshot(body.Design)
 	}
 	return out, nil
 }
@@ -2767,6 +2939,18 @@ func decodeC4EdgeItemTransportToC4EdgeItem(v *jsonC4EdgeItemTransport) *C4EdgeIt
 	return res
 }
 
+func decodeDesignSnapshotTransportToDesignSnapshot(v *jsonDesignSnapshotTransport) *DesignSnapshot {
+	res := &DesignSnapshot{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
+	}
+
+	return res
+}
+
 func decodeExampleItemTransportToExampleItem(v *jsonExampleItemTransport) *ExampleItem {
 	res := &ExampleItem{
 		ID:               *v.ID,
@@ -2847,6 +3031,42 @@ func encodeC4EdgeItemToC4EdgeItemTransport(v *C4EdgeItem) *jsonC4EdgeItemTranspo
 		FromID:   &v.FromID,
 		ToID:     &v.ToID,
 		Protocol: &v.Protocol,
+	}
+
+	return res
+}
+
+func encodeDesignSnapshotToDesignSnapshotTransport(v *DesignSnapshot) *jsonDesignSnapshotTransport {
+	res := &jsonDesignSnapshotTransport{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
+	}
+
+	return res
+}
+
+func encodeDesignSnapshotToDesignSnapshotTransport2(v *DesignSnapshot) *jsonDesignSnapshotTransport {
+	res := &jsonDesignSnapshotTransport{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
+	}
+
+	return res
+}
+
+func encodeDesignSnapshotToDesignSnapshotTransport3(v *DesignSnapshot) *jsonDesignSnapshotTransport {
+	res := &jsonDesignSnapshotTransport{}
+	res.Files = make(map[string]string, len(v.Files))
+	for key, val := range v.Files {
+		tk := key
+		tv := val
+		res.Files[tk] = tv
 	}
 
 	return res
@@ -3150,7 +3370,7 @@ func validateArchitecturePreviewResultJSONValue(path string, value any, descript
 		case "design_digest":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "SHA-256 digest of the evaluated Goa design source.",
+				typed[key], "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).",
 			); err != nil {
 				return err
 			}
@@ -3942,6 +4162,71 @@ func validateConfirmIntentPayloadJSONValue3(path string, value any, description 
 	return nil
 }
 
+// validateDesignSnapshotJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateDesignSnapshotJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "files":
+			if err := validateDesignSnapshotJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "File contents keyed by module-relative path, such as design/design.go or go.mod.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"files",
+			})
+		}
+	}
+	return nil
+}
+
+// validateDesignSnapshotJSONValue2 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateDesignSnapshotJSONValue2(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if err := validateAgentPolicyItemJSONValue2(
+			generatedJSONChildPath(path, key, true),
+			typed[key], description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // validateDiffPayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validateDiffPayloadJSONValue(path string, value any, description string) error {
 	field := path
@@ -3962,40 +4247,24 @@ func validateDiffPayloadJSONValue(path string, value any, description string) er
 	sort.Strings(keys)
 	for _, key := range keys {
 		switch key {
-		case "new_design":
-			if err := validateAgentPolicyItemJSONValue2(
+		case "new":
+			if err := validateDesignSnapshotJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate Go/Goa design source.",
+				typed[key], "Candidate design module.",
 			); err != nil {
 				return err
 			}
-		case "new_gomod":
-			if err := validateAgentPolicyItemJSONValue2(
+		case "old":
+			if err := validateDesignSnapshotJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate go.mod file contents.",
-			); err != nil {
-				return err
-			}
-		case "old_design":
-			if err := validateAgentPolicyItemJSONValue2(
-				generatedJSONChildPath(path, key, false),
-				typed[key], "Previous Go/Goa design source.",
-			); err != nil {
-				return err
-			}
-		case "old_gomod":
-			if err := validateAgentPolicyItemJSONValue2(
-				generatedJSONChildPath(path, key, false),
-				typed[key], "Previous go.mod file contents.",
+				typed[key], "Previous design module.",
 			); err != nil {
 				return err
 			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
-				"new_design",
-				"new_gomod",
-				"old_design",
-				"old_gomod",
+				"new",
+				"old",
 			})
 		}
 	}
@@ -4313,10 +4582,10 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 			); err != nil {
 				return err
 			}
-		case "design_source":
-			if err := validateAgentPolicyItemJSONValue2(
+		case "design":
+			if err := validateDesignSnapshotJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Candidate Goa and Goa-AI design source to evaluate.",
+				typed[key], "Candidate module whose Goa and Goa-AI design is evaluated.",
 			); err != nil {
 				return err
 			}
@@ -4330,7 +4599,7 @@ func validatePreviewArchitecturePayloadJSONValue(path string, value any, descrip
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"change_id",
-				"design_source",
+				"design",
 				"request_revision",
 			})
 		}
@@ -4958,6 +5227,42 @@ func checkConfirmIntentPayloadConfirmIntentPayloadValue(in *ConfirmIntentPayload
 	return nil
 }
 
+// checkDesignSnapshotValue checks text and cycles before conversion.
+func checkDesignSnapshotValue(in *DesignSnapshot) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkDesignSnapshotDesignSnapshotValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkDesignSnapshotDesignSnapshotValue checks one generated value on the active path.
+func checkDesignSnapshotDesignSnapshotValue(in *DesignSnapshot, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		for key1, item1 := range in.Files {
+			_ = item1
+			if !utf8.ValidString(string(key1)) {
+				return fmt.Errorf("%s: invalid UTF-8 map key", generatedJSONChildPath(field, "files", false))
+			}
+			if !utf8.ValidString(string(item1)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "files", false), string(key1), true))
+			}
+		}
+	}
+	return nil
+}
+
 // checkDiffPayloadValue checks text and cycles before conversion.
 func checkDiffPayloadValue(in *DiffPayload) error {
 	if in == nil {
@@ -4981,17 +5286,11 @@ func checkDiffPayloadDiffPayloadValue(in *DiffPayload, field string, active map[
 	active[in] = true
 	defer delete(active, in)
 	if in != nil {
-		if !utf8.ValidString(string(in.OldDesign)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "old_design", false))
+		if err := checkDesignSnapshotDesignSnapshotValue(in.Old, generatedJSONChildPath(field, "old", false), active); err != nil {
+			return err
 		}
-		if !utf8.ValidString(string(in.NewDesign)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "new_design", false))
-		}
-		if !utf8.ValidString(string(in.OldGomod)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "old_gomod", false))
-		}
-		if !utf8.ValidString(string(in.NewGomod)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "new_gomod", false))
+		if err := checkDesignSnapshotDesignSnapshotValue(in.New, generatedJSONChildPath(field, "new", false), active); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -5169,8 +5468,8 @@ func checkPreviewArchitecturePayloadPreviewArchitecturePayloadValue(in *PreviewA
 		if !utf8.ValidString(string(in.RequestRevision)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
 		}
-		if !utf8.ValidString(string(in.DesignSource)) {
-			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "design_source", false))
+		if err := checkDesignSnapshotDesignSnapshotValue(in.Design, generatedJSONChildPath(field, "design", false), active); err != nil {
+			return err
 		}
 	}
 	return nil

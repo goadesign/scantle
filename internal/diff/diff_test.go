@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/goadesign/scantle/internal/designeval"
+	"github.com/goadesign/scantle/internal/testmodule"
 )
 
 func TestCompareReportsEvaluatedDeclarationsHelperChangesAndGoModDirectives(t *testing.T) {
@@ -96,7 +97,7 @@ replace goa.design/goa-ai => ../goa-ai
 exclude example.com/legacy v1.1.0
 `
 
-	rep, err := Compare(ctx, oldDesign, newDesign, oldMod, newMod)
+	rep, err := Compare(ctx, testmodule.Snapshot(t, "", oldDesign), testmodule.Snapshot(t, "", newDesign))
 	if err != nil {
 		t.Fatalf("Compare returned unexpected error: %v", err)
 	}
@@ -115,6 +116,11 @@ exclude example.com/legacy v1.1.0
 	if !slices.Contains(rep.ModifiedDeclarations, "Service:orders/Method:get_order") {
 		t.Fatalf("expected ModifiedDeclarations to contain Service:orders/Method:get_order when const maximumItems changed from 10 to 20, got %v", rep.ModifiedDeclarations)
 	}
+	// go.mod directive deltas are a text comparison of the two go.mod files.
+	deltas, err := compareGoMod(oldMod, newMod)
+	if err != nil {
+		t.Fatalf("compareGoMod: %v", err)
+	}
 	wantDeltas := []string{
 		"exclude example.com/legacy@v1.0.0: removed excluded",
 		"goa.design/goa-ai: v0.5.3 -> v0.5.4",
@@ -122,8 +128,8 @@ exclude example.com/legacy v1.1.0
 		"goa.design/pulse: added v1.9.10",
 		"replace goa.design/goa-ai: added ../goa-ai",
 	}
-	if strings.Join(rep.VersionDeltas, ",") != strings.Join(wantDeltas, ",") {
-		t.Fatalf("unexpected VersionDeltas: got %v, want %v", rep.VersionDeltas, wantDeltas)
+	if strings.Join(deltas, ",") != strings.Join(wantDeltas, ",") {
+		t.Fatalf("unexpected VersionDeltas: got %v, want %v", deltas, wantDeltas)
 	}
 	if strings.Contains(strings.ToLower(rep.Summary), "compatible") {
 		t.Fatalf("summary must not emit a blanket compatibility claim: %q", rep.Summary)
@@ -306,7 +312,7 @@ var _ = Service("orders", func() {
 	})
 })
 `
-	rep, err := Compare(ctx, oldDesign, newDesign, "", "")
+	rep, err := Compare(ctx, testmodule.Snapshot(t, "", oldDesign), testmodule.Snapshot(t, "", newDesign))
 	if err != nil {
 		t.Fatalf("Compare returned unexpected error: %v", err)
 	}
@@ -320,7 +326,7 @@ var _ = Service("orders", func() {
 		}
 	}
 
-	evaluated, err := designeval.Evaluate(ctx, newDesign)
+	evaluated, err := designeval.Evaluate(ctx, testmodule.Snapshot(t, "", newDesign))
 	if err != nil {
 		t.Fatalf("Evaluate failed: %v", err)
 	}
@@ -504,10 +510,12 @@ var _ = m.Design("Architecture", "Orders architecture", func() {
 		return goMod
 	}
 
-	oldMod := writeModule(oldRoot, 10, "Int", "Header", "triage v1\npackage main\nfunc main() {}", "String", true, "Orders system v1")
-	newMod := writeModule(newRoot, 20, "UInt32", "Param", "triage v2\npackage main\nfunc main() {}", "String", false, "Orders system v2")
+	writeModule(oldRoot, 10, "Int", "Header", "triage v1\npackage main\nfunc main() {}", "String", true, "Orders system v1")
+	writeModule(newRoot, 20, "UInt32", "Param", "triage v2\npackage main\nfunc main() {}", "String", false, "Orders system v2")
+	oldFiles := testmodule.Module(t, "github.com/acme/orders", "", goFiles(t, oldRoot))
+	newFiles := testmodule.Module(t, "github.com/acme/orders", "", goFiles(t, newRoot))
 
-	rep, err := Compare(ctx, filepath.Join(oldRoot, "design"), filepath.Join(newRoot, "design"), oldMod, newMod)
+	rep, err := Compare(ctx, oldFiles, newFiles)
 	if err != nil {
 		t.Fatalf("Compare multi-file design directories failed: %v", err)
 	}
@@ -523,13 +531,13 @@ var _ = m.Design("Architecture", "Orders architecture", func() {
 		}
 	}
 
-	evalOld, err := designeval.EvaluateModule(ctx, filepath.Join(oldRoot, "design"), oldMod)
+	evalOld, err := designeval.Evaluate(ctx, oldFiles)
 	if err != nil {
-		t.Fatalf("EvaluateModule old failed: %v", err)
+		t.Fatalf("Evaluate old failed: %v", err)
 	}
-	evalNew, err := designeval.EvaluateModule(ctx, filepath.Join(newRoot, "design"), newMod)
+	evalNew, err := designeval.Evaluate(ctx, newFiles)
 	if err != nil {
-		t.Fatalf("EvaluateModule new failed: %v", err)
+		t.Fatalf("Evaluate new failed: %v", err)
 	}
 
 	// Verify BindField("tenant_id", Lookup(String)) keeps tenant_id in the model input schema
@@ -561,3 +569,28 @@ var _ = m.Design("Architecture", "Orders architecture", func() {
 	}
 }
 
+// goFiles reads every .go file under root into a snapshot map keyed by
+// slash-separated relative path.
+func goFiles(t *testing.T, root string) map[string]string {
+	t.Helper()
+	files := map[string]string{}
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".go") {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		files[filepath.ToSlash(rel)] = string(b)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return files
+}

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/goadesign/scantle/internal/testmodule"
 )
 
 func TestEvaluateEnforcesSandboxOnDesignInitAndBuildsJSONSchemas(t *testing.T) {
@@ -59,7 +61,7 @@ var _ = Service("orders", func() {
 	})
 })
 `
-	res, err := Evaluate(ctx, hostileDesign)
+	res, err := Evaluate(ctx, testmodule.Snapshot(t, "", hostileDesign))
 	if err != nil {
 		t.Fatalf("Evaluate failed on sandboxed design: %v", err)
 	}

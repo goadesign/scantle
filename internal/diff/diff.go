@@ -32,20 +32,19 @@ type (
 	}
 )
 
-// Compare evaluates old and new Go/Goa design sources via the real Goa/Goa-AI
-// DSL evaluator against their respective go.mod directives, parses old and new
-// go.mod files via golang.org/x/mod/modfile, and returns a factual structural
-// diff Report.
-func Compare(ctx context.Context, oldDesign, newDesign, oldGoMod, newGoMod string) (Report, error) {
-	oldEval, err := designeval.EvaluateModule(ctx, oldDesign, oldGoMod)
+// Compare evaluates the old and new design module snapshots, each with its own
+// go.mod dependencies (see designeval.Evaluate), compares their go.mod
+// directives, and returns a factual structural diff Report.
+func Compare(ctx context.Context, oldFiles, newFiles map[string]string) (Report, error) {
+	oldEval, err := designeval.Evaluate(ctx, oldFiles)
 	if err != nil {
 		return Report{}, fmt.Errorf("evaluate old design: %w", err)
 	}
-	newEval, err := designeval.EvaluateModule(ctx, newDesign, newGoMod)
+	newEval, err := designeval.Evaluate(ctx, newFiles)
 	if err != nil {
 		return Report{}, fmt.Errorf("evaluate new design: %w", err)
 	}
-	deltas, err := compareGoMod(oldGoMod, newGoMod)
+	deltas, err := compareGoMod(oldFiles["go.mod"], newFiles["go.mod"])
 	if err != nil {
 		return Report{}, err
 	}
