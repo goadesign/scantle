@@ -75,10 +75,10 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	bobCtx := WithPrincipal(context.Background(), Principal{ID: "bob@example.com"})
 
 	ambiguousAnalysis := CP1SemanticAnalysis{
-		Summary: "Auto-approve refunds under $50 and route larger refunds to manager approval.",
+		Summary: "  Auto-approve refunds under $50 and route larger refunds to manager approval.\n",
 		Ambiguities: []CP1ModelAmbiguity{
 			{
-				Question: "Does the $50 threshold apply to item subtotal or total order amount including tax?",
+				Question: "  Does the $50 threshold apply to item subtotal or total order amount including tax? ",
 				Options:  []string{"item_subtotal_cents", "total_order_cents"},
 			},
 			{
@@ -88,7 +88,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		},
 		Examples: []CP1ModelExample{
 			{
-				Scenario:         "Refund under $50 auto-approves",
+				Scenario:         "  Refund under $50 auto-approves  ",
 				InputSummary:     "Order subtotal $48.00, tax $4.32 ($52.32 total)",
 				ExpectedOutcome:  "Auto-approved immediately via payments provider",
 				VerificationKind: "deterministic",
@@ -107,7 +107,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 			},
 		},
 		PreservedBehaviors: []string{
-			"Cross-tenant order lookups return 404 Not Found.",
+			"  Cross-tenant order lookups return 404 Not Found.  ",
 			"Customer principals cannot call approve_refund.",
 		},
 	}
@@ -147,6 +147,12 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 	if len(proposed.Examples) != 3 || proposed.Examples[0].ID != "chg-refund-50-check-01" {
 		t.Fatalf("unexpected examples: %+v", proposed.Examples)
+	}
+	if proposed.Summary != ambiguousAnalysis.Summary ||
+		proposed.Ambiguities[0].Question != ambiguousAnalysis.Ambiguities[0].Question ||
+		proposed.Examples[0].Scenario != ambiguousAnalysis.Examples[0].Scenario ||
+		proposed.PreservedBehaviors[0] != ambiguousAnalysis.PreservedBehaviors[0] {
+		t.Fatalf("expected accepted authored strings to be preserved verbatim without TrimSpace rewriting")
 	}
 
 	// Attempting to overwrite an existing change_id must be rejected.

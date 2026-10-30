@@ -702,8 +702,7 @@ func validateCP1Analysis(
 	changeID string,
 	in CP1SemanticAnalysis,
 ) (string, []*genscantle.AmbiguityQuestion, []*genscantle.ExampleItem, []string, error) {
-	summary := strings.TrimSpace(in.Summary)
-	if summary == "" {
+	if strings.TrimSpace(in.Summary) == "" {
 		return "", nil, nil, nil, errors.New("summary is required")
 	}
 	ambiguities, err := validateAmbiguities(changeID, in.Ambiguities)
@@ -715,10 +714,9 @@ func validateCP1Analysis(
 	}
 	examples := make([]*genscantle.ExampleItem, 0, len(in.Examples))
 	for i, item := range in.Examples {
-		scenario := strings.TrimSpace(item.Scenario)
-		inputSummary := strings.TrimSpace(item.InputSummary)
-		expectedOutcome := strings.TrimSpace(item.ExpectedOutcome)
-		if scenario == "" || inputSummary == "" || expectedOutcome == "" {
+		if strings.TrimSpace(item.Scenario) == "" ||
+			strings.TrimSpace(item.InputSummary) == "" ||
+			strings.TrimSpace(item.ExpectedOutcome) == "" {
 			return "", nil, nil, nil, fmt.Errorf("examples[%d] requires non-empty scenario, input_summary, and expected_outcome", i)
 		}
 		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
@@ -726,21 +724,20 @@ func validateCP1Analysis(
 		}
 		examples = append(examples, &genscantle.ExampleItem{
 			ID:               fmt.Sprintf("%s-check-%02d", changeID, i+1),
-			Scenario:         scenario,
-			InputSummary:     inputSummary,
-			ExpectedOutcome:  expectedOutcome,
+			Scenario:         item.Scenario,
+			InputSummary:     item.InputSummary,
+			ExpectedOutcome:  item.ExpectedOutcome,
 			VerificationKind: item.VerificationKind,
 		})
 	}
 	preserved := make([]string, 0, len(in.PreservedBehaviors))
 	for i, item := range in.PreservedBehaviors {
-		trimmed := strings.TrimSpace(item)
-		if trimmed == "" {
+		if strings.TrimSpace(item) == "" {
 			return "", nil, nil, nil, fmt.Errorf("preserved_behaviors[%d] is empty", i)
 		}
-		preserved = append(preserved, trimmed)
+		preserved = append(preserved, item)
 	}
-	return summary, ambiguities, examples, preserved, nil
+	return in.Summary, ambiguities, examples, preserved, nil
 }
 
 // validateAmbiguities validates that every ambiguity question has a non-empty
@@ -753,29 +750,29 @@ func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle
 	out := make([]*genscantle.AmbiguityQuestion, 0, len(in))
 	for i, q := range in {
 		id := fmt.Sprintf("%s-ambiguity-%02d", changeID, i+1)
-		question := strings.TrimSpace(q.Question)
-		if question == "" {
+		if strings.TrimSpace(q.Question) == "" {
 			return nil, fmt.Errorf("ambiguities[%d] requires non-empty question", i)
 		}
 		if len(q.Options) < 2 {
 			return nil, fmt.Errorf("ambiguity %q requires at least 2 options", id)
 		}
-		seenOpts := make(map[string]bool, len(q.Options))
+		seenOpts := make(map[string]bool, len(q.Options)*2)
 		opts := make([]string, 0, len(q.Options))
 		for _, opt := range q.Options {
 			trimmed := strings.TrimSpace(opt)
 			if trimmed == "" {
 				return nil, fmt.Errorf("ambiguity %q has an empty option", id)
 			}
-			if seenOpts[trimmed] {
-				return nil, fmt.Errorf("ambiguity %q has duplicate option %q", id, trimmed)
+			if seenOpts[opt] || seenOpts[trimmed] {
+				return nil, fmt.Errorf("ambiguity %q has duplicate option %q", id, opt)
 			}
+			seenOpts[opt] = true
 			seenOpts[trimmed] = true
-			opts = append(opts, trimmed)
+			opts = append(opts, opt)
 		}
 		out = append(out, &genscantle.AmbiguityQuestion{
 			ID:       id,
-			Question: question,
+			Question: q.Question,
 			Options:  opts,
 		})
 	}
@@ -810,31 +807,32 @@ func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.Exam
 	if len(in) == 0 {
 		return nil, errors.New("at least one example is required")
 	}
-	seenIDs := make(map[string]bool, len(in))
+	seenIDs := make(map[string]bool, len(in)*2)
 	out := make([]*genscantle.ExampleItem, 0, len(in))
 	for i, item := range in {
 		if item == nil {
 			return nil, fmt.Errorf("examples[%d] is nil", i)
 		}
-		id := strings.TrimSpace(item.ID)
-		scenario := strings.TrimSpace(item.Scenario)
-		inputSummary := strings.TrimSpace(item.InputSummary)
-		expectedOutcome := strings.TrimSpace(item.ExpectedOutcome)
-		if id == "" || scenario == "" || inputSummary == "" || expectedOutcome == "" {
+		trimmedID := strings.TrimSpace(item.ID)
+		if trimmedID == "" ||
+			strings.TrimSpace(item.Scenario) == "" ||
+			strings.TrimSpace(item.InputSummary) == "" ||
+			strings.TrimSpace(item.ExpectedOutcome) == "" {
 			return nil, fmt.Errorf("examples[%d] requires non-empty id, scenario, input_summary, and expected_outcome", i)
 		}
 		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
 			return nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
 		}
-		if seenIDs[id] {
-			return nil, fmt.Errorf("duplicate example id %q", id)
+		if seenIDs[item.ID] || seenIDs[trimmedID] {
+			return nil, fmt.Errorf("duplicate example id %q", item.ID)
 		}
-		seenIDs[id] = true
+		seenIDs[item.ID] = true
+		seenIDs[trimmedID] = true
 		out = append(out, &genscantle.ExampleItem{
-			ID:               id,
-			Scenario:         scenario,
-			InputSummary:     inputSummary,
-			ExpectedOutcome:  expectedOutcome,
+			ID:               item.ID,
+			Scenario:         item.Scenario,
+			InputSummary:     item.InputSummary,
+			ExpectedOutcome:  item.ExpectedOutcome,
 			VerificationKind: item.VerificationKind,
 		})
 	}

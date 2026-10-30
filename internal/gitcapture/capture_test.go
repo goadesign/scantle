@@ -18,6 +18,9 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndTrailingSpacePaths(t *t
 	runGit(t, dir, "init")
 	runGit(t, dir, "config", "user.email", "test@example.com")
 	runGit(t, dir, "config", "user.name", "Test Operator")
+	runGit(t, dir, "config", "diff.noprefix", "true")
+	runGit(t, dir, "config", "diff.srcPrefix", "custom-src/")
+	runGit(t, dir, "config", "diff.dstPrefix", "custom-dst/")
 
 	trackedPath := filepath.Join(dir, "design.go")
 	if err := os.WriteFile(trackedPath, []byte("package design\n// v1\n"), 0o600); err != nil {

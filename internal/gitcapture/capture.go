@@ -63,7 +63,19 @@ func Capture(ctx context.Context, repoDir string, selectedPaths ...string) (Snap
 	}
 	head := strings.TrimSpace(string(headBytes))
 
-	patch, err := runGitReadOnly(ctx, repoDir, "diff", "--binary", "--no-ext-diff", "--no-textconv", head)
+	patch, err := runGitReadOnly(
+		ctx,
+		repoDir,
+		"-c",
+		"diff.noprefix=false",
+		"diff",
+		"--binary",
+		"--no-ext-diff",
+		"--no-textconv",
+		"--src-prefix=a/",
+		"--dst-prefix=b/",
+		head,
+	)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("diff tracked files: %w", err)
 	}
