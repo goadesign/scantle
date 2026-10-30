@@ -16,6 +16,15 @@ import (
 )
 
 type (
+	// goCommand runs the go command of one toolchain: the toolchain the
+	// sandboxed build compiles with, so resolving a design's modules and
+	// compiling it agree on the Go version. A design whose go.mod needs a
+	// newer Go than that toolchain fails explicitly instead of switching.
+	goCommand struct {
+		// bin is the toolchain's go binary.
+		bin string
+	}
+
 	// listedModule is one module of `go list -m -json all`.
 	listedModule struct {
 		// Path is the module path.
@@ -62,9 +71,9 @@ const (
 // Modules are downloaded through the operator's Go proxy settings. evalMod is
 // the evaluator's own go.mod, which supplies generator versions the target
 // does not require.
-func prepareHarnessModule(ctx context.Context, buildDir string, target *modfile.File, evalMod *modfile.File, logDir string) error {
+func prepareHarnessModule(ctx context.Context, gocmd goCommand, buildDir string, target *modfile.File, evalMod *modfile.File, logDir string) error {
 	targetDir := filepath.Join(buildDir, "target")
-	loaded, err := designModules(ctx, targetDir, filepath.Join(logDir, "target-load.log"))
+	loaded, err := gocmd.designModules(ctx, targetDir, filepath.Join(logDir, "target-load.log"))
 	if err != nil {
 		return fmt.Errorf("target module is incomplete or unresolvable: %w", err)
 	}
@@ -73,7 +82,7 @@ func prepareHarnessModule(ctx context.Context, buildDir string, target *modfile.
 			loaded[core] = true
 		}
 	}
-	targetModules, err := listModules(ctx, targetDir, filepath.Join(logDir, "target-modules.log"), "-mod=readonly")
+	targetModules, err := gocmd.listModules(ctx, targetDir, filepath.Join(logDir, "target-modules.log"), "-mod=readonly")
 	if err != nil {
 		return fmt.Errorf("list target modules: %w", err)
 	}
@@ -120,10 +129,10 @@ func prepareHarnessModule(ctx context.Context, buildDir string, target *modfile.
 	if err := os.WriteFile(filepath.Join(buildDir, "go.sum"), targetSum, 0o600); err != nil {
 		return fmt.Errorf("write harness go.sum: %w", err)
 	}
-	if err := runGo(ctx, buildDir, filepath.Join(logDir, "harness-load.log"), "list", "-mod=mod", "-deps", "."); err != nil {
+	if err := gocmd.run(ctx, buildDir, filepath.Join(logDir, "harness-load.log"), "list", "-mod=mod", "-deps", "."); err != nil {
 		return fmt.Errorf("resolve evaluator dependencies: %w", err)
 	}
-	harnessModules, err := listModules(ctx, buildDir, filepath.Join(logDir, "harness-modules.log"), "-mod=readonly")
+	harnessModules, err := gocmd.listModules(ctx, buildDir, filepath.Join(logDir, "harness-modules.log"), "-mod=readonly")
 	if err != nil {
 		return fmt.Errorf("list evaluator modules: %w", err)
 	}
@@ -134,9 +143,9 @@ func prepareHarnessModule(ctx context.Context, buildDir string, target *modfile.
 // design packages load, directly or transitively. Loading uses -mod=readonly,
 // so a go.mod or go.sum missing a dependency or a checksum is an error. It
 // parses source and resolves imports but compiles and runs nothing.
-func designModules(ctx context.Context, targetDir, logPath string) (map[string]bool, error) {
+func (g goCommand) designModules(ctx context.Context, targetDir, logPath string) (map[string]bool, error) {
 	out := logPath + ".txt"
-	if err := runGoTo(ctx, targetDir, logPath, out, "list", "-mod=readonly", "-deps",
+	if err := g.runTo(ctx, targetDir, logPath, out, "list", "-mod=readonly", "-deps",
 		"-f", "{{with .Module}}{{.Path}}{{end}}", "./design/..."); err != nil {
 		return nil, err
 	}
@@ -180,9 +189,9 @@ func sameVersions(loaded map[string]bool, target, harness map[string]listedModul
 }
 
 // listModules returns `go list -m -json all` for the module in dir.
-func listModules(ctx context.Context, dir, logPath, modFlag string) (map[string]listedModule, error) {
+func (g goCommand) listModules(ctx context.Context, dir, logPath, modFlag string) (map[string]listedModule, error) {
 	out := logPath + ".json"
-	if err := runGoTo(ctx, dir, logPath, out, "list", modFlag, "-m", "-json", "all"); err != nil {
+	if err := g.runTo(ctx, dir, logPath, out, "list", modFlag, "-m", "-json", "all"); err != nil {
 		return nil, err
 	}
 	f, err := os.Open(out)
@@ -203,16 +212,16 @@ func listModules(ctx context.Context, dir, logPath, modFlag string) (map[string]
 	}
 }
 
-// runGo runs one go command in dir with stdout and stderr in logPath.
-func runGo(ctx context.Context, dir, logPath string, args ...string) error {
-	return runGoTo(ctx, dir, logPath, logPath, args...)
+// run runs one go command in dir with stdout and stderr in logPath.
+func (g goCommand) run(ctx context.Context, dir, logPath string, args ...string) error {
+	return g.runTo(ctx, dir, logPath, logPath, args...)
 }
 
-// runGoTo runs one go command in dir with stdout in outPath and stderr in
+// runTo runs one go command in dir with stdout in outPath and stderr in
 // logPath. The environment is replaced: cgo is off, workspaces and toolchain
 // switching are off, GOFLAGS cannot inject flags such as -toolexec, and only
 // the operator's module download settings are passed through.
-func runGoTo(ctx context.Context, dir, logPath, outPath string, args ...string) error {
+func (g goCommand) runTo(ctx context.Context, dir, logPath, outPath string, args ...string) error {
 	stdout, err := os.Create(outPath)
 	if err != nil {
 		return err
@@ -225,7 +234,7 @@ func runGoTo(ctx context.Context, dir, logPath, outPath string, args ...string) 
 		}
 		defer stderr.Close()
 	}
-	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd := exec.CommandContext(ctx, g.bin, args...)
 	cmd.Dir = dir
 	cmd.Env = goEnv()
 	cmd.Stdout, cmd.Stderr = stdout, stderr
