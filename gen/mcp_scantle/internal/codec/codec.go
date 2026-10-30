@@ -498,7 +498,7 @@ type PreviewArchitectureResultC4ContainerItemTransport struct {
 	ID *string `json:"id"`
 	// Human-readable container name.
 	Name *string `json:"name"`
-	// Container role (service, agent, or toolset).
+	// Declared service, agent, toolset, person, system, container, or component.
 	Kind *string `json:"kind"`
 	// Summary of the container's responsibility.
 	Description *string `json:"description"`
@@ -522,8 +522,8 @@ func ValidatePreviewArchitectureResultC4ContainerItemTransport(value *PreviewArc
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if value.Kind != nil {
-		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset"}))
+		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset" || *value.Kind == "person" || *value.Kind == "system" || *value.Kind == "container" || *value.Kind == "component") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset", "person", "system", "container", "component"}))
 		}
 	}
 	return err

@@ -182,7 +182,7 @@ type (
 		ID string
 		// Human-readable container name.
 		Name string
-		// Container role (service, agent, or toolset).
+		// Declared service, agent, toolset, person, system, container, or component.
 		Kind string
 		// Summary of the container's responsibility.
 		Description string

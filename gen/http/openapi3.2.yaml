@@ -166,11 +166,11 @@ paths:
                                 containers:
                                     - description: Tempora ab omnis minima veritatis.
                                       id: Deserunt non quia earum.
-                                      kind: service
+                                      kind: toolset
                                       name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                                     - description: Tempora ab omnis minima veritatis.
                                       id: Deserunt non quia earum.
-                                      kind: service
+                                      kind: toolset
                                       name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                                 design_digest: Perferendis molestias nisi cupiditate in.
                                 edges:
@@ -535,11 +535,11 @@ components:
                     example:
                         - description: Tempora ab omnis minima veritatis.
                           id: Deserunt non quia earum.
-                          kind: service
+                          kind: toolset
                           name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                         - description: Tempora ab omnis minima veritatis.
                           id: Deserunt non quia earum.
-                          kind: service
+                          kind: toolset
                           name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                 design_digest:
                     type: string
@@ -640,11 +640,11 @@ components:
                 containers:
                     - description: Tempora ab omnis minima veritatis.
                       id: Deserunt non quia earum.
-                      kind: service
+                      kind: toolset
                       name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                     - description: Tempora ab omnis minima veritatis.
                       id: Deserunt non quia earum.
-                      kind: service
+                      kind: toolset
                       name: Quaerat facilis eum quisquam magnam voluptatem corporis.
                 design_digest: Perferendis molestias nisi cupiditate in.
                 edges:
@@ -709,21 +709,25 @@ components:
                     example: Deserunt non quia earum.
                 kind:
                     type: string
-                    description: Container role (service, agent, or toolset).
-                    example: service
+                    description: Declared service, agent, toolset, person, system, container, or component.
+                    example: toolset
                     enum:
                         - service
                         - agent
                         - toolset
+                        - person
+                        - system
+                        - container
+                        - component
                 name:
                     type: string
                     description: Human-readable container name.
                     example: Quaerat facilis eum quisquam magnam voluptatem corporis.
-            description: C4 container derived from the evaluated target Goa/Goa-AI design.
+            description: Architecture element declared by the target Goa, Goa-AI, or Model design.
             example:
                 description: Tempora ab omnis minima veritatis.
                 id: Deserunt non quia earum.
-                kind: service
+                kind: toolset
                 name: Quaerat facilis eum quisquam magnam voluptatem corporis.
             required:
                 - id

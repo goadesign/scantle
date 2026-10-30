@@ -112,13 +112,13 @@ type ArchitecturePreviewResult struct {
 	Banner string
 }
 
-// C4 container derived from the evaluated target Goa/Goa-AI design.
+// Architecture element declared by the target Goa, Goa-AI, or Model design.
 type C4ContainerItem struct {
 	// Stable container identifier.
 	ID string
 	// Human-readable container name.
 	Name string
-	// Container role (service, agent, or toolset).
+	// Declared service, agent, toolset, person, system, container, or component.
 	Kind string
 	// Summary of the container's responsibility.
 	Description string
@@ -481,7 +481,7 @@ type jsonC4ContainerItemTransport struct {
 	ID *string `json:"id"`
 	// Human-readable container name.
 	Name *string `json:"name"`
-	// Container role (service, agent, or toolset).
+	// Declared service, agent, toolset, person, system, container, or component.
 	Kind *string `json:"kind"`
 	// Summary of the container's responsibility.
 	Description *string `json:"description"`
@@ -505,8 +505,8 @@ func validatejsonC4ContainerItemTransport(value *jsonC4ContainerItemTransport) (
 		err = goa.MergeErrors(err, goa.MissingFieldError("description", "body"))
 	}
 	if value.Kind != nil {
-		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset") {
-			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset"}))
+		if !(*value.Kind == "service" || *value.Kind == "agent" || *value.Kind == "toolset" || *value.Kind == "person" || *value.Kind == "system" || *value.Kind == "container" || *value.Kind == "component") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"service", "agent", "toolset", "person", "system", "container", "component"}))
 		}
 	}
 	return err
@@ -997,8 +997,8 @@ func validateArchitecturePreviewResultOriginal(value *ArchitecturePreviewResult)
 
 // validateC4ContainerItemOriginal checks the original typed value before JSON conversion.
 func validateC4ContainerItemOriginal(value *C4ContainerItem) (err error) {
-	if !(value.Kind == "service" || value.Kind == "agent" || value.Kind == "toolset") {
-		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.kind", value.Kind, []any{"service", "agent", "toolset"}))
+	if !(value.Kind == "service" || value.Kind == "agent" || value.Kind == "toolset" || value.Kind == "person" || value.Kind == "system" || value.Kind == "container" || value.Kind == "component") {
+		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.kind", value.Kind, []any{"service", "agent", "toolset", "person", "system", "container", "component"}))
 	}
 	return err
 }
@@ -3510,7 +3510,7 @@ func validateArchitecturePreviewResultJSONValue4(path string, value any, descrip
 		case "kind":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Container role (service, agent, or toolset).",
+				typed[key], "Declared service, agent, toolset, person, system, container, or component.",
 			); err != nil {
 				return err
 			}

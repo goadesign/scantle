@@ -634,7 +634,7 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("containers"), tools.DynamicField{}, tools.FixedField("kind")},
 		JSONType:    "string",
-		Description: "Container role (service, agent, or toolset).",
+		Description: "Declared service, agent, toolset, person, system, container, or component.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("containers"), tools.DynamicField{}, tools.FixedField("description")},
@@ -3200,7 +3200,7 @@ func validatePreviewArchitectureResultC4ContainerItemTransportJSONValue(path str
 		case "kind":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Container role (service, agent, or toolset).",
+				typed[key], "Declared service, agent, toolset, person, system, container, or component.",
 			); err != nil {
 				return err
 			}

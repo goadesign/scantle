@@ -72,13 +72,13 @@ var ConfirmIntentPayload = Type("ConfirmIntentPayload", func() {
 	Required("change_id", "request_revision", "answers", "examples")
 })
 
-// C4ContainerItem describes one runtime container in a Checkpoint 2 C4 preview.
+// C4ContainerItem describes one architecture element in a Checkpoint 2 preview.
 var C4ContainerItem = Type("C4ContainerItem", func() {
-	Description("C4 container derived from the evaluated target Goa/Goa-AI design.")
+	Description("Architecture element declared by the target Goa, Goa-AI, or Model design.")
 	Attribute("id", String, "Stable container identifier.")
 	Attribute("name", String, "Human-readable container name.")
-	Attribute("kind", String, "Container role (service, agent, or toolset).", func() {
-		Enum("service", "agent", "toolset")
+	Attribute("kind", String, "Declared service, agent, toolset, person, system, container, or component.", func() {
+		Enum("service", "agent", "toolset", "person", "system", "container", "component")
 	})
 	Attribute("description", String, "Summary of the container's responsibility.")
 	Required("id", "name", "kind", "description")

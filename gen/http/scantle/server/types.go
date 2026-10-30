@@ -203,7 +203,7 @@ type C4ContainerItemResponseBody struct {
 	ID string `form:"id" json:"id" xml:"id"`
 	// Human-readable container name.
 	Name string `form:"name" json:"name" xml:"name"`
-	// Container role (service, agent, or toolset).
+	// Declared service, agent, toolset, person, system, container, or component.
 	Kind string `form:"kind" json:"kind" xml:"kind"`
 	// Summary of the container's responsibility.
 	Description string `form:"description" json:"description" xml:"description"`
