@@ -79,7 +79,7 @@ Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (
 
 Your agent will create the Change Card (`propose_change`, calling `confirm_intent` only if open ambiguity questions yield `status: "needs_confirmation"`), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and cross-family Chorus build roster (`@architect`, `@builder-orders`, `@eval-author`, `@reviewer`).
 
-To run the full OS-sandboxed verification suite (and compare the full operator report with the builder-redacted `-builder-view` report where unseen holdout scenarios appear as `holdout-1`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
+To run the full OS-sandboxed verification suite (and compare the full operator report with the builder-redacted `-builder-view` report where `"holdout"` scenarios are redacted to `"id": "holdout-1"`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
 
 ---
 

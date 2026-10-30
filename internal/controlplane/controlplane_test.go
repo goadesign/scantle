@@ -642,7 +642,9 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 		`"ui/initialize"`,
 		`"ui/notifications/initialized"`,
 		`"ui/notifications/tool-input"`,
+		`"ui/notifications/tool-cancelled"`,
 		`"ui/notifications/tool-result"`,
+		`"ui/resource-teardown"`,
 		`event.source !== window.parent`,
 	} {
 		if !strings.Contains(htmlDoc, want) {
@@ -1046,6 +1048,47 @@ messageListener({
 });
 if (root.dataset.state !== "error") {
   throw new Error("expected error state on malformed payload, got: " + root.dataset.state);
+}
+
+// 9. Deliver tool-cancelled notification -> clears attribution and transitions to cancelled state.
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-cancelled",
+    params: { reason: "user aborted" }
+  }
+});
+if (root.dataset.state !== "cancelled" || root.dataset.requestRevision !== undefined || !renderText(viewEl).includes("user aborted")) {
+  throw new Error("expected cancelled state with cleared attribution, got: " + JSON.stringify(root.dataset) + " / " + renderText(viewEl));
+}
+
+// 10. Deliver host ping and ui/resource-teardown requests with id === 1 (same as INIT_REQUEST_ID) -> must respond with JSON-RPC results, not misclassify as init response.
+const beforeCount = hostMessages.length;
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "ping",
+    params: {}
+  }
+});
+if (hostMessages.length !== beforeCount + 1 || hostMessages[beforeCount].msg.id !== 1 || !hostMessages[beforeCount].msg.result) {
+  throw new Error("expected ping result for id=1, got: " + JSON.stringify(hostMessages.slice(beforeCount)));
+}
+
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "ui/resource-teardown",
+    params: {}
+  }
+});
+if (hostMessages.length !== beforeCount + 2 || hostMessages[beforeCount + 1].msg.id !== 1 || !hostMessages[beforeCount + 1].msg.result || root.dataset.state !== "terminated") {
+  throw new Error("expected resource-teardown result for id=1 and terminated state, got: " + JSON.stringify(hostMessages.slice(beforeCount)) + " / " + root.dataset.state);
 }
 `
 	cmd := exec.CommandContext(ctx, nodePath, "-e", nodeHarness)

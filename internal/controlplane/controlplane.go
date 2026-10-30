@@ -239,18 +239,24 @@ const (
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 0.85rem;
     }
+    code {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     pre {
       padding: 0.65rem;
       border-radius: 6px;
       border: 1px solid rgba(127, 127, 127, 0.35);
       overflow-x: auto;
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
     .scantle-meta, .scantle-card {
       border: 1px solid rgba(127, 127, 127, 0.35);
       border-radius: 6px;
       padding: 0.75rem;
       margin-bottom: 0.75rem;
+      overflow-wrap: anywhere;
     }
     .scantle-badge {
       display: inline-block;
@@ -279,9 +285,9 @@ const (
 <body>
   <main id="scantle-checkpoint-root" data-profile="mcp-app" data-state="waiting">
     <header>
-      <h1>Scantle Interactive Checkpoint</h1>
-      <p>Renders validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Sandbox controls while preserving ordinary text fallback.</p>
-      <p><small>Visual inspection does not grant approval authority; confirmation and verification are enforced by <code>confirm_intent</code>, <code>preview_architecture</code> revision locks, and <code>scantle verify</code>.</small></p>
+      <h1>Scantle Checkpoint Viewer</h1>
+      <p>Displays validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Fast Draft Override results from structured MCP tool outputs.</p>
+      <p><small>Visual inspection does not grant approval authority; invoke <code>confirm_intent</code>, <code>preview_architecture</code>, <code>draft_override</code>, or <code>scantle verify</code> through your MCP host or CLI to advance the workflow.</small></p>
     </header>
     <p id="scantle-checkpoint-status" role="status" aria-live="polite">Awaiting MCP Apps host initialization and checkpoint tool result...</p>
     <section id="scantle-checkpoint-view" aria-label="Checkpoint Payload"></section>
@@ -292,6 +298,7 @@ const (
 
     var INIT_REQUEST_ID = 1;
     var PROTOCOL_VERSION = "2026-01-26";
+    var initPending = false;
     var root = document.getElementById("scantle-checkpoint-root");
     var statusEl = document.getElementById("scantle-checkpoint-status");
     var viewEl = document.getElementById("scantle-checkpoint-view");
@@ -365,6 +372,21 @@ const (
       root.dataset.state = "waiting";
       statusEl.textContent = message;
       replaceChildren(viewEl, []);
+    }
+
+    function renderCancelled(reason) {
+      clearDatasetKeys();
+      root.dataset.state = "cancelled";
+      statusEl.textContent = "Checkpoint tool call cancelled";
+      var detail = typeof reason === "string" && reason.length > 0
+        ? "Tool call was cancelled (" + reason + "). Re-run the Scantle checkpoint tool to inspect a fresh result."
+        : "Tool call was cancelled before completion. Re-run the Scantle checkpoint tool to inspect a fresh result.";
+      replaceChildren(viewEl, [
+        el("div", { className: "scantle-meta", role: "status" }, [
+          el("strong", { textContent: "Cancelled: " }),
+          detail
+        ])
+      ]);
     }
 
     function renderError(message) {
@@ -615,7 +637,7 @@ const (
           badges.push(el("span", { className: "scantle-badge", textContent: "BoundedResult" }));
         }
         if (t.requires_ui) {
-          badges.push(el("span", { className: "scantle-badge", textContent: "ToolUI" }));
+          badges.push(el("span", { className: "scantle-badge", textContent: "UI required" }));
         }
         return el("li", {}, [
           el("code", { textContent: t.id }),
@@ -769,7 +791,64 @@ const (
       if (!isPlainObject(msg) || msg.jsonrpc !== "2.0") {
         return;
       }
-      if (msg.id === INIT_REQUEST_ID) {
+      if (typeof msg.method === "string") {
+        if (msg.id !== undefined && msg.id !== null) {
+          if (msg.method === "ui/resource-teardown") {
+            clearDatasetKeys();
+            root.dataset.state = "terminated";
+            statusEl.textContent = "Checkpoint resource torn down.";
+            replaceChildren(viewEl, []);
+            window.parent.postMessage({
+              jsonrpc: "2.0",
+              id: msg.id,
+              result: {}
+            }, "*");
+            return;
+          }
+          if (msg.method === "ping") {
+            window.parent.postMessage({
+              jsonrpc: "2.0",
+              id: msg.id,
+              result: {}
+            }, "*");
+            return;
+          }
+          window.parent.postMessage({
+            jsonrpc: "2.0",
+            id: msg.id,
+            error: {
+              code: -32601,
+              message: "Method not found: " + msg.method
+            }
+          }, "*");
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-input") {
+          if (!isPlainObject(msg.params)) {
+            renderError("Malformed ui/notifications/tool-input notification.");
+            return;
+          }
+          renderWaiting("Received tool input; awaiting validated checkpoint result...");
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-cancelled") {
+          if (msg.params !== undefined && !isPlainObject(msg.params)) {
+            renderError("Malformed ui/notifications/tool-cancelled notification.");
+            return;
+          }
+          var cancelReason = isPlainObject(msg.params) && typeof msg.params.reason === "string"
+            ? msg.params.reason
+            : "";
+          renderCancelled(cancelReason);
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-result") {
+          handleToolResult(msg.params);
+        }
+        return;
+      }
+      if (initPending && msg.id === INIT_REQUEST_ID) {
+        initPending = false;
         if (msg.error) {
           var errMsg = isPlainObject(msg.error) && typeof msg.error.message === "string"
             ? msg.error.message
@@ -788,24 +867,13 @@ const (
           method: "ui/notifications/initialized",
           params: {}
         }, "*");
-        return;
-      }
-      if (msg.method === "ui/notifications/tool-input") {
-        if (!isPlainObject(msg.params)) {
-          renderError("Malformed ui/notifications/tool-input notification.");
-          return;
-        }
-        renderWaiting("Received tool input; awaiting validated checkpoint result...");
-        return;
-      }
-      if (msg.method === "ui/notifications/tool-result") {
-        handleToolResult(msg.params);
       }
     }
 
     window.addEventListener("message", handleMessage);
 
     if (window.parent && window.parent !== window) {
+      initPending = true;
       window.parent.postMessage({
         jsonrpc: "2.0",
         id: INIT_REQUEST_ID,

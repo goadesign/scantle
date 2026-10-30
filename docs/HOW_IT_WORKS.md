@@ -95,7 +95,7 @@ One-click replay of your confirmed examples:
 Or type any prompt to poke the agent live...        [+ Make This an Example] [⚡ Draft Tweak]
 ```
 
-- **Role Switching Against Real Auth Boundaries**: Trigger a `\$54.00` refund as a **Customer**, verify that a `Customer` bearer token receives `403 Forbidden` if it calls the manager approval endpoint (`POST /orders/runs/{run_id}/approval`), and switch to **Approving Manager** to approve or decline the paused workflow run via the public API.
+- **Role Switching Against Real Auth Boundaries**: Trigger a `\$54.00` refund as a **Customer**, verify that a `Customer` bearer token receives `403 Forbidden` if it calls the manager approval endpoint (`POST /runs/{run_id}/approval`), and switch to **Approving Manager** to approve or decline the paused workflow run via the public API.
 - **MCP Apps & Optional OpenUI Previews**: Tools that declare `ToolUI("ui://...")` pair structured `Result` and `ServerData` payloads with MCP Apps views (`ui://scantle/checkpoint`).
 - **Fast Draft Mode (`draft_override`)**:
   - Editing a **prompt template** (`target_kind: "prompt_template"`) invokes `Options.TargetUpdater` (when bound by an embedding host; rejected on standalone `scantle serve`) to update the target platform's `prompt.Store` in **0 seconds** and returns the new `prompt_version` digest.
