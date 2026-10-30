@@ -13,10 +13,18 @@
 
 ### Start the Scantle Server
 
+To enable feature-request analysis, set `ANTHROPIC_API_KEY` and set `SCANTLE_MODEL_NAME` to a model ID available to that key, then run:
+
 ```bash
 export SCANTLE_AUTH_TOKEN="dev-secret-token"
-go run ./cmd/scantle serve -addr 127.0.0.1:8090 -principal operator@example.com
+go run ./cmd/scantle serve -addr 127.0.0.1:8090 \
+  -principal operator@example.com \
+  -model-provider anthropic -model-name "$SCANTLE_MODEL_NAME"
 ```
+
+For OpenAI, use `-model-provider openai`, set `OPENAI_API_KEY`, and choose a model ID available to that key. Alternatively, use `-model-gateway-addr <host:port>` alone to call an existing model gateway; the gateway chooses the model. That connection uses plaintext gRPC and is intended for loopback or a trusted network.
+
+Omitting all model flags starts the server without feature-request analysis. The `diff` tool, Golden Path resource, and `compiled_rule` rebuild response still work; `propose_change` returns `cp1 semantic analyzer is required`.
 
 ### Register Scantle in `.mcp.json`
 
@@ -35,6 +43,51 @@ Add Scantle to your project's `.mcp.json` (or global agent configuration in Clau
   }
 }
 ```
+
+### Configure the Proposed Swarm Roster
+
+To include agent assignments in an architecture preview, pass `-swarm-profiles ./swarm-profiles.json` when starting the server. Save a JSON array with these fields, replacing the model placeholders with IDs available to your coding agents:
+
+```json
+[
+  {
+    "id": "refund-builder",
+    "provider": "anthropic",
+    "model": "YOUR_ANTHROPIC_MODEL",
+    "family": "claude",
+    "authenticated": true,
+    "capabilities": ["builder"]
+  },
+  {
+    "id": "independent-review",
+    "provider": "openai",
+    "model": "YOUR_OPENAI_MODEL",
+    "family": "gpt",
+    "authenticated": true,
+    "capabilities": ["architect", "eval_author", "reviewer"]
+  }
+]
+```
+
+These profiles describe coding agents separately from the CP1 analysis model. `authenticated: true` is the operator's assertion that the profile has usable credentials; the command does not test those credentials or discover installed coding agents. Keep credentials out of this file. Profiles from the same model family must use the same `family` value.
+
+After confirming a Change Card, include explicit builder ownership in the `preview_architecture` request. For example, a builder for the orders service can supply this `builders` field alongside `change_id`, `request_revision`, and `design`:
+
+```json
+{
+  "builders": [
+    {
+      "name": "orders",
+      "paths": ["internal/orders/**"],
+      "preferred_profile_id": "refund-builder"
+    }
+  ]
+}
+```
+
+Paths are relative to the target repository and must cover the files assigned to that builder. With no eligible profiles, the architecture preview returns the evaluated design with an `unconfigured` roster. If eligible profiles lack a required role, it returns `missing_capability`. Once all roles are covered, omitting builder scopes returns `unconfigured` with `builder` listed in `missing_roles`.
+
+A configured roster reports its actual `cross_family_review` and `cross_family_eval` values; family choices and capabilities determine whether those roles differ from every builder. The preview returns proposed assignments and manifest text; it does not launch agents or publish a Chorus manifest.
 
 ---
 
@@ -55,7 +108,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
   - Evaluates a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed Chorus `swarm` plan.
 - **`draft_override`** (`POST /sandbox/draft`)
   - **Input:** `target_kind` (`prompt_template` \| `compiled_rule`), `prompt_id?`, `new_content` → **Output:** `DraftOverrideResult`
-  - Hot-reloads a `prompt_template` in `0s` on the bound `CP3` sandbox target or rejects a `compiled_rule` override that requires a full Go rebuild.
+  - Applies a `prompt_template` to a target configured through `controlplane.Options.TargetUpdater`, without rebuilding Go code, or reports that a `compiled_rule` requires a rebuild. The `serve` command does not bind a prompt updater, so its `prompt_template` requests return `no target prompt updater is bound to this control plane`.
 - **`diff`** (`POST /diff`)
   - **Input:** `old` (`DesignSnapshot`), `new` (`DesignSnapshot`) → **Output:** `DiffResult`
   - Compares two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives.
@@ -65,7 +118,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 - **`scantle://golden-path`** (`GET /golden-path`, `text/markdown`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
 - **`ui://scantle/checkpoint`** (`GET /ui/checkpoint`, `text/html;profile=mcp-app`)
-  - Serves the interactive MCP Apps HTML host for `CP1`–`CP3` checkpoints and sandboxed `openui.v1` action dispatch.
+  - Serves the current checkpoint HTML placeholder. Interactive Change Cards, architecture rendering, sandbox controls, and `openui.v1` action dispatch are planned.
 
 ---
 
@@ -76,6 +129,12 @@ Starts the Scantle HTTP and MCP JSON-RPC control-plane server protected by beare
 - `-addr <host:port>` — Listen address (default `127.0.0.1:8090`).
 - `-principal <id>` — Authenticated operator principal ID *(required)*.
 - `-auth-token <token>` — Bearer token required on HTTP and MCP requests (or `$SCANTLE_AUTH_TOKEN`, *required*).
+- `-model-gateway-addr <host:port>` — Optional model gateway for CP1 analysis over plaintext gRPC. The gateway chooses the model; cannot be combined with `-model-provider` or `-model-name`.
+- `-model-provider <anthropic|openai>` — Optional direct provider for CP1 analysis. Requires `-model-name` and the matching `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` environment variable. Provider names must match exactly.
+- `-model-name <model>` — Model ID for direct provider mode; required with `-model-provider` and rejected in gateway mode.
+- `-swarm-profiles <path.json>` — Optional JSON array of configured coding-agent profiles for proposed CP2 assignments; see [Configure the Proposed Swarm Roster](#configure-the-proposed-swarm-roster).
+
+Model and swarm-profile flags are independent. Incomplete or mixed model options stop startup with an error. A supplied profiles file must contain one JSON array: unknown fields, trailing JSON values, duplicate profile IDs, empty required metadata, and unknown capabilities stop startup. Omitted profiles leave the proposed roster unconfigured.
 
 ### `scantle diff`
 Reads two Go design modules into symlink-safe snapshots, evaluates both inside the sandboxed Goa/Goa-AI compiler at their own `go.mod` dependency versions, and prints the JSON `DiffResult` to `stdout`.
@@ -86,10 +145,10 @@ Reads two Go design modules into symlink-safe snapshots, evaluates both inside t
 
 ## Reference Platform: `examples/orders` & `examples/orders-eval`
 
-Scantle ships with a complete reference platform and isolated evaluator so you can inspect and run every pattern locally:
+Scantle includes an order-refund service and an isolated evaluator for checking payment effects, manager approval, worker recovery, and token budgets:
 
 ### [`examples/orders`](../examples/orders/) — The Candidate Platform
-- **[`design/design.go`](../examples/orders/design/design.go) & [`design/model.go`](../examples/orders/design/model.go)**: Declares the public `orders` HTTP service, internal `commerce` and `payments` services, the `goa-ai` `refund` agent (`Inject("tenant_id", "customer_id")`, `BoundedResult`, and `Confirmation`), and the C4 architecture model rendered to [`gen/structurizr/model.json`](../examples/orders/gen/structurizr/model.json).
+- **[`design/`](../examples/orders/design/)**: Declares the public `orders` HTTP service, internal `commerce` and `payments` services, the `goa-ai` `refund` agent (`Inject("tenant_id", "customer_id")`, `BoundedResult`, and `Confirmation`), and the C4 architecture model rendered to [`gen/structurizr/model.json`](../examples/orders/gen/structurizr/model.json).
 - **[`AGENTS_QUICKSTART.md`](../examples/orders/AGENTS_QUICKSTART.md)**: Generated contextual map for coding agents, surfacing per-tool `BindTo` method links, server-injected fields, `BoundedResult` cursor guidance, `Confirmation` gates, and `gen/orders/agents/refund/specs/tool_schemas.json`.
 - **[`internal/refundflow`](../examples/orders/internal/refundflow/)**: Durable Temporal workflow implementing instant store credit (`<= \$50.00` including tax and shipping) and manager approval signals (`> \$50.00`) with idempotent payment keys.
 - **[`internal/runstore`](../examples/orders/internal/runstore/)**: Transactional SQLite implementation of `goa-ai`'s durable `storage.Store`.
