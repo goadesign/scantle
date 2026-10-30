@@ -1,0 +1,600 @@
+swagger: "2.0"
+info:
+    title: Scantle MCP Software Factory
+    description: Design-first MCP control plane for creating, verifying, and evolving production agentic platforms on the Goa Design suite.
+    version: 1.0.0
+host: localhost:80
+consumes:
+    - application/json
+    - application/xml
+    - application/gob
+produces:
+    - application/json
+    - application/xml
+    - application/gob
+paths:
+    /changes/confirm:
+        post:
+            tags:
+                - scantle
+            summary: confirm_intent scantle
+            description: Confirm Checkpoint 1 answers and examples to freeze the Change Card.
+            operationId: scantle#confirm_intent
+            parameters:
+                - name: confirm_intent_request_body
+                  in: body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/ConfirmIntentPayload'
+                    required:
+                        - change_id
+                        - operator
+                        - answers
+                        - examples
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        $ref: '#/definitions/ChangeCardResult'
+                        required:
+                            - change_id
+                            - status
+                            - summary
+                            - examples
+                            - preserved_behaviors
+                            - request_revision
+            schemes:
+                - http
+    /changes/propose:
+        post:
+            tags:
+                - scantle
+            summary: propose_change scantle
+            description: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.
+            operationId: scantle#propose_change
+            parameters:
+                - name: propose_change_request_body
+                  in: body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/ProposeChangePayload'
+                    required:
+                        - change_id
+                        - prompt
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        $ref: '#/definitions/ChangeCardResult'
+                        required:
+                            - change_id
+                            - status
+                            - summary
+                            - examples
+                            - preserved_behaviors
+                            - request_revision
+            schemes:
+                - http
+    /diff:
+        post:
+            tags:
+                - scantle
+            summary: diff scantle
+            description: Compare Goa design ASTs and go.mod versions without emitting a blanket compatibility verdict.
+            operationId: scantle#diff
+            parameters:
+                - name: DiffRequestBody
+                  in: body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/DiffPayload'
+                    required:
+                        - old_design
+                        - new_design
+                        - old_gomod
+                        - new_gomod
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        $ref: '#/definitions/DiffResult'
+                        required:
+                            - has_changes
+                            - added_declarations
+                            - removed_declarations
+                            - version_deltas
+                            - summary
+            schemes:
+                - http
+    /sandbox/draft:
+        post:
+            tags:
+                - scantle
+            summary: draft_override scantle
+            description: Apply a Fast Draft Mode prompt override in prompt.Store or reject a compiled-rule prompt hack.
+            operationId: scantle#draft_override
+            parameters:
+                - name: draft_override_request_body
+                  in: body
+                  required: true
+                  schema:
+                    $ref: '#/definitions/DraftOverridePayload'
+                    required:
+                        - target_kind
+                        - new_content
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        $ref: '#/definitions/DraftOverrideResult'
+                        required:
+                            - applied_in_store
+                            - requires_rebuild
+                            - message
+            schemes:
+                - http
+    /ui/checkpoint:
+        get:
+            tags:
+                - scantle
+            summary: checkpoint_ui scantle
+            description: Serve the interactive MCP Apps HTML host for Scantle checkpoints.
+            operationId: scantle#checkpoint_ui
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        type: string
+            schemes:
+                - http
+definitions:
+    AmbiguityQuestion:
+        title: AmbiguityQuestion
+        type: object
+        properties:
+            id:
+                type: string
+                description: Stable question identifier.
+                example: Aut fuga velit.
+            options:
+                type: array
+                items:
+                    type: string
+                    example: Ex aliquid est velit necessitatibus hic incidunt.
+                description: Concrete resolution choices.
+                example:
+                    - Ex aliquid est velit necessitatibus hic incidunt.
+                    - Quia aut qui maxime autem.
+                    - Facere voluptatum dolorem.
+                    - Sit qui nam odio itaque aut.
+            question:
+                type: string
+                description: Plain-English question for the operator.
+                example: Inventore maxime esse.
+        description: Domain ambiguity surfaced with concrete examples at Checkpoint 1.
+        example:
+            id: Aut fuga velit.
+            options:
+                - Ex aliquid est velit necessitatibus hic incidunt.
+                - Quia aut qui maxime autem.
+                - Facere voluptatum dolorem.
+                - Sit qui nam odio itaque aut.
+            question: Inventore maxime esse.
+        required:
+            - id
+            - question
+            - options
+    ChangeCardResult:
+        title: ChangeCardResult
+        type: object
+        properties:
+            ambiguities:
+                type: array
+                items:
+                    $ref: '#/definitions/AmbiguityQuestion'
+                description: Unresolved domain questions, empty when clear.
+                example:
+                    - id: Aut fuga velit.
+                      options:
+                        - Ex aliquid est velit necessitatibus hic incidunt.
+                        - Quia aut qui maxime autem.
+                        - Facere voluptatum dolorem.
+                        - Sit qui nam odio itaque aut.
+                      question: Inventore maxime esse.
+                    - id: Aut fuga velit.
+                      options:
+                        - Ex aliquid est velit necessitatibus hic incidunt.
+                        - Quia aut qui maxime autem.
+                        - Facere voluptatum dolorem.
+                        - Sit qui nam odio itaque aut.
+                      question: Inventore maxime esse.
+                    - id: Aut fuga velit.
+                      options:
+                        - Ex aliquid est velit necessitatibus hic incidunt.
+                        - Quia aut qui maxime autem.
+                        - Facere voluptatum dolorem.
+                        - Sit qui nam odio itaque aut.
+                      question: Inventore maxime esse.
+            change_id:
+                type: string
+                description: Change identifier.
+                example: Dolor adipisci ut nam quia ad.
+            examples:
+                type: array
+                items:
+                    $ref: '#/definitions/ExampleItem'
+                description: Concrete examples mapped to evaluator checks.
+                example:
+                    - expected_outcome: Voluptatem necessitatibus numquam.
+                      id: Nemo libero.
+                      input_summary: Deserunt tempore deleniti.
+                      scenario: Vitae velit dicta excepturi distinctio.
+                      verification_kind: deterministic
+                    - expected_outcome: Voluptatem necessitatibus numquam.
+                      id: Nemo libero.
+                      input_summary: Deserunt tempore deleniti.
+                      scenario: Vitae velit dicta excepturi distinctio.
+                      verification_kind: deterministic
+            preserved_behaviors:
+                type: array
+                items:
+                    type: string
+                    example: Qui quia assumenda vero fugit rerum sed.
+                description: Existing contract invariants preserved by this change.
+                example:
+                    - Qui quia assumenda vero fugit rerum sed.
+                    - Exercitationem ea dolores quo ab rerum adipisci.
+                    - Aut et nostrum.
+                    - Mollitia commodi qui error.
+            request_revision:
+                type: string
+                description: SHA-256 digest of the confirmed Change Card.
+                example: Necessitatibus quos et ut natus voluptates corporis.
+            status:
+                type: string
+                description: Checkpoint status (needs_confirmation or confirmed).
+                example: needs_confirmation
+                enum:
+                    - needs_confirmation
+                    - confirmed
+            summary:
+                type: string
+                description: Plain-English summary of requested behavior.
+                example: Maiores voluptate soluta quasi et in.
+        description: Frozen or pending Checkpoint 1 Change Card.
+        example:
+            ambiguities:
+                - id: Aut fuga velit.
+                  options:
+                    - Ex aliquid est velit necessitatibus hic incidunt.
+                    - Quia aut qui maxime autem.
+                    - Facere voluptatum dolorem.
+                    - Sit qui nam odio itaque aut.
+                  question: Inventore maxime esse.
+                - id: Aut fuga velit.
+                  options:
+                    - Ex aliquid est velit necessitatibus hic incidunt.
+                    - Quia aut qui maxime autem.
+                    - Facere voluptatum dolorem.
+                    - Sit qui nam odio itaque aut.
+                  question: Inventore maxime esse.
+                - id: Aut fuga velit.
+                  options:
+                    - Ex aliquid est velit necessitatibus hic incidunt.
+                    - Quia aut qui maxime autem.
+                    - Facere voluptatum dolorem.
+                    - Sit qui nam odio itaque aut.
+                  question: Inventore maxime esse.
+            change_id: Dolor adipisci ut nam quia ad.
+            examples:
+                - expected_outcome: Voluptatem necessitatibus numquam.
+                  id: Nemo libero.
+                  input_summary: Deserunt tempore deleniti.
+                  scenario: Vitae velit dicta excepturi distinctio.
+                  verification_kind: deterministic
+                - expected_outcome: Voluptatem necessitatibus numquam.
+                  id: Nemo libero.
+                  input_summary: Deserunt tempore deleniti.
+                  scenario: Vitae velit dicta excepturi distinctio.
+                  verification_kind: deterministic
+            preserved_behaviors:
+                - Qui quia assumenda vero fugit rerum sed.
+                - Exercitationem ea dolores quo ab rerum adipisci.
+                - Aut et nostrum.
+                - Mollitia commodi qui error.
+            request_revision: Necessitatibus quos et ut natus voluptates corporis.
+            status: needs_confirmation
+            summary: Maiores voluptate soluta quasi et in.
+        required:
+            - change_id
+            - status
+            - summary
+            - examples
+            - preserved_behaviors
+            - request_revision
+    ConfirmIntentPayload:
+        title: ConfirmIntentPayload
+        type: object
+        properties:
+            answers:
+                type: object
+                description: Selected resolution per ambiguity question ID.
+                example:
+                    Cupiditate vel.: Omnis debitis sit.
+                    Modi voluptates.: Occaecati corporis laborum libero odit repellat sit.
+                    Optio id ut quae.: Aperiam labore autem est possimus ipsam sunt.
+                additionalProperties:
+                    type: string
+                    example: Omnis debitis sit.
+            change_id:
+                type: string
+                description: Change identifier.
+                example: Aspernatur quia doloribus assumenda unde tenetur.
+            examples:
+                type: array
+                items:
+                    $ref: '#/definitions/ExampleItem'
+                description: Confirmed example table.
+                example:
+                    - expected_outcome: Voluptatem necessitatibus numquam.
+                      id: Nemo libero.
+                      input_summary: Deserunt tempore deleniti.
+                      scenario: Vitae velit dicta excepturi distinctio.
+                      verification_kind: deterministic
+                    - expected_outcome: Voluptatem necessitatibus numquam.
+                      id: Nemo libero.
+                      input_summary: Deserunt tempore deleniti.
+                      scenario: Vitae velit dicta excepturi distinctio.
+                      verification_kind: deterministic
+                    - expected_outcome: Voluptatem necessitatibus numquam.
+                      id: Nemo libero.
+                      input_summary: Deserunt tempore deleniti.
+                      scenario: Vitae velit dicta excepturi distinctio.
+                      verification_kind: deterministic
+            operator:
+                type: string
+                description: Authenticated operator identity.
+                example: Culpa repellat.
+        example:
+            answers:
+                Cupiditate vel.: Omnis debitis sit.
+                Modi voluptates.: Occaecati corporis laborum libero odit repellat sit.
+                Optio id ut quae.: Aperiam labore autem est possimus ipsam sunt.
+            change_id: Aspernatur quia doloribus assumenda unde tenetur.
+            examples:
+                - expected_outcome: Voluptatem necessitatibus numquam.
+                  id: Nemo libero.
+                  input_summary: Deserunt tempore deleniti.
+                  scenario: Vitae velit dicta excepturi distinctio.
+                  verification_kind: deterministic
+                - expected_outcome: Voluptatem necessitatibus numquam.
+                  id: Nemo libero.
+                  input_summary: Deserunt tempore deleniti.
+                  scenario: Vitae velit dicta excepturi distinctio.
+                  verification_kind: deterministic
+                - expected_outcome: Voluptatem necessitatibus numquam.
+                  id: Nemo libero.
+                  input_summary: Deserunt tempore deleniti.
+                  scenario: Vitae velit dicta excepturi distinctio.
+                  verification_kind: deterministic
+            operator: Culpa repellat.
+        required:
+            - change_id
+            - operator
+            - answers
+            - examples
+    DiffPayload:
+        title: DiffPayload
+        type: object
+        properties:
+            new_design:
+                type: string
+                description: Candidate Go/Goa design source.
+                example: Voluptatem distinctio numquam.
+            new_gomod:
+                type: string
+                description: Candidate go.mod file contents.
+                example: Libero vel fugiat.
+            old_design:
+                type: string
+                description: Previous Go/Goa design source.
+                example: Consequatur et vel iure quas.
+            old_gomod:
+                type: string
+                description: Previous go.mod file contents.
+                example: Dolorum quis et ipsum rerum.
+        example:
+            new_design: Voluptatem distinctio numquam.
+            new_gomod: Libero vel fugiat.
+            old_design: Consequatur et vel iure quas.
+            old_gomod: Dolorum quis et ipsum rerum.
+        required:
+            - old_design
+            - new_design
+            - old_gomod
+            - new_gomod
+    DiffResult:
+        title: DiffResult
+        type: object
+        properties:
+            added_declarations:
+                type: array
+                items:
+                    type: string
+                    example: Nostrum at rerum voluptatem eligendi quia.
+                description: Added services, methods, agents, or tools.
+                example:
+                    - Nostrum at rerum voluptatem eligendi quia.
+                    - Voluptates possimus.
+                    - Aut esse qui.
+                    - Debitis ut corrupti.
+            has_changes:
+                type: boolean
+                description: True when any declaration or module pin changed.
+                example: true
+            removed_declarations:
+                type: array
+                items:
+                    type: string
+                    example: Quidem ea quidem sunt non.
+                description: Removed services, methods, agents, or tools.
+                example:
+                    - Quidem ea quidem sunt non.
+                    - Perferendis et eum.
+            summary:
+                type: string
+                description: Human-readable structural diff summary.
+                example: Provident dolores nostrum.
+            version_deltas:
+                type: array
+                items:
+                    type: string
+                    example: Sint magnam.
+                description: Changed module dependency pins.
+                example:
+                    - Sint magnam.
+                    - Aut dignissimos autem voluptas fuga dolorem inventore.
+                    - Velit nihil velit veritatis.
+                    - Non dicta corrupti natus rerum quidem.
+        description: Factual structural and module version diff report.
+        example:
+            added_declarations:
+                - Nostrum at rerum voluptatem eligendi quia.
+                - Voluptates possimus.
+                - Aut esse qui.
+                - Debitis ut corrupti.
+            has_changes: true
+            removed_declarations:
+                - Quidem ea quidem sunt non.
+                - Perferendis et eum.
+            summary: Provident dolores nostrum.
+            version_deltas:
+                - Sint magnam.
+                - Aut dignissimos autem voluptas fuga dolorem inventore.
+                - Velit nihil velit veritatis.
+                - Non dicta corrupti natus rerum quidem.
+        required:
+            - has_changes
+            - added_declarations
+            - removed_declarations
+            - version_deltas
+            - summary
+    DraftOverridePayload:
+        title: DraftOverridePayload
+        type: object
+        properties:
+            new_content:
+                type: string
+                description: Updated prompt template text or rule expression.
+                example: Et autem necessitatibus.
+            prompt_id:
+                type: string
+                description: Registered prompt identifier when target_kind is prompt_template.
+                example: Nesciunt et qui aut eaque.
+            target_kind:
+                type: string
+                description: Override target kind (prompt_template or compiled_rule).
+                example: compiled_rule
+                enum:
+                    - prompt_template
+                    - compiled_rule
+        example:
+            new_content: Et autem necessitatibus.
+            prompt_id: Nesciunt et qui aut eaque.
+            target_kind: compiled_rule
+        required:
+            - target_kind
+            - new_content
+    DraftOverrideResult:
+        title: DraftOverrideResult
+        type: object
+        properties:
+            applied_in_store:
+                type: boolean
+                description: True when updated in prompt.Store for 0s reload.
+                example: false
+            message:
+                type: string
+                description: Operator-facing status explanation.
+                example: Ad assumenda iusto.
+            prompt_version:
+                type: string
+                description: New prompt version digest when applied in prompt.Store.
+                example: Provident iste temporibus magni molestiae facilis dolores.
+            requires_rebuild:
+                type: boolean
+                description: True when the change modifies a compiled Go business rule.
+                example: false
+        description: Fast Draft Mode result distinguishing 0s prompt reload from compiled Go rebuild.
+        example:
+            applied_in_store: false
+            message: Ad assumenda iusto.
+            prompt_version: Provident iste temporibus magni molestiae facilis dolores.
+            requires_rebuild: false
+        required:
+            - applied_in_store
+            - requires_rebuild
+            - message
+    ExampleItem:
+        title: ExampleItem
+        type: object
+        properties:
+            expected_outcome:
+                type: string
+                description: Expected side effect and response behavior.
+                example: Voluptatem necessitatibus numquam.
+            id:
+                type: string
+                description: Stable example identifier.
+                example: Nemo libero.
+            input_summary:
+                type: string
+                description: Representative user request and domain fixture state.
+                example: Deserunt tempore deleniti.
+            scenario:
+                type: string
+                description: Plain-English scenario description.
+                example: Vitae velit dicta excepturi distinctio.
+            verification_kind:
+                type: string
+                description: Evaluator check classification (deterministic or model_judged).
+                example: deterministic
+                enum:
+                    - deterministic
+                    - model_judged
+        description: Concrete input and expected outcome confirmed at Checkpoint 1.
+        example:
+            expected_outcome: Voluptatem necessitatibus numquam.
+            id: Nemo libero.
+            input_summary: Deserunt tempore deleniti.
+            scenario: Vitae velit dicta excepturi distinctio.
+            verification_kind: deterministic
+        required:
+            - id
+            - scenario
+            - input_summary
+            - expected_outcome
+            - verification_kind
+    ProposeChangePayload:
+        title: ProposeChangePayload
+        type: object
+        properties:
+            change_id:
+                type: string
+                description: Client-supplied or generated change identifier.
+                example: Molestiae debitis minima.
+            design_source:
+                type: string
+                description: Current target Goa design source inspected by the CP1 model.
+                example: Dolorem aut quidem molestiae nihil.
+            prompt:
+                type: string
+                description: Operator feature request.
+                example: Nobis alias dolores tenetur.
+        example:
+            change_id: Molestiae debitis minima.
+            design_source: Dolorem aut quidem molestiae nihil.
+            prompt: Nobis alias dolores tenetur.
+        required:
+            - change_id
+            - prompt
