@@ -56,7 +56,7 @@ go run ./cmd/scantle diff --old-dir examples/orders --new-dir examples/orders
 
 ## 2. Inspect CP1–CP3 via `scantle serve` & the MCP Apps Checkpoint Viewer
 
-Start the Scantle control plane with the included multi-family swarm profile file ([`swarm-profiles.example.json`](swarm-profiles.example.json)):
+Start the Scantle control plane with the included illustrative multi-family swarm profile file ([`swarm-profiles.example.json`](swarm-profiles.example.json)). Note that `swarm-profiles.example.json` is an operator-edited example where `"authenticated": true` is an operator assertion (not a live credential probe), and setting `ANTHROPIC_API_KEY` for CP1 analysis does not itself establish credentials for the OpenAI or Google coding-agent CLIs listed in the file:
 
 ```bash
 export SCANTLE_AUTH_TOKEN="dev-secret-token"
