@@ -65,7 +65,7 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Rule
 - Mark large, paged or truncated results with `BoundedResult()`. The service sets `Returned` and `Truncated` on every success, and sets `Total` only when it is known.
 - Keep `Return` to domain fields. Never add `returned`, `total`, `truncated` or `next_cursor` to it.
 - Prefer `BoundedResult(func() { ContinueWith("continue_x", "cursor"); NextCursor("next_cursor") })`. The runtime holds the cursor and the model calls the continuation with `{}`.
-- Put data that is too large for the model, or meant for a UI, in `ServerData`, never in `Return`.
+- Keep domain facts in `Return`, including facts a UI also renders. Put only data the model does not need, such as large or presentation-only payloads, in `ServerData`.
 - Declare `Confirmation(...)` on a tool when the domain requires a person to approve each call before it runs. Do not add it where the action is already authorized. Key the UI on the pending confirmation, never on a tool name.
 - Report expected tool failures as a classified `Failure` on the tool result (`RecoveryCorrectCall`, `RecoveryReplan` or `RecoveryFinish`), so the planner can recover. Return ordinary errors for unexpected failures; the runtime classifies them. Never panic.
 - Give every agent a `RunPolicy` with `DefaultCaps(MaxToolCalls(n), MaxRecoveryTurns(n))` and a `TimeBudget`, or a `Timing` block.
@@ -78,7 +78,7 @@ Rules for agents building services with Goa, Goa-AI, Model, Pulse and Clue. Rule
 - Agent turns and multi-step work run as durable workflows. Activities retry, so every side effect is idempotent. Key it by a stable ID such as the tool call ID or a domain key.
 - Pass downstream calls an idempotency key derived from the domain, for example `refund/<tenant>/<order>`.
 - Never retry a whole workflow. That repeats completed side effects.
-- Each encoded tool call, with its result, bounds, server data and metadata, must fit the engine's payload limit (1 MiB). Keep large domain data in application storage and return a typed reference.
+- Each complete workflow-engine input or output, including every tool call, result, transcript entry and metadata it carries, must fit the engine's payload limit (1 MiB). Keep large domain data in application storage and return a typed reference.
 - One host service owns the runtime store. Workers reach it through that service's typed API.
 - Never set a Temporal `DataConverter`. The engine installs its own.
 - Version workers with immutable build IDs. Keep old versions running until the executions pinned to them finish.
