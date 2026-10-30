@@ -9,6 +9,7 @@ import (
 
 	genevals "github.com/goadesign/scantle/examples/orders-eval/gen/evals/orders_acceptance"
 	"github.com/goadesign/scantle/examples/orders-eval/harness"
+	"github.com/goadesign/scantle/verify/candidate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"goa.design/goa-ai/eval"
@@ -25,7 +26,11 @@ func TestAcceptanceSuite(t *testing.T) {
 		out, err := build.CombinedOutput()
 		require.NoError(t, err, "build %s: %s", cmd, out)
 	}
-	env, err := harness.NewEnv(filepath.Join(bin, "orders"), filepath.Join(bin, "orders-worker"))
+	orders, err := candidate.NewArtifact(filepath.Join(bin, "orders"))
+	require.NoError(t, err)
+	worker, err := candidate.NewArtifact(filepath.Join(bin, "orders-worker"))
+	require.NoError(t, err)
+	env, err := harness.NewEnv(orders, worker)
 	require.NoError(t, err)
 	suite, err := genevals.New(New(env), genevals.Inputs{})
 	require.NoError(t, err)

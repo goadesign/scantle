@@ -1,18 +1,18 @@
 // Package harness starts the candidate orders platform for one evaluation
 // scenario and drives it through its public API.
 //
-// LOCAL SMOKE EVIDENCE ONLY: this harness executes candidate binaries itself,
-// under the evaluator's OS identity and working directory, with only an
-// environment allow-list. It does not enforce filesystem, network or credential
-// isolation, so its results cannot authorize promotion. Promotion evidence
-// requires launching through Scantle's sandboxed candidate launcher.
+// The evaluator never imports or directly executes candidate code. It starts
+// the candidate's digest-pinned binaries only through Scantle's
+// verify/candidate.Exec, which runs each one as a single sandboxed process: an
+// explicit environment, a private state directory, loopback access to the
+// assigned ports only, and no child processes. The harness points the
+// candidate's dependency URLs at a simulator owned by the scenario and talks to
+// it only with clients generated from the evaluator's own copy of the approved
+// contracts. Bearer tokens come from a test identity issuer whose key is
+// generated per environment; no real identity provider key is involved.
 //
-// The evaluator never imports candidate code. It launches the candidate's built
-// binaries as separate processes, points their dependency URLs at a simulator
-// owned by the scenario, and talks to them only with clients generated from the
-// evaluator's own copy of the approved contracts. Bearer tokens come from a
-// test identity issuer whose key is generated per environment and given to the
-// candidate's sim configuration; no real identity provider key is involved.
+// The Temporal dev server each platform uses is trusted test infrastructure and
+// runs outside the sandbox.
 package harness
 
 import (
@@ -23,29 +23,31 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"sync"
-	"syscall"
 	"time"
 
 	genordersclient "github.com/goadesign/scantle/examples/orders-eval/gen/http/orders/client"
 	genorders "github.com/goadesign/scantle/examples/orders-eval/gen/orders"
+	"github.com/goadesign/scantle/verify/candidate"
 	"github.com/golang-jwt/jwt/v5"
 	goahttp "goa.design/goa/v3/http"
 )
 
 type (
 	// Env is the shared environment of one evaluation run: the candidate's
-	// binaries and the test identity issuer's key. Every platform it starts
-	// gets its own Temporal dev server, because the candidate's task queues
-	// are fixed by its design and would otherwise be shared between
+	// pinned binaries and the test identity issuer's key. Every platform it
+	// starts gets its own Temporal dev server, because the candidate's task
+	// queues are fixed by its design and would otherwise be shared between
 	// scenarios.
 	Env struct {
-		// OrdersBin is the candidate's orders API binary.
-		OrdersBin string
-		// WorkerBin is the candidate's refund worker binary.
-		WorkerBin string
+		// Orders is the candidate's orders API binary.
+		Orders candidate.Artifact
+		// Worker is the candidate's refund worker binary.
+		Worker candidate.Artifact
 		// signingKey signs test bearer tokens and is given to the candidate as
 		// ORDERS_JWT_KEY. It is hex text so it is always a valid environment
 		// value; both sides use its bytes as the HS256 key.
@@ -58,33 +60,32 @@ type (
 		Client *genorders.Client
 		// env is the environment the platform runs in.
 		env *Env
-		// workerArgs restarts the refund worker with the same configuration.
-		workerArgs []string
+		// workerSpec restarts the refund worker with the same configuration.
+		workerSpec candidate.Spec
 		// worker is the current refund worker process.
-		worker *process
+		worker *candidate.Process
 		// api is the orders API process.
-		api *process
+		api *candidate.Process
 	}
 
-	// process is a started candidate process and its captured output.
-	process struct {
-		// cmd is the running command.
-		cmd *exec.Cmd
-		// out collects its stdout and stderr for diagnostics.
-		out *bytes.Buffer
-		// done is closed once the process exited.
-		done chan struct{}
+	// output is the single synchronized owner of a trusted helper process's
+	// combined output.
+	output struct {
+		// mu guards buf.
+		mu sync.Mutex
+		// buf accumulates output.
+		buf bytes.Buffer
 	}
 )
 
-// NewEnv returns an environment for the candidate binaries with a fresh test
-// identity issuer key.
-func NewEnv(ordersBin, workerBin string) (*Env, error) {
+// NewEnv returns an environment for the pinned candidate binaries with a fresh
+// test identity issuer key.
+func NewEnv(orders, worker candidate.Artifact) (*Env, error) {
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("generate test issuer key: %w", err)
 	}
-	return &Env{OrdersBin: ordersBin, WorkerBin: workerBin, signingKey: hex.EncodeToString(key)}, nil
+	return &Env{Orders: orders, Worker: worker, signingKey: hex.EncodeToString(key)}, nil
 }
 
 // Token signs a test bearer token for the tenant, subject and space-separated
@@ -95,32 +96,52 @@ func (e *Env) Token(tenant, subject, scope string) (string, error) {
 	}).SignedString([]byte(e.signingKey))
 }
 
-// Start launches a Temporal dev server, a candidate orders API and a refund
-// worker whose dependencies point at depsURL, and waits until the API accepts
-// connections. Everything stops when ctx ends.
+// Start launches a Temporal dev server and, in the sandbox, a candidate orders
+// API and refund worker whose dependencies point at depsURL; it waits until the
+// API accepts connections. Everything stops when ctx ends.
 func (e *Env) Start(ctx context.Context, depsURL string) (*Platform, error) {
-	temporalAddr, err := startTemporal(ctx)
+	depsPort, err := urlPort(depsURL)
 	if err != nil {
 		return nil, err
 	}
-	p := &Platform{env: e, workerArgs: []string{
-		"--env", "sim", "--payments-url", depsURL, "--temporal", temporalAddr,
+	temporalAddr, temporalPort, err := startTemporal(ctx)
+	if err != nil {
+		return nil, err
+	}
+	workerState, err := stateDir()
+	if err != nil {
+		return nil, err
+	}
+	p := &Platform{env: e, workerSpec: candidate.Spec{
+		Args:         []string{"--env", "sim", "--payments-url", depsURL, "--temporal", temporalAddr},
+		StateDir:     workerState,
+		ConnectPorts: []int{temporalPort, depsPort},
 	}}
-	if p.worker, err = launch(ctx, e.WorkerBin, nil, p.workerArgs...); err != nil {
-		return nil, err
+	if p.worker, err = candidate.Exec(ctx, e.Worker, p.workerSpec); err != nil {
+		return nil, fmt.Errorf("start refund worker: %w", err)
 	}
-	addr, err := freeAddr()
+	apiPort, err := freePort()
 	if err != nil {
 		return nil, err
 	}
-	p.api, err = launch(ctx, e.OrdersBin, []string{"ORDERS_JWT_KEY=" + e.signingKey},
-		"--env", "sim", "--commerce-url", depsURL, "--temporal", temporalAddr, "--listen", addr,
-		"--model-provider", "scripted")
+	apiState, err := stateDir()
 	if err != nil {
 		return nil, err
+	}
+	addr := "127.0.0.1:" + strconv.Itoa(apiPort)
+	p.api, err = candidate.Exec(ctx, e.Orders, candidate.Spec{
+		Args: []string{"--env", "sim", "--commerce-url", depsURL, "--temporal", temporalAddr,
+			"--listen", addr, "--model-provider", "scripted"},
+		Env:          []string{"ORDERS_JWT_KEY=" + e.signingKey},
+		StateDir:     apiState,
+		ConnectPorts: []int{temporalPort, depsPort},
+		ListenPort:   apiPort,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("start orders API: %w", err)
 	}
 	if err := WaitListening(ctx, addr); err != nil {
-		return nil, fmt.Errorf("orders API never listened: %w\n%s", err, p.api.out.String())
+		return nil, fmt.Errorf("orders API never listened: %w\n%s", err, p.api.Output())
 	}
 	c := genordersclient.NewClient("http", addr, http.DefaultClient, goahttp.RequestEncoder, goahttp.ResponseDecoder, false)
 	p.Client = genorders.NewClient(c.Chat(), c.RunStatus(), c.ApproveRefund())
@@ -129,18 +150,14 @@ func (e *Env) Start(ctx context.Context, depsURL string) (*Platform, error) {
 
 // KillWorker sends SIGKILL to the refund worker and waits for it to exit.
 func (p *Platform) KillWorker() error {
-	if err := p.worker.cmd.Process.Signal(syscall.SIGKILL); err != nil {
-		return fmt.Errorf("kill refund worker: %w", err)
-	}
-	<-p.worker.done
-	return nil
+	return p.worker.Kill()
 }
 
 // RestartWorker starts a replacement refund worker with the same configuration.
 func (p *Platform) RestartWorker(ctx context.Context) error {
-	w, err := launch(ctx, p.env.WorkerBin, nil, p.workerArgs...)
+	w, err := candidate.Exec(ctx, p.env.Worker, p.workerSpec)
 	if err != nil {
-		return err
+		return fmt.Errorf("restart refund worker: %w", err)
 	}
 	p.worker = w
 	return nil
@@ -148,7 +165,7 @@ func (p *Platform) RestartWorker(ctx context.Context) error {
 
 // Logs returns the candidate processes' output for diagnostics.
 func (p *Platform) Logs() string {
-	return "orders:\n" + p.api.out.String() + "\nworker:\n" + p.worker.out.String()
+	return "orders:\n" + p.api.Output() + "\nworker:\n" + p.worker.Output()
 }
 
 // WaitStatus polls a run until it reaches want or a terminal status, and
@@ -189,77 +206,75 @@ func WaitListening(ctx context.Context, addr string) error {
 }
 
 // startTemporal starts an in-memory Temporal dev server and returns its
-// frontend address. It stops when ctx ends.
-func startTemporal(ctx context.Context) (string, error) {
-	addr, err := freeAddr()
+// frontend address and port. It stops when ctx ends.
+func startTemporal(ctx context.Context) (string, int, error) {
+	port, err := freePort()
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
-	uiAddr, err := freeAddr()
+	uiPort, err := freePort()
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
-	_, port, _ := net.SplitHostPort(addr)
-	_, uiPort, _ := net.SplitHostPort(uiAddr)
-	proc, err := launch(ctx, "temporal", nil, "server", "start-dev", "--headless",
-		"--ip", "127.0.0.1", "--port", port, "--ui-port", uiPort, "--log-level", "error")
-	if err != nil {
-		return "", err
+	out := &output{}
+	cmd := exec.CommandContext(ctx, "temporal", "server", "start-dev", "--headless",
+		"--ip", "127.0.0.1", "--port", strconv.Itoa(port), "--ui-port", strconv.Itoa(uiPort), "--log-level", "error")
+	cmd.Stdout, cmd.Stderr = out, out
+	if err := cmd.Start(); err != nil {
+		return "", 0, fmt.Errorf("start temporal: %w", err)
 	}
+	go func() { _ = cmd.Wait() }()
+	addr := "127.0.0.1:" + strconv.Itoa(port)
 	waitCtx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	if err := WaitListening(waitCtx, addr); err != nil {
-		return "", fmt.Errorf("temporal never listened: %w\n%s", err, proc.out.String())
+		return "", 0, fmt.Errorf("temporal never listened: %w\n%s", err, out.String())
 	}
-	return addr, nil
+	return addr, port, nil
 }
 
-// launch starts a process that is killed when ctx ends. The process receives
-// only PATH, a private HOME and TMPDIR, and the variables in env: it never
-// inherits the evaluator's environment, so evaluator credentials cannot reach
-// candidate code.
-func launch(ctx context.Context, name string, env []string, args ...string) (*process, error) {
-	home, err := os.MkdirTemp("", "orders-eval-home-*")
+// stateDir creates a private state directory for one candidate process.
+func stateDir() (string, error) {
+	dir, err := os.MkdirTemp("", "orders-eval-state-*")
 	if err != nil {
-		return nil, fmt.Errorf("create private home: %w", err)
+		return "", fmt.Errorf("create state directory: %w", err)
 	}
-	out := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Env = append([]string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "TMPDIR=" + home}, env...)
-	cmd.Stdout, cmd.Stderr = &lockedWriter{w: out}, &lockedWriter{w: out}
-	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("start %s: %w", name, err)
-	}
-	p := &process{cmd: cmd, out: out, done: make(chan struct{})}
-	go func() {
-		_ = cmd.Wait()
-		_ = os.RemoveAll(home)
-		close(p.done)
-	}()
-	return p, nil
+	return dir, nil
 }
 
-// freeAddr returns a loopback address with a currently free port.
-func freeAddr() (string, error) {
+// urlPort returns the TCP port of an http URL.
+func urlPort(raw string) (int, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", raw, err)
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		return 0, fmt.Errorf("%s has no numeric port: %w", raw, err)
+	}
+	return port, nil
+}
+
+// freePort returns a currently free loopback port.
+func freePort() (int, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return "", fmt.Errorf("find free port: %w", err)
+		return 0, fmt.Errorf("find free port: %w", err)
 	}
-	addr := ln.Addr().String()
-	return addr, ln.Close()
-}
-
-// lockedWriter serializes writes from a process's stdout and stderr.
-type lockedWriter struct {
-	// mu guards w.
-	mu sync.Mutex
-	// w receives the output.
-	w *bytes.Buffer
+	port := ln.Addr().(*net.TCPAddr).Port
+	return port, ln.Close()
 }
 
 // Write appends p under the lock.
-func (l *lockedWriter) Write(p []byte) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.w.Write(p)
+func (o *output) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.Write(p)
+}
+
+// String returns a snapshot under the lock.
+func (o *output) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.String()
 }

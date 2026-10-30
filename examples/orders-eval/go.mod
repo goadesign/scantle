@@ -3,6 +3,7 @@ module github.com/goadesign/scantle/examples/orders-eval
 go 1.27.3
 
 require (
+	github.com/goadesign/scantle v0.0.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/stretchr/testify v1.12.1
 	goa.design/goa-ai v0.89.1-0.20261028052713-99d852887d11
@@ -44,3 +45,5 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/goadesign/scantle => ../..

@@ -17,6 +17,7 @@ import (
 	"github.com/goadesign/scantle/examples/orders-eval/acceptance"
 	genevals "github.com/goadesign/scantle/examples/orders-eval/gen/evals/orders_acceptance"
 	"github.com/goadesign/scantle/examples/orders-eval/harness"
+	"github.com/goadesign/scantle/verify/candidate"
 	"goa.design/goa-ai/eval"
 )
 
@@ -60,7 +61,15 @@ func run(ctx context.Context, ordersBin, workerBin string, concurrency int, scen
 	if len(scenarios) > 0 && len(tags) > 0 {
 		return nil, errors.New("--scenario and --tag cannot be combined")
 	}
-	env, err := harness.NewEnv(ordersBin, workerBin)
+	orders, err := candidate.NewArtifact(ordersBin)
+	if err != nil {
+		return nil, err
+	}
+	worker, err := candidate.NewArtifact(workerBin)
+	if err != nil {
+		return nil, err
+	}
+	env, err := harness.NewEnv(orders, worker)
 	if err != nil {
 		return nil, err
 	}
