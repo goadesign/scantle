@@ -115,9 +115,9 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 
 ### MCP Resources
 
-- **`scantle://golden-path`** (`GET /golden-path`, `text/markdown`)
+- **`scantle://golden-path`** (`text/markdown` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /golden-path`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
-- **`ui://scantle/checkpoint`** (`GET /ui/checkpoint`, `text/html;profile=mcp-app`)
+- **`ui://scantle/checkpoint`** (`text/html;profile=mcp-app` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /ui/checkpoint`)
   - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`). Completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders validated `ChangeCardResult` (`CP1`), `ArchitecturePreviewResult` (`CP2`), and `DraftOverrideResult` (`CP3`) payloads delivered by the host via `ui/notifications/tool-result` without server-retained preview state (interactive role-switching/replay controls and `openui.v1` action dispatch remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough)).
 
 ---
