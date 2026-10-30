@@ -142,15 +142,15 @@ Reads two Go design modules into symlink-safe snapshots, evaluates both inside t
 - `--new-dir <path>` — Root directory of the candidate design module *(required)*.
 
 ### `scantle verify`
-Clones the committed candidate and evaluator suite into an isolated work directory, builds the candidate binaries (`WorkDir/candidate-bin/<name>`) and suite runner (`WorkDir/suite-bin/suite`) inside `verify/candidate`'s macOS `sandbox-exec` jail, runs the suite, writes the canonical `verify.Report` JSON to `<report-dir>/<digest>.json`, and prints the JSON report to `stdout` (exiting non-zero if verification fails or any scenario does not pass).
+Clones the committed candidate and evaluator suite into an isolated work directory, builds the candidate binaries (`WorkDir/candidate-bin/<name>`) and suite runner (`WorkDir/suite-bin/suite`) inside `verify/candidate`'s macOS `sandbox-exec` jail, runs the suite, writes the canonical `verify.Report` JSON to `<report-dir>/<digest>.json`, and prints the JSON report to `stdout` (setup or build errors exit non-zero without printing report JSON, while an assembled report with a failing scenario is written and printed before exiting non-zero).
 - `-candidate-repo <path|url>` — Git repository holding the candidate *(required)*.
 - `-candidate-commit <sha>` — Full commit ID of the candidate to build *(required)*.
 - `-candidate-module <dir>` — Candidate Go module directory relative to `-candidate-repo` *(required)*.
-- `-binary <name=package>` — Candidate binary artifact name and package inside `-candidate-module` (repeatable, at least one *required*; `<name>` must be a single path element).
+- `-binary <name=package>` — Candidate binary artifact name and relative package path (`.` or `./...`) inside `-candidate-module` (repeatable, at least one *required*; `<name>` must be a single path element).
 - `-suite-repo <path|url>` — Git repository holding the evaluator suite *(required)*.
 - `-suite-commit <sha>` — Full commit ID of the evaluator suite *(required)*.
 - `-suite-module <dir>` — Suite Go module directory relative to `-suite-repo` *(required)*.
-- `-suite-command <package>` — Suite command package inside `-suite-module` *(required)*.
+- `-suite-command <package>` — Suite command relative package path (`.` or `./...`) inside `-suite-module` *(required)*.
 - `-request-revision <digest>` — Confirmed `request_revision` digest bound into the verification report *(required)*.
 - `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must be missing or empty at run start and must not be shared with or readable by builder agents *(required)*.
 - `-report-dir <path>` — Directory that receives the full canonical report as `<digest>.json`; must not be readable by builder agents when holdout privacy is required *(required)*.
