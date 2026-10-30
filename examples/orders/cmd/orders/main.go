@@ -49,8 +49,6 @@ type config struct {
 	commerceURL string
 	// temporalAddr is the Temporal frontend address.
 	temporalAddr string
-	// agentQueue is the task queue of the refund agent's workflows.
-	agentQueue string
 	// refundQueue is the task queue the refund worker polls.
 	refundQueue string
 	// modelProvider selects the refund agent's model: "anthropic" or
@@ -94,7 +92,7 @@ func run(ctx context.Context, cfg config) error {
 
 	eng, err := temporalengine.NewWorker(temporalengine.Options{
 		ClientOptions: &client.Options{HostPort: cfg.temporalAddr},
-		WorkerOptions: temporalengine.WorkerOptions{TaskQueue: cfg.agentQueue},
+		WorkerOptions: temporalengine.WorkerOptions{TaskQueue: genrefund.DefaultTaskQueue},
 	})
 	if err != nil {
 		return fmt.Errorf("create agent engine: %w", err)
@@ -156,7 +154,6 @@ func parseConfig() (config, error) {
 	flag.StringVar(&cfg.listen, "listen", "localhost:8080", "address of the orders API")
 	flag.StringVar(&cfg.commerceURL, "commerce-url", "", "base URL of the commerce system")
 	flag.StringVar(&cfg.temporalAddr, "temporal", "localhost:7233", "Temporal frontend address")
-	flag.StringVar(&cfg.agentQueue, "agent-queue", "orders.agents", "task queue of the refund agent")
 	flag.StringVar(&cfg.refundQueue, "refund-queue", "orders.refunds", "task queue of the refund worker")
 	flag.StringVar(&cfg.modelProvider, "model-provider", "anthropic", `refund agent model: "anthropic", or "scripted" for the zero-key demo`)
 	flag.StringVar(&cfg.model, "model", "claude-sonnet-5-5", "Anthropic model used by the refund agent")

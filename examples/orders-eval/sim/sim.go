@@ -17,10 +17,10 @@ import (
 	"sync"
 	"time"
 
-	gencommerce "github.com/goadesign/scantle/examples/orders/gen/commerce"
-	gencommerceserver "github.com/goadesign/scantle/examples/orders/gen/http/commerce/server"
-	genpaymentsserver "github.com/goadesign/scantle/examples/orders/gen/http/payments/server"
-	genpayments "github.com/goadesign/scantle/examples/orders/gen/payments"
+	gencommerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
+	gencommerceserver "github.com/goadesign/scantle/examples/orders-eval/gen/http/commerce/server"
+	genpaymentsserver "github.com/goadesign/scantle/examples/orders-eval/gen/http/payments/server"
+	genpayments "github.com/goadesign/scantle/examples/orders-eval/gen/payments"
 	goahttp "goa.design/goa/v3/http"
 )
 
