@@ -447,28 +447,58 @@ func (t *txn) preparationPage(state attemptRow, start, end int64, afterID string
 		after = parsed
 	}
 	limit = min(limit, transcriptPageMaxRecords)
-	records, err := t.seedRecords(state.seed.Declaration.RunID, state.seed.Declaration.AttemptID, after, end, limit+1)
-	if err != nil {
-		return storage.SeedPage{}, err
-	}
-	page := storage.SeedPage{}
-	for _, record := range records {
-		if len(page.Records) == limit {
-			page.NextCursor = page.Records[len(page.Records)-1].ID
-			break
-		}
+	// Records are read one at a time; reading stops at the first record that
+	// would overflow the page budget, so at most one record beyond the page
+	// is read.
+	var (
+		page     storage.SeedPage
+		full     bool
+		emptyErr error
+	)
+	runID, attemptID := state.seed.Declaration.RunID, state.seed.Declaration.AttemptID
+	err := t.seedRecords(runID, attemptID, after, end, limit, func(record storage.SeedRecord) bool {
 		page.Records = append(page.Records, record)
 		// Count the complete response, including a potential next cursor.
 		page.NextCursor = record.ID
 		if err := storage.ValidateSeedPageSize(page); err != nil {
 			page.Records = page.Records[:len(page.Records)-1]
 			if len(page.Records) == 0 {
-				return storage.SeedPage{}, err
+				emptyErr = err
 			}
-			page.NextCursor = page.Records[len(page.Records)-1].ID
-			break
+			full = true
+			return false
 		}
-		page.NextCursor = ""
+		return true
+	})
+	if err != nil {
+		return storage.SeedPage{}, err
+	}
+	if emptyErr != nil {
+		return storage.SeedPage{}, emptyErr
+	}
+	page.NextCursor = ""
+	if len(page.Records) == 0 {
+		return page, nil
+	}
+	last := page.Records[len(page.Records)-1].ID
+	if full {
+		page.NextCursor = last
+		return page, nil
+	}
+	if len(page.Records) == limit {
+		lastPosition, err := strconv.ParseInt(last, 10, 64)
+		if err != nil {
+			return storage.SeedPage{}, err
+		}
+		var one int
+		more, err := t.scanOne(`SELECT 1 FROM seed_records WHERE run_id = ? AND attempt_id = ? AND position > ? AND position <= ? LIMIT 1`,
+			[]any{runID, attemptID, lastPosition, end}, &one)
+		if err != nil {
+			return storage.SeedPage{}, err
+		}
+		if more {
+			page.NextCursor = last
+		}
 	}
 	return page, nil
 }
@@ -567,7 +597,7 @@ func (t *txn) seedSource(d storage.SeedDeclaration, origin genregistry.Execution
 		}
 		endID = terminal.ID
 	} else {
-		position, err := t.committedPosition(d.SourceRunID, endID)
+		position, _, err := t.committedPosition(d.SourceRunID, endID)
 		if err != nil {
 			return nil, err
 		}
@@ -675,10 +705,9 @@ func (t *txn) literalOpen(state attemptRow) (bool, error) {
 	if state.recordCount == 0 {
 		return false, nil
 	}
-	records, err := t.seedRecords(state.seed.Declaration.RunID, state.seed.Declaration.AttemptID, state.recordCount-1, state.recordCount, 1)
-	if err != nil {
-		return false, err
-	}
-	part := records[0].LiteralPart
-	return part != nil && !part.Final, nil
+	var open bool
+	_, err := t.scanOne(`SELECT literal_data IS NOT NULL AND literal_final = 0 FROM seed_records
+		WHERE run_id = ? AND attempt_id = ? AND position = ?`,
+		[]any{state.seed.Declaration.RunID, state.seed.Declaration.AttemptID, state.recordCount}, &open)
+	return open, err
 }
