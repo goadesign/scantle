@@ -152,8 +152,6 @@ const (
 
 	// maxChorusHandleLen is the maximum length of a Chorus agent handle (`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`).
 	maxChorusHandleLen = 32
-	// maxChorusTextLen is the maximum message length accepted by the Chorus send contract.
-	maxChorusTextLen = 4000
 )
 
 var (
@@ -362,11 +360,7 @@ func FormatManifest(changeID, designDigest string, plan PlanResult) (string, err
 			strings.Join(a.OwnedPaths, ", "),
 		)
 	}
-	text := b.String()
-	if len(text) > maxChorusTextLen {
-		return "", fmt.Errorf("formatted Chorus manifest length %d exceeds Chorus limit of %d bytes", len(text), maxChorusTextLen)
-	}
-	return text, nil
+	return b.String(), nil
 }
 
 // PublishManifest formats and publishes the pinned Collaboration Manifest to a
