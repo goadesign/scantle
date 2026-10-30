@@ -35,7 +35,7 @@ func ToolSchemas() []*genregistry.ToolSchema {
 	}
 } // schema1 constructs one generated schema declaration.
 func (declarations registryDeclarations) schema1() *genregistry.ToolSchema {
-	registryText1 := "Confirm Checkpoint 1 ambiguity answers and example checks."
+	registryText1 := "Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision."
 	return &genregistry.ToolSchema{
 		Name:                   "scantle.confirm_intent",
 		Description:            &registryText1,
@@ -46,16 +46,16 @@ func (declarations registryDeclarations) schema1() *genregistry.ToolSchema {
 			Kind:  "service",
 			Title: "Confirm Intent",
 			Search: &genregistry.ToolSearchDocument{
-				Length: 13,
-				Terms:  map[string]int{"1": 1, "ambiguity": 1, "and": 1, "answers": 1, "checkpoint": 1, "checks": 1, "confirm": 3, "example": 1, "intent": 2, "scantle": 1},
+				Length: 22,
+				Terms:  map[string]int{"1": 1, "ambiguity": 1, "and": 1, "answers": 1, "card": 1, "checkpoint": 1, "checks": 1, "confirm": 3, "current": 1, "example": 1, "for": 1, "intent": 2, "or": 1, "refine": 1, "request": 1, "revision": 1, "s": 1, "scantle": 1, "the": 1},
 			},
 			RequiresUI: false,
 			TextOnly: &genregistry.TextOnlyToolContract{
 				ExecutionSchema: []byte("{\"$defs\":{\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator confirmation of Checkpoint 1 ambiguity answers and concrete examples.\",\"properties\":{\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Selected resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"examples\":{\"description\":\"Confirmed example table.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Reviewed CP1 request_revision digest being confirmed.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"answers\",\"examples\"],\"type\":\"object\"}"),
-				Description:     "Confirm Checkpoint 1 ambiguity answers and example checks.",
+				Description:     "Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision.",
 				Search: &genregistry.ToolSearchDocument{
-					Length: 13,
-					Terms:  map[string]int{"1": 1, "ambiguity": 1, "and": 1, "answers": 1, "checkpoint": 1, "checks": 1, "confirm": 3, "example": 1, "intent": 2, "scantle": 1},
+					Length: 22,
+					Terms:  map[string]int{"1": 1, "ambiguity": 1, "and": 1, "answers": 1, "card": 1, "checkpoint": 1, "checks": 1, "confirm": 3, "current": 1, "example": 1, "for": 1, "intent": 2, "or": 1, "refine": 1, "request": 1, "revision": 1, "s": 1, "scantle": 1, "the": 1},
 				},
 				PayloadSchema: []byte("{\"$defs\":{\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator confirmation of Checkpoint 1 ambiguity answers and concrete examples.\",\"properties\":{\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Selected resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"examples\":{\"description\":\"Confirmed example table.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Reviewed CP1 request_revision digest being confirmed.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"answers\",\"examples\"],\"type\":\"object\"}"),
 				Payload:       declarations.metadata40(),

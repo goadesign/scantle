@@ -517,9 +517,15 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 	return card, nil
 }
 
-// ConfirmIntent verifies the authenticated owner and reviewed request_revision,
-// resolves all open Checkpoint 1 ambiguity questions, records the confirmed
-// example table and answers, and freezes the Change Card revision.
+// ConfirmIntent records the owner's complete answers and example table for a
+// Change Card that needs confirmation or is already confirmed. The caller
+// must be the card's owner and send the card's current request_revision, so
+// an edit based on an older revision fails. Every open ambiguity must have an
+// allowed answer. When a confirmed card's answers and examples are unchanged,
+// the card is returned as it is; otherwise the card is confirmed under a new
+// request_revision, so previews and verification reports bound to the earlier
+// revision no longer match it. The prompt, summary and preserved behaviors
+// never change here: a new requirement needs a new propose_change.
 func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmIntentPayload) (*genscantle.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
@@ -540,9 +546,6 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
 	}
 	existing := record.card
-	if existing.Status != StatusNeedsConfirmation {
-		return nil, fmt.Errorf("change_id %q does not require confirmation (status %q)", p.ChangeID, existing.Status)
-	}
 	if existing.RequestRevision != p.RequestRevision {
 		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, existing.RequestRevision)
 	}
@@ -554,7 +557,6 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	if err != nil {
 		return nil, fmt.Errorf("invalid confirmed examples: %w", err)
 	}
-
 	confirmedBy := principal.ID
 	confirmed := &genscantle.ChangeCardResult{
 		ChangeID:           existing.ChangeID,
@@ -570,6 +572,10 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	rev, err := computeCanonicalRevision(confirmed, record.owner, record.designSource)
 	if err != nil {
 		return nil, err
+	}
+	if rev == existing.RequestRevision {
+		// Same answers and examples on an already confirmed card.
+		return existing, nil
 	}
 	confirmed.RequestRevision = rev
 	c.cards[p.ChangeID] = storedChangeCard{

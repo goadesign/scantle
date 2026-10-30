@@ -406,6 +406,13 @@ var _ = Service("orders", func() {
 	if err != nil || len(toolsRes.Tools) != 5 {
 		t.Fatalf("expected 5 MCP tools from ToolsList, got %+v (err=%v)", toolsRes, err)
 	}
+	// Every tool, diff included, links the checkpoint viewer so an MCP Apps
+	// host can render its result.
+	for _, tool := range toolsRes.Tools {
+		if !strings.Contains(string(tool.Meta), `"resourceUri":"ui://scantle/checkpoint"`) {
+			t.Fatalf("tool %q does not link ui://scantle/checkpoint: _meta=%s", tool.Name, tool.Meta)
+		}
+	}
 	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://scantle/checkpoint"})
 	if err != nil {
 		t.Fatalf("ResourcesRead(ui://scantle/checkpoint) failed: %v", err)
@@ -644,4 +651,131 @@ func anthropicTextMessage(t *testing.T, text, stopReason string) *anthropicsdk.M
 		t.Fatalf("decode message: %v", err)
 	}
 	return &msg
+}
+
+// TestConfirmIntentRefinesNeedsConfirmationAndConfirmedCards verifies that the
+// owner can confirm a card and later refine its answers or examples against
+// the current request_revision, that unchanged submissions return the card as
+// it is, and that stale revisions, other principals and previews bound to an
+// earlier revision are refused.
+func TestConfirmIntentRefinesNeedsConfirmationAndConfirmedCards(t *testing.T) {
+	aliceCtx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
+	bobCtx := WithPrincipal(context.Background(), Principal{ID: "bob@example.com"})
+	example := CP1ModelExample{
+		Scenario:         "Refund at the limit",
+		InputSummary:     "Order total $50.00",
+		ExpectedOutcome:  "Instant store credit",
+		VerificationKind: "deterministic",
+	}
+	ambiguous, err := json.Marshal(CP1SemanticAnalysis{
+		Summary:            "Refunds up to $50 are instant.",
+		Ambiguities:        []CP1ModelAmbiguity{{Question: "Is $50.00 itself instant?", Options: []string{"instant", "manager"}}},
+		Examples:           []CP1ModelExample{example},
+		PreservedBehaviors: []string{},
+	})
+	if err != nil {
+		t.Fatalf("marshal analysis: %v", err)
+	}
+	unambiguous, err := json.Marshal(CP1SemanticAnalysis{
+		Summary:            "Refunds up to $50 are instant.",
+		Ambiguities:        []CP1ModelAmbiguity{},
+		Examples:           []CP1ModelExample{example},
+		PreservedBehaviors: []string{},
+	})
+	if err != nil {
+		t.Fatalf("marshal analysis: %v", err)
+	}
+	propose := func(t *testing.T, analysis []byte) (*ControlPlane, *genscantle.ChangeCardResult) {
+		t.Helper()
+		cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
+		card, err := cp.ProposeChange(aliceCtx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+		if err != nil {
+			t.Fatalf("ProposeChange: %v", err)
+		}
+		return cp, card
+	}
+	confirm := func(ctx context.Context, cp *ControlPlane, rev string, answers map[string]string, examples []*genscantle.ExampleItem) (*genscantle.ChangeCardResult, error) {
+		return cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: rev, Answers: answers, Examples: examples})
+	}
+	edited := func(card *genscantle.ChangeCardResult, outcome string) []*genscantle.ExampleItem {
+		ex := *card.Examples[0]
+		ex.ExpectedOutcome = outcome
+		return []*genscantle.ExampleItem{&ex}
+	}
+
+	t.Run("needs_confirmation card is confirmed, then refined", func(t *testing.T) {
+		cp, proposed := propose(t, ambiguous)
+		if proposed.Status != StatusNeedsConfirmation {
+			t.Fatalf("status = %q, want %q", proposed.Status, StatusNeedsConfirmation)
+		}
+		instant := map[string]string{"chg-ambiguity-01": "instant"}
+		first, err := confirm(aliceCtx, cp, proposed.RequestRevision, instant, proposed.Examples)
+		if err != nil {
+			t.Fatalf("first confirm: %v", err)
+		}
+		if first.Status != StatusConfirmed || first.RequestRevision == proposed.RequestRevision {
+			t.Fatalf("first confirm = %q at %q, want confirmed at a new revision", first.Status, first.RequestRevision)
+		}
+
+		same, err := confirm(aliceCtx, cp, first.RequestRevision, map[string]string{"chg-ambiguity-01": "instant"}, edited(first, first.Examples[0].ExpectedOutcome))
+		if err != nil {
+			t.Fatalf("unchanged confirm: %v", err)
+		}
+		if same.RequestRevision != first.RequestRevision {
+			t.Fatalf("unchanged answers and examples moved the revision from %q to %q", first.RequestRevision, same.RequestRevision)
+		}
+
+		manager, err := confirm(aliceCtx, cp, first.RequestRevision, map[string]string{"chg-ambiguity-01": "manager"}, first.Examples)
+		if err != nil {
+			t.Fatalf("changed answer: %v", err)
+		}
+		if manager.RequestRevision == first.RequestRevision || manager.Answers["chg-ambiguity-01"] != "manager" {
+			t.Fatalf("changed answer kept revision %q or answer %v", manager.RequestRevision, manager.Answers)
+		}
+		if manager.Summary != first.Summary || manager.Prompt != first.Prompt {
+			t.Fatal("refinement changed the prompt or summary")
+		}
+
+		if _, err := confirm(aliceCtx, cp, first.RequestRevision, instant, first.Examples); err == nil || !strings.Contains(err.Error(), "request_revision mismatch") {
+			t.Fatalf("stale revision err = %v, want request_revision mismatch", err)
+		}
+		if _, err := confirm(bobCtx, cp, manager.RequestRevision, instant, manager.Examples); err == nil || !strings.Contains(err.Error(), "is not the owner") {
+			t.Fatalf("other principal err = %v, want owner refusal", err)
+		}
+		if _, err := confirm(aliceCtx, cp, manager.RequestRevision, map[string]string{}, manager.Examples); err == nil || !strings.Contains(err.Error(), "missing confirmation answer") {
+			t.Fatalf("missing answer err = %v, want missing confirmation answer", err)
+		}
+
+		_, err = cp.PreviewArchitecture(aliceCtx, &genscantle.PreviewArchitecturePayload{
+			ChangeID: "chg", RequestRevision: first.RequestRevision, Design: &genscantle.DesignSnapshot{},
+		})
+		if err == nil || !strings.Contains(err.Error(), "request_revision mismatch") {
+			t.Fatalf("preview bound to the earlier revision err = %v, want request_revision mismatch", err)
+		}
+	})
+
+	t.Run("auto-confirmed card is refined later", func(t *testing.T) {
+		cp, proposed := propose(t, unambiguous)
+		if proposed.Status != StatusConfirmed {
+			t.Fatalf("status = %q, want %q", proposed.Status, StatusConfirmed)
+		}
+		same, err := confirm(aliceCtx, cp, proposed.RequestRevision, map[string]string{}, proposed.Examples)
+		if err != nil {
+			t.Fatalf("unchanged confirm: %v", err)
+		}
+		if same.RequestRevision != proposed.RequestRevision {
+			t.Fatalf("unchanged submission moved the revision from %q to %q", proposed.RequestRevision, same.RequestRevision)
+		}
+
+		refined, err := confirm(aliceCtx, cp, proposed.RequestRevision, map[string]string{}, edited(proposed, "Waits for a manager"))
+		if err != nil {
+			t.Fatalf("changed example: %v", err)
+		}
+		if refined.RequestRevision == proposed.RequestRevision || refined.Examples[0].ExpectedOutcome != "Waits for a manager" {
+			t.Fatalf("changed example kept revision %q or outcome %q", refined.RequestRevision, refined.Examples[0].ExpectedOutcome)
+		}
+		if refined.ConfirmedBy == nil || *refined.ConfirmedBy != "alice@example.com" {
+			t.Fatalf("confirmed_by = %v, want alice@example.com", refined.ConfirmedBy)
+		}
+	})
 }

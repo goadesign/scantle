@@ -31,7 +31,10 @@ type Service interface {
 	// Evaluate a feature request at Checkpoint 1, surfacing concrete examples and
 	// any genuine domain ambiguity.
 	ProposeChange(context.Context, *ProposeChangePayload) (res *ChangeCardResult, err error)
-	// Confirm Checkpoint 1 answers and examples to freeze the Change Card.
+	// Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity
+	// answers and example table, bound to its current request_revision. Changed
+	// answers or examples produce a new request_revision; unchanged ones return
+	// the card as it is.
 	ConfirmIntent(context.Context, *ConfirmIntentPayload) (res *ChangeCardResult, err error)
 	// Extract and validate the Checkpoint 2 C4 container topology, tool contracts,
 	// Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa

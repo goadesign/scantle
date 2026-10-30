@@ -346,10 +346,10 @@ var _ = Service("scantle", func() {
 	})
 
 	Method("confirm_intent", func() {
-		Description("Confirm Checkpoint 1 answers and examples to freeze the Change Card.")
+		Description("Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.")
 		Payload(ConfirmIntentPayload)
 		Result(ChangeCardResult)
-		Tool("confirm_intent", "Confirm Checkpoint 1 ambiguity answers and example checks.", func() {
+		Tool("confirm_intent", "Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision.", func() {
 			ToolUI("ui://scantle/checkpoint")
 		})
 		HTTP(func() {
@@ -388,7 +388,9 @@ var _ = Service("scantle", func() {
 		Description("Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.")
 		Payload(DiffPayload)
 		Result(DiffResult)
-		Tool("diff", "Compute structural Goa design and go.mod dependency diffs.")
+		Tool("diff", "Compute structural Goa design and go.mod dependency diffs.", func() {
+			ToolUI("ui://scantle/checkpoint")
+		})
 		HTTP(func() {
 			POST("/diff")
 			Response(StatusOK)

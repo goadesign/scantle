@@ -18,7 +18,7 @@ paths:
             tags:
                 - scantle
             summary: confirm_intent scantle
-            description: Confirm Checkpoint 1 answers and examples to freeze the Change Card.
+            description: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.
             operationId: scantle#confirm_intent
             parameters:
                 - name: confirm_intent_request_body

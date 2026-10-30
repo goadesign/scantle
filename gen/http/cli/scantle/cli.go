@@ -215,7 +215,7 @@ func scantleUsage() {
 	fmt.Fprintln(os.Stderr, `    checkpoint-ui: Serve the interactive MCP Apps HTML host for Scantle checkpoints.`)
 	fmt.Fprintln(os.Stderr, `    golden-path: Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.`)
 	fmt.Fprintln(os.Stderr, `    propose-change: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.`)
-	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm Checkpoint 1 answers and examples to freeze the Change Card.`)
+	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.`)
 	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
 	fmt.Fprintln(os.Stderr, `    diff: Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.`)
@@ -281,7 +281,7 @@ func scantleConfirmIntentUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Confirm Checkpoint 1 answers and examples to freeze the Change Card.`)
+	fmt.Fprintln(os.Stderr, `Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)
