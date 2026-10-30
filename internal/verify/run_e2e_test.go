@@ -3,6 +3,7 @@
 package verify
 
 import (
+	"encoding/json"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -41,6 +42,12 @@ func TestRunVerifiesTheOrdersReference(t *testing.T) {
 		ReportDir:       filepath.Join(work, "reports"),
 	})
 	require.NoError(t, err)
+	for _, s := range report.Scenarios {
+		if s.Outcome != OutcomePassed && s.Detail != nil {
+			detail, _ := json.MarshalIndent(s.Detail, "", "  ")
+			t.Logf("scenario %s %s:\n%s", s.ID, s.Outcome, detail)
+		}
+	}
 	assert.True(t, report.Passed, "%+v", report.Counts)
 	assert.Equal(t, Counts{Required: 5, Passed: 5}, report.Counts)
 	assert.Equal(t, "orders_acceptance", report.Binding.SuiteID)
