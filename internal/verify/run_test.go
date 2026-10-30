@@ -34,7 +34,7 @@ func TestRunAcceptsOnlyFullCommitIDs(t *testing.T) {
 	}
 }
 
-func TestRunRejectsPlansThatEscapeTheirDirectories(t *testing.T) {
+func TestRunRejectsInvalidPlansBeforeWriting(t *testing.T) {
 	full := "4d77355e0c1b2a3f4d5e6f708192a3b4c5d6e7f8"
 	valid := func() Plan {
 		return Plan{
@@ -43,6 +43,7 @@ func TestRunRejectsPlansThatEscapeTheirDirectories(t *testing.T) {
 			Binaries:        map[string]string{"orders": "./cmd/orders"},
 			SuiteCommit:     full,
 			SuiteModule:     "examples/orders-eval",
+			SuiteCommand:    "./cmd/orders_acceptance-evals",
 		}
 	}
 	cases := []struct {
@@ -50,10 +51,6 @@ func TestRunRejectsPlansThatEscapeTheirDirectories(t *testing.T) {
 		edit    func(*Plan)
 		wantErr string
 	}{
-		{"candidate module escapes", func(p *Plan) { p.CandidateModule = "../other" }, `candidate module "../other" must be a relative path inside the checkout`},
-		{"suite module escapes", func(p *Plan) { p.SuiteModule = "examples/../../other" }, `suite module "examples/../../other" must be a relative path`},
-		{"absolute suite module", func(p *Plan) { p.SuiteModule = "/tmp/suite" }, `suite module "/tmp/suite" must be a relative path`},
-		{"empty candidate module", func(p *Plan) { p.CandidateModule = "" }, `candidate module "" must be a relative path`},
 		{"parent binary name", func(p *Plan) { p.Binaries = map[string]string{"..": "./cmd/orders"} }, `binary name ".." is not a valid artifact name`},
 		{"current binary name", func(p *Plan) { p.Binaries = map[string]string{".": "./cmd/orders"} }, `binary name "." is not a valid artifact name`},
 		{"empty binary name", func(p *Plan) { p.Binaries = map[string]string{"": "./cmd/orders"} }, `binary name "" is not a valid artifact name`},
@@ -61,7 +58,10 @@ func TestRunRejectsPlansThatEscapeTheirDirectories(t *testing.T) {
 		{"binary name with backslash", func(p *Plan) { p.Binaries = map[string]string{`a\b`: "./cmd/orders"} }, `must not contain`},
 		{"binary name with equals", func(p *Plan) { p.Binaries = map[string]string{"a=b": "./cmd/orders"} }, `binary name "a=b" must not contain`},
 		{"binary name with NUL", func(p *Plan) { p.Binaries = map[string]string{"a\x00b": "./cmd/orders"} }, `must not contain`},
-		{"binary without package", func(p *Plan) { p.Binaries = map[string]string{"orders": ""} }, `binary "orders" has no package path`},
+		{"binary without package", func(p *Plan) { p.Binaries = map[string]string{"orders": ""} }, `binary "orders": package path "" must be "." or start with "./"`},
+		{"standard library package", func(p *Plan) { p.Binaries = map[string]string{"orders": "cmd/gofmt"} }, `binary "orders": package path "cmd/gofmt" must be`},
+		{"go build flag as package", func(p *Plan) { p.Binaries = map[string]string{"orders": "-toolexec=/bin/sh"} }, `package path "-toolexec=/bin/sh" must be`},
+		{"suite command outside module", func(p *Plan) { p.SuiteCommand = "cmd/gofmt" }, `suite command: package path "cmd/gofmt" must be`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -76,6 +76,71 @@ func TestRunRejectsPlansThatEscapeTheirDirectories(t *testing.T) {
 			assert.Empty(t, entries, "a rejected plan must not write into WorkDir")
 		})
 	}
+
+	_, err := Run(t.Context(), valid())
+	assert.EqualError(t, err, "work directory is required", "an empty WorkDir must not mean the current directory")
+}
+
+func TestResolveInsideFollowsLinksAndStaysInside(t *testing.T) {
+	outside := t.TempDir()
+	checkout := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(checkout, "examples", "orders", "cmd"), 0o700))
+	require.NoError(t, os.Symlink(outside, filepath.Join(checkout, "examples", "orders", "cmd", "linked-out")))
+	require.NoError(t, os.Symlink(outside, filepath.Join(checkout, "linked-out")))
+	require.NoError(t, os.Symlink("examples", filepath.Join(checkout, "linked-in")))
+	root, err := filepath.EvalSymlinks(checkout)
+	require.NoError(t, err)
+
+	cases := []struct {
+		rel     string
+		want    string
+		wantErr string
+	}{
+		{rel: ".", want: root},
+		{rel: "examples/orders", want: filepath.Join(root, "examples", "orders")},
+		{rel: "./examples/orders/cmd", want: filepath.Join(root, "examples", "orders", "cmd")},
+		{rel: "linked-in/orders", want: filepath.Join(root, "examples", "orders")},
+		{rel: "linked-out", wantErr: "outside"},
+		{rel: "./examples/orders/cmd/linked-out", wantErr: "outside"},
+		{rel: "../" + filepath.Base(outside), wantErr: "outside"},
+		{rel: "missing", wantErr: "no such file or directory"},
+	}
+	for _, c := range cases {
+		t.Run(c.rel, func(t *testing.T) {
+			got, err := resolveInside(checkout, c.rel)
+			if c.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), c.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, c.want, got)
+		})
+	}
+}
+
+func TestRunRefusesACommittedModuleLinkOutsideTheCheckout(t *testing.T) {
+	outside := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "go.mod"), []byte("module example.com/outside\n"), 0o600))
+	repo := t.TempDir()
+	git(t, repo, "init", "--quiet")
+	require.NoError(t, os.Symlink(outside, filepath.Join(repo, "module")))
+	git(t, repo, "add", "module")
+	git(t, repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "--quiet", "-m", "c")
+	head := strings.TrimSpace(git(t, repo, "rev-parse", "HEAD"))
+
+	_, err := Run(t.Context(), Plan{
+		CandidateRepo:   repo,
+		CandidateCommit: head,
+		CandidateModule: "module",
+		Binaries:        map[string]string{"orders": "./cmd/orders"},
+		SuiteCommit:     head,
+		SuiteCommand:    "./cmd/suite",
+		WorkDir:         t.TempDir(),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `candidate module "module": resolves to`)
+	assert.Contains(t, err.Error(), "outside")
 }
 
 func TestCheckoutRecordsTheExactCommitInEitherObjectFormat(t *testing.T) {

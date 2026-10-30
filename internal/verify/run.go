@@ -35,29 +35,35 @@ type (
 		// rejected.
 		CandidateCommit string
 		// CandidateModule is the Go module directory inside the candidate
-		// repository that the binaries are built from: a relative path that
-		// stays inside the checkout, such as "examples/orders" or ".".
+		// repository that the binaries are built from, such as
+		// "examples/orders" or ".". After symbolic links are resolved it must
+		// still be inside the checkout.
 		CandidateModule string
 		// Binaries maps each artifact name to its package path inside
 		// CandidateModule, such as "./cmd/orders". A name is the artifact ID
 		// the suite receives as --artifact name=path: it must be non-empty,
 		// not "." or "..", and contain no "/", "\\", "=" or NUL. Each package
-		// path must be non-empty.
+		// path is "." or starts with "./", and after symbolic links are
+		// resolved it must name a directory inside CandidateModule.
 		Binaries map[string]string
 		// SuiteRepo is the git repository holding the evaluator suite.
 		SuiteRepo string
 		// SuiteCommit is the full ID of the suite commit to run.
 		SuiteCommit string
-		// SuiteModule is the suite's Go module directory inside SuiteRepo: a
-		// relative path that stays inside the checkout, like CandidateModule.
+		// SuiteModule is the suite's Go module directory inside SuiteRepo.
+		// Like CandidateModule, it must resolve to a directory inside the
+		// checkout.
 		SuiteModule string
 		// SuiteCommand is the suite command's package path inside
-		// SuiteModule, following the suite command contract.
+		// SuiteModule, following the suite command contract. Like a candidate
+		// package path, it is "." or starts with "./" and must resolve to a
+		// directory inside SuiteModule.
 		SuiteCommand string
 		// RequestRevision identifies the confirmed request being verified.
 		RequestRevision string
 		// WorkDir is a private directory for clones, builds and evidence. It
-		// must not be shared with the candidate's builder.
+		// must not be shared with the candidate's builder. It is required; a
+		// relative path is made absolute against the current directory.
 		WorkDir string
 		// ReportDir receives the report, named by its digest.
 		ReportDir string
@@ -120,19 +126,25 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 			return Report{}, fmt.Errorf("%s commit %q is not a full commit ID", name, commit)
 		}
 	}
-	for name, dir := range map[string]string{"candidate": p.CandidateModule, "suite": p.SuiteModule} {
-		if !filepath.IsLocal(dir) {
-			return Report{}, fmt.Errorf("%s module %q must be a relative path inside the checkout", name, dir)
-		}
-	}
 	for name, pkg := range p.Binaries {
 		if err := validateArtifactName(name); err != nil {
 			return Report{}, err
 		}
-		if pkg == "" {
-			return Report{}, fmt.Errorf("binary %q has no package path", name)
+		if err := validatePackagePath(pkg); err != nil {
+			return Report{}, fmt.Errorf("binary %q: %w", name, err)
 		}
 	}
+	if err := validatePackagePath(p.SuiteCommand); err != nil {
+		return Report{}, fmt.Errorf("suite command: %w", err)
+	}
+	if p.WorkDir == "" {
+		return Report{}, errors.New("work directory is required")
+	}
+	workDir, err := filepath.Abs(p.WorkDir)
+	if err != nil {
+		return Report{}, fmt.Errorf("work directory: %w", err)
+	}
+	p.WorkDir = workDir
 	evidenceDir := filepath.Join(p.WorkDir, "evidence")
 	candidateBinDir := filepath.Join(p.WorkDir, "candidate-bin")
 	suiteBinDir := filepath.Join(p.WorkDir, "suite-bin")
@@ -153,7 +165,15 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	if err := r.checkout(ctx, "candidate", p.CandidateRepo, p.CandidateCommit, candidateDir); err != nil {
 		return Report{}, err
 	}
-	moduleDir := filepath.Join(candidateDir, p.CandidateModule)
+	moduleDir, err := resolveInside(candidateDir, p.CandidateModule)
+	if err != nil {
+		return Report{}, fmt.Errorf("candidate module %q: %w", p.CandidateModule, err)
+	}
+	for name, pkg := range p.Binaries {
+		if _, err := resolveInside(moduleDir, pkg); err != nil {
+			return Report{}, fmt.Errorf("binary %q package %q: %w", name, pkg, err)
+		}
+	}
 	toolchain, err := r.prepareBuild(ctx, moduleDir, p.WorkDir)
 	if err != nil {
 		return Report{}, err
@@ -180,8 +200,15 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	if err := r.checkout(ctx, "suite", p.SuiteRepo, p.SuiteCommit, suiteDir); err != nil {
 		return Report{}, err
 	}
+	suiteModuleDir, err := resolveInside(suiteDir, p.SuiteModule)
+	if err != nil {
+		return Report{}, fmt.Errorf("suite module %q: %w", p.SuiteModule, err)
+	}
+	if _, err := resolveInside(suiteModuleDir, p.SuiteCommand); err != nil {
+		return Report{}, fmt.Errorf("suite command %q: %w", p.SuiteCommand, err)
+	}
 	suiteBin := filepath.Join(suiteBinDir, "suite")
-	if err := r.run(ctx, "build-suite", filepath.Join(suiteDir, p.SuiteModule), nil,
+	if err := r.run(ctx, "build-suite", suiteModuleDir, nil,
 		"go", "build", "-o", suiteBin, p.SuiteCommand); err != nil {
 		return Report{}, fmt.Errorf("build suite: %w", err)
 	}
@@ -202,6 +229,36 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		return Report{}, err
 	}
 	return report, nil
+}
+
+// resolveInside resolves rel, a path relative to the directory root, following
+// every symbolic link in root and rel, and returns the resolved directory. It
+// fails unless that directory is root itself or inside it, so a committed link
+// cannot point a build at source outside the commit the report names.
+func resolveInside(root, rel string) (string, error) {
+	base, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s: %w", root, err)
+	}
+	dir, err := filepath.EvalSymlinks(filepath.Join(base, rel))
+	if err != nil {
+		return "", err
+	}
+	inner, err := filepath.Rel(base, dir)
+	if err != nil || !filepath.IsLocal(inner) {
+		return "", fmt.Errorf("resolves to %s, outside %s", dir, base)
+	}
+	return dir, nil
+}
+
+// validatePackagePath rejects a Go package argument that is not "." or a
+// "./"-relative directory, such as a standard library import path or a go
+// build flag, before it reaches `go build`.
+func validatePackagePath(pkg string) error {
+	if pkg != "." && !strings.HasPrefix(pkg, "./") {
+		return fmt.Errorf("package path %q must be \".\" or start with \"./\"", pkg)
+	}
+	return nil
 }
 
 // validateArtifactName rejects a binary name that cannot serve both as the
