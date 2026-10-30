@@ -10,6 +10,7 @@ require (
 	go.temporal.io/sdk v1.49.0
 	goa.design/goa-ai v0.89.1-0.20261030171518-459b7c18b476
 	goa.design/goa/v3 v3.35.1-0.20261030163856-3e08a6128171
+	goa.design/model v1.16.11-0.20261030164016-5e17c2e932fb
 	google.golang.org/grpc v1.84.0
 	modernc.org/sqlite v1.52.0
 )
