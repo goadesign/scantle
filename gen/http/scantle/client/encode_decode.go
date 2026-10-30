@@ -623,9 +623,32 @@ func unmarshalToolContractItemResponseBodyToScantleToolContractItem(v *ToolContr
 		Name:                 *v.Name,
 		Description:          *v.Description,
 		ArgsSchema:           *v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         *v.ReturnSchema,
+		RequiresUI:           *v.RequiresUI,
 		RequiresConfirmation: *v.RequiresConfirmation,
 		BoundedResult:        *v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = unmarshalToolInputBindingItemResponseBodyToScantleToolInputBindingItem(v.InputBinding)
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+// unmarshalToolInputBindingItemResponseBodyToScantleToolInputBindingItem
+// builds a value of type *scantle.ToolInputBindingItem from a value of type
+// *ToolInputBindingItemResponseBody.
+func unmarshalToolInputBindingItemResponseBodyToScantleToolInputBindingItem(v *ToolInputBindingItemResponseBody) *scantle.ToolInputBindingItem {
+	res := &scantle.ToolInputBindingItem{
+		ArgsSchema:               *v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {

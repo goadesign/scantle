@@ -241,24 +241,48 @@ type AgentPolicyItemResponseBody struct {
 
 // ToolContractItemResponseBody is used to define fields on response body types.
 type ToolContractItemResponseBody struct {
-	// Scoped tool identifier (<toolset>.<tool>).
+	// Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
 	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
-	// Owning toolset name.
+	// Compiler-selected toolset registration route.
 	Toolset *string `form:"toolset,omitempty" json:"toolset,omitempty" xml:"toolset,omitempty"`
 	// Tool name.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
 	// Tool description.
 	Description *string `form:"description,omitempty" json:"description,omitempty" xml:"description,omitempty"`
-	// Canonical evaluated argument schema summary.
+	// Generated provider model input before consumer binding.
 	ArgsSchema *string `form:"args_schema,omitempty" json:"args_schema,omitempty" xml:"args_schema,omitempty"`
-	// Canonical evaluated return schema summary.
+	// Generated provider text-only input, when supported.
+	TextOnlyArgsSchema *string `form:"text_only_args_schema,omitempty" json:"text_only_args_schema,omitempty" xml:"text_only_args_schema,omitempty"`
+	// Compiled consumer input choices, when binding is declared.
+	InputBinding *ToolInputBindingItemResponseBody `form:"input_binding,omitempty" json:"input_binding,omitempty" xml:"input_binding,omitempty"`
+	// Generated model-visible result schema; empty when the tool declares no
+	// result.
 	ReturnSchema *string `form:"return_schema,omitempty" json:"return_schema,omitempty" xml:"return_schema,omitempty"`
-	// Server-supplied InjectedFields hidden from the model.
+	// Compiler-listed runtime or provider fields omitted from the provider model
+	// input.
 	InjectedFields []string `form:"injected_fields,omitempty" json:"injected_fields,omitempty" xml:"injected_fields,omitempty"`
+	// True when the tool requires a UI-capable runtime.
+	RequiresUI *bool `form:"requires_ui,omitempty" json:"requires_ui,omitempty" xml:"requires_ui,omitempty"`
 	// True when the tool declares a design-time Confirmation gate.
 	RequiresConfirmation *bool `form:"requires_confirmation,omitempty" json:"requires_confirmation,omitempty" xml:"requires_confirmation,omitempty"`
 	// True when the tool declares a BoundedResult cursor/truncation contract.
 	BoundedResult *bool `form:"bounded_result,omitempty" json:"bounded_result,omitempty" xml:"bounded_result,omitempty"`
+}
+
+// ToolInputBindingItemResponseBody is used to define fields on response body
+// types.
+type ToolInputBindingItemResponseBody struct {
+	// Generated ordinary bound model input.
+	ArgsSchema *string `form:"args_schema,omitempty" json:"args_schema,omitempty" xml:"args_schema,omitempty"`
+	// Generated ordinary text-only input, when supported.
+	TextOnlyArgsSchema *string `form:"text_only_args_schema,omitempty" json:"text_only_args_schema,omitempty" xml:"text_only_args_schema,omitempty"`
+	// Generated lookup-key input, when declared; application lookup values are not
+	// inspected.
+	LookupArgsSchema *string `form:"lookup_args_schema,omitempty" json:"lookup_args_schema,omitempty" xml:"lookup_args_schema,omitempty"`
+	// Generated text-only lookup-key input, when supported.
+	LookupTextOnlyArgsSchema *string `form:"lookup_text_only_args_schema,omitempty" json:"lookup_text_only_args_schema,omitempty" xml:"lookup_text_only_args_schema,omitempty"`
+	// Compiler-listed fields supplied outside the ordinary bound model input.
+	InjectedFields []string `form:"injected_fields,omitempty" json:"injected_fields,omitempty" xml:"injected_fields,omitempty"`
 }
 
 // ExampleItemRequestBody is used to define fields on request body types.
@@ -970,8 +994,16 @@ func ValidateToolContractItemResponseBody(body *ToolContractItemResponseBody) (e
 	if body.RequiresConfirmation == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
 	}
+	if body.RequiresUI == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_ui", "body"))
+	}
 	if body.BoundedResult == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
+	}
+	if body.InputBinding != nil {
+		if err2 := validateToolInputBindingItemResponseBody(body.InputBinding, "body.input_binding"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return
 }
@@ -1003,8 +1035,40 @@ func validateToolContractItemResponseBody(body *ToolContractItemResponseBody, pa
 	if body.RequiresConfirmation == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", path))
 	}
+	if body.RequiresUI == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_ui", path))
+	}
 	if body.BoundedResult == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", path))
+	}
+	if body.InputBinding != nil {
+		if err2 := validateToolInputBindingItemResponseBody(body.InputBinding, path+".input_binding"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return
+}
+
+// ValidateToolInputBindingItemResponseBody runs the validations defined on
+// ToolInputBindingItem
+func ValidateToolInputBindingItemResponseBody(body *ToolInputBindingItemResponseBody) (err error) {
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	return
+}
+
+// validateToolInputBindingItemResponseBody checks ToolInputBindingItem and
+// reports errors using the path supplied by its caller
+func validateToolInputBindingItemResponseBody(body *ToolInputBindingItemResponseBody, path string) (err error) {
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", path))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", path))
 	}
 	return
 }

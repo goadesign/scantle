@@ -270,24 +270,49 @@ type ProposeChangePayload struct {
 
 // Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.
 type ToolContractItem struct {
-	// Scoped tool identifier (<toolset>.<tool>).
+	// Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
 	ID string
-	// Owning toolset name.
+	// Compiler-selected toolset registration route.
 	Toolset string
 	// Tool name.
 	Name string
 	// Tool description.
 	Description string
-	// Canonical evaluated argument schema summary.
+	// Generated provider model input before consumer binding.
 	ArgsSchema string
-	// Canonical evaluated return schema summary.
+	// Generated provider text-only input, when supported.
+	TextOnlyArgsSchema *string
+	// Compiled consumer input choices, when binding is declared.
+	InputBinding *ToolInputBindingItem
+	// Generated model-visible result schema; empty when the tool declares no
+	// result.
 	ReturnSchema string
-	// Server-supplied InjectedFields hidden from the model.
+	// Compiler-listed runtime or provider fields omitted from the provider model
+	// input.
 	InjectedFields []string
+	// True when the tool requires a UI-capable runtime.
+	RequiresUI bool
 	// True when the tool declares a design-time Confirmation gate.
 	RequiresConfirmation bool
 	// True when the tool declares a BoundedResult cursor/truncation contract.
 	BoundedResult bool
+}
+
+// Compiled consumer input contracts declared for one selected tool. The
+// application installs a binder and supplies values at runtime; compilation
+// does not prove that wiring.
+type ToolInputBindingItem struct {
+	// Generated ordinary bound model input.
+	ArgsSchema string
+	// Generated ordinary text-only input, when supported.
+	TextOnlyArgsSchema *string
+	// Generated lookup-key input, when declared; application lookup values are not
+	// inspected.
+	LookupArgsSchema *string
+	// Generated text-only lookup-key input, when supported.
+	LookupTextOnlyArgsSchema *string
+	// Compiler-listed fields supplied outside the ordinary bound model input.
+	InjectedFields []string
 }
 
 // agentPolicyItemIntTransport stores JSON fields until they have been validated.
@@ -901,20 +926,28 @@ func validatejsonProposeChangePayloadTransport(value *jsonProposeChangePayloadTr
 
 // jsonToolContractItemTransport stores JSON fields until they have been validated.
 type jsonToolContractItemTransport struct {
-	// Scoped tool identifier (<toolset>.<tool>).
+	// Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
 	ID *string `json:"id"`
-	// Owning toolset name.
+	// Compiler-selected toolset registration route.
 	Toolset *string `json:"toolset"`
 	// Tool name.
 	Name *string `json:"name"`
 	// Tool description.
 	Description *string `json:"description"`
-	// Canonical evaluated argument schema summary.
+	// Generated provider model input before consumer binding.
 	ArgsSchema *string `json:"args_schema"`
-	// Canonical evaluated return schema summary.
+	// Generated provider text-only input, when supported.
+	TextOnlyArgsSchema *string `json:"text_only_args_schema,omitempty"`
+	// Compiled consumer input choices, when binding is declared.
+	InputBinding *jsonToolInputBindingItemTransport `json:"input_binding,omitempty"`
+	// Generated model-visible result schema; empty when the tool declares no
+	// result.
 	ReturnSchema *string `json:"return_schema"`
-	// Server-supplied InjectedFields hidden from the model.
+	// Compiler-listed runtime or provider fields omitted from the provider model
+	// input.
 	InjectedFields []string `json:"injected_fields"`
+	// True when the tool requires a UI-capable runtime.
+	RequiresUI *bool `json:"requires_ui"`
 	// True when the tool declares a design-time Confirmation gate.
 	RequiresConfirmation *bool `json:"requires_confirmation"`
 	// True when the tool declares a BoundedResult cursor/truncation contract.
@@ -950,8 +983,45 @@ func validatejsonToolContractItemTransport(value *jsonToolContractItemTransport)
 	if value.RequiresConfirmation == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
 	}
+	if value.RequiresUI == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_ui", "body"))
+	}
 	if value.BoundedResult == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
+	}
+	if value.InputBinding != nil {
+		if err2 := validatejsonToolInputBindingItemTransport(value.InputBinding); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// jsonToolInputBindingItemTransport stores JSON fields until they have been validated.
+type jsonToolInputBindingItemTransport struct {
+	// Generated ordinary bound model input.
+	ArgsSchema *string `json:"args_schema"`
+	// Generated ordinary text-only input, when supported.
+	TextOnlyArgsSchema *string `json:"text_only_args_schema,omitempty"`
+	// Generated lookup-key input, when declared; application lookup values are not
+	// inspected.
+	LookupArgsSchema *string `json:"lookup_args_schema,omitempty"`
+	// Generated text-only lookup-key input, when supported.
+	LookupTextOnlyArgsSchema *string `json:"lookup_text_only_args_schema,omitempty"`
+	// Compiler-listed fields supplied outside the ordinary bound model input.
+	InjectedFields []string `json:"injected_fields"`
+}
+
+// validatejsonToolInputBindingItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonToolInputBindingItemTransport(value *jsonToolInputBindingItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if value.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
 	}
 	return err
 }
@@ -1005,6 +1075,19 @@ func validateC4ContainerItemOriginal(value *C4ContainerItem) (err error) {
 
 // validateToolContractItemOriginal checks the original typed value before JSON conversion.
 func validateToolContractItemOriginal(value *ToolContractItem) (err error) {
+	if value.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "value"))
+	}
+	if value.InputBinding != nil {
+		if err2 := validateToolInputBindingItemOriginal(value.InputBinding); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// validateToolInputBindingItemOriginal checks the original typed value before JSON conversion.
+func validateToolInputBindingItemOriginal(value *ToolInputBindingItem) (err error) {
 	if value.InjectedFields == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "value"))
 	}
@@ -1592,7 +1675,7 @@ func DecodeC4ContainerItem(data []byte) (out *C4ContainerItem, err error) {
 	if err != nil {
 		return out, fmt.Errorf("decode C4ContainerItem JSON: %w", err)
 	}
-	if err := validateArchitecturePreviewResultJSONValue4("", root, ""); err != nil {
+	if err := validateArchitecturePreviewResultJSONValue5("", root, ""); err != nil {
 		return out, fmt.Errorf("decode C4ContainerItem JSON: %w", err)
 	}
 	var body *jsonC4ContainerItemTransport
@@ -1676,7 +1759,7 @@ func DecodeC4EdgeItem(data []byte) (out *C4EdgeItem, err error) {
 	if err != nil {
 		return out, fmt.Errorf("decode C4EdgeItem JSON: %w", err)
 	}
-	if err := validateArchitecturePreviewResultJSONValue6("", root, ""); err != nil {
+	if err := validateArchitecturePreviewResultJSONValue7("", root, ""); err != nil {
 		return out, fmt.Errorf("decode C4EdgeItem JSON: %w", err)
 	}
 	var body *jsonC4EdgeItemTransport
@@ -2790,9 +2873,14 @@ func EncodeToolContractItem(in *ToolContractItem) ([]byte, error) {
 			Name:                 &in.Name,
 			Description:          &in.Description,
 			ArgsSchema:           &in.ArgsSchema,
+			TextOnlyArgsSchema:   in.TextOnlyArgsSchema,
 			ReturnSchema:         &in.ReturnSchema,
+			RequiresUI:           &in.RequiresUI,
 			RequiresConfirmation: &in.RequiresConfirmation,
 			BoundedResult:        &in.BoundedResult,
+		}
+		if in.InputBinding != nil {
+			body.InputBinding = encodeToolInputBindingItemToToolInputBindingItemTransport(in.InputBinding)
 		}
 		body.InjectedFields = make([]string, len(in.InjectedFields))
 		for i, val := range in.InjectedFields {
@@ -2832,9 +2920,14 @@ func ValidateToolContractItemValue(in *ToolContractItem) error {
 			Name:                 &in.Name,
 			Description:          &in.Description,
 			ArgsSchema:           &in.ArgsSchema,
+			TextOnlyArgsSchema:   in.TextOnlyArgsSchema,
 			ReturnSchema:         &in.ReturnSchema,
+			RequiresUI:           &in.RequiresUI,
 			RequiresConfirmation: &in.RequiresConfirmation,
 			BoundedResult:        &in.BoundedResult,
+		}
+		if in.InputBinding != nil {
+			body.InputBinding = encodeToolInputBindingItemToToolInputBindingItemTransport(in.InputBinding)
 		}
 		body.InjectedFields = make([]string, len(in.InjectedFields))
 		for i, val := range in.InjectedFields {
@@ -2853,7 +2946,7 @@ func DecodeToolContractItem(data []byte) (out *ToolContractItem, err error) {
 	if err != nil {
 		return out, fmt.Errorf("decode ToolContractItem JSON: %w", err)
 	}
-	if err := validateArchitecturePreviewResultJSONValue8("", root, ""); err != nil {
+	if err := validateArchitecturePreviewResultJSONValue9("", root, ""); err != nil {
 		return out, fmt.Errorf("decode ToolContractItem JSON: %w", err)
 	}
 	var body *jsonToolContractItemTransport
@@ -2878,9 +2971,118 @@ func DecodeToolContractItem(data []byte) (out *ToolContractItem, err error) {
 			Name:                 *body.Name,
 			Description:          *body.Description,
 			ArgsSchema:           *body.ArgsSchema,
+			TextOnlyArgsSchema:   body.TextOnlyArgsSchema,
 			ReturnSchema:         *body.ReturnSchema,
+			RequiresUI:           *body.RequiresUI,
 			RequiresConfirmation: *body.RequiresConfirmation,
 			BoundedResult:        *body.BoundedResult,
+		}
+		if body.InputBinding != nil {
+			out.InputBinding = decodeToolInputBindingItemTransportToToolInputBindingItem(body.InputBinding)
+		}
+		out.InjectedFields = make([]string, len(body.InjectedFields))
+		for i, val := range body.InjectedFields {
+			out.InjectedFields[i] = val
+		}
+	}
+	return out, nil
+}
+
+// EncodeToolInputBindingItem turns a service value into JSON using the field names in the Goa design.
+func EncodeToolInputBindingItem(in *ToolInputBindingItem) ([]byte, error) {
+	if err := checkToolInputBindingItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode ToolInputBindingItem JSON: %w", err)
+	}
+	if err := validateToolInputBindingItemOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate ToolInputBindingItem value: %w", err)
+	}
+	var body *jsonToolInputBindingItemTransport
+	{
+		body = &jsonToolInputBindingItemTransport{
+			ArgsSchema:               &in.ArgsSchema,
+			TextOnlyArgsSchema:       in.TextOnlyArgsSchema,
+			LookupArgsSchema:         in.LookupArgsSchema,
+			LookupTextOnlyArgsSchema: in.LookupTextOnlyArgsSchema,
+		}
+		body.InjectedFields = make([]string, len(in.InjectedFields))
+		for i, val := range in.InjectedFields {
+			body.InjectedFields[i] = val
+		}
+	}
+	if err := validatejsonToolInputBindingItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate ToolInputBindingItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode ToolInputBindingItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateToolInputBindingItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateToolInputBindingItemValue(in *ToolInputBindingItem) error {
+	if err := checkToolInputBindingItemValue(in); err != nil {
+		return fmt.Errorf("validate ToolInputBindingItem value: %w", err)
+	}
+	if err := validateToolInputBindingItemOriginal(in); err != nil {
+		return fmt.Errorf("validate ToolInputBindingItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "ToolInputBindingItem")
+	}
+
+	var body *jsonToolInputBindingItemTransport
+	{
+		body = &jsonToolInputBindingItemTransport{
+			ArgsSchema:               &in.ArgsSchema,
+			TextOnlyArgsSchema:       in.TextOnlyArgsSchema,
+			LookupArgsSchema:         in.LookupArgsSchema,
+			LookupTextOnlyArgsSchema: in.LookupTextOnlyArgsSchema,
+		}
+		body.InjectedFields = make([]string, len(in.InjectedFields))
+		for i, val := range in.InjectedFields {
+			body.InjectedFields[i] = val
+		}
+	}
+	if err := validatejsonToolInputBindingItemTransport(body); err != nil {
+		return fmt.Errorf("validate ToolInputBindingItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeToolInputBindingItem checks JSON field names from the Goa design and returns a service value.
+func DecodeToolInputBindingItem(data []byte) (out *ToolInputBindingItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode ToolInputBindingItem JSON: %w", err)
+	}
+	if err := validateArchitecturePreviewResultJSONValue11("", root, ""); err != nil {
+		return out, fmt.Errorf("decode ToolInputBindingItem JSON: %w", err)
+	}
+	var body *jsonToolInputBindingItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode ToolInputBindingItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode ToolInputBindingItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode ToolInputBindingItem JSON after first value: %w", err)
+	}
+	if err := validatejsonToolInputBindingItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate ToolInputBindingItem JSON: %w", err)
+	}
+	{
+		out = &ToolInputBindingItem{
+			ArgsSchema:               *body.ArgsSchema,
+			TextOnlyArgsSchema:       body.TextOnlyArgsSchema,
+			LookupArgsSchema:         body.LookupArgsSchema,
+			LookupTextOnlyArgsSchema: body.LookupTextOnlyArgsSchema,
 		}
 		out.InjectedFields = make([]string, len(body.InjectedFields))
 		for i, val := range body.InjectedFields {
@@ -2970,9 +3172,29 @@ func decodeToolContractItemTransportToToolContractItem(v *jsonToolContractItemTr
 		Name:                 *v.Name,
 		Description:          *v.Description,
 		ArgsSchema:           *v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         *v.ReturnSchema,
+		RequiresUI:           *v.RequiresUI,
 		RequiresConfirmation: *v.RequiresConfirmation,
 		BoundedResult:        *v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = decodeToolInputBindingItemTransportToToolInputBindingItem(v.InputBinding)
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func decodeToolInputBindingItemTransportToToolInputBindingItem(v *jsonToolInputBindingItemTransport) *ToolInputBindingItem {
+	res := &ToolInputBindingItem{
+		ArgsSchema:               *v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
@@ -3091,9 +3313,29 @@ func encodeToolContractItemToToolContractItemTransport(v *ToolContractItem) *jso
 		Name:                 &v.Name,
 		Description:          &v.Description,
 		ArgsSchema:           &v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         &v.ReturnSchema,
+		RequiresUI:           &v.RequiresUI,
 		RequiresConfirmation: &v.RequiresConfirmation,
 		BoundedResult:        &v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = encodeToolInputBindingItemToToolInputBindingItemTransport(v.InputBinding)
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func encodeToolInputBindingItemToToolInputBindingItemTransport(v *ToolInputBindingItem) *jsonToolInputBindingItemTransport {
+	res := &jsonToolInputBindingItemTransport{
+		ArgsSchema:               &v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
@@ -3361,7 +3603,7 @@ func validateArchitecturePreviewResultJSONValue(path string, value any, descript
 				return err
 			}
 		case "containers":
-			if err := validateArchitecturePreviewResultJSONValue3(
+			if err := validateArchitecturePreviewResultJSONValue4(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Derived C4 containers.",
 			); err != nil {
@@ -3375,7 +3617,7 @@ func validateArchitecturePreviewResultJSONValue(path string, value any, descript
 				return err
 			}
 		case "edges":
-			if err := validateArchitecturePreviewResultJSONValue5(
+			if err := validateArchitecturePreviewResultJSONValue6(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Validated directed edges between declared containers.",
 			); err != nil {
@@ -3396,7 +3638,7 @@ func validateArchitecturePreviewResultJSONValue(path string, value any, descript
 				return err
 			}
 		case "tools":
-			if err := validateArchitecturePreviewResultJSONValue7(
+			if err := validateArchitecturePreviewResultJSONValue8(
 				generatedJSONChildPath(path, key, false),
 				typed[key], "Evaluated Goa-AI tool contracts.",
 			); err != nil {
@@ -3446,8 +3688,8 @@ func validateArchitecturePreviewResultJSONValue2(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue3 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue3(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue4(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -3463,7 +3705,7 @@ func validateArchitecturePreviewResultJSONValue3(path string, value any, descrip
 		if item == nil {
 			continue
 		}
-		if err := validateArchitecturePreviewResultJSONValue4(
+		if err := validateArchitecturePreviewResultJSONValue5(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -3473,8 +3715,8 @@ func validateArchitecturePreviewResultJSONValue3(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue4(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue5 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue5(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -3533,8 +3775,8 @@ func validateArchitecturePreviewResultJSONValue4(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue5 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue5(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue6 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue6(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -3550,7 +3792,7 @@ func validateArchitecturePreviewResultJSONValue5(path string, value any, descrip
 		if item == nil {
 			continue
 		}
-		if err := validateArchitecturePreviewResultJSONValue6(
+		if err := validateArchitecturePreviewResultJSONValue7(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -3560,8 +3802,8 @@ func validateArchitecturePreviewResultJSONValue5(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue6 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue6(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue7 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue7(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -3612,8 +3854,8 @@ func validateArchitecturePreviewResultJSONValue6(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue7 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue7(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue8 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue8(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -3629,7 +3871,7 @@ func validateArchitecturePreviewResultJSONValue7(path string, value any, descrip
 		if item == nil {
 			continue
 		}
-		if err := validateArchitecturePreviewResultJSONValue8(
+		if err := validateArchitecturePreviewResultJSONValue9(
 			generatedJSONChildPath(path, strconv.Itoa(index), true),
 			item, description,
 		); err != nil {
@@ -3639,8 +3881,8 @@ func validateArchitecturePreviewResultJSONValue7(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue8 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue8(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue9 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue9(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -3662,7 +3904,7 @@ func validateArchitecturePreviewResultJSONValue8(path string, value any, descrip
 		case "args_schema":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Canonical evaluated argument schema summary.",
+				typed[key], "Generated provider model input before consumer binding.",
 			); err != nil {
 				return err
 			}
@@ -3683,14 +3925,21 @@ func validateArchitecturePreviewResultJSONValue8(path string, value any, descrip
 		case "id":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Scoped tool identifier (<toolset>.<tool>).",
+				typed[key], "Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).",
 			); err != nil {
 				return err
 			}
 		case "injected_fields":
-			if err := validateArchitecturePreviewResultJSONValue9(
+			if err := validateArchitecturePreviewResultJSONValue10(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Server-supplied InjectedFields hidden from the model.",
+				typed[key], "Compiler-listed runtime or provider fields omitted from the provider model input.",
+			); err != nil {
+				return err
+			}
+		case "input_binding":
+			if err := validateArchitecturePreviewResultJSONValue11(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Compiled consumer input choices, when binding is declared.",
 			); err != nil {
 				return err
 			}
@@ -3708,17 +3957,31 @@ func validateArchitecturePreviewResultJSONValue8(path string, value any, descrip
 			); err != nil {
 				return err
 			}
+		case "requires_ui":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when the tool requires a UI-capable runtime.",
+			); err != nil {
+				return err
+			}
 		case "return_schema":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Canonical evaluated return schema summary.",
+				typed[key], "Generated model-visible result schema; empty when the tool declares no result.",
+			); err != nil {
+				return err
+			}
+		case "text_only_args_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated provider text-only input, when supported.",
 			); err != nil {
 				return err
 			}
 		case "toolset":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Owning toolset name.",
+				typed[key], "Compiler-selected toolset registration route.",
 			); err != nil {
 				return err
 			}
@@ -3729,9 +3992,12 @@ func validateArchitecturePreviewResultJSONValue8(path string, value any, descrip
 				"description",
 				"id",
 				"injected_fields",
+				"input_binding",
 				"name",
 				"requires_confirmation",
+				"requires_ui",
 				"return_schema",
+				"text_only_args_schema",
 				"toolset",
 			})
 		}
@@ -3739,8 +4005,100 @@ func validateArchitecturePreviewResultJSONValue8(path string, value any, descrip
 	return nil
 }
 
-// validateArchitecturePreviewResultJSONValue9 checks one value whose JSON shape is fixed by the generated Goa type.
-func validateArchitecturePreviewResultJSONValue9(path string, value any, description string) error {
+// validateArchitecturePreviewResultJSONValue10 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue10(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validateAgentPolicyItemJSONValue2(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue11 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue11(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "args_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated ordinary bound model input.",
+			); err != nil {
+				return err
+			}
+		case "injected_fields":
+			if err := validateArchitecturePreviewResultJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Compiler-listed fields supplied outside the ordinary bound model input.",
+			); err != nil {
+				return err
+			}
+		case "lookup_args_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated lookup-key input, when declared; application lookup values are not inspected.",
+			); err != nil {
+				return err
+			}
+		case "lookup_text_only_args_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated text-only lookup-key input, when supported.",
+			); err != nil {
+				return err
+			}
+		case "text_only_args_schema":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated ordinary text-only input, when supported.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"args_schema",
+				"injected_fields",
+				"lookup_args_schema",
+				"lookup_text_only_args_schema",
+				"text_only_args_schema",
+			})
+		}
+	}
+	return nil
+}
+
+// validateArchitecturePreviewResultJSONValue3 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateArchitecturePreviewResultJSONValue3(path string, value any, description string) error {
 	field := path
 	if field == "" {
 		field = "$payload"
@@ -5033,8 +5391,56 @@ func checkArchitecturePreviewResultToolContractItemValue(in *ToolContractItem, f
 		if !utf8.ValidString(string(in.ArgsSchema)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "args_schema", false))
 		}
+		if in.TextOnlyArgsSchema != nil {
+			if !utf8.ValidString(string(*in.TextOnlyArgsSchema)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "text_only_args_schema", false))
+			}
+		}
+		if err := checkArchitecturePreviewResultToolInputBindingItemValue(in.InputBinding, generatedJSONChildPath(field, "input_binding", false), active); err != nil {
+			return err
+		}
 		if !utf8.ValidString(string(in.ReturnSchema)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "return_schema", false))
+		}
+		for index1, item1 := range in.InjectedFields {
+			_ = index1
+			_ = item1
+			if !utf8.ValidString(string(item1)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "injected_fields", false), strconv.Itoa(index1), true))
+			}
+		}
+	}
+	return nil
+}
+
+// checkArchitecturePreviewResultToolInputBindingItemValue checks one generated value on the active path.
+func checkArchitecturePreviewResultToolInputBindingItemValue(in *ToolInputBindingItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ArgsSchema)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "args_schema", false))
+		}
+		if in.TextOnlyArgsSchema != nil {
+			if !utf8.ValidString(string(*in.TextOnlyArgsSchema)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "text_only_args_schema", false))
+			}
+		}
+		if in.LookupArgsSchema != nil {
+			if !utf8.ValidString(string(*in.LookupArgsSchema)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "lookup_args_schema", false))
+			}
+		}
+		if in.LookupTextOnlyArgsSchema != nil {
+			if !utf8.ValidString(string(*in.LookupTextOnlyArgsSchema)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "lookup_text_only_args_schema", false))
+			}
 		}
 		for index1, item1 := range in.InjectedFields {
 			_ = index1
@@ -5520,6 +5926,18 @@ func checkToolContractItemValue(in *ToolContractItem) error {
 	}
 	active := make(map[any]bool)
 	if err := checkArchitecturePreviewResultToolContractItemValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkToolInputBindingItemValue checks text and cycles before conversion.
+func checkToolInputBindingItemValue(in *ToolInputBindingItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkArchitecturePreviewResultToolInputBindingItemValue(in, "$", active); err != nil {
 		return err
 	}
 	return nil

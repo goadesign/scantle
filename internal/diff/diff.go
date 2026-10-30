@@ -1,6 +1,5 @@
-// Package diff computes structural contract and module dependency diffs for
-// evaluated Goa/Goa-AI designs and go.mod files without emitting a blanket
-// compatibility verdict.
+// Package diff compares generated sources, domain declarations, Model diagrams,
+// agent policies, and module dependencies without claiming runtime compatibility.
 package diff
 
 import (
@@ -19,11 +18,11 @@ type (
 	Report struct {
 		// HasChanges is true when at least one declaration, evaluated contract schema, or module directive changed.
 		HasChanges bool
-		// AddedDeclarations lists newly introduced scoped Goa/Goa-AI declarations.
+		// AddedDeclarations lists new generated sources and scoped declarations.
 		AddedDeclarations []string
-		// RemovedDeclarations lists deleted scoped Goa/Goa-AI declarations.
+		// RemovedDeclarations lists deleted generated sources and scoped declarations.
 		RemovedDeclarations []string
-		// ModifiedDeclarations lists scoped Goa/Goa-AI declarations whose evaluated contract changed.
+		// ModifiedDeclarations lists generated sources or scoped declarations that changed.
 		ModifiedDeclarations []string
 		// VersionDeltas lists changed, added, or removed go.mod require, replace, or exclude directives.
 		VersionDeltas []string
@@ -52,7 +51,7 @@ func Compare(ctx context.Context, oldFiles, newFiles map[string]string) (Report,
 	added, removed, modified := diffDeclarations(oldEval.Declarations, newEval.Declarations)
 	hasChanges := len(added) > 0 || len(removed) > 0 || len(modified) > 0 || len(deltas) > 0
 
-	summary := "No structural design or module dependency changes."
+	summary := "No generated source, declared metadata, or module dependency changes."
 	if hasChanges {
 		parts := make([]string, 0, 4)
 		if len(added) > 0 {

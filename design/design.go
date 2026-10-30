@@ -116,17 +116,32 @@ var AgentPolicyItem = Type("AgentPolicyItem", func() {
 	)
 })
 
+// ToolInputBindingItem lists the compiled ordinary and lookup input choices for
+// one consumer; it does not assert which installer the application invokes.
+var ToolInputBindingItem = Type("ToolInputBindingItem", func() {
+	Description("Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.")
+	Attribute("args_schema", String, "Generated ordinary bound model input.")
+	Attribute("text_only_args_schema", String, "Generated ordinary text-only input, when supported.")
+	Attribute("lookup_args_schema", String, "Generated lookup-key input, when declared; application lookup values are not inspected.")
+	Attribute("lookup_text_only_args_schema", String, "Generated text-only lookup-key input, when supported.")
+	Attribute("injected_fields", ArrayOf(String), "Compiler-listed fields supplied outside the ordinary bound model input.")
+	Required("args_schema", "injected_fields")
+})
+
 // ToolContractItem reports the evaluated tool schema, server-data injections,
 // confirmation gate, and bounded-result contract for one tool.
 var ToolContractItem = Type("ToolContractItem", func() {
 	Description("Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.")
-	Attribute("id", String, "Scoped tool identifier (<toolset>.<tool>).")
-	Attribute("toolset", String, "Owning toolset name.")
+	Attribute("id", String, "Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).")
+	Attribute("toolset", String, "Compiler-selected toolset registration route.")
 	Attribute("name", String, "Tool name.")
 	Attribute("description", String, "Tool description.")
-	Attribute("args_schema", String, "Canonical evaluated argument schema summary.")
-	Attribute("return_schema", String, "Canonical evaluated return schema summary.")
-	Attribute("injected_fields", ArrayOf(String), "Server-supplied InjectedFields hidden from the model.")
+	Attribute("args_schema", String, "Generated provider model input before consumer binding.")
+	Attribute("text_only_args_schema", String, "Generated provider text-only input, when supported.")
+	Attribute("input_binding", ToolInputBindingItem, "Compiled consumer input choices, when binding is declared.")
+	Attribute("return_schema", String, "Generated model-visible result schema; empty when the tool declares no result.")
+	Attribute("injected_fields", ArrayOf(String), "Compiler-listed runtime or provider fields omitted from the provider model input.")
+	Attribute("requires_ui", Boolean, "True when the tool requires a UI-capable runtime.")
 	Attribute("requires_confirmation", Boolean, "True when the tool declares a design-time Confirmation gate.")
 	Attribute("bounded_result", Boolean, "True when the tool declares a BoundedResult cursor/truncation contract.")
 	Required(
@@ -138,6 +153,7 @@ var ToolContractItem = Type("ToolContractItem", func() {
 		"return_schema",
 		"injected_fields",
 		"requires_confirmation",
+		"requires_ui",
 		"bounded_result",
 	)
 })

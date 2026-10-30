@@ -425,8 +425,27 @@ func ValidateToolContractItemTransport(body *ToolContractItemTransport) (err err
 	if body.RequiresConfirmation == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
 	}
+	if body.RequiresUI == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_ui", "body"))
+	}
 	if body.BoundedResult == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
+	}
+	if body.InputBinding != nil {
+		if err2 := ValidateToolInputBindingItemTransport(body.InputBinding); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return
+}
+
+// ValidateToolInputBindingItemTransport runs the validations defined on ToolInputBindingItemTransport.
+func ValidateToolInputBindingItemTransport(body *ToolInputBindingItemTransport) (err error) {
+	if body.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if body.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
 	}
 	return
 }

@@ -69,8 +69,8 @@ var _ = Service("orders", func() {
 		t.Fatalf("expected SystemName orders, got %q", res.SystemName)
 	}
 	methodSig := res.Declarations["Service:orders/Method:get_order"]
-	if !strings.Contains(methodSig, "GET /api/v1/orders/{id}") {
-		t.Fatalf("expected full HTTP path GET /api/v1/orders/{id} in method declaration, got %q", methodSig)
+	if res.Declarations["Generated:gen/http/orders/server/paths.go"] == "" {
+		t.Fatal("expected the actual generated HTTP path source to be compared")
 	}
 	if !strings.Contains(methodSig, `"minLength":3`) {
 		t.Fatalf("expected JSON Schema minLength:3 in method payload schema, got %q", methodSig)

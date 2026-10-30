@@ -194,9 +194,19 @@ paths:
                                         - Odit culpa distinctio nobis.
                                         - Voluptatum similique.
                                         - Nisi minima reprehenderit.
+                                      input_binding:
+                                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                                        injected_fields:
+                                            - Quam laborum aut dolorum enim perferendis omnis.
+                                            - Aut doloribus.
+                                        lookup_args_schema: Qui itaque.
+                                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                                       name: Voluptatum voluptatem.
                                       requires_confirmation: true
+                                      requires_ui: true
                                       return_schema: Omnis aut ab aliquam qui.
+                                      text_only_args_schema: Suscipit dignissimos ut.
                                       toolset: Veniam aspernatur ad recusandae unde.
                                     - args_schema: Nisi vel iusto.
                                       bounded_result: true
@@ -207,9 +217,19 @@ paths:
                                         - Odit culpa distinctio nobis.
                                         - Voluptatum similique.
                                         - Nisi minima reprehenderit.
+                                      input_binding:
+                                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                                        injected_fields:
+                                            - Quam laborum aut dolorum enim perferendis omnis.
+                                            - Aut doloribus.
+                                        lookup_args_schema: Qui itaque.
+                                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                                       name: Voluptatum voluptatem.
                                       requires_confirmation: true
+                                      requires_ui: true
                                       return_schema: Omnis aut ab aliquam qui.
+                                      text_only_args_schema: Suscipit dignissimos ut.
                                       toolset: Veniam aspernatur ad recusandae unde.
     /changes/propose:
         post:
@@ -582,9 +602,19 @@ components:
                             - Odit culpa distinctio nobis.
                             - Voluptatum similique.
                             - Nisi minima reprehenderit.
+                          input_binding:
+                            args_schema: Qui qui illo assumenda dolores nemo harum.
+                            injected_fields:
+                                - Quam laborum aut dolorum enim perferendis omnis.
+                                - Aut doloribus.
+                            lookup_args_schema: Qui itaque.
+                            lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                            text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                           name: Voluptatum voluptatem.
                           requires_confirmation: true
+                          requires_ui: true
                           return_schema: Omnis aut ab aliquam qui.
+                          text_only_args_schema: Suscipit dignissimos ut.
                           toolset: Veniam aspernatur ad recusandae unde.
                         - args_schema: Nisi vel iusto.
                           bounded_result: true
@@ -595,9 +625,19 @@ components:
                             - Odit culpa distinctio nobis.
                             - Voluptatum similique.
                             - Nisi minima reprehenderit.
+                          input_binding:
+                            args_schema: Qui qui illo assumenda dolores nemo harum.
+                            injected_fields:
+                                - Quam laborum aut dolorum enim perferendis omnis.
+                                - Aut doloribus.
+                            lookup_args_schema: Qui itaque.
+                            lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                            text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                           name: Voluptatum voluptatem.
                           requires_confirmation: true
+                          requires_ui: true
                           return_schema: Omnis aut ab aliquam qui.
+                          text_only_args_schema: Suscipit dignissimos ut.
                           toolset: Veniam aspernatur ad recusandae unde.
             description: Checkpoint 2 C4 container topology, tool contracts, and per-agent Goa-AI guardrails derived from the evaluated candidate design.
             example:
@@ -668,9 +708,19 @@ components:
                         - Odit culpa distinctio nobis.
                         - Voluptatum similique.
                         - Nisi minima reprehenderit.
+                      input_binding:
+                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                        injected_fields:
+                            - Quam laborum aut dolorum enim perferendis omnis.
+                            - Aut doloribus.
+                        lookup_args_schema: Qui itaque.
+                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                       name: Voluptatum voluptatem.
                       requires_confirmation: true
+                      requires_ui: true
                       return_schema: Omnis aut ab aliquam qui.
+                      text_only_args_schema: Suscipit dignissimos ut.
                       toolset: Veniam aspernatur ad recusandae unde.
                     - args_schema: Nisi vel iusto.
                       bounded_result: true
@@ -681,9 +731,19 @@ components:
                         - Odit culpa distinctio nobis.
                         - Voluptatum similique.
                         - Nisi minima reprehenderit.
+                      input_binding:
+                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                        injected_fields:
+                            - Quam laborum aut dolorum enim perferendis omnis.
+                            - Aut doloribus.
+                        lookup_args_schema: Qui itaque.
+                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                       name: Voluptatum voluptatem.
                       requires_confirmation: true
+                      requires_ui: true
                       return_schema: Omnis aut ab aliquam qui.
+                      text_only_args_schema: Suscipit dignissimos ut.
                       toolset: Veniam aspernatur ad recusandae unde.
             required:
                 - change_id
@@ -1247,7 +1307,7 @@ components:
             properties:
                 args_schema:
                     type: string
-                    description: Canonical evaluated argument schema summary.
+                    description: Generated provider model input before consumer binding.
                     example: Nisi vel iusto.
                 bounded_result:
                     type: boolean
@@ -1259,19 +1319,21 @@ components:
                     example: Voluptatem pariatur similique omnis dolore.
                 id:
                     type: string
-                    description: Scoped tool identifier (<toolset>.<tool>).
+                    description: Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
                     example: Omnis aut quos rem qui sunt.
                 injected_fields:
                     type: array
                     items:
                         type: string
                         example: Soluta tenetur sint ullam aut illum.
-                    description: Server-supplied InjectedFields hidden from the model.
+                    description: Compiler-listed runtime or provider fields omitted from the provider model input.
                     example:
                         - Soluta tenetur sint ullam aut illum.
                         - Odit culpa distinctio nobis.
                         - Voluptatum similique.
                         - Nisi minima reprehenderit.
+                input_binding:
+                    $ref: '#/components/schemas/ToolInputBindingItem'
                 name:
                     type: string
                     description: Tool name.
@@ -1280,13 +1342,21 @@ components:
                     type: boolean
                     description: True when the tool declares a design-time Confirmation gate.
                     example: true
+                requires_ui:
+                    type: boolean
+                    description: True when the tool requires a UI-capable runtime.
+                    example: true
                 return_schema:
                     type: string
-                    description: Canonical evaluated return schema summary.
+                    description: Generated model-visible result schema; empty when the tool declares no result.
                     example: Omnis aut ab aliquam qui.
+                text_only_args_schema:
+                    type: string
+                    description: Generated provider text-only input, when supported.
+                    example: Suscipit dignissimos ut.
                 toolset:
                     type: string
-                    description: Owning toolset name.
+                    description: Compiler-selected toolset registration route.
                     example: Veniam aspernatur ad recusandae unde.
             description: Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.
             example:
@@ -1299,9 +1369,19 @@ components:
                     - Odit culpa distinctio nobis.
                     - Voluptatum similique.
                     - Nisi minima reprehenderit.
+                input_binding:
+                    args_schema: Qui qui illo assumenda dolores nemo harum.
+                    injected_fields:
+                        - Quam laborum aut dolorum enim perferendis omnis.
+                        - Aut doloribus.
+                    lookup_args_schema: Qui itaque.
+                    lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                    text_only_args_schema: Reprehenderit iusto quis distinctio iure.
                 name: Voluptatum voluptatem.
                 requires_confirmation: true
+                requires_ui: true
                 return_schema: Omnis aut ab aliquam qui.
+                text_only_args_schema: Suscipit dignissimos ut.
                 toolset: Veniam aspernatur ad recusandae unde.
             required:
                 - id
@@ -1312,7 +1392,48 @@ components:
                 - return_schema
                 - injected_fields
                 - requires_confirmation
+                - requires_ui
                 - bounded_result
+        ToolInputBindingItem:
+            type: object
+            properties:
+                args_schema:
+                    type: string
+                    description: Generated ordinary bound model input.
+                    example: Qui qui illo assumenda dolores nemo harum.
+                injected_fields:
+                    type: array
+                    items:
+                        type: string
+                        example: Quam laborum aut dolorum enim perferendis omnis.
+                    description: Compiler-listed fields supplied outside the ordinary bound model input.
+                    example:
+                        - Quam laborum aut dolorum enim perferendis omnis.
+                        - Aut doloribus.
+                lookup_args_schema:
+                    type: string
+                    description: Generated lookup-key input, when declared; application lookup values are not inspected.
+                    example: Qui itaque.
+                lookup_text_only_args_schema:
+                    type: string
+                    description: Generated text-only lookup-key input, when supported.
+                    example: Consequuntur sit iste rerum.
+                text_only_args_schema:
+                    type: string
+                    description: Generated ordinary text-only input, when supported.
+                    example: Reprehenderit iusto quis distinctio iure.
+            description: Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.
+            example:
+                args_schema: Qui qui illo assumenda dolores nemo harum.
+                injected_fields:
+                    - Quam laborum aut dolorum enim perferendis omnis.
+                    - Aut doloribus.
+                lookup_args_schema: Qui itaque.
+                lookup_text_only_args_schema: Consequuntur sit iste rerum.
+                text_only_args_schema: Reprehenderit iusto quis distinctio iure.
+            required:
+                - args_schema
+                - injected_fields
 tags:
     - name: scantle
       description: Scantle MCP software factory control plane.

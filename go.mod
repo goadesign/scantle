@@ -7,9 +7,9 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/yosida95/uritemplate/v3 v3.0.2
 	go.opentelemetry.io/otel v1.47.0
-	goa.design/goa-ai v0.89.1-0.20261030164650-746274f1805f
-	goa.design/goa/v3 v3.35.1-0.20261023134129-12a5635f9dd0
-	goa.design/model v1.16.11-0.20261015174523-13107c846b9b
+	goa.design/goa-ai v0.89.1-0.20261030171518-459b7c18b476
+	goa.design/goa/v3 v3.35.1-0.20261030163856-3e08a6128171
+	goa.design/model v1.16.11-0.20261030164016-5e17c2e932fb
 	golang.org/x/mod v0.42.0
 )
 

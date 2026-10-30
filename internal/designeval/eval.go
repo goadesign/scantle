@@ -1,7 +1,9 @@
 // Package designeval evaluates Go/Goa/Goa-AI/Model design sources by compiling a
 // standalone evaluator binary and executing it inside verify/candidate.Exec's
-// OS-enforced single-process sandbox, using Goa-AI's canonical preparation and
-// JSON Schema builders (`codegen/agent.Prepare` and `codegen/jsonschema.Build`).
+// OS-enforced single-process sandbox. Registered generators return source bytes;
+// the evaluator hashes those bytes and reads Goa-AI's existing tool catalogs.
+// Protobuf comparisons include Goa's .proto sources, without invoking protoc or
+// claiming that generated source equality proves runtime compatibility.
 package designeval
 
 import (
@@ -28,7 +30,8 @@ type (
 	Result struct {
 		// SystemName is the evaluated API name, Model system name, or primary service name.
 		SystemName string `json:"system_name"`
-		// Declarations maps each scoped declaration key to its canonical evaluated contract signature.
+		// Declarations contains generated source digests under Generated:<path>
+		// and domain, Model, and agent-policy declaration records under scoped names.
 		Declarations map[string]string `json:"declarations"`
 		// Containers lists the C4 containers derived from evaluated Services, Agents, Toolsets, and Model containers.
 		Containers []*genscantle.C4ContainerItem `json:"containers"`
@@ -36,7 +39,8 @@ type (
 		Edges []*genscantle.C4EdgeItem `json:"edges"`
 		// AgentPolicies lists the evaluated Goa-AI RunPolicy settings per agent.
 		AgentPolicies []*genscantle.AgentPolicyItem `json:"agent_policies"`
-		// Tools lists the evaluated Goa-AI tool contracts across all declared toolsets.
+		// Tools lists the public tools selected by each agent, with compiled input
+		// choices; it does not claim which binding the application installs.
 		Tools []*genscantle.ToolContractItem `json:"tools"`
 	}
 
@@ -121,6 +125,7 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	}
 	designImport := strconv.Quote(target.Module.Mod.Path + "/design")
 	harnessMain := strings.ReplaceAll(harnessMainTemplate, "{{DESIGN_IMPORT}}", designImport)
+	harnessMain = strings.ReplaceAll(harnessMain, "{{GEN_IMPORT}}", strconv.Quote(target.Module.Mod.Path+"/gen"))
 	if err := os.WriteFile(filepath.Join(buildDir, "main.go"), []byte(harnessMain), 0o600); err != nil {
 		return Result{}, fmt.Errorf("write evaluator main.go: %w", err)
 	}

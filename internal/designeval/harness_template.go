@@ -5,27 +5,28 @@ package designeval
 const (
 	// harnessMainTemplate is the standalone evaluator program compiled and
 	// executed inside candidate.Exec against the temporary design package.
-	harnessMainTemplate = harnessMainHead + harnessMainHelpers
+	harnessMainTemplate = harnessMainHead + harnessMainHelpers + harnessGeneratedHelpers
 
 	// harnessMainHead contains the package declarations, structured record types,
 	// and main evaluation flow of the standalone evaluator program.
 	harnessMainHead = `package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 
 	_ {{DESIGN_IMPORT}}
-	agentcodegen "goa.design/goa-ai/codegen/agent"
+	_ "goa.design/goa-ai/codegen/agent"
+	_ "goa.design/goa-ai/codegen/mcp"
+	"goa.design/goa/v3/codegen/generator"
 	"goa.design/goa-ai/codegen/jsonschema"
 	evalexpr "goa.design/goa-ai/eval/expr"
 	agentexpr "goa.design/goa-ai/expr/agent"
-	mcpexpr "goa.design/goa-ai/expr/mcp"
 	"goa.design/goa/v3/eval"
 	goaexpr "goa.design/goa/v3/expr"
 	modelexpr "goa.design/model/expr"
@@ -63,15 +64,31 @@ type (
 		CacheAfterTools          bool
 	}
 
+	// toolContract returns one selected tool and every compiled input choice.
 	toolContract struct {
+		// ID combines the exact agent and tool identities from the catalog.
 		ID                   string
+		// Toolset is the compiler's registration route.
 		Toolset              string
+		// Name is the authored tool name.
 		Name                 string
+		// Description is the generated model-facing tool description.
 		Description          string
+		// ArgsSchema is the provider model input before consumer binding.
 		ArgsSchema           string
+		// TextOnlyArgsSchema is provider UI-free input, absent when unsupported.
+		TextOnlyArgsSchema   *string
+		// InputBinding contains the consumer's declared input alternatives.
+		InputBinding *toolInputBinding
+		// ReturnSchema is empty when the tool declares no result.
 		ReturnSchema         string
+		// InjectedFields are omitted from ordinary input and supplied outside it.
 		InjectedFields       []string
+		// RequiresConfirmation reports a configured confirmation declaration.
 		RequiresConfirmation bool
+		// RequiresUI reports a UI-only tool declaration.
+		RequiresUI           bool
+		// BoundedResult reports the compiler's out-of-band result bounds contract.
 		BoundedResult        bool
 	}
 
@@ -86,21 +103,6 @@ type (
 
 	schemaDecl struct {
 		Schema     json.RawMessage        ` + "`json:\"schema\"`" + `
-		GoaTypes   map[string]string      ` + "`json:\"goa_types,omitempty\"`" + `
-		ProtoTypes map[string]string      ` + "`json:\"proto_types,omitempty\"`" + `
-		FieldMeta  map[string]metaDeclMap ` + "`json:\"field_meta,omitempty\"`" + `
-	}
-
-	metaDeclMap map[string][]string
-
-	mappedElemDecl struct {
-		Elem   string ` + "`json:\"elem\"`" + `
-		Target string ` + "`json:\"target\"`" + `
-	}
-
-	mappedAttDecl struct {
-		Schema   schemaDecl       ` + "`json:\"schema\"`" + `
-		Mappings []mappedElemDecl ` + "`json:\"mappings,omitempty\"`" + `
 	}
 
 	securityScopeDecl struct {
@@ -146,10 +148,6 @@ type (
 		Title       string               ` + "`json:\"title,omitempty\"`" + `
 		Version     string               ` + "`json:\"version,omitempty\"`" + `
 		Description string               ` + "`json:\"description,omitempty\"`" + `
-		HTTPPrefix  string               ` + "`json:\"http_prefix,omitempty\"`" + `
-		HTTPParams  *mappedAttDecl       ` + "`json:\"http_params,omitempty\"`" + `
-		HTTPHeaders *mappedAttDecl       ` + "`json:\"http_headers,omitempty\"`" + `
-		HTTPCookies *mappedAttDecl       ` + "`json:\"http_cookies,omitempty\"`" + `
 		Schemes     []securitySchemeDecl ` + "`json:\"schemes,omitempty\"`" + `
 	}
 
@@ -159,75 +157,11 @@ type (
 		Schema      schemaDecl ` + "`json:\"schema\"`" + `
 	}
 
-	httpRedirectDecl struct {
-		URL        string ` + "`json:\"url\"`" + `
-		StatusCode int    ` + "`json:\"status_code\"`" + `
-	}
-
 	serviceDecl struct {
 		Name          string             ` + "`json:\"name\"`" + `
 		Description   string             ` + "`json:\"description,omitempty\"`" + `
-		HTTPPaths     []string           ` + "`json:\"http_paths,omitempty\"`" + `
-		HTTPParams    *mappedAttDecl     ` + "`json:\"http_params,omitempty\"`" + `
-		HTTPHeaders   *mappedAttDecl     ` + "`json:\"http_headers,omitempty\"`" + `
-		HTTPCookies   *mappedAttDecl     ` + "`json:\"http_cookies,omitempty\"`" + `
-		HTTPRedirects []httpRedirectDecl ` + "`json:\"http_redirects,omitempty\"`" + `
 		Security      []securityReqDecl  ` + "`json:\"security,omitempty\"`" + `
 		Errors        []errorDecl        ` + "`json:\"errors,omitempty\"`" + `
-	}
-
-	httpResponseDecl struct {
-		StatusCode  int            ` + "`json:\"status_code\"`" + `
-		Description string         ` + "`json:\"description,omitempty\"`" + `
-		ContentType string         ` + "`json:\"content_type,omitempty\"`" + `
-		View        string         ` + "`json:\"view,omitempty\"`" + `
-		Tag         [2]string      ` + "`json:\"tag,omitempty\"`" + `
-		Headers     *mappedAttDecl ` + "`json:\"headers,omitempty\"`" + `
-		Cookies     *mappedAttDecl ` + "`json:\"cookies,omitempty\"`" + `
-		Body        *schemaDecl    ` + "`json:\"body,omitempty\"`" + `
-	}
-
-	httpErrorDecl struct {
-		Name     string           ` + "`json:\"name\"`" + `
-		Response httpResponseDecl ` + "`json:\"response\"`" + `
-	}
-
-	httpEndpointDecl struct {
-		Routes                       []string           ` + "`json:\"routes,omitempty\"`" + `
-		Params                       *mappedAttDecl     ` + "`json:\"params,omitempty\"`" + `
-		Headers                      *mappedAttDecl     ` + "`json:\"headers,omitempty\"`" + `
-		Cookies                      *mappedAttDecl     ` + "`json:\"cookies,omitempty\"`" + `
-		Body                         *schemaDecl        ` + "`json:\"body,omitempty\"`" + `
-		StreamingBody                *schemaDecl        ` + "`json:\"streaming_body,omitempty\"`" + `
-		MapQueryParams               *string            ` + "`json:\"map_query_params,omitempty\"`" + `
-		MultipartRequest             bool               ` + "`json:\"multipart_request,omitempty\"`" + `
-		FormRequest                  bool               ` + "`json:\"form_request,omitempty\"`" + `
-		SkipRequestBodyEncodeDecode  bool               ` + "`json:\"skip_request_body_encode_decode,omitempty\"`" + `
-		SkipResponseBodyEncodeDecode bool               ` + "`json:\"skip_response_body_encode_decode,omitempty\"`" + `
-		Redirect                     *httpRedirectDecl  ` + "`json:\"redirect,omitempty\"`" + `
-		Security                     []securityReqDecl  ` + "`json:\"security,omitempty\"`" + `
-		Responses                    []httpResponseDecl ` + "`json:\"responses,omitempty\"`" + `
-		Errors                       []httpErrorDecl    ` + "`json:\"errors,omitempty\"`" + `
-	}
-
-	grpcResponseDecl struct {
-		StatusCode int            ` + "`json:\"status_code\"`" + `
-		Message    *schemaDecl    ` + "`json:\"message,omitempty\"`" + `
-		Headers    *mappedAttDecl ` + "`json:\"headers,omitempty\"`" + `
-		Trailers   *mappedAttDecl ` + "`json:\"trailers,omitempty\"`" + `
-	}
-
-	grpcErrorDecl struct {
-		Name     string           ` + "`json:\"name\"`" + `
-		Response grpcResponseDecl ` + "`json:\"response\"`" + `
-	}
-
-	grpcEndpointDecl struct {
-		Request          *schemaDecl      ` + "`json:\"request,omitempty\"`" + `
-		StreamingRequest *schemaDecl      ` + "`json:\"streaming_request,omitempty\"`" + `
-		Metadata         *mappedAttDecl   ` + "`json:\"metadata,omitempty\"`" + `
-		Response         grpcResponseDecl ` + "`json:\"response\"`" + `
-		Errors           []grpcErrorDecl  ` + "`json:\"errors,omitempty\"`" + `
 	}
 
 	methodDecl struct {
@@ -238,55 +172,6 @@ type (
 		Result           schemaDecl        ` + "`json:\"result\"`" + `
 		Security         []securityReqDecl ` + "`json:\"security,omitempty\"`" + `
 		Errors           []errorDecl       ` + "`json:\"errors,omitempty\"`" + `
-		HTTP             *httpEndpointDecl ` + "`json:\"http,omitempty\"`" + `
-		GRPC             *grpcEndpointDecl ` + "`json:\"grpc,omitempty\"`" + `
-	}
-
-	mcpAnnotationsDecl struct {
-		Title           *string ` + "`json:\"title,omitempty\"`" + `
-		ReadOnlyHint    *bool   ` + "`json:\"read_only_hint,omitempty\"`" + `
-		DestructiveHint *bool   ` + "`json:\"destructive_hint,omitempty\"`" + `
-		IdempotentHint  *bool   ` + "`json:\"idempotent_hint,omitempty\"`" + `
-		OpenWorldHint   *bool   ` + "`json:\"open_world_hint,omitempty\"`" + `
-	}
-
-	mcpServerDecl struct {
-		Name         string            ` + "`json:\"name\"`" + `
-		Version      string            ` + "`json:\"version\"`" + `
-		Description  string            ` + "`json:\"description,omitempty\"`" + `
-		DynamicTools bool              ` + "`json:\"dynamic_tools,omitempty\"`" + `
-		Security     []securityReqDecl ` + "`json:\"security,omitempty\"`" + `
-	}
-
-	mcpToolDecl struct {
-		Name          string              ` + "`json:\"name\"`" + `
-		Method        string              ` + "`json:\"method\"`" + `
-		Description   string              ` + "`json:\"description,omitempty\"`" + `
-		ContentField  string              ` + "`json:\"content_field,omitempty\"`" + `
-		MetadataField string              ` + "`json:\"metadata_field,omitempty\"`" + `
-		UIResourceURI string              ` + "`json:\"ui_resource_uri,omitempty\"`" + `
-		Visibility    uint8               ` + "`json:\"visibility\"`" + `
-		Annotations   *mcpAnnotationsDecl ` + "`json:\"annotations,omitempty\"`" + `
-	}
-
-	mcpResourceDecl struct {
-		Name        string ` + "`json:\"name\"`" + `
-		Description string ` + "`json:\"description,omitempty\"`" + `
-		URI         string ` + "`json:\"uri\"`" + `
-		MimeType    string ` + "`json:\"mime_type,omitempty\"`" + `
-		Method      string ` + "`json:\"method,omitempty\"`" + `
-	}
-
-	mcpMessageDecl struct {
-		Role    string ` + "`json:\"role\"`" + `
-		Content string ` + "`json:\"content\"`" + `
-	}
-
-	mcpPromptDecl struct {
-		Name        string           ` + "`json:\"name\"`" + `
-		Description string           ` + "`json:\"description,omitempty\"`" + `
-		Method      string           ` + "`json:\"method,omitempty\"`" + `
-		Messages    []mcpMessageDecl ` + "`json:\"messages,omitempty\"`" + `
 	}
 
 	inputBindingDecl struct {
@@ -306,35 +191,6 @@ type (
 		DeferredTools []string           ` + "`json:\"deferred_tools,omitempty\"`" + `
 		InputBindings []inputBindingDecl ` + "`json:\"input_bindings,omitempty\"`" + `
 		FieldBindings []fieldBindingDecl ` + "`json:\"field_bindings,omitempty\"`" + `
-	}
-
-	toolConfirmDecl struct {
-		Title                string ` + "`json:\"title,omitempty\"`" + `
-		PromptTemplate       string ` + "`json:\"prompt_template,omitempty\"`" + `
-		DeniedResultTemplate string ` + "`json:\"denied_result_template,omitempty\"`" + `
-	}
-
-	toolBoundsDecl struct {
-		Bounded         bool   ` + "`json:\"bounded\"`" + `
-		CursorField     string ` + "`json:\"cursor_field,omitempty\"`" + `
-		NextCursorField string ` + "`json:\"next_cursor_field,omitempty\"`" + `
-		ContinueTool    string ` + "`json:\"continue_tool,omitempty\"`" + `
-	}
-
-	toolDecl struct {
-		Name            string           ` + "`json:\"name\"`" + `
-		Description     string           ` + "`json:\"description,omitempty\"`" + `
-		ArgsSchema      json.RawMessage  ` + "`json:\"args_schema\"`" + `
-		ReturnSchema    json.RawMessage  ` + "`json:\"return_schema\"`" + `
-		HiddenFields    []string         ` + "`json:\"hidden_fields,omitempty\"`" + `
-		LookupFields    []string         ` + "`json:\"lookup_fields,omitempty\"`" + `
-		RequiresUI      bool             ` + "`json:\"requires_ui,omitempty\"`" + `
-		UIOnlyFields    []string         ` + "`json:\"ui_only_fields,omitempty\"`" + `
-		Confirmation    *toolConfirmDecl ` + "`json:\"confirmation,omitempty\"`" + `
-		Bounds          *toolBoundsDecl  ` + "`json:\"bounds,omitempty\"`" + `
-		TerminalRun     bool             ` + "`json:\"terminal_run,omitempty\"`" + `
-		Bookkeeping     bool             ` + "`json:\"bookkeeping,omitempty\"`" + `
-		ReplanOnTimeout bool             ` + "`json:\"replan_on_timeout,omitempty\"`" + `
 	}
 
 	agentDecl struct {
@@ -384,8 +240,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
-	if err := agentcodegen.Prepare("", []eval.Root{goaexpr.Root, agentexpr.Root}); err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
+	roots, err := eval.Context.Roots()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	sources, err := generator.Sources({{GEN_IMPORT}}, roots)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 
@@ -414,13 +276,9 @@ func main() {
 		seenEdges[k] = true
 		out.Edges = append(out.Edges, e)
 	}
-	seenToolCardIDs := make(map[string]bool)
-	addToolCard := func(tc toolContract) {
-		if seenToolCardIDs[tc.ID] {
-			return
-		}
-		seenToolCardIDs[tc.ID] = true
-		out.Tools = append(out.Tools, tc)
+	if err := recordGeneratedSources(&out, sources); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	api := goaexpr.Root.API
@@ -441,12 +299,6 @@ func main() {
 			if sch != nil {
 				decl.Schemes = append(decl.Schemes, describeSecurityScheme(sch))
 			}
-		}
-		if api.HTTP != nil {
-			decl.HTTPPrefix = api.HTTP.Path
-			decl.HTTPParams = describeMappedAtt(api, api.HTTP.Params, "api.http.params")
-			decl.HTTPHeaders = describeMappedAtt(api, api.HTTP.Headers, "api.http.headers")
-			decl.HTTPCookies = describeMappedAtt(api, api.HTTP.Cookies, "api.http.cookies")
 		}
 		out.Declarations["API:"+api.Name] = mustJSON(decl)
 	}
@@ -486,34 +338,11 @@ func main() {
 			Description: desc,
 		})
 
-		var httpSvc *goaexpr.HTTPServiceExpr
-		if api != nil && api.HTTP != nil {
-			httpSvc = api.HTTP.Service(svc.Name)
-		}
-		var grpcSvc *goaexpr.GRPCServiceExpr
-		if api != nil && api.GRPC != nil {
-			grpcSvc = api.GRPC.Service(svc.Name)
-		}
 		svcDecl := serviceDecl{
 			Name:        svc.Name,
 			Description: svc.Description,
 			Security:    describeSecurity(svc.Requirements),
 			Errors:      describeErrors(api, svc.Errors),
-		}
-		if httpSvc != nil {
-			svcDecl.HTTPPaths = slices.Clone(httpSvc.Paths)
-			slices.Sort(svcDecl.HTTPPaths)
-			svcDecl.HTTPParams = describeMappedAtt(api, httpSvc.Params, "svc.http.params."+svc.Name)
-			svcDecl.HTTPHeaders = describeMappedAtt(api, httpSvc.Headers, "svc.http.headers."+svc.Name)
-			svcDecl.HTTPCookies = describeMappedAtt(api, httpSvc.Cookies, "svc.http.cookies."+svc.Name)
-			for _, fs := range httpSvc.FileServers {
-				if fs != nil && fs.Redirect != nil {
-					svcDecl.HTTPRedirects = append(svcDecl.HTTPRedirects, httpRedirectDecl{
-						URL:        fs.Redirect.URL,
-						StatusCode: fs.Redirect.StatusCode,
-					})
-				}
-			}
 		}
 		out.Declarations["Service:"+svc.Name] = mustJSON(svcDecl)
 
@@ -533,102 +362,10 @@ func main() {
 				sp := describeSchema(api, m.StreamingPayload, "method.stream_payload."+svc.Name+"."+m.Name)
 				mDecl.StreamingPayload = &sp
 			}
-			if httpSvc != nil {
-				if ep := httpSvc.Endpoint(m.Name); ep != nil {
-					mDecl.HTTP = describeHTTPEndpoint(api, svc.Name, m.Name, ep)
-				}
-			}
-			if grpcSvc != nil {
-				if gep := grpcSvc.Endpoint(m.Name); gep != nil {
-					mDecl.GRPC = describeGRPCEndpoint(api, svc.Name, m.Name, gep)
-				}
-			}
 			key := fmt.Sprintf("Service:%s/Method:%s", svc.Name, m.Name)
 			out.Declarations[key] = mustJSON(mDecl)
 		}
 
-		if mcpexpr.Root != nil {
-			if mcp := mcpexpr.Root.GetMCP(svc); mcp != nil {
-				mcpKey := fmt.Sprintf("Service:%s/MCP:%s", svc.Name, mcp.Name)
-				out.Declarations[mcpKey] = mustJSON(mcpServerDecl{
-					Name:         mcp.Name,
-					Version:      mcp.Version,
-					Description:  mcp.Description,
-					DynamicTools: mcp.DynamicTools,
-					Security:     describeSecurity(mcp.Requirements),
-				})
-				for _, t := range mcp.Tools {
-					if t != nil && t.Method != nil {
-						out.Declarations[fmt.Sprintf("%s/Tool:%s", mcpKey, t.Name)] = mustJSON(mcpToolDecl{
-							Name:          t.Name,
-							Method:        t.Method.Name,
-							Description:   t.Description,
-							ContentField:  t.ContentField,
-							MetadataField: t.MetadataField,
-							UIResourceURI: t.UIResourceURI,
-							Visibility:    uint8(t.Visibility),
-							Annotations:   describeMCPAnnotations(t.Annotations),
-						})
-					}
-				}
-				for _, r := range mcp.Resources {
-					if r != nil {
-						var methodName string
-						if r.Method != nil {
-							methodName = r.Method.Name
-						}
-						out.Declarations[fmt.Sprintf("%s/Resource:%s", mcpKey, r.Name)] = mustJSON(mcpResourceDecl{
-							Name:        r.Name,
-							Description: r.Description,
-							URI:         r.URI,
-							MimeType:    r.MimeType,
-							Method:      methodName,
-						})
-					}
-				}
-				for _, rt := range mcp.ResourceTemplates {
-					if rt != nil {
-						out.Declarations[fmt.Sprintf("%s/ResourceTemplate:%s", mcpKey, rt.Name)] = mustJSON(mcpResourceDecl{
-							Name:        rt.Name,
-							Description: rt.Description,
-							URI:         rt.URI,
-							MimeType:    rt.MimeType,
-						})
-					}
-				}
-				for _, p := range mcp.Prompts {
-					if p != nil {
-						var msgs []mcpMessageDecl
-						for _, msg := range p.Messages {
-							if msg != nil {
-								msgs = append(msgs, mcpMessageDecl{
-									Role:    msg.Role,
-									Content: msg.Content,
-								})
-							}
-						}
-						out.Declarations[fmt.Sprintf("%s/Prompt:%s", mcpKey, p.Name)] = mustJSON(mcpPromptDecl{
-							Name:        p.Name,
-							Description: p.Description,
-							Messages:    msgs,
-						})
-					}
-				}
-				for _, mp := range mcp.MethodPrompts {
-					if mp != nil {
-						var methodName string
-						if mp.Method != nil {
-							methodName = mp.Method.Name
-						}
-						out.Declarations[fmt.Sprintf("%s/MethodPrompt:%s", mcpKey, mp.Name)] = mustJSON(mcpPromptDecl{
-							Name:        mp.Name,
-							Description: mp.Description,
-							Method:      methodName,
-						})
-					}
-				}
-			}
-		}
 	}
 
 	recordToolset := func(ts *agentexpr.ToolsetExpr, scopePrefix string) string {
@@ -702,95 +439,11 @@ func main() {
 		})
 
 		for _, t := range origin.Tools {
-			if t == nil {
-				continue
-			}
-			hidden, lookups := collectHiddenAndLookupFields(t, ts, origin.Tools)
-			argsSig := buildModelArgsSchemaJSON(api, t.Args, hidden, lookups, "tool.args."+origin.Name+"."+t.Name)
-			retAtt := effectiveToolReturn(t)
-			var methodResult *goaexpr.AttributeExpr
-			if t.Method != nil {
-				methodResult = t.Method.Result
-			}
-			retSig := buildToolReturnSchemaJSON(api, retAtt, methodResult, t.Bounds, "tool.return."+origin.Name+"."+t.Name)
-
-			var confirmDecl *toolConfirmDecl
-			if t.Confirmation != nil {
-				confirmDecl = &toolConfirmDecl{
-					Title:                t.Confirmation.Title,
-					PromptTemplate:       t.Confirmation.PromptTemplate,
-					DeniedResultTemplate: t.Confirmation.DeniedResultTemplate,
-				}
-			}
-			var boundsDecl *toolBoundsDecl
-			if t.Bounds != nil {
-				boundsDecl = &toolBoundsDecl{Bounded: true}
-				if t.Bounds.Paging != nil {
-					boundsDecl.CursorField = t.Bounds.Paging.CursorField
-					boundsDecl.NextCursorField = t.Bounds.Paging.NextCursorField
-					boundsDecl.ContinueTool = t.Bounds.Paging.ContinueTool
-				}
-			}
-			uiOnly := slices.Clone(t.UIOnlyFields)
-			slices.Sort(uiOnly)
-			var lookupNames []string
-			for k := range lookups {
-				lookupNames = append(lookupNames, k)
-			}
-			slices.Sort(lookupNames)
-			toolKey := fmt.Sprintf("%s/Tool:%s", tsDeclKey, t.Name)
-			out.Declarations[toolKey] = mustJSON(toolDecl{
-				Name:            t.Name,
-				Description:     t.Description,
-				ArgsSchema:      json.RawMessage(argsSig),
-				ReturnSchema:    json.RawMessage(retSig),
-				HiddenFields:    hidden,
-				LookupFields:    lookupNames,
-				RequiresUI:      t.RequiresUI,
-				UIOnlyFields:    uiOnly,
-				Confirmation:    confirmDecl,
-				Bounds:          boundsDecl,
-				TerminalRun:     t.TerminalRun,
-				Bookkeeping:     t.Bookkeeping,
-				ReplanOnTimeout: t.ReplanOnTimeout,
-			})
-
-			baseToolID := origin.Name + "." + t.Name
-			providerHidden, providerLookups := collectHiddenAndLookupFields(t, origin, origin.Tools)
-			providerArgsSig := buildModelArgsSchemaJSON(api, t.Args, providerHidden, providerLookups, "tool.args."+origin.Name+"."+t.Name)
-			addToolCard(toolContract{
-				ID:                   baseToolID,
-				Toolset:              origin.Name,
-				Name:                 t.Name,
-				Description:          t.Description,
-				ArgsSchema:           providerArgsSig,
-				ReturnSchema:         retSig,
-				InjectedFields:       providerHidden,
-				RequiresConfirmation: confirmDecl != nil,
-				BoundedResult:        boundsDecl != nil,
-			})
-			if scopePrefix != "" && (!slices.Equal(hidden, providerHidden) || argsSig != providerArgsSig) {
-				addToolCard(toolContract{
-					ID:                   scopePrefix + "/" + baseToolID,
-					Toolset:              scopePrefix + "/" + origin.Name,
-					Name:                 t.Name,
-					Description:          t.Description,
-					ArgsSchema:           argsSig,
-					ReturnSchema:         retSig,
-					InjectedFields:       hidden,
-					RequiresConfirmation: confirmDecl != nil,
-					BoundedResult:        boundsDecl != nil,
-				})
-			}
-
 			if t.Method != nil && t.Method.Service != nil {
-				addEdge(c4Edge{
-					FromID:   tsID,
-					ToID:     "service:" + t.Method.Service.Name,
-					Protocol: "Goa Method Binding",
-				})
+				addEdge(c4Edge{FromID: tsID, ToID: "service:" + t.Method.Service.Name, Protocol: "Goa Method Binding"})
 			}
 		}
+
 		return tsID
 	}
 

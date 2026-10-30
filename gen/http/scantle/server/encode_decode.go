@@ -356,9 +356,36 @@ func marshalScantleToolContractItemToToolContractItemResponseBody(v *scantle.Too
 		Name:                 v.Name,
 		Description:          v.Description,
 		ArgsSchema:           v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         v.ReturnSchema,
+		RequiresUI:           v.RequiresUI,
 		RequiresConfirmation: v.RequiresConfirmation,
 		BoundedResult:        v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = marshalScantleToolInputBindingItemToToolInputBindingItemResponseBody(v.InputBinding)
+	}
+	if v.InjectedFields != nil {
+		res.InjectedFields = make([]string, len(v.InjectedFields))
+		for i, val := range v.InjectedFields {
+			res.InjectedFields[i] = val
+		}
+	} else {
+		res.InjectedFields = []string{}
+	}
+
+	return res
+}
+
+// marshalScantleToolInputBindingItemToToolInputBindingItemResponseBody builds
+// a value of type *ToolInputBindingItemResponseBody from a value of type
+// *scantle.ToolInputBindingItem.
+func marshalScantleToolInputBindingItemToToolInputBindingItemResponseBody(v *scantle.ToolInputBindingItem) *ToolInputBindingItemResponseBody {
+	res := &ToolInputBindingItemResponseBody{
+		ArgsSchema:               v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	if v.InjectedFields != nil {
 		res.InjectedFields = make([]string, len(v.InjectedFields))

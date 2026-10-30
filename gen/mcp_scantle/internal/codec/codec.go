@@ -558,20 +558,28 @@ func ValidatePreviewArchitectureResultC4EdgeItemTransport(value *PreviewArchitec
 
 // PreviewArchitectureResultToolContractItemTransport stores JSON fields until they have been validated.
 type PreviewArchitectureResultToolContractItemTransport struct {
-	// Scoped tool identifier (<toolset>.<tool>).
+	// Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
 	ID *string `json:"id"`
-	// Owning toolset name.
+	// Compiler-selected toolset registration route.
 	Toolset *string `json:"toolset"`
 	// Tool name.
 	Name *string `json:"name"`
 	// Tool description.
 	Description *string `json:"description"`
-	// Canonical evaluated argument schema summary.
+	// Generated provider model input before consumer binding.
 	ArgsSchema *string `json:"args_schema"`
-	// Canonical evaluated return schema summary.
+	// Generated provider text-only input, when supported.
+	TextOnlyArgsSchema *string `json:"text_only_args_schema,omitempty"`
+	// Compiled consumer input choices, when binding is declared.
+	InputBinding *PreviewArchitectureResultToolInputBindingItemTransport `json:"input_binding,omitempty"`
+	// Generated model-visible result schema; empty when the tool declares no
+	// result.
 	ReturnSchema *string `json:"return_schema"`
-	// Server-supplied InjectedFields hidden from the model.
+	// Compiler-listed runtime or provider fields omitted from the provider model
+	// input.
 	InjectedFields []string `json:"injected_fields"`
+	// True when the tool requires a UI-capable runtime.
+	RequiresUI *bool `json:"requires_ui"`
 	// True when the tool declares a design-time Confirmation gate.
 	RequiresConfirmation *bool `json:"requires_confirmation"`
 	// True when the tool declares a BoundedResult cursor/truncation contract.
@@ -607,8 +615,45 @@ func ValidatePreviewArchitectureResultToolContractItemTransport(value *PreviewAr
 	if value.RequiresConfirmation == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("requires_confirmation", "body"))
 	}
+	if value.RequiresUI == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("requires_ui", "body"))
+	}
 	if value.BoundedResult == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("bounded_result", "body"))
+	}
+	if value.InputBinding != nil {
+		if err2 := ValidatePreviewArchitectureResultToolInputBindingItemTransport(value.InputBinding); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// PreviewArchitectureResultToolInputBindingItemTransport stores JSON fields until they have been validated.
+type PreviewArchitectureResultToolInputBindingItemTransport struct {
+	// Generated ordinary bound model input.
+	ArgsSchema *string `json:"args_schema"`
+	// Generated ordinary text-only input, when supported.
+	TextOnlyArgsSchema *string `json:"text_only_args_schema,omitempty"`
+	// Generated lookup-key input, when declared; application lookup values are not
+	// inspected.
+	LookupArgsSchema *string `json:"lookup_args_schema,omitempty"`
+	// Generated text-only lookup-key input, when supported.
+	LookupTextOnlyArgsSchema *string `json:"lookup_text_only_args_schema,omitempty"`
+	// Compiler-listed fields supplied outside the ordinary bound model input.
+	InjectedFields []string `json:"injected_fields"`
+}
+
+// ValidatePreviewArchitectureResultToolInputBindingItemTransport checks decoded JSON before it becomes a service value.
+func ValidatePreviewArchitectureResultToolInputBindingItemTransport(value *PreviewArchitectureResultToolInputBindingItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ArgsSchema == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("args_schema", "body"))
+	}
+	if value.InjectedFields == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
 	}
 	return err
 }
@@ -1367,9 +1412,29 @@ func encodeToolContractItemToPreviewArchitectureResultToolContractItemTransport(
 		Name:                 &v.Name,
 		Description:          &v.Description,
 		ArgsSchema:           &v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         &v.ReturnSchema,
+		RequiresUI:           &v.RequiresUI,
 		RequiresConfirmation: &v.RequiresConfirmation,
 		BoundedResult:        &v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = encodeToolInputBindingItemToPreviewArchitectureResultToolInputBindingItemTransport(v.InputBinding)
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func encodeToolInputBindingItemToPreviewArchitectureResultToolInputBindingItemTransport(v *scantle.ToolInputBindingItem) *PreviewArchitectureResultToolInputBindingItemTransport {
+	res := &PreviewArchitectureResultToolInputBindingItemTransport{
+		ArgsSchema:               &v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {

@@ -217,23 +217,45 @@ type (
 	}
 	// ToolContractItem is a nested type used by the generated JSON contract.
 	ToolContractItem = struct {
-		// Scoped tool identifier (<toolset>.<tool>).
+		// Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
 		ID string
-		// Owning toolset name.
+		// Compiler-selected toolset registration route.
 		Toolset string
 		// Tool name.
 		Name string
 		// Tool description.
 		Description string
-		// Canonical evaluated argument schema summary.
+		// Generated provider model input before consumer binding.
 		ArgsSchema string
-		// Canonical evaluated return schema summary.
+		// Generated provider text-only input, when supported.
+		TextOnlyArgsSchema *string
+		// Compiled consumer input choices, when binding is declared.
+		InputBinding *ToolInputBindingItem
+		// Generated model-visible result schema; empty when the tool declares no
+		// result.
 		ReturnSchema string
-		// Server-supplied InjectedFields hidden from the model.
+		// Compiler-listed runtime or provider fields omitted from the provider model
+		// input.
 		InjectedFields []string
+		// True when the tool requires a UI-capable runtime.
+		RequiresUI bool
 		// True when the tool declares a design-time Confirmation gate.
 		RequiresConfirmation bool
 		// True when the tool declares a BoundedResult cursor/truncation contract.
 		BoundedResult bool
+	}
+	// ToolInputBindingItem is a nested type used by the generated JSON contract.
+	ToolInputBindingItem = struct {
+		// Generated ordinary bound model input.
+		ArgsSchema string
+		// Generated ordinary text-only input, when supported.
+		TextOnlyArgsSchema *string
+		// Generated lookup-key input, when declared; application lookup values are not
+		// inspected.
+		LookupArgsSchema *string
+		// Generated text-only lookup-key input, when supported.
+		LookupTextOnlyArgsSchema *string
+		// Compiler-listed fields supplied outside the ordinary bound model input.
+		InjectedFields []string
 	}
 )

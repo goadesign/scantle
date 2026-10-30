@@ -729,12 +729,12 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("id")},
 		JSONType:    "string",
-		Description: "Scoped tool identifier (<toolset>.<tool>).",
+		Description: "Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("toolset")},
 		JSONType:    "string",
-		Description: "Owning toolset name.",
+		Description: "Compiler-selected toolset registration route.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("name")},
@@ -749,22 +749,67 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("args_schema")},
 		JSONType:    "string",
-		Description: "Canonical evaluated argument schema summary.",
+		Description: "Generated provider model input before consumer binding.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("text_only_args_schema")},
+		JSONType:    "string",
+		Description: "Generated provider text-only input, when supported.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding")},
+		JSONType:    "object",
+		Description: "Compiled consumer input choices, when binding is declared.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding"), tools.FixedField("args_schema")},
+		JSONType:    "string",
+		Description: "Generated ordinary bound model input.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding"), tools.FixedField("text_only_args_schema")},
+		JSONType:    "string",
+		Description: "Generated ordinary text-only input, when supported.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding"), tools.FixedField("lookup_args_schema")},
+		JSONType:    "string",
+		Description: "Generated lookup-key input, when declared; application lookup values are not inspected.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding"), tools.FixedField("lookup_text_only_args_schema")},
+		JSONType:    "string",
+		Description: "Generated text-only lookup-key input, when supported.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding"), tools.FixedField("injected_fields")},
+		JSONType:    "array",
+		Description: "Compiler-listed fields supplied outside the ordinary bound model input.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("input_binding"), tools.FixedField("injected_fields"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Compiler-listed fields supplied outside the ordinary bound model input.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("return_schema")},
 		JSONType:    "string",
-		Description: "Canonical evaluated return schema summary.",
+		Description: "Generated model-visible result schema; empty when the tool declares no result.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("injected_fields")},
 		JSONType:    "array",
-		Description: "Server-supplied InjectedFields hidden from the model.",
+		Description: "Compiler-listed runtime or provider fields omitted from the provider model input.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("injected_fields"), tools.DynamicField{}},
 		JSONType:    "string",
-		Description: "Server-supplied InjectedFields hidden from the model.",
+		Description: "Compiler-listed runtime or provider fields omitted from the provider model input.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("requires_ui")},
+		JSONType:    "boolean",
+		Description: "True when the tool requires a UI-capable runtime.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("tools"), tools.DynamicField{}, tools.FixedField("requires_confirmation")},
@@ -3346,7 +3391,7 @@ func validatePreviewArchitectureResultToolContractItemTransportJSONValue(path st
 		case "args_schema":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Canonical evaluated argument schema summary.",
+				typed[key], "Generated provider model input before consumer binding.",
 			); err != nil {
 				return err
 			}
@@ -3367,14 +3412,21 @@ func validatePreviewArchitectureResultToolContractItemTransportJSONValue(path st
 		case "id":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Scoped tool identifier (<toolset>.<tool>).",
+				typed[key], "Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).",
 			); err != nil {
 				return err
 			}
 		case "injected_fields":
 			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Server-supplied InjectedFields hidden from the model.",
+				typed[key], "Compiler-listed runtime or provider fields omitted from the provider model input.",
+			); err != nil {
+				return err
+			}
+		case "input_binding":
+			if err := validatePreviewArchitectureResultToolInputBindingItemTransportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Compiled consumer input choices, when binding is declared.",
 			); err != nil {
 				return err
 			}
@@ -3392,17 +3444,31 @@ func validatePreviewArchitectureResultToolContractItemTransportJSONValue(path st
 			); err != nil {
 				return err
 			}
+		case "requires_ui":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "True when the tool requires a UI-capable runtime.",
+			); err != nil {
+				return err
+			}
 		case "return_schema":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Canonical evaluated return schema summary.",
+				typed[key], "Generated model-visible result schema; empty when the tool declares no result.",
+			); err != nil {
+				return err
+			}
+		case "text_only_args_schema":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated provider text-only input, when supported.",
 			); err != nil {
 				return err
 			}
 		case "toolset":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Owning toolset name.",
+				typed[key], "Compiler-selected toolset registration route.",
 			); err != nil {
 				return err
 			}
@@ -3413,10 +3479,81 @@ func validatePreviewArchitectureResultToolContractItemTransportJSONValue(path st
 				"description",
 				"id",
 				"injected_fields",
+				"input_binding",
 				"name",
 				"requires_confirmation",
+				"requires_ui",
 				"return_schema",
+				"text_only_args_schema",
 				"toolset",
+			})
+		}
+	}
+	return nil
+}
+
+// validatePreviewArchitectureResultToolInputBindingItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validatePreviewArchitectureResultToolInputBindingItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "args_schema":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated ordinary bound model input.",
+			); err != nil {
+				return err
+			}
+		case "injected_fields":
+			if err := validateProposeChangeResultAmbiguityQuestionTransportOptionsJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Compiler-listed fields supplied outside the ordinary bound model input.",
+			); err != nil {
+				return err
+			}
+		case "lookup_args_schema":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated lookup-key input, when declared; application lookup values are not inspected.",
+			); err != nil {
+				return err
+			}
+		case "lookup_text_only_args_schema":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated text-only lookup-key input, when supported.",
+			); err != nil {
+				return err
+			}
+		case "text_only_args_schema":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Generated ordinary text-only input, when supported.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"args_schema",
+				"injected_fields",
+				"lookup_args_schema",
+				"lookup_text_only_args_schema",
+				"text_only_args_schema",
 			})
 		}
 	}
@@ -3866,9 +4003,28 @@ func decodeToolContractItemTransportToToolContractItem(v *toolhttp.ToolContractI
 		Name:                 *v.Name,
 		Description:          *v.Description,
 		ArgsSchema:           *v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         *v.ReturnSchema,
+		RequiresUI:           *v.RequiresUI,
 		RequiresConfirmation: *v.RequiresConfirmation,
 		BoundedResult:        *v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = decodeToolInputBindingItemTransportToToolInputBindingItem(v.InputBinding)
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+func decodeToolInputBindingItemTransportToToolInputBindingItem(v *toolhttp.ToolInputBindingItemTransport) *ToolInputBindingItem {
+	res := &ToolInputBindingItem{
+		ArgsSchema:               *v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
@@ -3917,9 +4073,28 @@ func encodeToolContractItemToToolContractItemTransport(v *ToolContractItem) *too
 		Name:                 &v.Name,
 		Description:          &v.Description,
 		ArgsSchema:           &v.ArgsSchema,
+		TextOnlyArgsSchema:   v.TextOnlyArgsSchema,
 		ReturnSchema:         &v.ReturnSchema,
+		RequiresUI:           &v.RequiresUI,
 		RequiresConfirmation: &v.RequiresConfirmation,
 		BoundedResult:        &v.BoundedResult,
+	}
+	if v.InputBinding != nil {
+		res.InputBinding = encodeToolInputBindingItemToToolInputBindingItemTransport(v.InputBinding)
+	}
+	res.InjectedFields = make([]string, len(v.InjectedFields))
+	for i, val := range v.InjectedFields {
+		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+func encodeToolInputBindingItemToToolInputBindingItemTransport(v *ToolInputBindingItem) *toolhttp.ToolInputBindingItemTransport {
+	res := &toolhttp.ToolInputBindingItemTransport{
+		ArgsSchema:               &v.ArgsSchema,
+		TextOnlyArgsSchema:       v.TextOnlyArgsSchema,
+		LookupArgsSchema:         v.LookupArgsSchema,
+		LookupTextOnlyArgsSchema: v.LookupTextOnlyArgsSchema,
 	}
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {

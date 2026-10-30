@@ -3,7 +3,9 @@
 package diff
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -106,7 +108,7 @@ exclude example.com/legacy v1.1.0
 	}
 	for _, want := range []string{
 		"Service:orders/Agent:refund_agent",
-		"Service:orders/Agent:refund_agent/Toolset:refund_tools/Tool:issue_refund",
+		"Generated:gen/orders/toolsets/refund_tools/specs.go",
 		"Service:orders/Method:approve_refund",
 	} {
 		if !slices.Contains(rep.AddedDeclarations, want) {
@@ -177,6 +179,11 @@ var OrderTools = Toolset("order_tools", func() {
 		BoundedResult(func() {
 			Cursor("cursor")
 			NextCursor("next_cursor")
+		})
+		Confirmation(func() {
+			Title("A|B,C")
+			PromptTemplate("D: {{ .order_id }}")
+			DeniedResultTemplate("E")
 		})
 	})
 })
@@ -265,6 +272,11 @@ var OrderTools = Toolset("order_tools", func() {
 			Cursor("cursor")
 			NextCursor("next_cursor")
 		})
+		Confirmation(func() {
+			Title("A")
+			PromptTemplate("B,C|D: {{ .order_id }}")
+			DeniedResultTemplate("E")
+		})
 	})
 })
 
@@ -317,9 +329,9 @@ var _ = Service("orders", func() {
 		t.Fatalf("Compare returned unexpected error: %v", err)
 	}
 	for _, wantMod := range []string{
-		"Service:orders/Method:get_order",
-		"Service:orders/MCP:orders_mcp/Tool:get_order",
-		"Toolset:order_tools/Tool:list_orders",
+		"Generated:gen/grpc/orders/pb/goagen_design_orders.proto",
+		"Generated:gen/mcp_orders/adapter_server.go",
+		"Generated:gen/orders/toolsets/order_tools/specs.go",
 	} {
 		if !slices.Contains(rep.ModifiedDeclarations, wantMod) {
 			t.Fatalf("expected ModifiedDeclarations to contain %q, got %v", wantMod, rep.ModifiedDeclarations)
@@ -333,29 +345,26 @@ var _ = Service("orders", func() {
 	var cardIDs []string
 	for _, tc := range evaluated.Tools {
 		cardIDs = append(cardIDs, tc.ID)
-		if tc.ID == "order_tools.list_orders" {
+		if tc.ID == "orders.tenant_agent/order_tools.list_orders" {
 			if strings.Contains(tc.ArgsSchema, `"cursor"`) {
 				t.Fatalf("expected continuation cursor field to be hidden from initial tool args schema: %s", tc.ArgsSchema)
 			}
 			if !strings.Contains(tc.ReturnSchema, `"returned"`) || !strings.Contains(tc.ReturnSchema, `"truncated"`) {
 				t.Fatalf("expected bounded-result fields in return schema: %s", tc.ReturnSchema)
 			}
-		}
-		if tc.ID == "Service:orders/Agent:tenant_agent/order_tools.list_orders" {
-			if strings.Contains(tc.ArgsSchema, `"tenant_id"`) || !strings.Contains(tc.ArgsSchema, `"order_id"`) {
+			if tc.InputBinding == nil || strings.Contains(tc.InputBinding.ArgsSchema, `"tenant_id"`) || !strings.Contains(tc.InputBinding.ArgsSchema, `"order_id"`) {
 				t.Fatalf("expected tenant_agent card to hide tenant_id and keep order_id: %s", tc.ArgsSchema)
 			}
 		}
-		if tc.ID == "Service:orders/Agent:order_agent/order_tools.list_orders" {
-			if strings.Contains(tc.ArgsSchema, `"order_id"`) || !strings.Contains(tc.ArgsSchema, `"tenant_id"`) {
+		if tc.ID == "orders.order_agent/order_tools.list_orders" {
+			if tc.InputBinding == nil || strings.Contains(tc.InputBinding.ArgsSchema, `"order_id"`) || !strings.Contains(tc.InputBinding.ArgsSchema, `"tenant_id"`) {
 				t.Fatalf("expected order_agent card to hide order_id and keep tenant_id: %s", tc.ArgsSchema)
 			}
 		}
 	}
 	for _, wantCard := range []string{
-		"order_tools.list_orders",
-		"Service:orders/Agent:tenant_agent/order_tools.list_orders",
-		"Service:orders/Agent:order_agent/order_tools.list_orders",
+		"orders.tenant_agent/order_tools.list_orders",
+		"orders.order_agent/order_tools.list_orders",
 	} {
 		if !slices.Contains(cardIDs, wantCard) {
 			t.Fatalf("expected tool cards to include %q without overwriting, got %v", wantCard, cardIDs)
@@ -522,8 +531,8 @@ var _ = m.Design("Architecture", "Orders architecture", func() {
 	for _, wantMod := range []string{
 		"Type:OrderQuery",
 		"Service:orders/Method:search_orders",
-		"Service:orders/MCP:orders_mcp/Prompt:triage",
-		"Toolset:order_tools/Tool:search_orders",
+		"Generated:gen/mcp_orders/adapter_server.go",
+		"Generated:gen/orders/toolsets/order_tools/specs.go",
 		"Model:System:OrdersSystem",
 	} {
 		if !slices.Contains(rep.ModifiedDeclarations, wantMod) {
@@ -540,29 +549,29 @@ var _ = m.Design("Architecture", "Orders architecture", func() {
 		t.Fatalf("Evaluate new failed: %v", err)
 	}
 
-	// Verify BindField("tenant_id", Lookup(String)) keeps tenant_id in the model input schema
-	// with type "string" instead of hiding it or keeping integer.
+	// Lookup declares a key-shaped alternative while ordinary binding omits
+	// tenant_id. Neither static view claims which installer the application uses.
 	var foundLookupCard bool
 	for _, tc := range evalOld.Tools {
-		if tc.ID == "Service:orders/Agent:lookup_agent/order_tools.search_orders" {
+		if tc.ID == "orders.lookup_agent/order_tools.search_orders" {
 			foundLookupCard = true
-			if !strings.Contains(tc.ArgsSchema, `"tenant_id":{"type":"string"}`) {
+			if tc.InputBinding == nil || tc.InputBinding.LookupArgsSchema == nil || !strings.Contains(compactSchema(t, *tc.InputBinding.LookupArgsSchema), `"tenant_id":{"type":"string"}`) {
 				t.Fatalf("expected lookup_agent ArgsSchema to keep tenant_id as string lookup, got %s", tc.ArgsSchema)
 			}
 			// MethodPageResult required "total" in oldRoot even though ToolPageReturn did not.
-			if !strings.Contains(tc.ReturnSchema, `"required":["items","returned","total","truncated"]`) {
+			if !strings.Contains(compactSchema(t, tc.ReturnSchema), `"required":["items","returned","total","truncated"]`) {
 				t.Fatalf("expected ReturnSchema to require total when Method.Result requires total, got %s", tc.ReturnSchema)
 			}
 		}
 	}
 	if !foundLookupCard {
-		t.Fatalf("expected per-consumer card Service:orders/Agent:lookup_agent/order_tools.search_orders in %v", evalOld.Tools)
+		t.Fatalf("expected per-consumer card orders.lookup_agent/order_tools.search_orders in %v", evalOld.Tools)
 	}
 
 	for _, tc := range evalNew.Tools {
-		if tc.ID == "Service:orders/Agent:lookup_agent/order_tools.search_orders" {
+		if tc.ID == "orders.lookup_agent/order_tools.search_orders" {
 			// MethodPageResult did NOT require "total" in newRoot.
-			if strings.Contains(tc.ReturnSchema, `"required":["items","returned","total","truncated"]`) {
+			if strings.Contains(compactSchema(t, tc.ReturnSchema), `"required":["items","returned","total","truncated"]`) {
 				t.Fatalf("expected ReturnSchema not to require total when Method.Result does not require total, got %s", tc.ReturnSchema)
 			}
 		}
@@ -593,4 +602,15 @@ func goFiles(t *testing.T, root string) map[string]string {
 		t.Fatal(err)
 	}
 	return files
+}
+
+// compactSchema validates a schema and removes presentation whitespace for
+// assertions that inspect individual generated JSON fragments.
+func compactSchema(t *testing.T, schema string) string {
+	t.Helper()
+	var output bytes.Buffer
+	if err := json.Compact(&output, []byte(schema)); err != nil {
+		t.Fatalf("invalid generated schema: %v", err)
+	}
+	return output.String()
 }
