@@ -9,6 +9,7 @@ package sim
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,6 +51,9 @@ type (
 		srv *http.Server
 		// shutdown runs the server's graceful shutdown exactly once.
 		shutdown sync.Once
+		// stopping is closed when shutdown begins; it releases a withheld
+		// refund response.
+		stopping chan struct{}
 		// stopped is closed once every accepted request finished.
 		stopped chan struct{}
 		// active records each request a handler is still serving, so a stop
@@ -57,7 +61,7 @@ type (
 		active map[*http.Request]time.Time
 		// hold, when set, receives the order ID of the next new refund after
 		// it is recorded; the simulator then withholds that response until
-		// the caller disconnects. It is disarmed after one use.
+		// the caller disconnects or the simulator stops. It is disarmed after one use.
 		hold chan string
 	}
 
@@ -127,9 +131,9 @@ func (s *Sim) Refunds() ([]genpayments.Receipt, int) {
 
 // HoldNextRefund arms a one-shot fault: the next new refund is recorded (the
 // money moves) and its order ID is sent on the returned channel, but the
-// response is withheld until the caller disconnects. Crash tests use it to kill
-// the worker at the exact point after the provider accepted the refund and
-// before the worker learned of it.
+// response is withheld until the caller disconnects or the simulator stops.
+// Crash tests use it to kill the worker at the exact point after the provider
+// accepted the refund and before the worker learned of it.
 func (s *Sim) HoldNextRefund() <-chan string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -152,6 +156,7 @@ func (s *Sim) Serve(ctx context.Context) (string, error) {
 	srv := &http.Server{Handler: s.track(mux), ReadHeaderTimeout: 5 * time.Second}
 	s.mu.Lock()
 	s.srv = srv
+	s.stopping = make(chan struct{})
 	s.stopped = make(chan struct{})
 	s.mu.Unlock()
 	go func() { _ = srv.Serve(ln) }()
@@ -216,6 +221,7 @@ func (s *Sim) describeActive() string {
 // every accepted request returned.
 func (s *Sim) beginShutdown() {
 	s.shutdown.Do(func() {
+		close(s.stopping)
 		go func() {
 			_ = s.srv.Shutdown(context.Background())
 			close(s.stopped)
@@ -273,8 +279,16 @@ func (s *Sim) Refund(ctx context.Context, p *genpayments.RefundPayload) (*genpay
 		return r, err
 	}
 	hold <- p.OrderID
-	<-ctx.Done()
-	return nil, fmt.Errorf("caller disconnected while the refund response was withheld: %w", ctx.Err())
+	// net/http reports a disconnect only once the request body was read to
+	// its end, which the decoder does not guarantee, so the simulator's own
+	// stop also releases the response. Scenarios stop the simulator only
+	// after every candidate process has exited.
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("caller disconnected while the refund response was withheld: %w", ctx.Err())
+	case <-s.stopping:
+		return nil, errors.New("simulator stopped while the refund response was withheld")
+	}
 }
 
 // refund applies one refund request and returns the receipt, plus the armed

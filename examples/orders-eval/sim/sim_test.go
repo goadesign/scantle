@@ -1,9 +1,11 @@
 package sim
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	gencommerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
 	gencommerceclient "github.com/goadesign/scantle/examples/orders-eval/gen/http/commerce/client"
@@ -101,4 +103,36 @@ func ids(orders []*gencommerce.Order) []string {
 		out[i] = o.ID
 	}
 	return out
+}
+
+func TestStopReleasesAWithheldRefund(t *testing.T) {
+	s := New()
+	_, err := s.Serve(t.Context())
+	require.NoError(t, err)
+	s.Reset(Fixture{TenantID: "t1", CustomerID: "c1", Orders: []*gencommerce.Order{
+		{ID: "o-1", PlacedAt: "2026-10-01T10:00:00Z", ItemsCents: 3500, TaxCents: 350, TotalCents: 3850},
+	}})
+	held := s.HoldNextRefund()
+	// The caller never disconnects, as when net/http has not noticed a dead
+	// client; only Stop can release the response.
+	refunded := make(chan error, 1)
+	go func() {
+		_, err := s.Refund(context.Background(), &genpayments.RefundPayload{
+			TenantID: "t1", OrderID: "o-1", AmountCents: 3850, Method: "store_credit", IdempotencyKey: "refund/t1/o-1",
+		})
+		refunded <- err
+	}()
+	assert.Equal(t, "o-1", <-held)
+
+	stopCtx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, s.Stop(stopCtx))
+	select {
+	case err := <-refunded:
+		assert.Error(t, err, "the withheld response is an error, never a receipt")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not release the withheld refund")
+	}
+	ledger, _ := s.Refunds()
+	assert.Len(t, ledger, 1, "the refund was still issued")
 }
