@@ -50,7 +50,8 @@ func TestRefundFlows(t *testing.T) {
 	api := freeAddr(t)
 	start(t, filepath.Join(bin, "orders"), []string{"ORDERS_JWT_KEY=" + signingKey},
 		"--env", "sim", "--commerce-url", simURL, "--temporal", temporalAddr, "--listen", api,
-		"--agent-queue", "e2e.agents", "--refund-queue", "e2e.refunds", "--model-provider", "scripted")
+		"--agent-queue", "e2e.agents", "--refund-queue", "e2e.refunds", "--model-provider", "scripted",
+		"--state-dir", t.TempDir())
 	waitListening(t, api)
 	base := "http://" + api
 
