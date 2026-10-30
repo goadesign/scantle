@@ -1,6 +1,12 @@
 // Package harness starts the candidate orders platform for one evaluation
 // scenario and drives it through its public API.
 //
+// LOCAL SMOKE EVIDENCE ONLY: this harness executes candidate binaries itself,
+// under the evaluator's OS identity and working directory, with only an
+// environment allow-list. It does not enforce filesystem, network or credential
+// isolation, so its results cannot authorize promotion. Promotion evidence
+// requires launching through Scantle's sandboxed candidate launcher.
+//
 // The evaluator never imports candidate code. It launches the candidate's built
 // binaries as separate processes, points their dependency URLs at a simulator
 // owned by the scenario, and talks to them only with clients generated from the
