@@ -30,3 +30,10 @@ func TestStreamReportsUsageThatGrowsWithTheRequest(t *testing.T) {
 	assert.Greater(t, long.InputTokens, short.InputTokens)
 	assert.Equal(t, usage("refund"), short, "the count is deterministic")
 }
+
+func TestStreamRejectsAnOrderRequestWithoutTools(t *testing.T) {
+	_, err := New().Stream(t.Context(), &model.Request{Messages: []*model.Message{{
+		Role: model.ConversationRoleUser, Parts: []model.Part{model.TextPart{Text: "Please refund order o-1"}},
+	}}})
+	assert.ErrorContains(t, err, "advertises no tools")
+}

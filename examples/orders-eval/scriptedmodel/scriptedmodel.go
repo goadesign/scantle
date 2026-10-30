@@ -148,7 +148,11 @@ func nextStep(req *model.Request) (*model.ToolCall, string, error) {
 			return nil, "", err
 		}
 		return &model.ToolCall{ID: "call-list", Name: name, Payload: rawjson.Message(`{}`)}, "", nil
-	case last != nil && last.IsError:
+	case last == nil:
+		// The script starts by listing the orders; a conversation that names
+		// an order but offers no tools has no step it can take.
+		return nil, "", errors.New("scripted model: the request names an order but advertises no tools")
+	case last.IsError:
 		return nil, fmt.Sprintf("[scripted] I could not refund order %s: %v", orderID, last.Content), nil
 	}
 	var out toolOutcome
