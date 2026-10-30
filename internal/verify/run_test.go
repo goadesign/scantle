@@ -34,6 +34,50 @@ func TestRunAcceptsOnlyFullCommitIDs(t *testing.T) {
 	}
 }
 
+func TestRunRejectsPlansThatEscapeTheirDirectories(t *testing.T) {
+	full := "4d77355e0c1b2a3f4d5e6f708192a3b4c5d6e7f8"
+	valid := func() Plan {
+		return Plan{
+			CandidateCommit: full,
+			CandidateModule: "examples/orders",
+			Binaries:        map[string]string{"orders": "./cmd/orders"},
+			SuiteCommit:     full,
+			SuiteModule:     "examples/orders-eval",
+		}
+	}
+	cases := []struct {
+		name    string
+		edit    func(*Plan)
+		wantErr string
+	}{
+		{"candidate module escapes", func(p *Plan) { p.CandidateModule = "../other" }, `candidate module "../other" must be a relative path inside the checkout`},
+		{"suite module escapes", func(p *Plan) { p.SuiteModule = "examples/../../other" }, `suite module "examples/../../other" must be a relative path`},
+		{"absolute suite module", func(p *Plan) { p.SuiteModule = "/tmp/suite" }, `suite module "/tmp/suite" must be a relative path`},
+		{"empty candidate module", func(p *Plan) { p.CandidateModule = "" }, `candidate module "" must be a relative path`},
+		{"parent binary name", func(p *Plan) { p.Binaries = map[string]string{"..": "./cmd/orders"} }, `binary name ".." is not a valid artifact name`},
+		{"current binary name", func(p *Plan) { p.Binaries = map[string]string{".": "./cmd/orders"} }, `binary name "." is not a valid artifact name`},
+		{"empty binary name", func(p *Plan) { p.Binaries = map[string]string{"": "./cmd/orders"} }, `binary name "" is not a valid artifact name`},
+		{"binary name with separator", func(p *Plan) { p.Binaries = map[string]string{"../x": "./cmd/orders"} }, `binary name "../x" must not contain`},
+		{"binary name with backslash", func(p *Plan) { p.Binaries = map[string]string{`a\b`: "./cmd/orders"} }, `must not contain`},
+		{"binary name with equals", func(p *Plan) { p.Binaries = map[string]string{"a=b": "./cmd/orders"} }, `binary name "a=b" must not contain`},
+		{"binary name with NUL", func(p *Plan) { p.Binaries = map[string]string{"a\x00b": "./cmd/orders"} }, `must not contain`},
+		{"binary without package", func(p *Plan) { p.Binaries = map[string]string{"orders": ""} }, `binary "orders" has no package path`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := valid()
+			p.WorkDir = t.TempDir()
+			c.edit(&p)
+			_, err := Run(t.Context(), p)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), c.wantErr)
+			entries, err := os.ReadDir(p.WorkDir)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "a rejected plan must not write into WorkDir")
+		})
+	}
+}
+
 func TestCheckoutRecordsTheExactCommitInEitherObjectFormat(t *testing.T) {
 	for _, format := range []string{"sha1", "sha256"} {
 		t.Run(format, func(t *testing.T) {

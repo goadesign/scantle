@@ -35,16 +35,21 @@ type (
 		// rejected.
 		CandidateCommit string
 		// CandidateModule is the Go module directory inside the candidate
-		// repository that the binaries are built from.
+		// repository that the binaries are built from: a relative path that
+		// stays inside the checkout, such as "examples/orders" or ".".
 		CandidateModule string
 		// Binaries maps each artifact name to its package path inside
-		// CandidateModule, such as "./cmd/orders".
+		// CandidateModule, such as "./cmd/orders". A name is the artifact ID
+		// the suite receives as --artifact name=path: it must be non-empty,
+		// not "." or "..", and contain no "/", "\\", "=" or NUL. Each package
+		// path must be non-empty.
 		Binaries map[string]string
 		// SuiteRepo is the git repository holding the evaluator suite.
 		SuiteRepo string
 		// SuiteCommit is the full ID of the suite commit to run.
 		SuiteCommit string
-		// SuiteModule is the suite's Go module directory inside SuiteRepo.
+		// SuiteModule is the suite's Go module directory inside SuiteRepo: a
+		// relative path that stays inside the checkout, like CandidateModule.
 		SuiteModule string
 		// SuiteCommand is the suite command's package path inside
 		// SuiteModule, following the suite command contract.
@@ -92,8 +97,10 @@ const (
 	groupStopTimeout = 30 * time.Second
 )
 
-// Run clones the candidate at its exact commit and builds its binaries, then
-// clones the suite at its exact commit, asks it for its declaration, runs it
+// Run clones the candidate at its exact commit and builds its binaries into
+// WorkDir/candidate-bin, then
+// clones the suite at its exact commit, builds it into WorkDir/suite-bin, asks
+// it for its declaration, runs it
 // against the built binaries, and returns the CP4 report bound to everything
 // that was tested. The report is also written to ReportDir as <digest>.json.
 //
@@ -113,9 +120,23 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 			return Report{}, fmt.Errorf("%s commit %q is not a full commit ID", name, commit)
 		}
 	}
+	for name, dir := range map[string]string{"candidate": p.CandidateModule, "suite": p.SuiteModule} {
+		if !filepath.IsLocal(dir) {
+			return Report{}, fmt.Errorf("%s module %q must be a relative path inside the checkout", name, dir)
+		}
+	}
+	for name, pkg := range p.Binaries {
+		if err := validateArtifactName(name); err != nil {
+			return Report{}, err
+		}
+		if pkg == "" {
+			return Report{}, fmt.Errorf("binary %q has no package path", name)
+		}
+	}
 	evidenceDir := filepath.Join(p.WorkDir, "evidence")
-	binDir := filepath.Join(p.WorkDir, "bin")
-	for _, dir := range []string{evidenceDir, binDir} {
+	candidateBinDir := filepath.Join(p.WorkDir, "candidate-bin")
+	suiteBinDir := filepath.Join(p.WorkDir, "suite-bin")
+	for _, dir := range []string{evidenceDir, candidateBinDir, suiteBinDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return Report{}, fmt.Errorf("create %s: %w", dir, err)
 		}
@@ -139,7 +160,7 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	}
 	var artifactFlags []string
 	for _, name := range slices.Sorted(maps.Keys(p.Binaries)) {
-		out := filepath.Join(binDir, name)
+		out := filepath.Join(candidateBinDir, name)
 		if err := candidate.Build(ctx, candidate.BuildSpec{
 			ModuleDir: moduleDir, Package: p.Binaries[name], Out: out,
 			GOROOT: toolchain.goroot, ModCache: toolchain.modCache, WorkDir: toolchain.workDir,
@@ -159,7 +180,7 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	if err := r.checkout(ctx, "suite", p.SuiteRepo, p.SuiteCommit, suiteDir); err != nil {
 		return Report{}, err
 	}
-	suiteBin := filepath.Join(binDir, "suite")
+	suiteBin := filepath.Join(suiteBinDir, "suite")
 	if err := r.run(ctx, "build-suite", filepath.Join(suiteDir, p.SuiteModule), nil,
 		"go", "build", "-o", suiteBin, p.SuiteCommand); err != nil {
 		return Report{}, fmt.Errorf("build suite: %w", err)
@@ -181,6 +202,19 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		return Report{}, err
 	}
 	return report, nil
+}
+
+// validateArtifactName rejects a binary name that cannot serve both as the
+// artifact ID passed to the suite as --artifact name=path and as one file name
+// inside WorkDir/candidate-bin and WorkDir/evidence.
+func validateArtifactName(name string) error {
+	switch {
+	case name == "", name == ".", name == "..":
+		return fmt.Errorf("binary name %q is not a valid artifact name", name)
+	case strings.ContainsAny(name, "/\\=\x00"):
+		return fmt.Errorf("binary name %q must not contain /, \\, = or NUL", name)
+	}
+	return nil
 }
 
 // runner runs the verifier's commands with file-backed output.
