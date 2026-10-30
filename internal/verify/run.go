@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -62,8 +63,10 @@ type (
 		// RequestRevision identifies the confirmed request being verified.
 		RequestRevision string
 		// WorkDir is a private directory for clones, builds and evidence. It
-		// must not be shared with the candidate's builder. It is required; a
-		// relative path is made absolute against the current directory.
+		// must not be shared with the candidate's builder. It is required and
+		// must be missing or empty, so everything a build can read under it was
+		// written by this run; a relative path is made absolute against the
+		// current directory.
 		WorkDir string
 		// ReportDir receives the report, named by its digest.
 		ReportDir string
@@ -110,12 +113,14 @@ const (
 // tested. The report is also written to ReportDir as <digest>.json.
 //
 // Both builds go through candidate.Build: an OS sandbox in which the build
-// reads nothing but its source tree, the toolchain and the module cache,
-// writes nothing but its private directories, and has no network. The
-// candidate's source tree is its module; the suite's is its whole checkout, so
-// it may replace sibling modules there. Either way, a committed link or replace
-// directive cannot make the build read source outside the bound commit. The
-// suite is checked out only after the candidate is built. Every command's
+// reads nothing but its source tree, the toolchain, the module cache and its
+// own directories under WorkDir, writes nothing but those directories, and has
+// no network. The candidate's source tree is its module; the suite's is its
+// whole checkout, so it may replace sibling modules there. A committed link or
+// replace directive can reach only those trees: the bound commit, the trusted
+// toolchain and checksum-verified modules, and directories this run created
+// empty, because Run refuses a WorkDir that already has contents. The suite is
+// checked out only after the candidate is built. Every command's
 // output goes to files under WorkDir/evidence; errors quote only a bounded
 // excerpt.
 //
@@ -148,6 +153,13 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		return Report{}, fmt.Errorf("work directory: %w", err)
 	}
 	p.WorkDir = workDir
+	switch entries, err := os.ReadDir(p.WorkDir); {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return Report{}, fmt.Errorf("work directory: %w", err)
+	case len(entries) > 0:
+		return Report{}, fmt.Errorf("work directory %s must be missing or empty", p.WorkDir)
+	}
 	evidenceDir := filepath.Join(p.WorkDir, "evidence")
 	candidateBinDir := filepath.Join(p.WorkDir, "candidate-bin")
 	suiteBinDir := filepath.Join(p.WorkDir, "suite-bin")

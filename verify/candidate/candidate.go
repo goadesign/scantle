@@ -221,10 +221,11 @@ func Exec(ctx context.Context, a Artifact, spec Spec) (*Process, error) {
 
 // BuildSpec describes one sandboxed compile of candidate source.
 type BuildSpec struct {
-	// SourceDir is the only source tree the build may read, such as the
+	// SourceDir is the declared source tree the build may read, such as the
 	// candidate module or a whole checkout whose modules replace each other.
-	// Every source file the build reads, including through symbolic links and
-	// local replace directives, must resolve inside it.
+	// Besides SourceDir, the build can read only GOROOT, ModCache, WorkDir,
+	// the output directory and system libraries; a symbolic link or local
+	// replace directive that resolves anywhere else is denied.
 	SourceDir string
 	// ModuleDir is the directory of the module being built. It must resolve
 	// inside SourceDir.
@@ -262,9 +263,9 @@ const buildStopGrace = 10 * time.Second
 // selected toolchain, and module versions verified against their checksums
 // when they were downloaded. A source file linked into either reads bytes the
 // build could already read by importing that toolchain package or module
-// version, so such a link grants nothing beyond that trust. WorkDir and the
-// output directory hold only what builds in this run wrote; callers give each
-// run fresh ones.
+// version, so such a link grants nothing beyond that trust. Build does not
+// check that WorkDir and the output directory are fresh: a caller that relies
+// on them holding only this build's output must create them empty.
 func Build(ctx context.Context, spec BuildSpec) error {
 	if runtime.GOOS != "darwin" {
 		return ErrIsolationUnavailable

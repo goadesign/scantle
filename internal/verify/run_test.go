@@ -79,6 +79,13 @@ func TestRunRejectsInvalidPlansBeforeWriting(t *testing.T) {
 
 	_, err := Run(t.Context(), valid())
 	assert.EqualError(t, err, "work directory is required", "an empty WorkDir must not mean the current directory")
+
+	used := valid()
+	used.WorkDir = t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(used.WorkDir, "build-home-suite"), 0o700))
+	_, err = Run(t.Context(), used)
+	assert.EqualError(t, err, "work directory "+used.WorkDir+" must be missing or empty",
+		"files left in WorkDir could be read by a build through a committed link")
 }
 
 func TestResolveInsideFollowsLinksAndStaysInside(t *testing.T) {
