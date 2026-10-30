@@ -33,6 +33,10 @@ type Client struct {
 	// confirm_intent endpoint.
 	ConfirmIntentDoer goahttp.Doer
 
+	// GetChange Doer is the HTTP client used to make requests to the get_change
+	// endpoint.
+	GetChangeDoer goahttp.Doer
+
 	// PreviewArchitecture Doer is the HTTP client used to make requests to the
 	// preview_architecture endpoint.
 	PreviewArchitectureDoer goahttp.Doer
@@ -68,6 +72,7 @@ func NewClient(
 		GoldenPathDoer:          doer,
 		ProposeChangeDoer:       doer,
 		ConfirmIntentDoer:       doer,
+		GetChangeDoer:           doer,
 		PreviewArchitectureDoer: doer,
 		DraftOverrideDoer:       doer,
 		DiffDoer:                doer,
@@ -160,6 +165,25 @@ func (c *Client) ConfirmIntent() goa.Endpoint {
 		resp, err := c.ConfirmIntentDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("scantle", "confirm_intent", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// GetChange returns an endpoint that makes HTTP requests to the scantle
+// service get_change server.
+func (c *Client) GetChange() goa.Endpoint {
+	var (
+		decodeResponse = DecodeGetChangeResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildGetChangeRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.GetChangeDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("scantle", "get_change", err)
 		}
 		return decodeResponse(resp)
 	}

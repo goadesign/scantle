@@ -11,6 +11,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -293,6 +294,82 @@ func DecodeConfirmIntentResponse(decoder func(*http.Response) goahttp.Decoder, r
 				return nil, goahttp.ErrDecodingError("scantle", "confirm_intent", err)
 			}
 			return nil, goahttp.ErrInvalidResponse("scantle", "confirm_intent", resp.StatusCode, string(body))
+		}
+	}
+}
+
+// BuildGetChangeRequest instantiates a HTTP request object with method and
+// path set to call the "scantle" service "get_change" endpoint
+func (c *Client) BuildGetChangeRequest(ctx context.Context, v any) (*http.Request, error) {
+	var (
+		changeID string
+	)
+	{
+		p, ok := v.(*scantle.GetChangePayload)
+		if !ok {
+			return nil, goahttp.ErrInvalidType("scantle", "get_change", "*scantle.GetChangePayload", v)
+		}
+		changeID = p.ChangeID
+	}
+
+	rawPath := fmt.Sprintf("/changes/%v", url.PathEscape(fmt.Sprint(changeID)))
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: GetChangeScantlePath(changeID), RawPath: rawPath}
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, goahttp.ErrInvalidURL("scantle", "get_change", u.String(), err)
+	}
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	return req, nil
+}
+
+// DecodeGetChangeResponse returns a decoder for responses returned by the
+// scantle get_change endpoint. restoreBody controls whether the response body
+// should be restored after having been read.
+func DecodeGetChangeResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
+	return func(resp *http.Response) (result any, decodeErr error) {
+		responseBody := resp.Body
+		if restoreBody {
+			b, readErr := io.ReadAll(responseBody)
+			closeErr := responseBody.Close()
+			if err := errors.Join(readErr, closeErr); err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "get_change", err)
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			defer func() {
+				resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			}()
+		} else {
+			defer func() {
+				if err := responseBody.Close(); err != nil {
+					decodeErr = errors.Join(decodeErr, goahttp.ErrDecodingError("scantle", "get_change", err))
+				}
+			}()
+		}
+		switch resp.StatusCode {
+		case http.StatusOK:
+			var (
+				body GetChangeResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "get_change", err)
+			}
+			err = ValidateGetChangeResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("scantle", "get_change", err)
+			}
+			res := NewGetChangeChangeCardResultOK(&body)
+			return res, nil
+		default:
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("scantle", "get_change", err)
+			}
+			return nil, goahttp.ErrInvalidResponse("scantle", "get_change", resp.StatusCode, string(body))
 		}
 	}
 }

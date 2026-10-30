@@ -19,18 +19,20 @@ type Client struct {
 	GoldenPathEndpoint          goa.Endpoint
 	ProposeChangeEndpoint       goa.Endpoint
 	ConfirmIntentEndpoint       goa.Endpoint
+	GetChangeEndpoint           goa.Endpoint
 	PreviewArchitectureEndpoint goa.Endpoint
 	DraftOverrideEndpoint       goa.Endpoint
 	DiffEndpoint                goa.Endpoint
 }
 
 // NewClient initializes a "scantle" service client given the endpoints.
-func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, previewArchitecture, draftOverride, diff goa.Endpoint) *Client {
+func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange, previewArchitecture, draftOverride, diff goa.Endpoint) *Client {
 	return &Client{
 		CheckpointUIEndpoint:        checkpointUI,
 		GoldenPathEndpoint:          goldenPath,
 		ProposeChangeEndpoint:       proposeChange,
 		ConfirmIntentEndpoint:       confirmIntent,
+		GetChangeEndpoint:           getChange,
 		PreviewArchitectureEndpoint: previewArchitecture,
 		DraftOverrideEndpoint:       draftOverride,
 		DiffEndpoint:                diff,
@@ -71,6 +73,16 @@ func (c *Client) ProposeChange(ctx context.Context, p *ProposeChangePayload) (re
 func (c *Client) ConfirmIntent(ctx context.Context, p *ConfirmIntentPayload) (res *ChangeCardResult, err error) {
 	var ires any
 	ires, err = c.ConfirmIntentEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*ChangeCardResult), nil
+}
+
+// GetChange calls the "get_change" endpoint of the "scantle" service.
+func (c *Client) GetChange(ctx context.Context, p *GetChangePayload) (res *ChangeCardResult, err error) {
+	var ires any
+	ires, err = c.GetChangeEndpoint(ctx, p)
 	if err != nil {
 		return
 	}

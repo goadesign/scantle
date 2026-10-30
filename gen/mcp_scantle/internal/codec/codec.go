@@ -390,6 +390,164 @@ func ValidateDraftOverrideResultTransport(value *DraftOverrideResultTransport) (
 	return err
 }
 
+// GetChangePayloadTransport stores JSON fields until they have been validated.
+type GetChangePayloadTransport struct {
+	// Change identifier.
+	ChangeID *string `json:"change_id"`
+}
+
+// ValidateGetChangePayloadTransport checks decoded JSON before it becomes a service value.
+func ValidateGetChangePayloadTransport(value *GetChangePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	return err
+}
+
+// GetChangeResultAmbiguityQuestionTransport stores JSON fields until they have been validated.
+type GetChangeResultAmbiguityQuestionTransport struct {
+	// Stable question identifier.
+	ID *string `json:"id"`
+	// Plain-English question for the operator.
+	Question *string `json:"question"`
+	// Concrete resolution choices.
+	Options []string `json:"options"`
+}
+
+// ValidateGetChangeResultAmbiguityQuestionTransport checks decoded JSON before it becomes a service value.
+func ValidateGetChangeResultAmbiguityQuestionTransport(value *GetChangeResultAmbiguityQuestionTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Question == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("question", "body"))
+	}
+	if value.Options == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("options", "body"))
+	}
+	return err
+}
+
+// GetChangeResultExampleItemTransport stores JSON fields until they have been validated.
+type GetChangeResultExampleItemTransport struct {
+	// Code-assigned stable example identifier.
+	ID *string `json:"id"`
+	// Plain-English scenario description.
+	Scenario *string `json:"scenario"`
+	// Representative user request and domain fixture state.
+	InputSummary *string `json:"input_summary"`
+	// Expected side effect and response behavior.
+	ExpectedOutcome *string `json:"expected_outcome"`
+	// Evaluator check classification (deterministic or model_judged).
+	VerificationKind *string `json:"verification_kind"`
+}
+
+// ValidateGetChangeResultExampleItemTransport checks decoded JSON before it becomes a service value.
+func ValidateGetChangeResultExampleItemTransport(value *GetChangeResultExampleItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Scenario == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario", "body"))
+	}
+	if value.InputSummary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("input_summary", "body"))
+	}
+	if value.ExpectedOutcome == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("expected_outcome", "body"))
+	}
+	if value.VerificationKind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("verification_kind", "body"))
+	}
+	if value.VerificationKind != nil {
+		if !(*value.VerificationKind == "deterministic" || *value.VerificationKind == "model_judged") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.verification_kind", *value.VerificationKind, []any{"deterministic", "model_judged"}))
+		}
+	}
+	return err
+}
+
+// GetChangeResultTransport stores JSON fields until they have been validated.
+type GetChangeResultTransport struct {
+	// Change identifier.
+	ChangeID *string `json:"change_id"`
+	// Checkpoint status (needs_confirmation or confirmed).
+	Status *string `json:"status"`
+	// Original operator feature request.
+	Prompt *string `json:"prompt"`
+	// Plain-English summary of requested behavior.
+	Summary *string `json:"summary"`
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
+	Ambiguities []*GetChangeResultAmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `json:"answers,omitempty"`
+	// Concrete examples mapped to evaluator checks.
+	Examples []*GetChangeResultExampleItemTransport `json:"examples"`
+	// Existing contract invariants preserved by this change.
+	PreservedBehaviors []string `json:"preserved_behaviors"`
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `json:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
+	RequestRevision *string `json:"request_revision"`
+}
+
+// ValidateGetChangeResultTransport checks decoded JSON before it becomes a service value.
+func ValidateGetChangeResultTransport(value *GetChangeResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if value.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
+	}
+	if value.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if value.Examples == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("examples", "body"))
+	}
+	if value.PreservedBehaviors == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("preserved_behaviors", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.Status != nil {
+		if !(*value.Status == "needs_confirmation" || *value.Status == "confirmed") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *value.Status, []any{"needs_confirmation", "confirmed"}))
+		}
+	}
+	for _, e := range value.Ambiguities {
+		if e != nil {
+			if err2 := ValidateGetChangeResultAmbiguityQuestionTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Examples {
+		if e != nil {
+			if err2 := ValidateGetChangeResultExampleItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
 // PreviewArchitecturePayloadBuilderScopeItemTransport stores JSON fields until they have been validated.
 type PreviewArchitecturePayloadBuilderScopeItemTransport struct {
 	// Human-readable builder scope name (for example, orders or api).
@@ -1283,6 +1441,84 @@ func EncodeDraftOverrideResult(in *scantle.DraftOverrideResult) ([]byte, error) 
 	return data, nil
 }
 
+// DecodeGetChangePayload checks JSON field names from the Goa design and returns a service value.
+func DecodeGetChangePayload(data []byte) (out *scantle.GetChangePayload, err error) {
+	var body *GetChangePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode GetChangePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode GetChangePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode GetChangePayload JSON after first value: %w", err)
+	}
+	if err := ValidateGetChangePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate GetChangePayload JSON: %w", err)
+	}
+	{
+		out = &scantle.GetChangePayload{
+			ChangeID: *body.ChangeID,
+		}
+	}
+	return out, nil
+}
+
+// EncodeGetChangeResult turns a service value into JSON using the field names in the Goa design.
+func EncodeGetChangeResult(in *scantle.ChangeCardResult) ([]byte, error) {
+	var body *GetChangeResultTransport
+	{
+		body = &GetChangeResultTransport{
+			ChangeID:        &in.ChangeID,
+			Status:          &in.Status,
+			Prompt:          &in.Prompt,
+			Summary:         &in.Summary,
+			ConfirmedBy:     in.ConfirmedBy,
+			RequestRevision: &in.RequestRevision,
+		}
+		if in.Ambiguities != nil {
+			body.Ambiguities = make([]*GetChangeResultAmbiguityQuestionTransport, len(in.Ambiguities))
+			for i, val := range in.Ambiguities {
+				if val == nil {
+					body.Ambiguities[i] = nil
+					continue
+				}
+				body.Ambiguities[i] = encodeAmbiguityQuestionToGetChangeResultAmbiguityQuestionTransport(val)
+			}
+		}
+		if in.Answers != nil {
+			body.Answers = make(map[string]string, len(in.Answers))
+			for key, val := range in.Answers {
+				tk := key
+				tv := val
+				body.Answers[tk] = tv
+			}
+		}
+		body.Examples = make([]*GetChangeResultExampleItemTransport, len(in.Examples))
+		for i, val := range in.Examples {
+			if val == nil {
+				body.Examples[i] = nil
+				continue
+			}
+			body.Examples[i] = encodeExampleItemToGetChangeResultExampleItemTransport(val)
+		}
+		body.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
+		for i, val := range in.PreservedBehaviors {
+			body.PreservedBehaviors[i] = val
+		}
+	}
+	if err := ValidateGetChangeResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate GetChangeResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode GetChangeResult JSON: %w", err)
+	}
+	return data, nil
+}
+
 // DecodePreviewArchitecturePayload checks JSON field names from the Goa design and returns a service value.
 func DecodePreviewArchitecturePayload(data []byte) (out *scantle.PreviewArchitecturePayload, err error) {
 	var body *PreviewArchitecturePayloadTransport
@@ -1544,6 +1780,19 @@ func encodeAmbiguityQuestionToConfirmIntentResultAmbiguityQuestionTransport(v *s
 	return res
 }
 
+func encodeAmbiguityQuestionToGetChangeResultAmbiguityQuestionTransport(v *scantle.AmbiguityQuestion) *GetChangeResultAmbiguityQuestionTransport {
+	res := &GetChangeResultAmbiguityQuestionTransport{
+		ID:       &v.ID,
+		Question: &v.Question,
+	}
+	res.Options = make([]string, len(v.Options))
+	for i, val := range v.Options {
+		res.Options[i] = val
+	}
+
+	return res
+}
+
 func encodeAmbiguityQuestionToProposeChangeResultAmbiguityQuestionTransport(v *scantle.AmbiguityQuestion) *ProposeChangeResultAmbiguityQuestionTransport {
 	res := &ProposeChangeResultAmbiguityQuestionTransport{
 		ID:       &v.ID,
@@ -1580,6 +1829,18 @@ func encodeC4EdgeItemToPreviewArchitectureResultC4EdgeItemTransport(v *scantle.C
 
 func encodeExampleItemToConfirmIntentResultExampleItemTransport(v *scantle.ExampleItem) *ConfirmIntentResultExampleItemTransport {
 	res := &ConfirmIntentResultExampleItemTransport{
+		ID:               &v.ID,
+		Scenario:         &v.Scenario,
+		InputSummary:     &v.InputSummary,
+		ExpectedOutcome:  &v.ExpectedOutcome,
+		VerificationKind: &v.VerificationKind,
+	}
+
+	return res
+}
+
+func encodeExampleItemToGetChangeResultExampleItemTransport(v *scantle.ExampleItem) *GetChangeResultExampleItemTransport {
+	res := &GetChangeResultExampleItemTransport{
 		ID:               &v.ID,
 		Scenario:         &v.Scenario,
 		InputSummary:     &v.InputSummary,

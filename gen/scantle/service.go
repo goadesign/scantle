@@ -36,6 +36,10 @@ type Service interface {
 	// answers or examples produce a new request_revision; unchanged ones return
 	// the card as it is.
 	ConfirmIntent(context.Context, *ConfirmIntentPayload) (res *ChangeCardResult, err error)
+	// Return the current Change Card, including its request_revision, to its
+	// owner, for example after confirm_intent refused an edit made against an
+	// older revision. Reading never confirms or changes the card.
+	GetChange(context.Context, *GetChangePayload) (res *ChangeCardResult, err error)
 	// Extract and validate the Checkpoint 2 C4 container topology, tool contracts,
 	// Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa
 	// design bound to a confirmed Change Card.
@@ -62,7 +66,7 @@ const ServiceName = "scantle"
 // MethodNames lists the service method names as defined in the design. These
 // are the same values that are set in the endpoint request contexts under the
 // MethodKey key.
-var MethodNames = [7]string{"checkpoint_ui", "golden_path", "propose_change", "confirm_intent", "preview_architecture", "draft_override", "diff"}
+var MethodNames = [8]string{"checkpoint_ui", "golden_path", "propose_change", "confirm_intent", "get_change", "preview_architecture", "draft_override", "diff"}
 
 // Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.
 type AgentPolicyItem struct {
@@ -262,6 +266,13 @@ type ExampleItem struct {
 	ExpectedOutcome string
 	// Evaluator check classification (deterministic or model_judged).
 	VerificationKind string
+}
+
+// GetChangePayload is the payload type of the scantle service get_change
+// method.
+type GetChangePayload struct {
+	// Change identifier.
+	ChangeID string
 }
 
 // PreviewArchitecturePayload is the payload type of the scantle service
@@ -968,6 +979,23 @@ func validatejsonExampleItemTransport(value *jsonExampleItemTransport) (err erro
 		if !(*value.VerificationKind == "deterministic" || *value.VerificationKind == "model_judged") {
 			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.verification_kind", *value.VerificationKind, []any{"deterministic", "model_judged"}))
 		}
+	}
+	return err
+}
+
+// jsonGetChangePayloadTransport stores JSON fields until they have been validated.
+type jsonGetChangePayloadTransport struct {
+	// Change identifier.
+	ChangeID *string `json:"change_id"`
+}
+
+// validatejsonGetChangePayloadTransport checks decoded JSON before it becomes a service value.
+func validatejsonGetChangePayloadTransport(value *jsonGetChangePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}
 	return err
 }
@@ -3079,6 +3107,83 @@ func DecodeExampleItem(data []byte) (out *ExampleItem, err error) {
 			InputSummary:     *body.InputSummary,
 			ExpectedOutcome:  *body.ExpectedOutcome,
 			VerificationKind: *body.VerificationKind,
+		}
+	}
+	return out, nil
+}
+
+// EncodeGetChangePayload turns a service value into JSON using the field names in the Goa design.
+func EncodeGetChangePayload(in *GetChangePayload) ([]byte, error) {
+	if err := checkGetChangePayloadValue(in); err != nil {
+		return nil, fmt.Errorf("encode GetChangePayload JSON: %w", err)
+	}
+	var body *jsonGetChangePayloadTransport
+	{
+		body = &jsonGetChangePayloadTransport{
+			ChangeID: &in.ChangeID,
+		}
+	}
+	if err := validatejsonGetChangePayloadTransport(body); err != nil {
+		return nil, fmt.Errorf("validate GetChangePayload JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode GetChangePayload JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateGetChangePayloadValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateGetChangePayloadValue(in *GetChangePayload) error {
+	if err := checkGetChangePayloadValue(in); err != nil {
+		return fmt.Errorf("validate GetChangePayload value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "GetChangePayload")
+	}
+
+	var body *jsonGetChangePayloadTransport
+	{
+		body = &jsonGetChangePayloadTransport{
+			ChangeID: &in.ChangeID,
+		}
+	}
+	if err := validatejsonGetChangePayloadTransport(body); err != nil {
+		return fmt.Errorf("validate GetChangePayload value: %w", err)
+	}
+	return nil
+}
+
+// DecodeGetChangePayload checks JSON field names from the Goa design and returns a service value.
+func DecodeGetChangePayload(data []byte) (out *GetChangePayload, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode GetChangePayload JSON: %w", err)
+	}
+	if err := validateGetChangePayloadJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode GetChangePayload JSON: %w", err)
+	}
+	var body *jsonGetChangePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode GetChangePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode GetChangePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode GetChangePayload JSON after first value: %w", err)
+	}
+	if err := validatejsonGetChangePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate GetChangePayload JSON: %w", err)
+	}
+	{
+		out = &GetChangePayload{
+			ChangeID: *body.ChangeID,
 		}
 	}
 	return out, nil
@@ -6067,6 +6172,42 @@ func validateDraftOverrideResultJSONValue(path string, value any, description st
 	return nil
 }
 
+// validateGetChangePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateGetChangePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "change_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Change identifier.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"change_id",
+			})
+		}
+	}
+	return nil
+}
+
 // validatePreviewArchitecturePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validatePreviewArchitecturePayloadJSONValue(path string, value any, description string) error {
 	field := path
@@ -7161,6 +7302,36 @@ func checkExampleItemValue(in *ExampleItem) error {
 	active := make(map[any]bool)
 	if err := checkChangeCardResultExampleItemValue(in, "$", active); err != nil {
 		return err
+	}
+	return nil
+}
+
+// checkGetChangePayloadValue checks text and cycles before conversion.
+func checkGetChangePayloadValue(in *GetChangePayload) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkGetChangePayloadGetChangePayloadValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkGetChangePayloadGetChangePayloadValue checks one generated value on the active path.
+func checkGetChangePayloadGetChangePayloadValue(in *GetChangePayload, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ChangeID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
+		}
 	}
 	return nil
 }

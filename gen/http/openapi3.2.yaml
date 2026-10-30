@@ -8,6 +8,81 @@ servers:
       name: scantle
       description: Default server for scantle
 paths:
+    /changes/{change_id}:
+        get:
+            tags:
+                - scantle
+            summary: get_change scantle
+            description: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.
+            operationId: scantle#get_change
+            parameters:
+                - name: change_id
+                  in: path
+                  description: Change identifier.
+                  required: true
+                  schema:
+                    type: string
+                    description: Change identifier.
+                    example: Aliquid eaque veniam quia voluptas.
+                  example: Aliquid eaque veniam quia voluptas.
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ChangeCardResult'
+                            example:
+                                ambiguities:
+                                    - id: Aut fuga velit.
+                                      options:
+                                        - Ex aliquid est velit necessitatibus hic incidunt.
+                                        - Quia aut qui maxime autem.
+                                        - Facere voluptatum dolorem.
+                                        - Sit qui nam odio itaque aut.
+                                      question: Inventore maxime esse.
+                                    - id: Aut fuga velit.
+                                      options:
+                                        - Ex aliquid est velit necessitatibus hic incidunt.
+                                        - Quia aut qui maxime autem.
+                                        - Facere voluptatum dolorem.
+                                        - Sit qui nam odio itaque aut.
+                                      question: Inventore maxime esse.
+                                    - id: Aut fuga velit.
+                                      options:
+                                        - Ex aliquid est velit necessitatibus hic incidunt.
+                                        - Quia aut qui maxime autem.
+                                        - Facere voluptatum dolorem.
+                                        - Sit qui nam odio itaque aut.
+                                      question: Inventore maxime esse.
+                                answers:
+                                    Et modi molestiae.: Id aut.
+                                change_id: Non consequuntur quis.
+                                confirmed_by: Fugit quam magnam beatae sint.
+                                examples:
+                                    - expected_outcome: Voluptatem necessitatibus numquam.
+                                      id: Nemo libero.
+                                      input_summary: Deserunt tempore deleniti.
+                                      scenario: Vitae velit dicta excepturi distinctio.
+                                      verification_kind: deterministic
+                                    - expected_outcome: Voluptatem necessitatibus numquam.
+                                      id: Nemo libero.
+                                      input_summary: Deserunt tempore deleniti.
+                                      scenario: Vitae velit dicta excepturi distinctio.
+                                      verification_kind: deterministic
+                                    - expected_outcome: Voluptatem necessitatibus numquam.
+                                      id: Nemo libero.
+                                      input_summary: Deserunt tempore deleniti.
+                                      scenario: Vitae velit dicta excepturi distinctio.
+                                      verification_kind: deterministic
+                                preserved_behaviors:
+                                    - Ea beatae totam numquam soluta.
+                                    - Autem laboriosam adipisci sed.
+                                    - Expedita iste dolor.
+                                prompt: Repudiandae aut qui aliquam cumque ab non.
+                                request_revision: Maiores et neque.
+                                status: needs_confirmation
+                                summary: Dolorem blanditiis.
     /changes/confirm:
         post:
             tags:

@@ -70,6 +70,22 @@ func DraftOverrideResultCodec() tools.JSONCodec[*DraftOverrideResult] {
 	}
 }
 
+// GetChangePayloadCodec returns a fresh codec for *GetChangePayload.
+func GetChangePayloadCodec() tools.JSONCodec[*GetChangePayload] {
+	return tools.JSONCodec[*GetChangePayload]{
+		ToJSON:   MarshalGetChangePayload,
+		FromJSON: UnmarshalGetChangePayload,
+	}
+}
+
+// GetChangeResultCodec returns a fresh codec for *GetChangeResult.
+func GetChangeResultCodec() tools.JSONCodec[*GetChangeResult] {
+	return tools.JSONCodec[*GetChangeResult]{
+		ToJSON:   MarshalGetChangeResult,
+		FromJSON: UnmarshalGetChangeResult,
+	}
+}
+
 // PreviewArchitecturePayloadCodec returns a fresh codec for *PreviewArchitecturePayload.
 func PreviewArchitecturePayloadCodec() tools.JSONCodec[*PreviewArchitecturePayload] {
 	return tools.JSONCodec[*PreviewArchitecturePayload]{
@@ -179,6 +195,32 @@ var (
 		},
 		FromJSON: func(data []byte) (any, error) {
 			return UnmarshalDraftOverrideResult(data)
+		},
+	}
+	// getChangePayloadCodec provides an untyped codec for *GetChangePayload.
+	getChangePayloadCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*GetChangePayload); ok {
+				return MarshalGetChangePayload(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *GetChangePayload: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalGetChangePayload(data)
+		},
+	}
+	// getChangeResultCodec provides an untyped codec for *GetChangeResult.
+	getChangeResultCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*GetChangeResult); ok {
+				return MarshalGetChangeResult(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *GetChangeResult: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalGetChangeResult(data)
 		},
 	}
 	// previewArchitecturePayloadCodec provides an untyped codec for *PreviewArchitecturePayload.
@@ -553,6 +595,138 @@ var draftOverrideResultFields = []tools.FieldMetadata{
 		Path:        []tools.FieldPathSegment{tools.FixedField("message")},
 		JSONType:    "string",
 		Description: "Operator-facing status explanation.",
+	},
+}
+var getChangePayloadFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "Identifies the Change Card the authenticated owner wants to read.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Change identifier.",
+	},
+}
+var getChangeResultFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Change identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("status")},
+		JSONType:    "string",
+		Description: "Checkpoint status (needs_confirmation or confirmed).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("prompt")},
+		JSONType:    "string",
+		Description: "Original operator feature request.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("summary")},
+		JSONType:    "string",
+		Description: "Plain-English summary of requested behavior.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities")},
+		JSONType:    "array",
+		Description: "Domain questions surfaced at CP1, retained for audit after confirmation.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Domain questions surfaced at CP1, retained for audit after confirmation.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Stable question identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("question")},
+		JSONType:    "string",
+		Description: "Plain-English question for the operator.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("options")},
+		JSONType:    "array",
+		Description: "Concrete resolution choices.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("options"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Concrete resolution choices.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("answers")},
+		JSONType:    "object",
+		Description: "Confirmed resolution per ambiguity question ID.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("answers"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Confirmed resolution per ambiguity question ID.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples")},
+		JSONType:    "array",
+		Description: "Concrete examples mapped to evaluator checks.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Concrete examples mapped to evaluator checks.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Code-assigned stable example identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("scenario")},
+		JSONType:    "string",
+		Description: "Plain-English scenario description.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("input_summary")},
+		JSONType:    "string",
+		Description: "Representative user request and domain fixture state.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("expected_outcome")},
+		JSONType:    "string",
+		Description: "Expected side effect and response behavior.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("verification_kind")},
+		JSONType:    "string",
+		Description: "Evaluator check classification (deterministic or model_judged).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("preserved_behaviors")},
+		JSONType:    "array",
+		Description: "Existing contract invariants preserved by this change.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("preserved_behaviors"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Existing contract invariants preserved by this change.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("confirmed_by")},
+		JSONType:    "string",
+		Description: "Authenticated principal that confirmed the Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the canonical versioned Change Card.",
 	},
 }
 var previewArchitecturePayloadFields = []tools.FieldMetadata{
@@ -1238,6 +1412,40 @@ func enrichDraftOverrideResultValidationError(err error) error {
 	}
 	return tools.NewValidationError(ve.Error(), issues, m)
 }
+func enrichGetChangePayloadValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(getChangePayloadFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
+func enrichGetChangeResultValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(getChangeResultFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
 func enrichPreviewArchitecturePayloadValidationError(err error) error {
 	var ve *tools.ValidationError
 	if !errors.As(err, &ve) {
@@ -1472,6 +1680,68 @@ func invalidDraftOverrideResultFieldTypeError(err error) error {
 		field = "$payload"
 	}
 	metadata, ok := tools.LookupFieldMetadata(draftOverrideResultFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
+func invalidGetChangePayloadFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "GetChangePayloadTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(getChangePayloadFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
+func invalidGetChangeResultFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "GetChangeResultTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(getChangeResultFields, field)
 	if !ok || metadata.JSONType == "" {
 		return err
 	}
@@ -2001,6 +2271,156 @@ func UnmarshalDraftOverrideResult(data []byte) (*DraftOverrideResult, error) {
 	return out, nil
 }
 
+// MarshalGetChangePayload serializes *GetChangePayload into JSON.
+func MarshalGetChangePayload(v *GetChangePayload) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("getChangePayload is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.GetChangePayloadTransport
+	out = &toolhttp.GetChangePayloadTransport{
+		ChangeID: &in.ChangeID,
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalGetChangePayload deserializes JSON into *GetChangePayload.
+func UnmarshalGetChangePayload(data []byte) (*GetChangePayload, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("getChangePayload JSON is empty")
+	}
+	var tv toolhttp.GetChangePayloadTransport
+	if err := validateGetChangePayloadJSON(data); err != nil {
+		return nil, invalidGetChangePayloadFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidGetChangePayloadFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateGetChangePayloadTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichGetChangePayloadValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *GetChangePayload
+	out = &GetChangePayload{
+		ChangeID: *in.ChangeID,
+	}
+	return out, nil
+}
+
+// MarshalGetChangeResult serializes *GetChangeResult into JSON.
+func MarshalGetChangeResult(v *GetChangeResult) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("getChangeResult is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.GetChangeResultTransport
+	out = &toolhttp.GetChangeResultTransport{
+		ChangeID:        &in.ChangeID,
+		Status:          &in.Status,
+		Prompt:          &in.Prompt,
+		Summary:         &in.Summary,
+		ConfirmedBy:     in.ConfirmedBy,
+		RequestRevision: &in.RequestRevision,
+	}
+	if in.Ambiguities != nil {
+		out.Ambiguities = make([]*toolhttp.AmbiguityQuestionTransport, len(in.Ambiguities))
+		for i, val := range in.Ambiguities {
+			if val == nil {
+				out.Ambiguities[i] = nil
+				continue
+			}
+			out.Ambiguities[i] = encodeAmbiguityQuestionToAmbiguityQuestionTransport(val)
+		}
+	}
+	if in.Answers != nil {
+		out.Answers = make(map[string]string, len(in.Answers))
+		for key, val := range in.Answers {
+			tk := key
+			tv := val
+			out.Answers[tk] = tv
+		}
+	}
+	out.Examples = make([]*toolhttp.ExampleItemTransport, len(in.Examples))
+	for i, val := range in.Examples {
+		if val == nil {
+			out.Examples[i] = nil
+			continue
+		}
+		out.Examples[i] = encodeExampleItemToExampleItemTransport(val)
+	}
+	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
+	for i, val := range in.PreservedBehaviors {
+		out.PreservedBehaviors[i] = val
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalGetChangeResult deserializes JSON into *GetChangeResult.
+func UnmarshalGetChangeResult(data []byte) (*GetChangeResult, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("getChangeResult JSON is empty")
+	}
+	var tv toolhttp.GetChangeResultTransport
+	if err := validateProposeChangeResultJSON(data); err != nil {
+		return nil, invalidGetChangeResultFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidGetChangeResultFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateGetChangeResultTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichGetChangeResultValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *GetChangeResult
+	out = &GetChangeResult{
+		ChangeID:        *in.ChangeID,
+		Status:          *in.Status,
+		Prompt:          *in.Prompt,
+		Summary:         *in.Summary,
+		ConfirmedBy:     in.ConfirmedBy,
+		RequestRevision: *in.RequestRevision,
+	}
+	if in.Ambiguities != nil {
+		out.Ambiguities = make([]*AmbiguityQuestion, len(in.Ambiguities))
+		for i, val := range in.Ambiguities {
+			if val == nil {
+				out.Ambiguities[i] = nil
+				continue
+			}
+			out.Ambiguities[i] = decodeAmbiguityQuestionTransportToAmbiguityQuestion(val)
+		}
+	}
+	if in.Answers != nil {
+		out.Answers = make(map[string]string, len(in.Answers))
+		for key, val := range in.Answers {
+			tk := key
+			tv := val
+			out.Answers[tk] = tv
+		}
+	}
+	out.Examples = make([]*ExampleItem, len(in.Examples))
+	for i, val := range in.Examples {
+		if val == nil {
+			out.Examples[i] = nil
+			continue
+		}
+		out.Examples[i] = decodeExampleItemTransportToExampleItem(val)
+	}
+	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
+	for i, val := range in.PreservedBehaviors {
+		out.PreservedBehaviors[i] = val
+	}
+	return out, nil
+}
+
 // MarshalPreviewArchitecturePayload serializes *PreviewArchitecturePayload into JSON.
 func MarshalPreviewArchitecturePayload(v *PreviewArchitecturePayload) ([]byte, error) {
 	if v == nil {
@@ -2361,6 +2781,16 @@ func validateConfirmIntentPayloadJSON(data []byte) error {
 		return err
 	}
 	return validateConfirmIntentPayloadJSONValue("", root, "")
+}
+
+// validateGetChangePayloadJSON parses one JSON document and checks the exact value
+// shapes known from this generated Goa type.
+func validateGetChangePayloadJSON(data []byte) error {
+	root, err := readStrictToolJSON(data)
+	if err != nil {
+		return err
+	}
+	return validateGetChangePayloadJSONValue("", root, "")
 }
 
 // validatePreviewArchitecturePayloadJSON parses one JSON document and checks the exact value
@@ -2996,6 +3426,42 @@ func validateConfirmIntentPayloadJSONValue(path string, value any, description s
 				"change_id",
 				"examples",
 				"request_revision",
+			})
+		}
+	}
+	return nil
+}
+
+// validateGetChangePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateGetChangePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "change_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Change identifier.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"change_id",
 			})
 		}
 	}

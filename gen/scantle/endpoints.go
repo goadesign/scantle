@@ -19,6 +19,7 @@ type Endpoints struct {
 	GoldenPath          goa.Endpoint
 	ProposeChange       goa.Endpoint
 	ConfirmIntent       goa.Endpoint
+	GetChange           goa.Endpoint
 	PreviewArchitecture goa.Endpoint
 	DraftOverride       goa.Endpoint
 	Diff                goa.Endpoint
@@ -31,6 +32,7 @@ func NewEndpoints(s Service) *Endpoints {
 		GoldenPath:          NewGoldenPathEndpoint(s),
 		ProposeChange:       NewProposeChangeEndpoint(s),
 		ConfirmIntent:       NewConfirmIntentEndpoint(s),
+		GetChange:           NewGetChangeEndpoint(s),
 		PreviewArchitecture: NewPreviewArchitectureEndpoint(s),
 		DraftOverride:       NewDraftOverrideEndpoint(s),
 		Diff:                NewDiffEndpoint(s),
@@ -43,6 +45,7 @@ func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 	e.GoldenPath = m(e.GoldenPath)
 	e.ProposeChange = m(e.ProposeChange)
 	e.ConfirmIntent = m(e.ConfirmIntent)
+	e.GetChange = m(e.GetChange)
 	e.PreviewArchitecture = m(e.PreviewArchitecture)
 	e.DraftOverride = m(e.DraftOverride)
 	e.Diff = m(e.Diff)
@@ -79,6 +82,15 @@ func NewConfirmIntentEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
 		p := req.(*ConfirmIntentPayload)
 		return s.ConfirmIntent(ctx, p)
+	}
+}
+
+// NewGetChangeEndpoint returns an endpoint function that calls the method
+// "get_change" of service "scantle".
+func NewGetChangeEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		p := req.(*GetChangePayload)
+		return s.GetChange(ctx, p)
 	}
 }
 

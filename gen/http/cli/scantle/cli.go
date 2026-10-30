@@ -23,7 +23,7 @@ import (
 //	command (subcommand1|subcommand2|...)
 func UsageCommands() []string {
 	return []string{
-		"scantle (checkpoint-ui|golden-path|propose-change|confirm-intent|preview-architecture|draft-override|diff)",
+		"scantle (checkpoint-ui|golden-path|propose-change|confirm-intent|get-change|preview-architecture|draft-override|diff)",
 	}
 }
 
@@ -74,6 +74,9 @@ func ParseEndpoint(
 		scantleConfirmIntentFlags    = flag.NewFlagSet("confirm-intent", flag.ExitOnError)
 		scantleConfirmIntentBodyFlag = new(cliStringFlag)
 
+		scantleGetChangeFlags        = flag.NewFlagSet("get-change", flag.ExitOnError)
+		scantleGetChangeChangeIDFlag = new(cliStringFlag)
+
 		scantlePreviewArchitectureFlags    = flag.NewFlagSet("preview-architecture", flag.ExitOnError)
 		scantlePreviewArchitectureBodyFlag = new(cliStringFlag)
 
@@ -85,6 +88,7 @@ func ParseEndpoint(
 	)
 	scantleProposeChangeFlags.Var(scantleProposeChangeBodyFlag, "body", "")
 	scantleConfirmIntentFlags.Var(scantleConfirmIntentBodyFlag, "body", "")
+	scantleGetChangeFlags.Var(scantleGetChangeChangeIDFlag, "change-id", "Change identifier.")
 	scantlePreviewArchitectureFlags.Var(scantlePreviewArchitectureBodyFlag, "body", "")
 	scantleDraftOverrideFlags.Var(scantleDraftOverrideBodyFlag, "body", "")
 	scantleDiffFlags.Var(scantleDiffBodyFlag, "body", "")
@@ -94,6 +98,7 @@ func ParseEndpoint(
 	scantleGoldenPathFlags.Usage = scantleGoldenPathUsage
 	scantleProposeChangeFlags.Usage = scantleProposeChangeUsage
 	scantleConfirmIntentFlags.Usage = scantleConfirmIntentUsage
+	scantleGetChangeFlags.Usage = scantleGetChangeUsage
 	scantlePreviewArchitectureFlags.Usage = scantlePreviewArchitectureUsage
 	scantleDraftOverrideFlags.Usage = scantleDraftOverrideUsage
 	scantleDiffFlags.Usage = scantleDiffUsage
@@ -144,6 +149,9 @@ func ParseEndpoint(
 			case "confirm-intent":
 				epf = scantleConfirmIntentFlags
 
+			case "get-change":
+				epf = scantleGetChangeFlags
+
 			case "preview-architecture":
 				epf = scantlePreviewArchitectureFlags
 
@@ -188,6 +196,9 @@ func ParseEndpoint(
 			case "confirm-intent":
 				endpoint = c.ConfirmIntent()
 				data, err = scantlec.BuildConfirmIntentPayload(scantleConfirmIntentBodyFlag.value)
+			case "get-change":
+				endpoint = c.GetChange()
+				data, err = scantlec.BuildGetChangePayload(scantleGetChangeChangeIDFlag.value)
 			case "preview-architecture":
 				endpoint = c.PreviewArchitecture()
 				data, err = scantlec.BuildPreviewArchitecturePayload(scantlePreviewArchitectureBodyFlag.value)
@@ -216,6 +227,7 @@ func scantleUsage() {
 	fmt.Fprintln(os.Stderr, `    golden-path: Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.`)
 	fmt.Fprintln(os.Stderr, `    propose-change: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.`)
 	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.`)
+	fmt.Fprintln(os.Stderr, `    get-change: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.`)
 	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
 	fmt.Fprintln(os.Stderr, `    diff: Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.`)
@@ -289,6 +301,24 @@ func scantleConfirmIntentUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle confirm-intent --body '{\n      \"answers\": {\n         \"Cupiditate vel.\": \"Omnis debitis sit.\",\n         \"Modi voluptates.\": \"Occaecati corporis laborum libero odit repellat sit.\",\n         \"Optio id ut quae.\": \"Aperiam labore autem est possimus ipsam sunt.\"\n      },\n      \"change_id\": \"Aspernatur quia doloribus assumenda unde tenetur.\",\n      \"examples\": [\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         },\n         {\n            \"expected_outcome\": \"Voluptatem necessitatibus numquam.\",\n            \"id\": \"Nemo libero.\",\n            \"input_summary\": \"Deserunt tempore deleniti.\",\n            \"scenario\": \"Vitae velit dicta excepturi distinctio.\",\n            \"verification_kind\": \"deterministic\"\n         }\n      ],\n      \"request_revision\": \"Rerum consequatur iste necessitatibus ab dolor enim.\"\n   }'")
+}
+
+func scantleGetChangeUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] scantle get-change", os.Args[0])
+	fmt.Fprint(os.Stderr, " -change-id STRING")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -change-id STRING: Change identifier.`)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "scantle get-change --change-id \"Aliquid eaque veniam quia voluptas.\"")
 }
 
 func scantlePreviewArchitectureUsage() {

@@ -119,6 +119,31 @@ type ConfirmIntentResponseBody struct {
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
 }
 
+// GetChangeResponseBody is the type of the "scantle" service "get_change"
+// endpoint HTTP response body.
+type GetChangeResponseBody struct {
+	// Change identifier.
+	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Checkpoint status (needs_confirmation or confirmed).
+	Status string `form:"status" json:"status" xml:"status"`
+	// Original operator feature request.
+	Prompt string `form:"prompt" json:"prompt" xml:"prompt"`
+	// Plain-English summary of requested behavior.
+	Summary string `form:"summary" json:"summary" xml:"summary"`
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
+	Ambiguities []*AmbiguityQuestionResponseBody `form:"ambiguities,omitempty" json:"ambiguities,omitempty" xml:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
+	// Concrete examples mapped to evaluator checks.
+	Examples []*ExampleItemResponseBody `form:"examples" json:"examples" xml:"examples"`
+	// Existing contract invariants preserved by this change.
+	PreservedBehaviors []string `form:"preserved_behaviors" json:"preserved_behaviors" xml:"preserved_behaviors"`
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+}
+
 // PreviewArchitectureResponseBody is the type of the "scantle" service
 // "preview_architecture" endpoint HTTP response body.
 type PreviewArchitectureResponseBody struct {
@@ -471,6 +496,58 @@ func NewConfirmIntentResponseBody(res *scantle.ChangeCardResult) *ConfirmIntentR
 	return body
 }
 
+// NewGetChangeResponseBody builds the HTTP response body from the result of
+// the "get_change" endpoint of the "scantle" service.
+func NewGetChangeResponseBody(res *scantle.ChangeCardResult) *GetChangeResponseBody {
+	body := &GetChangeResponseBody{
+		ChangeID:        res.ChangeID,
+		Status:          res.Status,
+		Prompt:          res.Prompt,
+		Summary:         res.Summary,
+		ConfirmedBy:     res.ConfirmedBy,
+		RequestRevision: res.RequestRevision,
+	}
+	if res.Ambiguities != nil {
+		body.Ambiguities = make([]*AmbiguityQuestionResponseBody, len(res.Ambiguities))
+		for i, val := range res.Ambiguities {
+			if val == nil {
+				body.Ambiguities[i] = nil
+				continue
+			}
+			body.Ambiguities[i] = marshalScantleAmbiguityQuestionToAmbiguityQuestionResponseBody(val)
+		}
+	}
+	if res.Answers != nil {
+		body.Answers = make(map[string]string, len(res.Answers))
+		for key, val := range res.Answers {
+			tk := key
+			tv := val
+			body.Answers[tk] = tv
+		}
+	}
+	if res.Examples != nil {
+		body.Examples = make([]*ExampleItemResponseBody, len(res.Examples))
+		for i, val := range res.Examples {
+			if val == nil {
+				body.Examples[i] = nil
+				continue
+			}
+			body.Examples[i] = marshalScantleExampleItemToExampleItemResponseBody(val)
+		}
+	} else {
+		body.Examples = []*ExampleItemResponseBody{}
+	}
+	if res.PreservedBehaviors != nil {
+		body.PreservedBehaviors = make([]string, len(res.PreservedBehaviors))
+		for i, val := range res.PreservedBehaviors {
+			body.PreservedBehaviors[i] = val
+		}
+	} else {
+		body.PreservedBehaviors = []string{}
+	}
+	return body
+}
+
 // NewPreviewArchitectureResponseBody builds the HTTP response body from the
 // result of the "preview_architecture" endpoint of the "scantle" service.
 func NewPreviewArchitectureResponseBody(res *scantle.ArchitecturePreviewResult) *PreviewArchitectureResponseBody {
@@ -622,6 +699,14 @@ func NewConfirmIntentPayload(body *ConfirmIntentRequestBody) *scantle.ConfirmInt
 		}
 		v.Examples[i] = unmarshalExampleItemRequestBodyToScantleExampleItem(val)
 	}
+
+	return v
+}
+
+// NewGetChangePayload builds a scantle service get_change endpoint payload.
+func NewGetChangePayload(changeID string) *scantle.GetChangePayload {
+	v := &scantle.GetChangePayload{}
+	v.ChangeID = changeID
 
 	return v
 }

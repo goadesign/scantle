@@ -517,6 +517,26 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 	return card, nil
 }
 
+// GetChange returns the current Change Card for change_id to its owner. It
+// fails for an unknown change_id or a caller who does not own the card, and
+// never changes the card.
+func (c *ControlPlane) GetChange(ctx context.Context, p *genscantle.GetChangePayload) (*genscantle.ChangeCardResult, error) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return nil, errors.New("authenticated principal is required")
+	}
+	c.mu.RLock()
+	record, ok := c.cards[p.ChangeID]
+	c.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	}
+	if record.owner != principal.ID {
+		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	return record.card, nil
+}
+
 // ConfirmIntent records the owner's complete answers and example table for a
 // Change Card that needs confirmation or is already confirmed. The caller
 // must be the card's owner and send the card's current request_revision, so

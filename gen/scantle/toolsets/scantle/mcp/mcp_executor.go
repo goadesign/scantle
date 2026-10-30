@@ -29,6 +29,8 @@ func NewMCPExecutor(caller mcpruntime.Caller) runtime.ToolCallExecutor {
 			return runtime.ExecuteMCPTool(ctx, caller, call, "diff", genscantle.SpecDiff())
 		case genscantle.DraftOverride:
 			return runtime.ExecuteMCPTool(ctx, caller, call, "draft_override", genscantle.SpecDraftOverride())
+		case genscantle.GetChange:
+			return runtime.ExecuteMCPTool(ctx, caller, call, "get_change", genscantle.SpecGetChange())
 		case genscantle.PreviewArchitecture:
 			return runtime.ExecuteMCPTool(ctx, caller, call, "preview_architecture", genscantle.SpecPreviewArchitecture())
 		case genscantle.ProposeChange:

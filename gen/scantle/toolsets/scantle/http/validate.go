@@ -152,6 +152,59 @@ func ValidateDraftOverrideResultTransport(body *DraftOverrideResultTransport) (e
 	return
 }
 
+// ValidateGetChangePayloadTransport runs the validations defined on GetChangePayloadTransport.
+func ValidateGetChangePayloadTransport(body *GetChangePayloadTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	return
+}
+
+// ValidateGetChangeResultTransport runs the validations defined on GetChangeResultTransport.
+func ValidateGetChangeResultTransport(body *GetChangeResultTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
+	}
+	if body.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if body.Examples == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("examples", "body"))
+	}
+	if body.PreservedBehaviors == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("preserved_behaviors", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.Status != nil {
+		if !(*body.Status == "needs_confirmation" || *body.Status == "confirmed") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *body.Status, []any{"needs_confirmation", "confirmed"}))
+		}
+	}
+	for _, e := range body.Ambiguities {
+		if e != nil {
+			if err2 := ValidateAmbiguityQuestionTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Examples {
+		if e != nil {
+			if err2 := ValidateExampleItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return
+}
+
 // ValidatePreviewArchitecturePayloadTransport runs the validations defined on PreviewArchitecturePayloadTransport.
 func ValidatePreviewArchitecturePayloadTransport(body *PreviewArchitecturePayloadTransport) (err error) {
 	if body.ChangeID == nil {

@@ -44,7 +44,14 @@ var ProposeChangePayload = Type("ProposeChangePayload", func() {
 	Required("change_id", "prompt")
 })
 
-// ChangeCardResult is the output of CP1 propose_change and confirm_intent.
+// GetChangePayload is the input to the get_change tool.
+var GetChangePayload = Type("GetChangePayload", func() {
+	Description("Identifies the Change Card the authenticated owner wants to read.")
+	Attribute("change_id", String, "Change identifier.")
+	Required("change_id")
+})
+
+// ChangeCardResult is the output of CP1 propose_change, confirm_intent and get_change.
 var ChangeCardResult = Type("ChangeCardResult", func() {
 	Description("Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.")
 	Attribute("change_id", String, "Change identifier.")
@@ -354,6 +361,19 @@ var _ = Service("scantle", func() {
 		})
 		HTTP(func() {
 			POST("/changes/confirm")
+			Response(StatusOK)
+		})
+	})
+
+	Method("get_change", func() {
+		Description("Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.")
+		Payload(GetChangePayload)
+		Result(ChangeCardResult)
+		Tool("get_change", "Read the current Checkpoint 1 Change Card and its request_revision.", func() {
+			ToolUI("ui://scantle/checkpoint")
+		})
+		HTTP(func() {
+			GET("/changes/{change_id}")
 			Response(StatusOK)
 		})
 	})
