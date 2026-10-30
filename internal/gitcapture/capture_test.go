@@ -100,6 +100,19 @@ func TestCapturePreservesDirtyWorkingTreeModesSymlinksAndTrailingSpacePaths(t *t
 		t.Fatalf("expected 3 selected untracked entries under scripts, got %+v", snap1.Untracked)
 	}
 
+	// Reject cloning into a subdirectory of the source checkout (directly or via symlink).
+	if err := ApplyToClone(ctx, dir, filepath.Join(dir, "nested-clone"), snap1); err == nil {
+		t.Fatal("expected ApplyToClone into a subdirectory of srcRepoDir to fail")
+	}
+	aliasParent := t.TempDir()
+	symlinkToSrc := filepath.Join(aliasParent, "src-alias")
+	if err := os.Symlink(dir, symlinkToSrc); err != nil {
+		t.Fatalf("create symlink alias to srcRepoDir: %v", err)
+	}
+	if err := ApplyToClone(ctx, dir, filepath.Join(symlinkToSrc, "nested-via-symlink"), snap1); err == nil {
+		t.Fatal("expected ApplyToClone into symlinked subdirectory of srcRepoDir to fail")
+	}
+
 	cloneDir := filepath.Join(t.TempDir(), "verify-clone")
 	if err := ApplyToClone(ctx, dir, cloneDir, snap1); err != nil {
 		t.Fatalf("ApplyToClone failed: %v", err)

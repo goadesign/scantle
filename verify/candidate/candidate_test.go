@@ -1,0 +1,224 @@
+package candidate
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// probeResult mirrors the probe's output line.
+type probeResult struct {
+	Action  string `json:"action"`
+	Allowed bool   `json:"allowed"`
+	Detail  string `json:"detail"`
+}
+
+// TestExecEnforcesTheSandbox runs a hostile probe binary through Exec and
+// checks, from what the operating system actually allowed, that every
+// forbidden access fails and every assigned access works.
+func TestExecEnforcesTheSandbox(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	probe := buildProbe(t)
+	state := t.TempDir()
+	protected := t.TempDir()
+	secret := filepath.Join(protected, "secret.txt")
+	require.NoError(t, os.WriteFile(secret, []byte("evaluator secret"), 0o600))
+	allowed := listen(t)
+	unassigned := listen(t)
+	listenPort := freePort(t)
+	t.Setenv("EVAL_SECRET", "must not leak")
+
+	p, err := Exec(t.Context(), probe, Spec{
+		Args: []string{
+			"read:" + secret,
+			"write:" + filepath.Join(protected, "out.txt"),
+			"write:" + filepath.Join(state, "ok.txt"),
+			"env:EVAL_SECRET",
+			"env:GIVEN",
+			fmt.Sprintf("connect:127.0.0.1:%d", allowed),
+			fmt.Sprintf("connect:127.0.0.1:%d", unassigned),
+			"connect:1.1.1.1:53",
+			fmt.Sprintf("listen:127.0.0.1:%d", listenPort),
+			fmt.Sprintf("listen:127.0.0.1:%d", freePort(t)),
+			"spawn",
+			"read:/etc/hosts",
+			"stat:" + secret,
+			"stat:" + filepath.Join(state, "ok.txt"),
+		},
+		Env:          []string{"GIVEN=explicit"},
+		StateDir:     state,
+		ConnectPorts: []int{allowed},
+		ListenPort:   listenPort,
+		LogFile:      filepath.Join(t.TempDir(), "probe.log"),
+	})
+	require.NoError(t, err)
+	out, truncated, err := excerptAfterExit(p)
+	require.NoError(t, err)
+	require.False(t, truncated)
+
+	got := map[string]bool{}
+	sc := bufio.NewScanner(strings.NewReader(out))
+	for sc.Scan() {
+		var r probeResult
+		require.NoError(t, json.Unmarshal(sc.Bytes(), &r), sc.Text())
+		got[strings.SplitN(r.Action, ":", 2)[0]+"@"+r.Action] = r.Allowed
+	}
+	cases := []struct {
+		name   string
+		action string
+		allow  bool
+	}{
+		{"read a protected file", "read:" + secret, false},
+		{"write outside its state", "write:" + filepath.Join(protected, "out.txt"), false},
+		{"write its own state", "write:" + filepath.Join(state, "ok.txt"), true},
+		{"see the evaluator's environment", "env:EVAL_SECRET", false},
+		{"see its explicit environment", "env:GIVEN", true},
+		{"connect to an assigned port", fmt.Sprintf("connect:127.0.0.1:%d", allowed), true},
+		{"connect to an unassigned loopback port", fmt.Sprintf("connect:127.0.0.1:%d", unassigned), false},
+		{"connect off the machine", "connect:1.1.1.1:53", false},
+		{"listen on its assigned port", fmt.Sprintf("listen:127.0.0.1:%d", listenPort), true},
+		{"spawn a child process", "spawn", false},
+		{"read other system files", "read:/etc/hosts", false},
+		{"learn whether a protected file exists", "stat:" + secret, false},
+		{"stat its own state", "stat:" + filepath.Join(state, "ok.txt"), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			v, ok := got[strings.SplitN(c.action, ":", 2)[0]+"@"+c.action]
+			require.True(t, ok, "probe did not report %s", c.action)
+			assert.Equal(t, c.allow, v)
+		})
+	}
+	listenOthers := 0
+	for k, v := range got {
+		if strings.HasPrefix(k, "listen@") && !strings.HasSuffix(k, fmt.Sprintf(":%d", listenPort)) {
+			listenOthers++
+			assert.False(t, v, "listened on an unassigned port: %s", k)
+		}
+	}
+	assert.Equal(t, 1, listenOthers)
+}
+
+func TestExecRefusesAModifiedBinary(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		_, err := Exec(t.Context(), Artifact{}, Spec{})
+		require.ErrorIs(t, err, ErrIsolationUnavailable)
+		return
+	}
+	probe := buildProbe(t)
+	require.NoError(t, os.Chmod(filepath.Dir(probe.path), 0o700))
+	require.NoError(t, os.Chmod(probe.path, 0o700))
+	require.NoError(t, os.WriteFile(probe.path, []byte("tampered"), 0o700))
+	_, err := Exec(t.Context(), probe, Spec{StateDir: t.TempDir(), LogFile: filepath.Join(t.TempDir(), "x.log")})
+	require.ErrorIs(t, err, ErrDigestMismatch)
+}
+
+func TestPinIsolatesTheArtifactFromItsSource(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "bin")
+	require.NoError(t, os.WriteFile(src, []byte("original"), 0o700))
+	store := filepath.Join(t.TempDir(), "artifacts")
+	t.Cleanup(func() { require.NoError(t, RemoveStore(store)) })
+	a, err := Pin(store, src)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(src, []byte("replaced after pinning"), 0o700))
+	got, err := fileDigest(a.path)
+	require.NoError(t, err)
+	assert.Equal(t, a.Digest(), got, "the pinned copy keeps the original bytes")
+	info, err := os.Stat(a.path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o500), info.Mode().Perm())
+}
+
+func TestExcerptIsBoundedAndReportsTruncation(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	probe := buildProbe(t)
+	state := t.TempDir()
+	p, err := Exec(t.Context(), probe, Spec{
+		Args:     []string{"env:A", "env:B", "env:C"},
+		StateDir: state,
+		LogFile:  filepath.Join(t.TempDir(), "probe.log"),
+	})
+	require.NoError(t, err)
+	require.NoError(t, p.Wait(), "the probe reports failed lookups in its output and exits normally")
+	full, truncated, err := p.Excerpt(1 << 20)
+	require.NoError(t, err)
+	assert.False(t, truncated)
+	tail, truncated, err := p.Excerpt(20)
+	require.NoError(t, err)
+	assert.True(t, truncated)
+	assert.Len(t, tail, 20)
+	assert.True(t, strings.HasSuffix(full, tail))
+}
+
+func TestExecRejectsALogFileInsideTheState(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the sandbox is implemented with sandbox-exec on macOS")
+	}
+	state := t.TempDir()
+	_, err := Exec(t.Context(), buildProbe(t), Spec{StateDir: state, LogFile: filepath.Join(state, "probe.log")})
+	require.ErrorContains(t, err, "outside the candidate state directory")
+}
+
+// excerptAfterExit waits for the process and returns its whole output.
+func excerptAfterExit(p *Process) (string, bool, error) {
+	if err := p.Wait(); err != nil {
+		return "", false, err
+	}
+	return p.Excerpt(1 << 20)
+}
+
+// buildProbe builds the hostile probe and pins it.
+func buildProbe(t *testing.T) Artifact {
+	t.Helper()
+	bin := filepath.Join(t.TempDir(), "probe")
+	build := exec.Command("go", "build", "-o", bin, "./testdata/probe")
+	out, err := build.CombinedOutput()
+	require.NoError(t, err, string(out))
+	store := filepath.Join(t.TempDir(), "artifacts")
+	t.Cleanup(func() { require.NoError(t, RemoveStore(store)) })
+	a, err := Pin(store, bin)
+	require.NoError(t, err)
+	return a
+}
+
+// listen opens a loopback listener for the test's lifetime and returns its port.
+func listen(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close()
+		}
+	}()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// freePort returns a currently unused loopback port.
+func freePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := ln.Addr().(*net.TCPAddr).Port
+	require.NoError(t, ln.Close())
+	return port
+}

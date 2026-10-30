@@ -5,6 +5,7 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,8 +18,9 @@ import (
 )
 
 type (
-	// stubModelClient implements ModelCompleter for testing ModelCP1Analyzer.
-	stubModelClient struct {
+	// stubProvider implements model.Provider for testing ModelCP1Analyzer through
+	// the goa-ai model.NewClient StructuredOutput validation wrapper.
+	stubProvider struct {
 		// responseJSON is the structured JSON payload returned by Complete.
 		responseJSON string
 	}
@@ -31,7 +33,7 @@ type (
 	}
 )
 
-func (s *stubModelClient) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
+func (s *stubProvider) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
 	return &model.Response{
 		Content: []model.Message{
 			{
@@ -39,7 +41,21 @@ func (s *stubModelClient) Complete(_ context.Context, _ *model.Request) (*model.
 				Parts: []model.Part{model.TextPart{Text: s.responseJSON}},
 			},
 		},
+		StopReason: "stop",
 	}, nil
+}
+
+func (s *stubProvider) Stream(_ context.Context, _ *model.Request) (model.Streamer, error) {
+	return nil, errors.New("streaming not used by CP1 analyzer")
+}
+
+func newStubModelClient(t *testing.T, responseJSON string) model.Client {
+	t.Helper()
+	client, err := model.NewClient(&stubProvider{responseJSON: responseJSON})
+	if err != nil {
+		t.Fatalf("model.NewClient: %v", err)
+	}
+	return client
 }
 
 func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, promptID, newContent string) (string, error) {
@@ -60,14 +76,12 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 
 	ambiguousAnalysis := CP1SemanticAnalysis{
 		Summary: "Auto-approve refunds under $50 and route larger refunds to manager approval.",
-		Ambiguities: []*genscantle.AmbiguityQuestion{
+		Ambiguities: []CP1ModelAmbiguity{
 			{
-				ID:       "amount-basis",
 				Question: "Does the $50 threshold apply to item subtotal or total order amount including tax?",
 				Options:  []string{"item_subtotal_cents", "total_order_cents"},
 			},
 			{
-				ID:       "exact-boundary",
 				Question: "Should an exact $50.00 refund auto-approve or require manager approval?",
 				Options:  []string{"auto_approve_lte_5000", "require_manager_at_5000"},
 			},
@@ -103,7 +117,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 
 	cp := New(Options{
-		Analyzer: NewModelCP1Analyzer(&stubModelClient{responseJSON: "```json\n" + string(rawBytes) + "\n```"}),
+		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(rawBytes))),
 	})
 
 	designSrc := `package design // orders service`
@@ -126,8 +140,10 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	if proposed.Status != StatusNeedsConfirmation {
 		t.Fatalf("expected status %q, got %q", StatusNeedsConfirmation, proposed.Status)
 	}
-	if len(proposed.Ambiguities) != 2 {
-		t.Fatalf("expected 2 ambiguities, got %d", len(proposed.Ambiguities))
+	if len(proposed.Ambiguities) != 2 ||
+		proposed.Ambiguities[0].ID != "chg-refund-50-ambiguity-01" ||
+		proposed.Ambiguities[1].ID != "chg-refund-50-ambiguity-02" {
+		t.Fatalf("expected 2 ambiguities with code-owned IDs, got %+v", proposed.Ambiguities)
 	}
 	if len(proposed.Examples) != 3 || proposed.Examples[0].ID != "chg-refund-50-check-01" {
 		t.Fatalf("unexpected examples: %+v", proposed.Examples)
@@ -146,8 +162,8 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		ChangeID:        "chg-refund-50",
 		RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{
-			"amount-basis":   "item_subtotal_cents",
-			"exact-boundary": "require_manager_at_5000",
+			"chg-refund-50-ambiguity-01": "item_subtotal_cents",
+			"chg-refund-50-ambiguity-02": "require_manager_at_5000",
 		},
 		Examples: proposed.Examples,
 	}); err == nil {
@@ -159,8 +175,8 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		ChangeID:        "chg-refund-50",
 		RequestRevision: "stale-revision",
 		Answers: map[string]string{
-			"amount-basis":   "item_subtotal_cents",
-			"exact-boundary": "require_manager_at_5000",
+			"chg-refund-50-ambiguity-01": "item_subtotal_cents",
+			"chg-refund-50-ambiguity-02": "require_manager_at_5000",
 		},
 		Examples: proposed.Examples,
 	}); err == nil {
@@ -171,8 +187,8 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		ChangeID:        "chg-refund-50",
 		RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{
-			"amount-basis":   "item_subtotal_cents",
-			"exact-boundary": "require_manager_at_5000",
+			"chg-refund-50-ambiguity-01": "item_subtotal_cents",
+			"chg-refund-50-ambiguity-02": "require_manager_at_5000",
 		},
 		Examples: proposed.Examples,
 	})
@@ -193,17 +209,37 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 }
 
-func TestCP1RejectsMalformedModelAnalysis(t *testing.T) {
+func TestCP1RejectsMalformedOrUnknownFieldsViaStructuredOutput(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
-	invalidKindAnalysis := `{"summary":"Valid summary","ambiguities":[],"examples":[{"scenario":"s","input_summary":"i","expected_outcome":"o","verification_kind":"bogus_kind"}],"preserved_behaviors":[]}`
-	cp := New(Options{
-		Analyzer: NewModelCP1Analyzer(&stubModelClient{responseJSON: invalidKindAnalysis}),
-	})
-	if _, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
-		ChangeID: "chg-bad-kind",
-		Prompt:   "Test invalid verification_kind rejection",
-	}); err == nil {
-		t.Fatal("expected ProposeChange to reject invalid verification_kind")
+	cases := []struct {
+		name string
+		raw  string
+	}{
+		{
+			name: "invalid_verification_kind",
+			raw:  `{"summary":"Valid summary","ambiguities":[],"examples":[{"scenario":"s","input_summary":"i","expected_outcome":"o","verification_kind":"bogus_kind"}],"preserved_behaviors":[]}`,
+		},
+		{
+			name: "unknown_top_level_field",
+			raw:  `{"summary":"Valid summary","unexpected":true,"ambiguities":[],"examples":[{"scenario":"s","input_summary":"i","expected_outcome":"o","verification_kind":"deterministic"}],"preserved_behaviors":[]}`,
+		},
+		{
+			name: "model_supplied_ambiguity_id",
+			raw:  `{"summary":"Valid summary","ambiguities":[{"id":"m1","question":"q","options":["a","b"]}],"examples":[{"scenario":"s","input_summary":"i","expected_outcome":"o","verification_kind":"deterministic"}],"preserved_behaviors":[]}`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cp := New(Options{
+				Analyzer: NewModelCP1Analyzer(newStubModelClient(t, tc.raw)),
+			})
+			if _, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+				ChangeID: "chg-" + tc.name,
+				Prompt:   "Test structured output validation rejection",
+			}); err == nil {
+				t.Fatalf("expected ProposeChange to reject %s", tc.name)
+			}
+		})
 	}
 }
 
@@ -211,7 +247,7 @@ func TestCP2EvaluatedArchitecturePreviewCP3FastDraftAndTokenAuthenticator(t *tes
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	clearAnalysis := CP1SemanticAnalysis{
 		Summary:     "Refunds with item_subtotal_cents < 5000 auto-approve; >= 5000 require manager approval.",
-		Ambiguities: nil,
+		Ambiguities: []CP1ModelAmbiguity{},
 		Examples: []CP1ModelExample{
 			{
 				Scenario:         "Subtotal 4999 cents auto-approves",
@@ -222,11 +258,14 @@ func TestCP2EvaluatedArchitecturePreviewCP3FastDraftAndTokenAuthenticator(t *tes
 		},
 		PreservedBehaviors: []string{"Idempotency key refund/<tenant>/<order>"},
 	}
-	rawBytes, _ := json.Marshal(clearAnalysis)
+	rawBytes, err := json.Marshal(clearAnalysis)
+	if err != nil {
+		t.Fatalf("marshal clearAnalysis: %v", err)
+	}
 
 	targetStore := prompt.NewInMemoryStore()
 	cp := New(Options{
-		Analyzer:      NewModelCP1Analyzer(&stubModelClient{responseJSON: string(rawBytes)}),
+		Analyzer:      NewModelCP1Analyzer(newStubModelClient(t, string(rawBytes))),
 		TargetUpdater: &boundTargetPromptUpdater{store: targetStore},
 	})
 
@@ -338,7 +377,9 @@ var _ = Service("orders", func() {
 	if err != nil {
 		t.Fatalf("GET /ui/checkpoint failed: %v", err)
 	}
-	unauthResp.Body.Close()
+	if closeErr := unauthResp.Body.Close(); closeErr != nil {
+		t.Fatalf("close unauthResp: %v", closeErr)
+	}
 	if unauthResp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 Unauthorized without bearer token, got %d", unauthResp.StatusCode)
 	}
@@ -352,7 +393,9 @@ var _ = Service("orders", func() {
 	if err != nil {
 		t.Fatalf("authenticated GET /ui/checkpoint failed: %v", err)
 	}
-	authResp.Body.Close()
+	if closeErr := authResp.Body.Close(); closeErr != nil {
+		t.Fatalf("close authResp: %v", closeErr)
+	}
 	if authResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 OK with valid bearer token, got %d", authResp.StatusCode)
 	}

@@ -1,7 +1,7 @@
-// Package designeval evaluates Go/Goa/Goa-AI design sources using the real Goa
-// and Goa-AI DSL engine (`goa.design/goa/v3/eval.RunDSL`) so structural diffs
-// and Checkpoint 2 architecture previews derive all facts from compiled,
-// validated DSL expressions rather than a second AST interpreter.
+// Package designeval evaluates Go/Goa/Goa-AI design sources by compiling a
+// standalone evaluator binary and executing it inside verify/candidate.Exec's
+// OS-enforced single-process sandbox, using Goa-AI's canonical preparation and
+// JSON Schema builders (`codegen/agent.Prepare` and `codegen/jsonschema.Build`).
 package designeval
 
 import (
@@ -10,13 +10,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/printer"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	genscantle "github.com/goadesign/scantle/gen/scantle"
+	"github.com/goadesign/scantle/verify/candidate"
+	"golang.org/x/mod/modfile"
 )
 
 type (
@@ -39,18 +46,21 @@ type (
 )
 
 const (
-	// harnessMainSource is the standalone evaluator program executed via `go run`
-	// against the temporary design package.
-	harnessMainSource = `package main
+	// harnessMainTemplate is the standalone evaluator program compiled and
+	// executed inside candidate.Exec against the temporary design package.
+	harnessMainTemplate = `package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"slices"
 	"strings"
 
-	_ "github.com/goadesign/scantle/design"
+	_ {{DESIGN_IMPORT}}
+	agentcodegen "goa.design/goa-ai/codegen/agent"
+	"goa.design/goa-ai/codegen/jsonschema"
 	evalexpr "goa.design/goa-ai/eval/expr"
 	agentexpr "goa.design/goa-ai/expr/agent"
 	mcpexpr "goa.design/goa-ai/expr/mcp"
@@ -104,7 +114,14 @@ type output struct {
 }
 
 func main() {
+	outPath := flag.String("out", "", "Output JSON path")
+	flag.Parse()
+
 	if err := eval.RunDSL(); err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(1)
+	}
+	if err := agentcodegen.Prepare("", []eval.Root{goaexpr.Root, agentexpr.Root}); err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
@@ -134,18 +151,29 @@ func main() {
 		seenEdges[k] = true
 		out.Edges = append(out.Edges, e)
 	}
-	seenTools := make(map[string]bool)
+	toolIndexByID := make(map[string]int)
 
-	if goaexpr.Root.API != nil && goaexpr.Root.API.Name != "" && goaexpr.Root.API.Name != "api" {
-		out.SystemName = goaexpr.Root.API.Name
-		out.Declarations["API:"+goaexpr.Root.API.Name] = fmt.Sprintf("title=%s;version=%s;desc=%s", goaexpr.Root.API.Title, goaexpr.Root.API.Version, goaexpr.Root.API.Description)
+	api := goaexpr.Root.API
+	if api != nil && api.Name != "" && api.Name != "api" {
+		out.SystemName = api.Name
+		var httpPrefix string
+		if api.HTTP != nil {
+			httpPrefix = api.HTTP.Path
+		}
+		out.Declarations["API:"+api.Name] = fmt.Sprintf(
+			"title=%s;version=%s;desc=%s;httpPrefix=%s",
+			api.Title,
+			api.Version,
+			api.Description,
+			httpPrefix,
+		)
 	}
 
 	for _, ut := range goaexpr.Root.Types {
 		if ut == nil {
 			continue
 		}
-		out.Declarations["Type:"+ut.Name()] = describeAttr(ut.Attribute(), make(map[string]bool))
+		out.Declarations["Type:"+ut.Name()] = schemaJSON(api, ut.Attribute(), "type."+ut.Name())
 	}
 
 	for _, svc := range goaexpr.Root.Services {
@@ -166,32 +194,75 @@ func main() {
 			Kind:        "service",
 			Description: desc,
 		})
-		out.Declarations["Service:"+svc.Name] = fmt.Sprintf("desc=%s", svc.Description)
 
 		var httpSvc *goaexpr.HTTPServiceExpr
-		if goaexpr.Root.API != nil && goaexpr.Root.API.HTTP != nil {
-			httpSvc = goaexpr.Root.API.HTTP.Service(svc.Name)
+		if api != nil && api.HTTP != nil {
+			httpSvc = api.HTTP.Service(svc.Name)
 		}
+		var grpcSvc *goaexpr.GRPCServiceExpr
+		if api != nil && api.GRPC != nil {
+			grpcSvc = api.GRPC.Service(svc.Name)
+		}
+		var svcHTTPPaths []string
+		if httpSvc != nil {
+			svcHTTPPaths = slices.Clone(httpSvc.Paths)
+			slices.Sort(svcHTTPPaths)
+		}
+		out.Declarations["Service:"+svc.Name] = fmt.Sprintf(
+			"desc=%s;httpPaths=%s;security=%s;errors=%s",
+			svc.Description,
+			strings.Join(svcHTTPPaths, ","),
+			describeSecurity(svc.Requirements),
+			describeErrors(api, svc.Errors),
+		)
+
 		for _, m := range svc.Methods {
 			if m == nil {
 				continue
 			}
-			var routes []string
+			var routes, respCodes, errCodes []string
 			if httpSvc != nil {
 				if ep := httpSvc.Endpoint(m.Name); ep != nil {
 					for _, r := range ep.Routes {
-						routes = append(routes, r.Method+" "+r.Path)
+						for _, fp := range r.FullPaths() {
+							routes = append(routes, r.Method+" "+fp)
+						}
+					}
+					for _, resp := range ep.Responses {
+						respCodes = append(respCodes, fmt.Sprintf("%d", resp.StatusCode))
+					}
+					for _, he := range ep.HTTPErrors {
+						if he.Response != nil {
+							errCodes = append(errCodes, fmt.Sprintf("%s:%d", he.ErrorExpr.Name, he.Response.StatusCode))
+						}
 					}
 				}
 			}
+			var grpcSig string
+			if grpcSvc != nil {
+				if gep := grpcSvc.Endpoint(m.Name); gep != nil {
+					grpcSig = fmt.Sprintf(
+						"req=%s;resp=%s",
+						schemaJSON(api, gep.Request, "grpc.req."+svc.Name+"."+m.Name),
+						schemaJSON(api, gep.Response.Message, "grpc.resp."+svc.Name+"."+m.Name),
+					)
+				}
+			}
 			slices.Sort(routes)
+			slices.Sort(respCodes)
+			slices.Sort(errCodes)
 			key := fmt.Sprintf("Service:%s/Method:%s", svc.Name, m.Name)
 			out.Declarations[key] = fmt.Sprintf(
-				"desc=%s;payload=%s;result=%s;routes=%s",
+				"desc=%s;payload=%s;result=%s;security=%s;errors=%s;routes=%s;status=%s;httpErrors=%s;grpc=%s",
 				m.Description,
-				describeAttr(m.Payload, make(map[string]bool)),
-				describeAttr(m.Result, make(map[string]bool)),
+				schemaJSON(api, m.Payload, "method.payload."+svc.Name+"."+m.Name),
+				schemaJSON(api, m.Result, "method.result."+svc.Name+"."+m.Name),
+				describeSecurity(m.Requirements),
+				describeErrors(api, m.Errors),
 				strings.Join(routes, ","),
+				strings.Join(respCodes, ","),
+				strings.Join(errCodes, ","),
+				grpcSig,
 			)
 		}
 
@@ -201,7 +272,7 @@ func main() {
 				out.Declarations[mcpKey] = fmt.Sprintf("version=%s", mcp.Version)
 				for _, t := range mcp.Tools {
 					if t != nil && t.Method != nil {
-						out.Declarations[fmt.Sprintf("%s/Tool:%s", mcpKey, t.Name)] = fmt.Sprintf("method=%s;desc=%s", t.Method.Name, t.Description)
+						out.Declarations[fmt.Sprintf("%s/Tool:%s", mcpKey, t.Name)] = fmt.Sprintf("method=%s;desc=%s;ui=%s", t.Method.Name, t.Description, t.UIResourceURI)
 					}
 				}
 				for _, r := range mcp.Resources {
@@ -236,45 +307,81 @@ func main() {
 		if scopePrefix != "" {
 			tsDeclKey = scopePrefix + "/Toolset:" + origin.Name
 		}
-		out.Declarations[tsDeclKey] = fmt.Sprintf("desc=%s", origin.Description)
+
+		var inputBinds, fieldBinds []string
+		for _, ib := range ts.InputBindings {
+			if ib != nil {
+				fields := slices.Clone(ib.Fields)
+				slices.Sort(fields)
+				inputBinds = append(inputBinds, ib.Tool+":"+strings.Join(fields, ","))
+			}
+		}
+		for _, fb := range ts.FieldBindings {
+			if fb != nil {
+				fieldBinds = append(fieldBinds, fb.Field)
+			}
+		}
+		slices.Sort(inputBinds)
+		slices.Sort(fieldBinds)
+		deferredTools := slices.Clone(ts.DeferredTools)
+		slices.Sort(deferredTools)
+
+		out.Declarations[tsDeclKey] = fmt.Sprintf(
+			"desc=%s;deferred=%t;deferredTools=%s;inputBinds=%s;fieldBinds=%s",
+			origin.Description,
+			ts.Deferred,
+			strings.Join(deferredTools, ","),
+			strings.Join(inputBinds, ";"),
+			strings.Join(fieldBinds, ","),
+		)
 
 		for _, t := range origin.Tools {
 			if t == nil {
 				continue
 			}
-			argsSig := describeAttr(t.Args, make(map[string]bool))
-			retSig := describeAttr(t.Return, make(map[string]bool))
-			inj := slices.Clone(t.InjectedFields)
-			slices.Sort(inj)
-			if inj == nil {
-				inj = []string{}
-			}
+			hidden := collectHiddenFields(t, ts)
+			modelArgs := stripHiddenFields(t.Args, hidden)
+			argsSig := schemaJSON(api, modelArgs, "tool.args."+origin.Name+"."+t.Name)
+			retSig := schemaJSON(api, t.Return, "tool.return."+origin.Name+"."+t.Name)
 			hasConfirm := t.Confirmation != nil
+			var confirmSig string
+			if t.Confirmation != nil {
+				confirmSig = fmt.Sprintf("%s|%s|%s", t.Confirmation.Title, t.Confirmation.PromptTemplate, t.Confirmation.DeniedResultTemplate)
+			}
 			hasBounds := t.Bounds != nil
+			var boundsSig string
+			if t.Bounds != nil && t.Bounds.Paging != nil {
+				boundsSig = fmt.Sprintf("%s|%s|%s", t.Bounds.Paging.CursorField, t.Bounds.Paging.NextCursorField, t.Bounds.Paging.ContinueTool)
+			}
 			toolKey := fmt.Sprintf("%s/Tool:%s", tsDeclKey, t.Name)
 			out.Declarations[toolKey] = fmt.Sprintf(
-				"desc=%s;args=%s;return=%s;inject=%s;confirm=%t;bounds=%t",
+				"desc=%s;args=%s;return=%s;hidden=%s;confirm=%s;bounds=%s;terminal=%t;bookkeeping=%t",
 				t.Description,
 				argsSig,
 				retSig,
-				strings.Join(inj, ","),
-				hasConfirm,
-				hasBounds,
+				strings.Join(hidden, ","),
+				confirmSig,
+				boundsSig,
+				t.TerminalRun,
+				t.Bookkeeping,
 			)
-			fullToolID := origin.Name + "." + t.Name
-			if !seenTools[fullToolID] {
-				seenTools[fullToolID] = true
-				out.Tools = append(out.Tools, toolContract{
-					ID:                   fullToolID,
-					Toolset:              origin.Name,
-					Name:                 t.Name,
-					Description:          t.Description,
-					ArgsSchema:           argsSig,
-					ReturnSchema:         retSig,
-					InjectedFields:       inj,
-					RequiresConfirmation: hasConfirm,
-					BoundedResult:        hasBounds,
-				})
+			baseToolID := origin.Name + "." + t.Name
+			tc := toolContract{
+				ID:                   baseToolID,
+				Toolset:              origin.Name,
+				Name:                 t.Name,
+				Description:          t.Description,
+				ArgsSchema:           argsSig,
+				ReturnSchema:         retSig,
+				InjectedFields:       hidden,
+				RequiresConfirmation: hasConfirm,
+				BoundedResult:        hasBounds,
+			}
+			if idx, exists := toolIndexByID[baseToolID]; !exists {
+				toolIndexByID[baseToolID] = len(out.Tools)
+				out.Tools = append(out.Tools, tc)
+			} else if len(ts.InputBindings) > 0 || len(ts.FieldBindings) > 0 {
+				out.Tools[idx] = tc
 			}
 			if t.Method != nil && t.Method.Service != nil {
 				addEdge(c4Edge{
@@ -412,107 +519,134 @@ func main() {
 					"desc=%s;tags=%s;input=%s",
 					sc.Description,
 					strings.Join(sc.Tags, ","),
-					describeAttr(sc.Input, make(map[string]bool)),
+					schemaJSON(api, sc.Input, "scenario.input."+suite.Name+"."+sc.Name),
 				)
 			}
 		}
 	}
 
-	enc := json.NewEncoder(os.Stdout)
-	if err := enc.Encode(out); err != nil {
+	rawOut, err := json.Marshal(out)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+	if *outPath != "" {
+		if err := os.WriteFile(*outPath, rawOut, 0o600); err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+		return
+	}
+	os.Stdout.Write(rawOut)
 }
 
-func describeAttr(att *goaexpr.AttributeExpr, visiting map[string]bool) string {
+func schemaJSON(api *goaexpr.APIExpr, att *goaexpr.AttributeExpr, id string) string {
 	if att == nil || att.Type == nil || att.Type == goaexpr.Empty {
-		return "empty"
+		return "{\"type\":\"null\"}"
 	}
-	var b strings.Builder
-	describeDataType(&b, att.Type, visiting)
-	if v := att.Validation; v != nil {
-		if v.Minimum != nil {
-			fmt.Fprintf(&b, "[min=%v]", *v.Minimum)
-		}
-		if v.Maximum != nil {
-			fmt.Fprintf(&b, "[max=%v]", *v.Maximum)
-		}
-		if v.MinLength != nil {
-			fmt.Fprintf(&b, "[minLen=%d]", *v.MinLength)
-		}
-		if v.MaxLength != nil {
-			fmt.Fprintf(&b, "[maxLen=%d]", *v.MaxLength)
-		}
-		if v.Pattern != "" {
-			fmt.Fprintf(&b, "[pattern=%s]", v.Pattern)
-		}
-		if len(v.Values) > 0 {
-			vals := make([]string, 0, len(v.Values))
-			for _, val := range v.Values {
-				vals = append(vals, fmt.Sprintf("%v", val))
-			}
-			slices.Sort(vals)
-			fmt.Fprintf(&b, "[enum=%s]", strings.Join(vals, "|"))
-		}
-		if len(v.Required) > 0 {
-			req := slices.Clone(v.Required)
-			slices.Sort(req)
-			fmt.Fprintf(&b, "[req=%s]", strings.Join(req, ","))
-		}
+	if api == nil {
+		api = &goaexpr.APIExpr{Name: "api", RandomizerFactory: goaexpr.NewDeterministicRandomizerFactory()}
+	} else if api.RandomizerFactory == nil {
+		api.RandomizerFactory = goaexpr.NewDeterministicRandomizerFactory()
 	}
-	return b.String()
+	identity := goaexpr.UserTypeExampleIdentity(&goaexpr.UserTypeExpr{TypeName: id, AttributeExpr: att})
+	raw, err := jsonschema.Build(api, att, identity)
+	if err != nil {
+		return fmt.Sprintf("{\"error\":%q}", err.Error())
+	}
+	return string(raw)
 }
 
-func describeDataType(b *strings.Builder, dt goaexpr.DataType, visiting map[string]bool) {
-	switch t := dt.(type) {
-	case goaexpr.Primitive:
-		b.WriteString(t.Name())
-	case *goaexpr.Array:
-		b.WriteString("[]")
-		b.WriteString(describeAttr(t.ElemType, visiting))
-	case *goaexpr.Map:
-		b.WriteString("map[")
-		b.WriteString(describeAttr(t.KeyType, visiting))
-		b.WriteString("]")
-		b.WriteString(describeAttr(t.ElemType, visiting))
-	case *goaexpr.Object:
-		b.WriteString("{")
-		names := make([]string, 0, len(*t))
-		byName := make(map[string]*goaexpr.AttributeExpr, len(*t))
-		for _, nat := range *t {
-			names = append(names, nat.Name)
-			byName[nat.Name] = nat.Attribute
-		}
-		slices.Sort(names)
-		for i, name := range names {
-			if i > 0 {
-				b.WriteString(";")
-			}
-			b.WriteString(name)
-			b.WriteString(":")
-			b.WriteString(describeAttr(byName[name], visiting))
-		}
-		b.WriteString("}")
-	case goaexpr.UserType:
-		b.WriteString(t.Name())
-		if visiting[t.ID()] {
-			return
-		}
-		visiting[t.ID()] = true
-		b.WriteString("(")
-		b.WriteString(describeAttr(t.Attribute(), visiting))
-		b.WriteString(")")
-		delete(visiting, t.ID())
-	default:
-		b.WriteString(dt.Name())
+func collectHiddenFields(t *agentexpr.ToolExpr, consumer *agentexpr.ToolsetExpr) []string {
+	seen := make(map[string]bool)
+	for _, f := range t.InjectedFields {
+		seen[f] = true
 	}
+	if consumer != nil {
+		for _, ib := range consumer.InputBindings {
+			if ib != nil && ib.Tool == t.Name {
+				for _, f := range ib.Fields {
+					seen[f] = true
+				}
+			}
+		}
+		for _, fb := range consumer.FieldBindings {
+			if fb != nil {
+				seen[fb.Field] = true
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for f := range seen {
+		out = append(out, f)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func stripHiddenFields(att *goaexpr.AttributeExpr, hidden []string) *goaexpr.AttributeExpr {
+	if att == nil || len(hidden) == 0 {
+		return att
+	}
+	cloned := goaexpr.DupAtt(att)
+	obj := goaexpr.AsObject(cloned.Type)
+	if obj == nil {
+		return cloned
+	}
+	for _, field := range hidden {
+		obj.Delete(field)
+		if cloned.Validation != nil && len(cloned.Validation.Required) > 0 {
+			cloned.Validation.Required = slices.DeleteFunc(cloned.Validation.Required, func(req string) bool {
+				return req == field
+			})
+		}
+	}
+	return cloned
+}
+
+func describeSecurity(reqs []*goaexpr.SecurityExpr) string {
+	if len(reqs) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(reqs))
+	for _, r := range reqs {
+		if r == nil {
+			continue
+		}
+		var schemes []string
+		for _, s := range r.Schemes {
+			if s != nil {
+				schemes = append(schemes, s.SchemeName)
+			}
+		}
+		scopes := slices.Clone(r.Scopes)
+		slices.Sort(schemes)
+		slices.Sort(scopes)
+		parts = append(parts, strings.Join(schemes, "+")+"["+strings.Join(scopes, ",")+"]")
+	}
+	slices.Sort(parts)
+	return strings.Join(parts, ";")
+}
+
+func describeErrors(api *goaexpr.APIExpr, errs []*goaexpr.ErrorExpr) string {
+	if len(errs) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(errs))
+	for _, e := range errs {
+		if e != nil {
+			parts = append(parts, e.Name+":"+schemaJSON(api, e.AttributeExpr, "err."+e.Name))
+		}
+	}
+	slices.Sort(parts)
+	return strings.Join(parts, ";")
 }
 `
 )
 
-// Evaluate compiles and executes a Goa/Goa-AI design source string using the
-// real Goa evaluation engine (`eval.RunDSL`) and returns the evaluated Result.
+// Evaluate compiles a standalone Goa/Goa-AI design evaluator binary and runs it
+// inside verify/candidate.Exec's OS-enforced single-process sandbox, returning
+// the evaluated Result.
 func Evaluate(ctx context.Context, designSource string) (Result, error) {
 	if strings.TrimSpace(designSource) == "" {
 		return Result{
@@ -524,7 +658,12 @@ func Evaluate(ctx context.Context, designSource string) (Result, error) {
 		}, nil
 	}
 
-	modRoot, err := locateModuleRoot()
+	normalizedSrc, err := normalizeDesignPackage(designSource)
+	if err != nil {
+		return Result{}, fmt.Errorf("parse design source: %w", err)
+	}
+
+	modRoot, modPath, err := locateModuleRoot()
 	if err != nil {
 		return Result{}, err
 	}
@@ -535,56 +674,136 @@ func Evaluate(ctx context.Context, designSource string) (Result, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	if err := os.Symlink(filepath.Join(modRoot, "go.mod"), filepath.Join(tmpDir, "go.mod")); err != nil {
+	buildDir := filepath.Join(tmpDir, "build")
+	storeDir := filepath.Join(tmpDir, "store")
+	stateDir := filepath.Join(tmpDir, "state")
+	for _, d := range []string{buildDir, storeDir, stateDir, filepath.Join(buildDir, "design")} {
+		if err := os.MkdirAll(d, 0o750); err != nil {
+			return Result{}, fmt.Errorf("mkdir %q: %w", d, err)
+		}
+	}
+
+	if err := os.Symlink(filepath.Join(modRoot, "go.mod"), filepath.Join(buildDir, "go.mod")); err != nil {
 		return Result{}, fmt.Errorf("symlink go.mod: %w", err)
 	}
-	if err := os.Symlink(filepath.Join(modRoot, "go.sum"), filepath.Join(tmpDir, "go.sum")); err != nil {
+	if err := os.Symlink(filepath.Join(modRoot, "go.sum"), filepath.Join(buildDir, "go.sum")); err != nil {
 		return Result{}, fmt.Errorf("symlink go.sum: %w", err)
 	}
 
-	designDir := filepath.Join(tmpDir, "design")
-	if err := os.MkdirAll(designDir, 0o750); err != nil {
-		return Result{}, fmt.Errorf("mkdir design: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join(designDir, "design.go"), []byte(designSource), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(buildDir, "design", "design.go"), []byte(normalizedSrc), 0o600); err != nil {
 		return Result{}, fmt.Errorf("write design.go: %w", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte(harnessMainSource), 0o600); err != nil {
+	harnessMain := strings.ReplaceAll(harnessMainTemplate, "{{DESIGN_IMPORT}}", strconv.Quote(modPath+"/design"))
+	if err := os.WriteFile(filepath.Join(buildDir, "main.go"), []byte(harnessMain), 0o600); err != nil {
 		return Result{}, fmt.Errorf("write evaluator main.go: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "go", "run", ".")
-	cmd.Dir = tmpDir
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		return Result{}, fmt.Errorf("evaluate Goa design: %w (%s)", err, strings.TrimSpace(stderr.String()))
+	rawBin := filepath.Join(buildDir, "designeval-bin")
+	buildCmd := exec.CommandContext(ctx, "go", "build", "-mod=readonly", "-o", rawBin, ".")
+	buildCmd.Dir = buildDir
+	buildCmd.Env = minimalBuildEnv(tmpDir)
+	var buildStderr bytes.Buffer
+	buildCmd.Stderr = &buildStderr
+	if err := buildCmd.Run(); err != nil {
+		return Result{}, fmt.Errorf("compile Goa design: %w (%s)", err, strings.TrimSpace(buildStderr.String()))
 	}
 
+	art, err := candidate.Pin(storeDir, rawBin)
+	if err != nil {
+		return Result{}, fmt.Errorf("pin design evaluator binary: %w", err)
+	}
+	defer candidate.RemoveStore(storeDir)
+
+	outFile := filepath.Join(stateDir, "evaluated.json")
+	logFile := filepath.Join(tmpDir, "designeval.log")
+	proc, err := candidate.Exec(ctx, art, candidate.Spec{
+		Args:     []string{"-out", outFile},
+		StateDir: stateDir,
+		LogFile:  logFile,
+	})
+	if err != nil {
+		return Result{}, fmt.Errorf("exec sandboxed design evaluator: %w", err)
+	}
+	if waitErr := proc.Wait(); waitErr != nil {
+		excerpt, _, _ := proc.Excerpt(16 << 10)
+		return Result{}, fmt.Errorf("evaluate Goa design in sandbox: %w (%s)", waitErr, strings.TrimSpace(excerpt))
+	}
+
+	rawJSON, err := os.ReadFile(outFile)
+	if err != nil {
+		return Result{}, fmt.Errorf("read evaluated design output: %w", err)
+	}
 	var res Result
-	if err := json.Unmarshal(stdout.Bytes(), &res); err != nil {
+	if err := json.Unmarshal(rawJSON, &res); err != nil {
 		return Result{}, fmt.Errorf("decode evaluated Goa design: %w", err)
 	}
 	return res, nil
 }
 
-// locateModuleRoot walks up from this source file's directory to find the
-// enclosing repository's go.mod file.
-func locateModuleRoot() (string, error) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		return "", errors.New("unable to locate caller path for module root")
+// normalizeDesignPackage parses src as Go source and ensures its package clause
+// is `package design` so the temporary evaluator harness can import it cleanly.
+func normalizeDesignPackage(src string) (string, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "design.go", src, parser.ParseComments)
+	if err != nil {
+		return "", err
 	}
-	dir := filepath.Dir(file)
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
+	if file.Name != nil && file.Name.Name != "design" {
+		file.Name = ast.NewIdent("design")
+		var buf bytes.Buffer
+		if err := printer.Fprint(&buf, fset, file); err != nil {
+			return "", err
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", errors.New("go.mod not found above internal/designeval")
-		}
-		dir = parent
+		return buf.String(), nil
 	}
+	return src, nil
+}
+
+// minimalBuildEnv constructs an explicit environment for `go build` without
+// inheriting ambient API keys or control-plane secrets.
+func minimalBuildEnv(tmpDir string) []string {
+	env := []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + os.Getenv("HOME"),
+		"TMPDIR=" + tmpDir,
+	}
+	for _, key := range []string{"GOCACHE", "GOMODCACHE", "GOPATH", "GOROOT", "GOPROXY", "GOSUMDB"} {
+		if val := os.Getenv(key); val != "" {
+			env = append(env, key+"="+val)
+		}
+	}
+	return env
+}
+
+// locateModuleRoot resolves the repository root containing go.mod and returns
+// its directory path and declared module path.
+func locateModuleRoot() (string, string, error) {
+	var candidates []string
+	if envRoot := strings.TrimSpace(os.Getenv("SCANTLE_MODULE_ROOT")); envRoot != "" {
+		candidates = append(candidates, envRoot)
+	}
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, wd)
+	}
+	if _, file, _, ok := runtime.Caller(0); ok {
+		candidates = append(candidates, filepath.Dir(file))
+	}
+
+	for _, start := range candidates {
+		dir := start
+		for {
+			modFile := filepath.Join(dir, "go.mod")
+			if raw, err := os.ReadFile(modFile); err == nil {
+				if modPath := modfile.ModulePath(raw); modPath != "" {
+					return dir, modPath, nil
+				}
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	return "", "", errors.New("go.mod not found via SCANTLE_MODULE_ROOT, working directory, or caller path")
 }

@@ -38,7 +38,7 @@ type (
 	Snapshot struct {
 		// HeadCommit is the resolved HEAD commit SHA.
 		HeadCommit string
-		// TrackedPatch is the output of `git diff --binary HEAD`.
+		// TrackedPatch is the output of `git diff --binary --no-ext-diff --no-textconv <head>`.
 		TrackedPatch []byte
 		// Untracked lists captured untracked non-ignored entries in deterministic path order.
 		Untracked []UntrackedFile
@@ -48,9 +48,9 @@ type (
 )
 
 // Capture inspects repoDir using read-only Git commands and returns a Snapshot
-// of HEAD, tracked modifications, and explicitly selected untracked files
-// without modifying the working tree or Git index. When selectedPaths is empty,
-// no untracked files are captured.
+// of HEAD, tracked modifications against that exact resolved commit, and
+// explicitly selected untracked files without modifying the working tree or Git
+// index. When selectedPaths is empty, no untracked files are captured.
 func Capture(ctx context.Context, repoDir string, selectedPaths ...string) (Snapshot, error) {
 	normFilters, err := normalizeSelectedPaths(selectedPaths)
 	if err != nil {
@@ -63,7 +63,7 @@ func Capture(ctx context.Context, repoDir string, selectedPaths ...string) (Snap
 	}
 	head := strings.TrimSpace(string(headBytes))
 
-	patch, err := runGitReadOnly(ctx, repoDir, "diff", "--binary", "HEAD")
+	patch, err := runGitReadOnly(ctx, repoDir, "diff", "--binary", "--no-ext-diff", "--no-textconv", head)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("diff tracked files: %w", err)
 	}
@@ -130,12 +130,15 @@ func ApplyToClone(ctx context.Context, srcRepoDir, dstCloneDir string, snap Snap
 	if strings.TrimSpace(snap.HeadCommit) == "" {
 		return errors.New("snapshot HeadCommit is required")
 	}
+	if err := validateDisjointCloneDestination(srcRepoDir, dstCloneDir); err != nil {
+		return err
+	}
 	expectedDigest := computeDigest(snap.HeadCommit, snap.TrackedPatch, snap.Untracked)
 	if snap.TreeDigest != expectedDigest {
 		return fmt.Errorf("snapshot TreeDigest mismatch: got %q, computed %q", snap.TreeDigest, expectedDigest)
 	}
 
-	if err := runGitCommand(ctx, srcRepoDir, nil, "clone", "--no-local", "--no-checkout", srcRepoDir, dstCloneDir); err != nil {
+	if err := runGitCommand(ctx, srcRepoDir, nil, "clone", "--no-local", "--no-checkout", "--template=", srcRepoDir, dstCloneDir); err != nil {
 		return fmt.Errorf("clone repository to %q: %w", dstCloneDir, err)
 	}
 	if err := runGitCommand(ctx, dstCloneDir, nil, "checkout", "--detach", snap.HeadCommit); err != nil {
@@ -185,6 +188,60 @@ func ApplyToClone(ctx context.Context, srcRepoDir, dstCloneDir string, snap Snap
 	return nil
 }
 
+// validateDisjointCloneDestination resolves symlinks on srcRepoDir and the
+// nearest existing ancestor of dstCloneDir and rejects any destination that
+// overlaps with or is nested inside srcRepoDir (or vice versa).
+func validateDisjointCloneDestination(srcRepoDir, dstCloneDir string) error {
+	srcAbs, err := filepath.Abs(srcRepoDir)
+	if err != nil {
+		return fmt.Errorf("resolve source repository path: %w", err)
+	}
+	srcCanonical, err := filepath.EvalSymlinks(srcAbs)
+	if err != nil {
+		return fmt.Errorf("eval symlinks for source repository %q: %w", srcRepoDir, err)
+	}
+	dstCanonical, err := resolveCanonicalTargetPath(dstCloneDir)
+	if err != nil {
+		return fmt.Errorf("resolve destination clone path %q: %w", dstCloneDir, err)
+	}
+	sep := string(filepath.Separator)
+	if dstCanonical == srcCanonical ||
+		strings.HasPrefix(dstCanonical, srcCanonical+sep) ||
+		strings.HasPrefix(srcCanonical, dstCanonical+sep) {
+		return fmt.Errorf("destination clone directory %q overlaps with source repository %q", dstCloneDir, srcRepoDir)
+	}
+	return nil
+}
+
+// resolveCanonicalTargetPath resolves symlinks on the deepest existing ancestor
+// of path and appends any not-yet-created suffix segments.
+func resolveCanonicalTargetPath(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	var tail []string
+	cur := abs
+	for {
+		resolved, err := filepath.EvalSymlinks(cur)
+		if err == nil {
+			for i := len(tail) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, tail[i])
+			}
+			return resolved, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return "", fmt.Errorf("no existing ancestor for %q", abs)
+		}
+		tail = append(tail, filepath.Base(cur))
+		cur = parent
+	}
+}
+
 // prepareUntrackedDestination ensures every ancestor directory under dstCloneDir
 // is a real non-symlink directory and that the leaf path does not yet exist.
 func prepareUntrackedDestination(dstCloneDir, exactRel string) (string, error) {
@@ -215,10 +272,10 @@ func prepareUntrackedDestination(dstCloneDir, exactRel string) (string, error) {
 	return dstPath, nil
 }
 
-// runGitReadOnly executes a Git subcommand with --no-optional-locks so the
-// repository index and working tree are never touched.
+// runGitReadOnly executes a Git subcommand with --no-optional-locks and
+// disabled hooks so the repository index and working tree are never touched.
 func runGitReadOnly(ctx context.Context, repoDir string, args ...string) ([]byte, error) {
-	fullArgs := append([]string{"--no-optional-locks"}, args...)
+	fullArgs := append([]string{"--no-optional-locks", "-c", "core.hooksPath=/dev/null"}, args...)
 	cmd := exec.CommandContext(ctx, "git", fullArgs...)
 	cmd.Dir = repoDir
 	var stdout, stderr bytes.Buffer
@@ -230,9 +287,11 @@ func runGitReadOnly(ctx context.Context, repoDir string, args ...string) ([]byte
 	return stdout.Bytes(), nil
 }
 
-// runGitCommand executes a Git command inside dir with optional stdin bytes.
+// runGitCommand executes a Git command inside dir with hooks and template
+// directories disabled and optional stdin bytes.
 func runGitCommand(ctx context.Context, dir string, stdin []byte, args ...string) error {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	fullArgs := append([]string{"-c", "core.hooksPath=/dev/null", "-c", "init.templateDir="}, args...)
+	cmd := exec.CommandContext(ctx, "git", fullArgs...)
 	cmd.Dir = dir
 	if len(stdin) > 0 {
 		cmd.Stdin = bytes.NewReader(stdin)

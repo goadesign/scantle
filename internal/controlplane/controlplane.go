@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net/http"
 	"slices"
@@ -51,6 +52,15 @@ type (
 		Analyze(ctx context.Context, promptText, designSource string) (CP1SemanticAnalysis, error)
 	}
 
+	// CP1ModelAmbiguity is an open domain question returned by a CP1Analyzer
+	// model call before Scantle assigns its mechanical question ID.
+	CP1ModelAmbiguity struct {
+		// Question is the plain-English ambiguity question.
+		Question string `json:"question"`
+		// Options lists the candidate answers (at least 2 distinct options).
+		Options []string `json:"options"`
+	}
+
 	// CP1ModelExample is a concrete input/outcome example returned by a
 	// CP1Analyzer model call before Scantle assigns its mechanical check ID.
 	CP1ModelExample struct {
@@ -70,25 +80,18 @@ type (
 		// Summary is the plain-English description of the requested behavior.
 		Summary string `json:"summary"`
 		// Ambiguities lists genuine domain questions that require human confirmation.
-		Ambiguities []*genscantle.AmbiguityQuestion `json:"ambiguities"`
+		Ambiguities []CP1ModelAmbiguity `json:"ambiguities"`
 		// Examples lists concrete input/outcome examples for the Change Card.
 		Examples []CP1ModelExample `json:"examples"`
 		// PreservedBehaviors lists existing contract invariants preserved by the change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
 	}
 
-	// ModelCompleter is the subset of goa-ai model.Client required by
-	// ModelCP1Analyzer. Every goa-ai model.Client satisfies this interface.
-	ModelCompleter interface {
-		// Complete executes a single model request and returns its response.
-		Complete(ctx context.Context, req *model.Request) (*model.Response, error)
-	}
-
 	// ModelCP1Analyzer implements CP1Analyzer using a Goa-AI model.Client with
-	// structured JSON output.
+	// schema-validated structured JSON output.
 	ModelCP1Analyzer struct {
-		// client is the underlying Goa-AI model completer.
-		client ModelCompleter
+		// client is the underlying Goa-AI model.Client.
+		client model.Client
 	}
 
 	// TargetPromptUpdater applies a Checkpoint 3 Fast Draft Mode prompt template
@@ -191,6 +194,79 @@ const (
 </html>`
 )
 
+var (
+	// cp1AnalysisJSONSchema is the canonical JSON Schema (Draft 2020-12) enforced
+	// at the goa-ai model.Client boundary for CP1 semantic analysis.
+	cp1AnalysisJSONSchema = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "ambiguities", "examples", "preserved_behaviors"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambiguities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question", "options"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "examples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scenario", "input_summary", "expected_outcome", "verification_kind"],
+        "properties": {
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input_summary": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_outcome": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verification_kind": {
+            "type": "string",
+            "enum": ["deterministic", "model_judged"]
+          }
+        }
+      }
+    },
+    "preserved_behaviors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}`)
+)
+
 // WithPrincipal returns a child context carrying the authenticated Principal.
 func WithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalContextKey{}, p)
@@ -284,12 +360,13 @@ func NewHTTPHandler(svc genscantle.Service, auth RequestAuthenticator) http.Hand
 }
 
 // NewModelCP1Analyzer constructs a CP1Analyzer backed by a Goa-AI model.Client.
-func NewModelCP1Analyzer(client ModelCompleter) *ModelCP1Analyzer {
+func NewModelCP1Analyzer(client model.Client) *ModelCP1Analyzer {
 	return &ModelCP1Analyzer{client: client}
 }
 
-// Analyze invokes the underlying model.Client with the operator request and Goa
-// design source and decodes the structured CP1SemanticAnalysis JSON response.
+// Analyze invokes the underlying Goa-AI model.Client with a JSON Schema
+// StructuredOutput contract for CP1 semantic analysis and strictly decodes the
+// validated CP1SemanticAnalysis response.
 func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource string) (CP1SemanticAnalysis, error) {
 	if a == nil || a.client == nil {
 		return CP1SemanticAnalysis{}, errors.New("cp1 model client is required")
@@ -300,7 +377,7 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 				Role: model.ConversationRoleSystem,
 				Parts: []model.Part{
 					model.TextPart{
-						Text: "Analyze the operator feature request against the Goa design source. Return JSON with fields: summary, ambiguities, examples, preserved_behaviors.",
+						Text: "Analyze the operator feature request against the Goa design source. Return structured JSON matching the cp1_change_card_analysis schema.",
 					},
 				},
 			},
@@ -313,18 +390,27 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 				},
 			},
 		},
+		StructuredOutput: &model.StructuredOutput{
+			Name:   "cp1_change_card_analysis",
+			Schema: cp1AnalysisJSONSchema,
+		},
 	}
 	resp, err := a.client.Complete(ctx, req)
 	if err != nil {
 		return CP1SemanticAnalysis{}, fmt.Errorf("cp1 model completion: %w", err)
 	}
-	raw := stripMarkdownCodeFence(extractAssistantText(resp))
+	raw := extractAssistantText(resp)
 	if raw == "" {
 		return CP1SemanticAnalysis{}, errors.New("cp1 model returned empty analysis")
 	}
 	var parsed CP1SemanticAnalysis
-	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+	dec := json.NewDecoder(strings.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&parsed); err != nil {
 		return CP1SemanticAnalysis{}, fmt.Errorf("decode cp1 model analysis: %w", err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return CP1SemanticAnalysis{}, errors.New("cp1 model analysis contains trailing JSON tokens")
 	}
 	return parsed, nil
 }
@@ -336,9 +422,9 @@ func (c *ControlPlane) CheckpointUI(_ context.Context) (string, error) {
 
 // ProposeChange evaluates a feature request at Checkpoint 1 (CP1) via the
 // configured CP1Analyzer model call, validates all model-emitted fields
-// strictly, assigns code-owned example IDs, binds ownership to the
-// authenticated principal, and stops for human confirmation only when genuine
-// domain ambiguities are present.
+// strictly, assigns code-owned ambiguity and example IDs, binds ownership to
+// the authenticated principal, and stops for human confirmation only when
+// genuine domain ambiguities are present.
 func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeChangePayload) (*genscantle.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
@@ -611,7 +697,7 @@ func (c *ControlPlane) Diff(ctx context.Context, p *genscantle.DiffPayload) (*ge
 }
 
 // validateCP1Analysis validates all model-returned CP1 fields strictly without
-// silent coercion and assigns code-owned mechanical check IDs.
+// silent coercion and assigns code-owned mechanical ambiguity and check IDs.
 func validateCP1Analysis(
 	changeID string,
 	in CP1SemanticAnalysis,
@@ -620,7 +706,7 @@ func validateCP1Analysis(
 	if summary == "" {
 		return "", nil, nil, nil, errors.New("summary is required")
 	}
-	ambiguities, err := validateAmbiguities(in.Ambiguities)
+	ambiguities, err := validateAmbiguities(changeID, in.Ambiguities)
 	if err != nil {
 		return "", nil, nil, nil, err
 	}
@@ -632,11 +718,10 @@ func validateCP1Analysis(
 		scenario := strings.TrimSpace(item.Scenario)
 		inputSummary := strings.TrimSpace(item.InputSummary)
 		expectedOutcome := strings.TrimSpace(item.ExpectedOutcome)
-		kind := strings.TrimSpace(item.VerificationKind)
 		if scenario == "" || inputSummary == "" || expectedOutcome == "" {
 			return "", nil, nil, nil, fmt.Errorf("examples[%d] requires non-empty scenario, input_summary, and expected_outcome", i)
 		}
-		if kind != "deterministic" && kind != "model_judged" {
+		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
 			return "", nil, nil, nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
 		}
 		examples = append(examples, &genscantle.ExampleItem{
@@ -644,7 +729,7 @@ func validateCP1Analysis(
 			Scenario:         scenario,
 			InputSummary:     inputSummary,
 			ExpectedOutcome:  expectedOutcome,
-			VerificationKind: kind,
+			VerificationKind: item.VerificationKind,
 		})
 	}
 	preserved := make([]string, 0, len(in.PreservedBehaviors))
@@ -658,27 +743,20 @@ func validateCP1Analysis(
 	return summary, ambiguities, examples, preserved, nil
 }
 
-// validateAmbiguities validates that every ambiguity question has a unique
-// non-empty ID, a non-empty question, and at least two distinct non-empty options.
-func validateAmbiguities(in []*genscantle.AmbiguityQuestion) ([]*genscantle.AmbiguityQuestion, error) {
+// validateAmbiguities validates that every ambiguity question has a non-empty
+// question and at least two distinct non-empty options, and assigns a
+// code-owned question ID (`<changeID>-ambiguity-NN`).
+func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle.AmbiguityQuestion, error) {
 	if len(in) == 0 {
 		return nil, nil
 	}
-	seenIDs := make(map[string]bool, len(in))
 	out := make([]*genscantle.AmbiguityQuestion, 0, len(in))
 	for i, q := range in {
-		if q == nil {
-			return nil, fmt.Errorf("ambiguities[%d] is nil", i)
-		}
-		id := strings.TrimSpace(q.ID)
+		id := fmt.Sprintf("%s-ambiguity-%02d", changeID, i+1)
 		question := strings.TrimSpace(q.Question)
-		if id == "" || question == "" {
-			return nil, fmt.Errorf("ambiguities[%d] requires non-empty id and question", i)
+		if question == "" {
+			return nil, fmt.Errorf("ambiguities[%d] requires non-empty question", i)
 		}
-		if seenIDs[id] {
-			return nil, fmt.Errorf("duplicate ambiguity id %q", id)
-		}
-		seenIDs[id] = true
 		if len(q.Options) < 2 {
 			return nil, fmt.Errorf("ambiguity %q requires at least 2 options", id)
 		}
@@ -742,11 +820,10 @@ func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.Exam
 		scenario := strings.TrimSpace(item.Scenario)
 		inputSummary := strings.TrimSpace(item.InputSummary)
 		expectedOutcome := strings.TrimSpace(item.ExpectedOutcome)
-		kind := strings.TrimSpace(item.VerificationKind)
 		if id == "" || scenario == "" || inputSummary == "" || expectedOutcome == "" {
 			return nil, fmt.Errorf("examples[%d] requires non-empty id, scenario, input_summary, and expected_outcome", i)
 		}
-		if kind != "deterministic" && kind != "model_judged" {
+		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
 			return nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
 		}
 		if seenIDs[id] {
@@ -758,7 +835,7 @@ func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.Exam
 			Scenario:         scenario,
 			InputSummary:     inputSummary,
 			ExpectedOutcome:  expectedOutcome,
-			VerificationKind: kind,
+			VerificationKind: item.VerificationKind,
 		})
 	}
 	return out, nil
@@ -778,20 +855,6 @@ func extractAssistantText(resp *model.Response) string {
 		}
 	}
 	return b.String()
-}
-
-// stripMarkdownCodeFence removes optional ```json ... ``` fences surrounding a
-// model JSON response.
-func stripMarkdownCodeFence(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if !strings.HasPrefix(trimmed, "```") {
-		return trimmed
-	}
-	if nl := strings.IndexByte(trimmed, '\n'); nl >= 0 {
-		trimmed = trimmed[nl+1:]
-	}
-	trimmed = strings.TrimSuffix(strings.TrimSpace(trimmed), "```")
-	return strings.TrimSpace(trimmed)
 }
 
 // computeCanonicalRevision computes a collision-free SHA-256 hex digest over
