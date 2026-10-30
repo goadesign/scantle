@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scantle Checkpoint Host</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.45;
+    }
+    body {
+      margin: 0;
+      padding: 1rem 1.25rem;
+    }
+    header {
+      border-bottom: 1px solid rgba(127, 127, 127, 0.35);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      font-size: 1.25rem;
+      margin: 0 0 0.35rem 0;
+    }
+    h2 {
+      font-size: 1.05rem;
+      margin: 0 0 0.5rem 0;
+    }
+    h3 {
+      font-size: 0.95rem;
+      margin: 0.85rem 0 0.35rem 0;
+    }
+    p {
+      margin: 0.25rem 0;
+    }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+    }
+    code {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    pre {
+      padding: 0.65rem;
+      border-radius: 6px;
+      border: 1px solid rgba(127, 127, 127, 0.35);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .scantle-meta, .scantle-card {
+      border: 1px solid rgba(127, 127, 127, 0.35);
+      border-radius: 6px;
+      padding: 0.75rem;
+      margin-bottom: 0.75rem;
+      overflow-wrap: anywhere;
+    }
+    .scantle-badge {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid rgba(127, 127, 127, 0.5);
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 0.4rem;
+    }
+    .scantle-error {
+      border: 2px solid #c62828;
+      border-radius: 6px;
+      padding: 0.75rem;
+      margin-top: 0.5rem;
+    }
+    ul {
+      margin: 0.35rem 0;
+      padding-left: 1.25rem;
+    }
+    li {
+      margin-bottom: 0.25rem;
+    }
+  </style>
+</head>
+<body>
+  <main id="scantle-checkpoint-root" data-profile="mcp-app" data-state="waiting">
+    <header>
+      <h1>Scantle Checkpoint Viewer</h1>
+      <p>Displays validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Fast Draft Override results from structured MCP tool outputs.</p>
+      <p><small>Visual inspection does not grant approval authority; invoke <code>confirm_intent</code>, <code>preview_architecture</code>, <code>draft_override</code>, or <code>scantle verify</code> through your MCP host or CLI to advance the workflow.</small></p>
+    </header>
+    <p id="scantle-checkpoint-status" role="status" aria-live="polite">Awaiting MCP Apps host initialization and checkpoint tool result...</p>
+    <section id="scantle-checkpoint-view" aria-label="Checkpoint Payload"></section>
+  </main>
+  <script>
+  (function () {
+    "use strict";
+
+    var INIT_REQUEST_ID = 1;
+    var PROTOCOL_VERSION = "2026-01-26";
+    var initPending = false;
+    var root = document.getElementById("scantle-checkpoint-root");
+    var statusEl = document.getElementById("scantle-checkpoint-status");
+    var viewEl = document.getElementById("scantle-checkpoint-view");
+
+    function isPlainObject(v) {
+      return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+    }
+
+    function isStringArray(v) {
+      return Array.isArray(v) && v.every(function (item) {
+        return typeof item === "string";
+      });
+    }
+
+    function isStringMap(v) {
+      if (!isPlainObject(v)) {
+        return false;
+      }
+      return Object.keys(v).every(function (k) {
+        return typeof v[k] === "string";
+      });
+    }
+
+    function el(tag, attrs, children) {
+      var node = document.createElement(tag);
+      if (isPlainObject(attrs)) {
+        Object.keys(attrs).forEach(function (k) {
+          if (k === "className") {
+            node.className = attrs[k];
+          } else if (k === "textContent") {
+            node.textContent = String(attrs[k]);
+          } else {
+            node.setAttribute(k, String(attrs[k]));
+          }
+        });
+      }
+      if (Array.isArray(children)) {
+        children.forEach(function (child) {
+          if (child === null || child === undefined) {
+            return;
+          }
+          if (typeof child === "string" || typeof child === "number" || typeof child === "boolean") {
+            node.appendChild(document.createTextNode(String(child)));
+          } else {
+            node.appendChild(child);
+          }
+        });
+      }
+      return node;
+    }
+
+    function clearDatasetKeys() {
+      delete root.dataset.changeId;
+      delete root.dataset.requestRevision;
+      delete root.dataset.designDigest;
+    }
+
+    function replaceChildren(container, nodes) {
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
+      nodes.forEach(function (n) {
+        if (n) {
+          container.appendChild(n);
+        }
+      });
+    }
+
+    function renderWaiting(message) {
+      clearDatasetKeys();
+      root.dataset.state = "waiting";
+      statusEl.textContent = message;
+      replaceChildren(viewEl, []);
+    }
+
+    function renderCancelled(reason) {
+      clearDatasetKeys();
+      root.dataset.state = "cancelled";
+      statusEl.textContent = "Checkpoint tool call cancelled";
+      var detail = typeof reason === "string" && reason.length > 0
+        ? "Tool call was cancelled (" + reason + "). Re-run the Scantle checkpoint tool to inspect a fresh result."
+        : "Tool call was cancelled before completion. Re-run the Scantle checkpoint tool to inspect a fresh result.";
+      replaceChildren(viewEl, [
+        el("div", { className: "scantle-meta", role: "status" }, [
+          el("strong", { textContent: "Cancelled: " }),
+          detail
+        ])
+      ]);
+    }
+
+    function renderError(message) {
+      clearDatasetKeys();
+      root.dataset.state = "error";
+      statusEl.textContent = "Checkpoint payload error";
+      replaceChildren(viewEl, [
+        el("div", { className: "scantle-error", role: "alert" }, [
+          el("strong", { textContent: "Error: " }),
+          String(message)
+        ])
+      ]);
+    }
+
+    function isValidAmbiguity(a) {
+      return isPlainObject(a) &&
+        typeof a.id === "string" &&
+        typeof a.question === "string" &&
+        isStringArray(a.options);
+    }
+
+    function isValidExample(ex) {
+      return isPlainObject(ex) &&
+        typeof ex.id === "string" &&
+        typeof ex.scenario === "string" &&
+        typeof ex.input_summary === "string" &&
+        typeof ex.expected_outcome === "string" &&
+        (ex.verification_kind === "deterministic" || ex.verification_kind === "model_judged");
+    }
+
+    function isValidChangeCard(d) {
+      return isPlainObject(d) &&
+        typeof d.change_id === "string" &&
+        (d.status === "needs_confirmation" || d.status === "confirmed") &&
+        typeof d.prompt === "string" &&
+        typeof d.summary === "string" &&
+        typeof d.request_revision === "string" &&
+        Array.isArray(d.examples) && d.examples.every(isValidExample) &&
+        isStringArray(d.preserved_behaviors) &&
+        (d.ambiguities === undefined || (Array.isArray(d.ambiguities) && d.ambiguities.every(isValidAmbiguity))) &&
+        (d.answers === undefined || isStringMap(d.answers)) &&
+        (d.confirmed_by === undefined || typeof d.confirmed_by === "string");
+    }
+
+    function isValidContainer(c) {
+      return isPlainObject(c) &&
+        typeof c.id === "string" &&
+        typeof c.name === "string" &&
+        typeof c.kind === "string" &&
+        typeof c.description === "string";
+    }
+
+    function isValidEdge(e) {
+      return isPlainObject(e) &&
+        typeof e.from_id === "string" &&
+        typeof e.to_id === "string" &&
+        typeof e.protocol === "string";
+    }
+
+    function isValidAgentPolicy(p) {
+      return isPlainObject(p) &&
+        typeof p.agent_id === "string" &&
+        typeof p.max_execution_seconds === "number" &&
+        typeof p.max_tool_calls === "number" &&
+        typeof p.max_recovery_turns === "number" &&
+        typeof p.compress_at_turns === "number" &&
+        typeof p.keep_recent_turns === "number" &&
+        typeof p.cache_after_system === "boolean" &&
+        typeof p.cache_after_tools === "boolean";
+    }
+
+    function isValidTool(t) {
+      return isPlainObject(t) &&
+        typeof t.id === "string" &&
+        typeof t.toolset === "string" &&
+        typeof t.name === "string" &&
+        typeof t.description === "string" &&
+        typeof t.args_schema === "string" &&
+        typeof t.return_schema === "string" &&
+        isStringArray(t.injected_fields) &&
+        typeof t.requires_ui === "boolean" &&
+        typeof t.requires_confirmation === "boolean" &&
+        typeof t.bounded_result === "boolean";
+    }
+
+    function isValidSwarmRole(r) {
+      return isPlainObject(r) &&
+        typeof r.handle === "string" &&
+        typeof r.role === "string" &&
+        typeof r.scope_name === "string" &&
+        typeof r.profile_id === "string" &&
+        typeof r.provider === "string" &&
+        typeof r.model === "string" &&
+        typeof r.family === "string" &&
+        isStringArray(r.owned_paths) &&
+        typeof r.access_mode === "string";
+    }
+
+    function isValidSwarm(s) {
+      return isPlainObject(s) &&
+        (s.status === "configured" || s.status === "unconfigured" || s.status === "missing_capability") &&
+        Array.isArray(s.assignments) && s.assignments.every(isValidSwarmRole) &&
+        typeof s.cross_family_review === "boolean" &&
+        typeof s.cross_family_eval === "boolean" &&
+        typeof s.single_family === "boolean" &&
+        typeof s.summary === "string" &&
+        (s.missing_roles === undefined || isStringArray(s.missing_roles)) &&
+        (s.manifest === undefined || typeof s.manifest === "string");
+    }
+
+    function isValidArchitecturePreview(d) {
+      return isPlainObject(d) &&
+        typeof d.change_id === "string" &&
+        typeof d.request_revision === "string" &&
+        typeof d.design_digest === "string" &&
+        typeof d.system_name === "string" &&
+        typeof d.banner === "string" &&
+        Array.isArray(d.containers) && d.containers.every(isValidContainer) &&
+        Array.isArray(d.edges) && d.edges.every(isValidEdge) &&
+        Array.isArray(d.agent_policies) && d.agent_policies.every(isValidAgentPolicy) &&
+        Array.isArray(d.tools) && d.tools.every(isValidTool) &&
+        isValidSwarm(d.swarm);
+    }
+
+    function isValidDraftOverride(d) {
+      return isPlainObject(d) &&
+        typeof d.applied_in_store === "boolean" &&
+        typeof d.requires_rebuild === "boolean" &&
+        typeof d.message === "string" &&
+        (d.prompt_version === undefined || typeof d.prompt_version === "string");
+    }
+
+    function renderChangeCard(card) {
+      clearDatasetKeys();
+      root.dataset.state = "cp1-change-card";
+      root.dataset.changeId = card.change_id;
+      root.dataset.requestRevision = card.request_revision;
+      statusEl.textContent = "Rendered Checkpoint 1 Change Card (" + card.status + ")";
+
+      var metaRows = [
+        el("h2", { textContent: "CP1 Change Card: " + card.change_id }),
+        el("p", {}, [
+          el("span", { className: "scantle-badge", textContent: card.status }),
+          "request_revision: ",
+          el("code", { textContent: card.request_revision })
+        ]),
+        el("p", {}, [el("strong", { textContent: "Summary: " }), card.summary]),
+        el("p", {}, [el("strong", { textContent: "Prompt: " }), card.prompt])
+      ];
+      if (card.confirmed_by) {
+        metaRows.push(el("p", {}, [el("strong", { textContent: "Confirmed by: " }), card.confirmed_by]));
+      }
+
+      var ambiguities = Array.isArray(card.ambiguities) ? card.ambiguities : [];
+      var answers = isPlainObject(card.answers) ? card.answers : {};
+      var ambItems = ambiguities.map(function (amb) {
+        var answerText = answers[amb.id] ? " [Confirmed answer: " + answers[amb.id] + "]" : "";
+        return el("li", {}, [
+          el("code", { textContent: amb.id }),
+          ": ",
+          amb.question,
+          " (options: " + amb.options.join(", ") + ")",
+          answerText
+        ]);
+      });
+
+      var exampleItems = card.examples.map(function (ex) {
+        return el("li", {}, [
+          el("code", { textContent: ex.id }),
+          " [",
+          ex.verification_kind,
+          "] ",
+          el("strong", { textContent: ex.scenario }),
+          " — Input: ",
+          ex.input_summary,
+          " -> Expected: ",
+          ex.expected_outcome
+        ]);
+      });
+
+      var preservedItems = card.preserved_behaviors.map(function (pb) {
+        return el("li", { textContent: pb });
+      });
+
+      replaceChildren(viewEl, [
+        el("div", { className: "scantle-meta" }, metaRows),
+        el("div", { className: "scantle-card" }, [
+          el("h3", { textContent: "Ambiguities (" + ambiguities.length + ")" }),
+          ambItems.length > 0 ? el("ul", {}, ambItems) : el("p", { textContent: "No open domain ambiguities." }),
+          el("h3", { textContent: "Concrete Examples (" + card.examples.length + ")" }),
+          el("ul", {}, exampleItems),
+          el("h3", { textContent: "Preserved Contract Invariants (" + card.preserved_behaviors.length + ")" }),
+          preservedItems.length > 0 ? el("ul", {}, preservedItems) : el("p", { textContent: "None declared." })
+        ])
+      ]);
+    }
+
+    function renderArchitecturePreview(preview) {
+      clearDatasetKeys();
+      root.dataset.state = "cp2-architecture-preview";
+      root.dataset.changeId = preview.change_id;
+      root.dataset.requestRevision = preview.request_revision;
+      root.dataset.designDigest = preview.design_digest;
+      statusEl.textContent = "Rendered Checkpoint 2 Architecture Preview (" + preview.system_name + ")";
+
+      var containerItems = preview.containers.map(function (c) {
+        return el("li", {}, [
+          el("span", { className: "scantle-badge", textContent: c.kind }),
+          el("code", { textContent: c.id }),
+          " (",
+          c.name,
+          "): ",
+          c.description
+        ]);
+      });
+
+      var edgeItems = preview.edges.map(function (e) {
+        return el("li", {}, [
+          el("code", { textContent: e.from_id }),
+          " -> ",
+          el("code", { textContent: e.to_id }),
+          " [",
+          e.protocol,
+          "]"
+        ]);
+      });
+
+      var policyItems = preview.agent_policies.map(function (p) {
+        return el("li", {}, [
+          el("code", { textContent: p.agent_id }),
+          ": time_budget=" + p.max_execution_seconds + "s, max_tool_calls=" + p.max_tool_calls +
+          ", max_recovery_turns=" + p.max_recovery_turns +
+          ", history=" + p.compress_at_turns + "/" + p.keep_recent_turns +
+          ", cache_after_system=" + p.cache_after_system +
+          ", cache_after_tools=" + p.cache_after_tools
+        ]);
+      });
+
+      var toolItems = preview.tools.map(function (t) {
+        var badges = [];
+        if (t.injected_fields.length > 0) {
+          badges.push(el("span", { className: "scantle-badge", textContent: "Inject: " + t.injected_fields.join(", ") }));
+        }
+        if (t.requires_confirmation) {
+          badges.push(el("span", { className: "scantle-badge", textContent: "Confirmation" }));
+        }
+        if (t.bounded_result) {
+          badges.push(el("span", { className: "scantle-badge", textContent: "BoundedResult" }));
+        }
+        if (t.requires_ui) {
+          badges.push(el("span", { className: "scantle-badge", textContent: "UI required" }));
+        }
+        return el("li", {}, [
+          el("code", { textContent: t.id }),
+          " (",
+          t.toolset,
+          "): ",
+          t.description,
+          " "
+        ].concat(badges));
+      });
+
+      var swarmRoleItems = preview.swarm.assignments.map(function (r) {
+        return el("li", {}, [
+          el("code", { textContent: "@" + r.handle }),
+          " [",
+          r.role,
+          " / ",
+          r.scope_name,
+          "] -> ",
+          r.provider + ":" + r.model + " (" + r.family + "), access=" + r.access_mode +
+          ", paths=" + r.owned_paths.join(", ")
+        ]);
+      });
+
+      var swarmNodes = [
+        el("h3", { textContent: "Proposed Chorus Swarm (" + preview.swarm.status + ")" }),
+        el("p", { textContent: preview.swarm.summary }),
+        el("p", {}, [
+          el("span", { className: "scantle-badge", textContent: "cross_family_review=" + preview.swarm.cross_family_review }),
+          el("span", { className: "scantle-badge", textContent: "cross_family_eval=" + preview.swarm.cross_family_eval }),
+          el("span", { className: "scantle-badge", textContent: "single_family=" + preview.swarm.single_family })
+        ])
+      ];
+      if (swarmRoleItems.length > 0) {
+        swarmNodes.push(el("ul", {}, swarmRoleItems));
+      }
+      if (preview.swarm.manifest) {
+        swarmNodes.push(el("pre", { textContent: preview.swarm.manifest }));
+      }
+
+      replaceChildren(viewEl, [
+        el("div", { className: "scantle-meta" }, [
+          el("h2", { textContent: "CP2 Architecture Preview: " + preview.system_name }),
+          el("p", { textContent: preview.banner }),
+          el("p", {}, ["change_id: ", el("code", { textContent: preview.change_id })]),
+          el("p", {}, ["request_revision: ", el("code", { textContent: preview.request_revision })]),
+          el("p", {}, ["design_digest: ", el("code", { textContent: preview.design_digest })])
+        ]),
+        el("div", { className: "scantle-card" }, [
+          el("h3", { textContent: "C4 Containers (" + preview.containers.length + ")" }),
+          el("ul", {}, containerItems),
+          el("h3", { textContent: "Directed Contract Edges (" + preview.edges.length + ")" }),
+          el("ul", {}, edgeItems),
+          el("h3", { textContent: "Evaluated Agent Policies (" + preview.agent_policies.length + ")" }),
+          el("ul", {}, policyItems),
+          el("h3", { textContent: "Evaluated Tool Guardrails (" + preview.tools.length + ")" }),
+          el("ul", {}, toolItems)
+        ]),
+        el("div", { className: "scantle-card" }, swarmNodes)
+      ]);
+    }
+
+    function renderDraftOverride(draft) {
+      clearDatasetKeys();
+      root.dataset.state = "cp3-draft-override";
+      statusEl.textContent = "Rendered Checkpoint 3 Fast Draft Override";
+
+      var rows = [
+        el("h2", { textContent: "CP3 Fast Draft Mode" }),
+        el("p", {}, [
+          el("span", { className: "scantle-badge", textContent: "applied_in_store=" + draft.applied_in_store }),
+          el("span", { className: "scantle-badge", textContent: "requires_rebuild=" + draft.requires_rebuild })
+        ]),
+        el("p", { textContent: draft.message })
+      ];
+      if (draft.prompt_version) {
+        rows.push(el("p", {}, ["prompt_version: ", el("code", { textContent: draft.prompt_version })]));
+      }
+      replaceChildren(viewEl, [el("div", { className: "scantle-meta" }, rows)]);
+    }
+
+    function extractErrorText(params) {
+      if (Array.isArray(params.content)) {
+        for (var i = 0; i < params.content.length; i++) {
+          var item = params.content[i];
+          if (isPlainObject(item) && item.type === "text" && typeof item.text === "string" && item.text.length > 0) {
+            return item.text;
+          }
+        }
+      }
+      return "Tool execution failed.";
+    }
+
+    function handleToolResult(params) {
+      if (!isPlainObject(params)) {
+        renderError("Malformed ui/notifications/tool-result: params must be an object.");
+        return;
+      }
+      if (params.isError === true) {
+        renderError(extractErrorText(params));
+        return;
+      }
+      if (!isPlainObject(params.structuredContent)) {
+        renderError("Tool result is missing structuredContent object.");
+        return;
+      }
+      var payload = params.structuredContent;
+      if (isValidArchitecturePreview(payload)) {
+        renderArchitecturePreview(payload);
+        return;
+      }
+      if (isValidChangeCard(payload)) {
+        renderChangeCard(payload);
+        return;
+      }
+      if (isValidDraftOverride(payload)) {
+        renderDraftOverride(payload);
+        return;
+      }
+      renderError("Unsupported or malformed Scantle checkpoint payload.");
+    }
+
+    function handleMessage(event) {
+      if (!event || event.source !== window.parent) {
+        return;
+      }
+      var msg = event.data;
+      if (!isPlainObject(msg) || msg.jsonrpc !== "2.0") {
+        return;
+      }
+      if (typeof msg.method === "string") {
+        if (msg.id !== undefined && msg.id !== null) {
+          if (msg.method === "ui/resource-teardown") {
+            clearDatasetKeys();
+            root.dataset.state = "terminated";
+            statusEl.textContent = "Checkpoint resource torn down.";
+            replaceChildren(viewEl, []);
+            window.parent.postMessage({
+              jsonrpc: "2.0",
+              id: msg.id,
+              result: {}
+            }, "*");
+            return;
+          }
+          if (msg.method === "ping") {
+            window.parent.postMessage({
+              jsonrpc: "2.0",
+              id: msg.id,
+              result: {}
+            }, "*");
+            return;
+          }
+          window.parent.postMessage({
+            jsonrpc: "2.0",
+            id: msg.id,
+            error: {
+              code: -32601,
+              message: "Method not found: " + msg.method
+            }
+          }, "*");
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-input") {
+          if (msg.params !== undefined && !isPlainObject(msg.params)) {
+            renderError("Malformed ui/notifications/tool-input notification.");
+            return;
+          }
+          renderWaiting("Received tool input; awaiting validated checkpoint result...");
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-cancelled") {
+          if (msg.params !== undefined && !isPlainObject(msg.params)) {
+            renderError("Malformed ui/notifications/tool-cancelled notification.");
+            return;
+          }
+          var cancelReason = isPlainObject(msg.params) && typeof msg.params.reason === "string"
+            ? msg.params.reason
+            : "";
+          renderCancelled(cancelReason);
+          return;
+        }
+        if (msg.method === "ui/notifications/tool-result") {
+          handleToolResult(msg.params);
+        }
+        return;
+      }
+      if (initPending && msg.id === INIT_REQUEST_ID) {
+        initPending = false;
+        if (msg.error) {
+          var errMsg = isPlainObject(msg.error) && typeof msg.error.message === "string"
+            ? msg.error.message
+            : "MCP Apps host rejected ui/initialize.";
+          renderError(errMsg);
+          return;
+        }
+        if (!isPlainObject(msg.result)) {
+          renderError("MCP Apps host returned invalid ui/initialize result.");
+          return;
+        }
+        root.dataset.initialized = "true";
+        statusEl.textContent = "MCP Apps handshake complete; awaiting checkpoint tool result...";
+        window.parent.postMessage({
+          jsonrpc: "2.0",
+          method: "ui/notifications/initialized",
+          params: {}
+        }, "*");
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+
+    if (window.parent && window.parent !== window) {
+      initPending = true;
+      window.parent.postMessage({
+        jsonrpc: "2.0",
+        id: INIT_REQUEST_ID,
+        method: "ui/initialize",
+        params: {
+          protocolVersion: PROTOCOL_VERSION,
+          appInfo: {
+            name: "scantle-checkpoint",
+            version: "1.0.0"
+          },
+          appCapabilities: {}
+        }
+      }, "*");
+    }
+  })();
+  </script>
+</body>
+</html>

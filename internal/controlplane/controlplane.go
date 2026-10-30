@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -192,23 +193,16 @@ const (
 	// provider marks OutputLimited fails Analyze even when its JSON parses, so
 	// no card is stored from an analysis that may be incomplete.
 	cp1AnalysisMaxOutputTokens = 4096
-	// checkpointUIHTML is the MCP Apps (`ui://scantle/checkpoint`) HTML document host.
-	checkpointUIHTML = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>Scantle Checkpoint Host</title>
-</head>
-<body>
-  <main id="scantle-checkpoint-root" data-profile="mcp-app">
-    <h1>Scantle Interactive Checkpoint</h1>
-    <p>Renders validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Sandbox controls while preserving ordinary text fallback.</p>
-  </main>
-</body>
-</html>`
 )
 
 var (
+	// checkpointUIHTML is the stateless MCP Apps (`ui://scantle/checkpoint`,
+	// `text/html;profile=mcp-app`) HTML document host embedded from
+	// checkpoint.html.
+	//
+	//go:embed checkpoint.html
+	checkpointUIHTML string
+
 	// cp1AnalysisJSONSchema is the canonical JSON Schema (Draft 2020-12) enforced
 	// at the goa-ai model.Client boundary for CP1 semantic analysis.
 	cp1AnalysisJSONSchema = []byte(`{

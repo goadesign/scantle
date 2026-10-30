@@ -118,7 +118,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 - **`scantle://golden-path`** (`GET /golden-path`, `text/markdown`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
 - **`ui://scantle/checkpoint`** (`GET /ui/checkpoint`, `text/html;profile=mcp-app`)
-  - Serves the current checkpoint HTML placeholder. Interactive Change Cards, architecture rendering, sandbox controls, and `openui.v1` action dispatch are planned.
+  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`). Completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders validated `ChangeCardResult` (`CP1`), `ArchitecturePreviewResult` (`CP2`), and `DraftOverrideResult` (`CP3`) payloads delivered by the host via `ui/notifications/tool-result` without server-retained preview state (interactive role-switching/replay controls and `openui.v1` action dispatch remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough)).
 
 ---
 
@@ -141,6 +141,21 @@ Reads two Go design modules into symlink-safe snapshots, evaluates both inside t
 - `--old-dir <path>` — Root directory of the previous design module *(required)*.
 - `--new-dir <path>` — Root directory of the candidate design module *(required)*.
 
+### `scantle verify`
+Clones the committed candidate and evaluator suite into an isolated work directory, builds the candidate binaries (`WorkDir/candidate-bin/<name>`) and suite runner (`WorkDir/suite-bin/suite`) inside `verify/candidate`'s macOS `sandbox-exec` jail, runs the suite, writes the canonical `verify.Report` JSON to `<report-dir>/<digest>.json`, and prints the JSON report to `stdout` (exiting non-zero if verification fails or any scenario does not pass).
+- `-candidate-repo <path|url>` — Git repository holding the candidate *(required)*.
+- `-candidate-commit <sha>` — Full commit ID of the candidate to build *(required)*.
+- `-candidate-module <dir>` — Candidate Go module directory relative to `-candidate-repo` *(required)*.
+- `-binary <name=package>` — Candidate binary artifact name and package inside `-candidate-module` (repeatable, at least one *required*; `<name>` must be a single path element).
+- `-suite-repo <path|url>` — Git repository holding the evaluator suite *(required)*.
+- `-suite-commit <sha>` — Full commit ID of the evaluator suite *(required)*.
+- `-suite-module <dir>` — Suite Go module directory relative to `-suite-repo` *(required)*.
+- `-suite-command <package>` — Suite command package inside `-suite-module` *(required)*.
+- `-request-revision <digest>` — Confirmed `request_revision` digest bound into the verification report *(required)*.
+- `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must be missing or empty at run start and must not be shared with or readable by builder agents *(required)*.
+- `-report-dir <path>` — Directory that receives the full canonical report as `<digest>.json`; must not be readable by builder agents when holdout privacy is required *(required)*.
+- `-builder-view` — Optional boolean flag; when set, `stdout` prints `Report.ForBuilders()`, which redacts `"holdout"` scenarios to `"id": "holdout-N"` with scenario names, inputs, declarations, checks, and failure logs stripped (the full unredacted report is still written to `-report-dir`).
+
 ---
 
 ## Reference Platform: `examples/orders` & `examples/orders-eval`
@@ -155,7 +170,7 @@ Scantle includes an order-refund service and an isolated evaluator for checking 
 
 ### [`examples/orders-eval`](../examples/orders-eval/) — The Isolated Evaluator
 - **[`acceptance/acceptance_test.go`](../examples/orders-eval/acceptance/acceptance_test.go)**: Compiles and boots the candidate inside `verify/candidate`'s macOS `sandbox-exec` jail against stateful commerce and payment simulators ([`sim/`](../examples/orders-eval/sim/)) and a scripted model gateway ([`scriptedmodel/`](../examples/orders-eval/scriptedmodel/)).
-- Exercises five acceptance scenarios (instant store credit, manager approval across an API restart, Temporal worker `kill -9` crash recovery, manager decline, and a holdout cross-customer refund refusal) plus `TestSeededPayloadBloatFailsTheBudget`.
+- Exercises five acceptance scenarios (`store_credit_within_limit`, `card_refund_needs_manager`, `refund_survives_worker_crash`, `pending_approval_survives_api_restart`, and the holdout `other_customers_order_refused`) plus `TestSeededPayloadBloatFailsTheBudget`.
 
 Run the unit and race checks across all three modules:
 
@@ -172,6 +187,8 @@ The end-to-end tests require the `e2e` build tag, macOS, and the Temporal CLI. R
 go test -race -tags e2e ./internal/verify
 ```
 
+See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-step walkthrough including `scantle verify` (full operator report vs. `-builder-view`).
+
 ---
 
 ## Project Layout
@@ -182,7 +199,7 @@ go test -race -tags e2e ./internal/verify
 │   └── design.go                 # Scantle Goa & Goa-AI MCP 1.0.0 DSL contract
 ├── cmd/
 │   └── scantle/
-│       └── main.go               # CLI entrypoint (`scantle serve` and `scantle diff`)
+│       └── main.go               # CLI entrypoint (`scantle serve`, `scantle diff`, and `scantle verify`)
 ├── docs/
 │   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & sandbox verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview

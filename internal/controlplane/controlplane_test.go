@@ -39,38 +39,18 @@ type (
 		// store is the target platform's prompt.Store.
 		store prompt.Store
 	}
+
+	// recordingAnthropicMessages is an anthropic.MessagesClient that records the
+	// encoded request and returns a fixed message.
+	recordingAnthropicMessages struct {
+		// resp is the message returned by New.
+		resp *anthropicsdk.Message
+		// last is the most recent request body encoded by the adapter.
+		last anthropicsdk.MessageNewParams
+		// calls counts New invocations.
+		calls int
+	}
 )
-
-// Complete returns the preconfigured JSON payload as an assistant TextPart.
-func (s *stubProvider) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
-	return &model.Response{
-		Content: []model.Message{
-			{
-				Role:  model.ConversationRoleAssistant,
-				Parts: []model.Part{model.TextPart{Text: s.responseJSON}},
-			},
-		},
-		StopReason: "stop",
-	}, nil
-}
-
-// Stream returns an error because ModelCP1Analyzer uses synchronous Complete calls.
-func (s *stubProvider) Stream(_ context.Context, _ *model.Request) (model.Streamer, error) {
-	return nil, errors.New("streaming not used by CP1 analyzer")
-}
-
-// ApplyPromptOverride writes newContent into the target prompt.Store and returns the resolved version.
-func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, promptID, newContent string) (string, error) {
-	id := prompt.Ident(promptID)
-	if err := u.store.Set(ctx, id, prompt.Scope{}, newContent, map[string]string{"source": "cp3_fast_draft"}); err != nil {
-		return "", err
-	}
-	override, err := u.store.Resolve(ctx, id, prompt.Scope{})
-	if err != nil || override == nil {
-		return "", err
-	}
-	return override.Version, nil
-}
 
 // TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock verifies
 // CP1 ambiguity detection, code-owned question/check IDs, authenticated owner
@@ -519,16 +499,6 @@ var _ = Service("orders", func() {
 	}
 }
 
-// newStubModelClient wraps a stubProvider in a goa-ai model.Client.
-func newStubModelClient(t *testing.T, responseJSON string) model.Client {
-	t.Helper()
-	client, err := model.NewClient(&stubProvider{responseJSON: responseJSON})
-	if err != nil {
-		t.Fatalf("model.NewClient: %v", err)
-	}
-	return client
-}
-
 // TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter runs the CP1
 // analyzer through the real Anthropic adapter configured as NewFromAPIKey
 // configures it (default model only, no client-wide MaxTokens). The request
@@ -595,15 +565,35 @@ func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
 	}
 }
 
-// recordingAnthropicMessages is an anthropic.MessagesClient that records the
-// encoded request and returns a fixed message.
-type recordingAnthropicMessages struct {
-	// resp is the message returned by New.
-	resp *anthropicsdk.Message
-	// last is the most recent request body encoded by the adapter.
-	last anthropicsdk.MessageNewParams
-	// calls counts New invocations.
-	calls int
+// Complete returns the preconfigured JSON payload as an assistant TextPart.
+func (s *stubProvider) Complete(_ context.Context, _ *model.Request) (*model.Response, error) {
+	return &model.Response{
+		Content: []model.Message{
+			{
+				Role:  model.ConversationRoleAssistant,
+				Parts: []model.Part{model.TextPart{Text: s.responseJSON}},
+			},
+		},
+		StopReason: "stop",
+	}, nil
+}
+
+// Stream returns an error because ModelCP1Analyzer uses synchronous Complete calls.
+func (s *stubProvider) Stream(_ context.Context, _ *model.Request) (model.Streamer, error) {
+	return nil, errors.New("streaming not used by CP1 analyzer")
+}
+
+// ApplyPromptOverride writes newContent into the target prompt.Store and returns the resolved version.
+func (u *boundTargetPromptUpdater) ApplyPromptOverride(ctx context.Context, promptID, newContent string) (string, error) {
+	id := prompt.Ident(promptID)
+	if err := u.store.Set(ctx, id, prompt.Scope{}, newContent, map[string]string{"source": "cp3_fast_draft"}); err != nil {
+		return "", err
+	}
+	override, err := u.store.Resolve(ctx, id, prompt.Scope{})
+	if err != nil || override == nil {
+		return "", err
+	}
+	return override.Version, nil
 }
 
 // New records body and returns the fixed message.
@@ -621,6 +611,16 @@ func (m *recordingAnthropicMessages) NewStreaming(context.Context, anthropicsdk.
 // CountTokens is unused because the CP1 analyzer does not count tokens.
 func (m *recordingAnthropicMessages) CountTokens(context.Context, anthropicsdk.MessageCountTokensParams, ...option.RequestOption) (*anthropicsdk.MessageTokensCount, error) {
 	return nil, errors.New("token counting not used by CP1 analyzer")
+}
+
+// newStubModelClient wraps a stubProvider in a goa-ai model.Client.
+func newStubModelClient(t *testing.T, responseJSON string) model.Client {
+	t.Helper()
+	client, err := model.NewClient(&stubProvider{responseJSON: responseJSON})
+	if err != nil {
+		t.Fatalf("model.NewClient: %v", err)
+	}
+	return client
 }
 
 // anthropicTextMessage decodes a provider-shaped assistant message holding
