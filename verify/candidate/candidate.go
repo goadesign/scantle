@@ -157,7 +157,13 @@ func Profile(binary, stateDir string, connectPorts []int, listenPort int) string
 	fmt.Fprintf(&b, "(allow process-exec (literal %s))\n", quote(binary))
 	// The standard macOS top-level symlinks must be resolvable so callers can
 	// use /var/... and /tmp/... paths; this reveals only that they exist.
-	b.WriteString("(allow sysctl-read)\n(allow file-read-metadata (literal \"/var\") (literal \"/tmp\") (literal \"/etc\"))\n")
+	b.WriteString("(allow sysctl-read)\n(allow file-read-metadata (literal \"/var\") (literal \"/tmp\") (literal \"/etc\")")
+	// Libraries such as SQLite stat every directory on the path to their
+	// files; the state directory's ancestors are visible as metadata only.
+	for dir := filepath.Dir(stateDir); dir != "/"; dir = filepath.Dir(dir) {
+		fmt.Fprintf(&b, " (literal %s)", quote(dir))
+	}
+	b.WriteString(")\n")
 	fmt.Fprintf(&b, "(allow file-read* (literal \"/\") (literal %s) (subpath \"/usr/lib\") (subpath \"/System\") "+
 		"(subpath \"/private/var/db/dyld\") (subpath %s) (literal \"/dev/null\") (literal \"/dev/urandom\") (literal \"/dev/random\"))\n",
 		quote(binary), quote(stateDir))
