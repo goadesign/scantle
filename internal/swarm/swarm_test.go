@@ -165,6 +165,9 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 					Capabilities:  allRoles(),
 				},
 			},
+			Builders: []BuilderScope{
+				{Name: "orders", Paths: []string{"orders.go", "internal/orders/**"}},
+			},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, StatusConfigured, plan.Status)
@@ -201,6 +204,9 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 					Capabilities:  allRoles(),
 				},
 			},
+			Builders: []BuilderScope{
+				{Name: "orders", Paths: []string{"orders.go", "internal/orders/**"}},
+			},
 		})
 		require.NoError(t, err)
 		assert.Equal(t, StatusConfigured, plan.Status)
@@ -208,6 +214,43 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 		assert.False(t, plan.CrossFamilyReview)
 		assert.False(t, plan.CrossFamilyEval)
 		assert.Contains(t, plan.Summary, "single-family routing")
+	})
+
+	// Case 2b: Pinned builder in family B + unpinned builder with profiles A and B
+	// aligns unpinned builder with family B so family A stays disjoint for review/eval.
+	t.Run("pinned_builder_family_aligns_unpinned_builder_to_preserve_cross_family_review", func(t *testing.T) {
+		t.Parallel()
+		plan, err := Plan(Request{
+			ChangeID:     "chg-2b",
+			DesignDigest: "sha256:2b",
+			Profiles: []ProviderProfile{
+				{
+					ID:            "claude-opus",
+					Provider:      "anthropic",
+					Model:         "claude-opus-4-6",
+					Family:        "claude",
+					Authenticated: true,
+					Capabilities:  allRoles(),
+				},
+				{
+					ID:            "codex-gpt5",
+					Provider:      "openai",
+					Model:         "gpt-5.2-codex",
+					Family:        "gpt",
+					Authenticated: true,
+					Capabilities:  allRoles(),
+				},
+			},
+			Builders: []BuilderScope{
+				{Name: "api", Paths: []string{"cmd/orders/**"}, PreferredProfileID: "codex-gpt5"},
+				{Name: "orders", Paths: []string{"internal/orders/**"}},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, StatusConfigured, plan.Status)
+		assert.True(t, plan.CrossFamilyReview)
+		assert.True(t, plan.CrossFamilyEval)
+		assert.False(t, plan.SingleFamily)
 	})
 
 	// Case 3: Mixed-family builders forced across the only 2 families with 1 global reviewer.
@@ -284,6 +327,41 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 		assert.Equal(t, requiredRoles, plan.MissingRoles)
 		assert.Empty(t, plan.Assignments)
 		assert.ErrorContains(t, RequireReady(plan), "unconfigured")
+	})
+
+	// Case 5b: Authenticated profiles without explicit builder scopes returns unconfigured status for builder role.
+	t.Run("profiles_without_builders_returns_unconfigured_builder_scope", func(t *testing.T) {
+		t.Parallel()
+		plan, err := Plan(Request{
+			ChangeID:     "chg-5b",
+			DesignDigest: "sha256:5b",
+			Profiles: []ProviderProfile{
+				{ID: "p1", Provider: "anthropic", Model: "m1", Family: "claude", Authenticated: true, Capabilities: allRoles()},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, StatusUnconfigured, plan.Status)
+		assert.Equal(t, []RoleKind{RoleBuilder}, plan.MissingRoles)
+		assert.Empty(t, plan.Assignments)
+		assert.ErrorContains(t, RequireReady(plan), "unconfigured")
+	})
+
+	// Case 5c: Absolute or parent-traversing ownership paths are rejected at the boundary.
+	t.Run("absolute_or_traversing_paths_rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, badPath := range []string{"/outside/**", "../outside/**", "internal/../../outside/**"} {
+			_, err := Plan(Request{
+				ChangeID:     "chg-bad-path",
+				DesignDigest: "sha256:bad",
+				Profiles: []ProviderProfile{
+					{ID: "p1", Provider: "anthropic", Model: "m1", Family: "claude", Authenticated: true, Capabilities: allRoles()},
+				},
+				Builders: []BuilderScope{
+					{Name: "orders", Paths: []string{badPath}},
+				},
+			})
+			require.Error(t, err, "expected path %q to be rejected", badPath)
+		}
 	})
 
 	// Case 6: Duplicate profile IDs and long/colliding builder names.

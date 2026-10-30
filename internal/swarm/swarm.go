@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -62,7 +63,9 @@ type (
 		Profiles []ProviderProfile `json:"profiles"`
 		// ArchitectPaths lists the paths owned by @architect (defaults to ["design/**"] when empty).
 		ArchitectPaths []string `json:"architect_paths,omitempty"`
-		// Builders lists the explicit builder write scopes (defaults to a single module builder when empty).
+		// Builders lists the explicit builder write scopes. When empty, Plan
+		// reports Status "unconfigured" with MissingRoles ["builder"] rather than
+		// guessing repository paths.
 		Builders []BuilderScope `json:"builders,omitempty"`
 		// EvalPaths lists the isolated evaluator workspace paths (defaults to ["*-eval/**"] when empty).
 		EvalPaths []string `json:"eval_paths,omitempty"`
@@ -188,8 +191,14 @@ func Plan(req Request) (PlanResult, error) {
 	if err != nil {
 		return PlanResult{}, err
 	}
-	archPaths := normalizePaths(req.ArchitectPaths, []string{"design/**"})
-	evalPaths := normalizePaths(req.EvalPaths, []string{"*-eval/**"})
+	archPaths, err := normalizePaths(req.ArchitectPaths, []string{"design/**"})
+	if err != nil {
+		return PlanResult{}, fmt.Errorf("architect_paths: %w", err)
+	}
+	evalPaths, err := normalizePaths(req.EvalPaths, []string{"*-eval/**"})
+	if err != nil {
+		return PlanResult{}, fmt.Errorf("eval_paths: %w", err)
+	}
 
 	var eligible []ProviderProfile
 	for _, p := range profiles {
@@ -223,6 +232,13 @@ func Plan(req Request) (PlanResult, error) {
 				"Proposed swarm: missing_capability (no authenticated profile supports required role(s): %s).",
 				strings.Join(names, ", "),
 			),
+		}, nil
+	}
+	if len(builders) == 0 {
+		return PlanResult{
+			Status:       StatusUnconfigured,
+			MissingRoles: []RoleKind{RoleBuilder},
+			Summary:      "Proposed swarm: unconfigured (no explicit builder path scopes supplied; specify builders to assign write ownership before launching build jobs).",
 		}, nil
 	}
 
@@ -449,15 +465,11 @@ func validateAndSortProfiles(in []ProviderProfile) ([]ProviderProfile, error) {
 }
 
 // normalizeBuilders validates and canonically sorts BuilderScope entries so
-// Plan is invariant to input slice order.
+// Plan is invariant to input slice order. When in is empty, normalizeBuilders
+// returns nil without inventing guessed ownership paths.
 func normalizeBuilders(in []BuilderScope) ([]BuilderScope, error) {
 	if len(in) == 0 {
-		return []BuilderScope{
-			{
-				Name:  "service",
-				Paths: []string{"cmd/**", "internal/**"},
-			},
-		}, nil
+		return nil, nil
 	}
 	seenNames := make(map[string]bool, len(in))
 	out := make([]BuilderScope, 0, len(in))
@@ -470,7 +482,10 @@ func normalizeBuilders(in []BuilderScope) ([]BuilderScope, error) {
 			return nil, fmt.Errorf("duplicate builder scope name %q", name)
 		}
 		seenNames[name] = true
-		paths := normalizePaths(b.Paths, nil)
+		paths, err := normalizePaths(b.Paths, nil)
+		if err != nil {
+			return nil, fmt.Errorf("builder scope %q: %w", name, err)
+		}
 		if len(paths) == 0 {
 			return nil, fmt.Errorf("builder scope %q requires at least one owned path", name)
 		}
@@ -486,13 +501,20 @@ func normalizeBuilders(in []BuilderScope) ([]BuilderScope, error) {
 	return out, nil
 }
 
-// normalizePaths deduplicates and sorts path globs, falling back to defaults when empty.
-func normalizePaths(in, defaults []string) []string {
+// normalizePaths validates repository-relative path globs, deduplicates and
+// sorts them, and falls back to defaults when no non-empty path is supplied.
+func normalizePaths(in, defaults []string) ([]string, error) {
 	seen := make(map[string]bool, len(in))
 	var out []string
 	for _, p := range in {
 		trimmed := strings.TrimSpace(p)
-		if trimmed != "" && !seen[trimmed] {
+		if trimmed == "" {
+			continue
+		}
+		if err := validateRelativePathGlob(trimmed); err != nil {
+			return nil, err
+		}
+		if !seen[trimmed] {
 			seen[trimmed] = true
 			out = append(out, trimmed)
 		}
@@ -500,14 +522,32 @@ func normalizePaths(in, defaults []string) []string {
 	if len(out) == 0 && len(defaults) > 0 {
 		for _, p := range defaults {
 			trimmed := strings.TrimSpace(p)
-			if trimmed != "" && !seen[trimmed] {
+			if trimmed == "" {
+				continue
+			}
+			if err := validateRelativePathGlob(trimmed); err != nil {
+				return nil, err
+			}
+			if !seen[trimmed] {
 				seen[trimmed] = true
 				out = append(out, trimmed)
 			}
 		}
 	}
 	slices.Sort(out)
-	return out
+	return out, nil
+}
+
+// validateRelativePathGlob verifies that p is a repository-relative path glob
+// without leading slashes, volume prefixes, backslashes, or `..` parent traversal.
+func validateRelativePathGlob(p string) error {
+	if strings.HasPrefix(p, "/") || strings.Contains(p, "\\") || (len(p) >= 2 && p[1] == ':') {
+		return fmt.Errorf("ownership path %q must be repository-relative", p)
+	}
+	if slices.Contains(strings.Split(p, "/"), "..") {
+		return fmt.Errorf("ownership path %q must not traverse parent directories", p)
+	}
+	return nil
 }
 
 // profilesWithCapability filters profiles to those advertising role.
@@ -522,25 +562,58 @@ func profilesWithCapability(profiles []ProviderProfile, role RoleKind) []Provide
 }
 
 // selectBuilderProfiles chooses an authenticated builder-capable profile for
-// each BuilderScope. When no explicit PreferredProfileID overrides it, all
-// builders are kept in a single builder family that leaves a distinct family
-// available for @reviewer (and @eval-author) whenever possible.
+// each BuilderScope, resolving pinned builder profiles first and scoring the
+// default builder family against the union of pinned and unpinned builder
+// families so @reviewer and @eval-author retain disjoint families whenever possible.
 func selectBuilderProfiles(eligible []ProviderProfile, builders []BuilderScope) ([]ProviderProfile, error) {
 	builderCapable := profilesWithCapability(eligible, RoleBuilder)
 	reviewerCapable := profilesWithCapability(eligible, RoleReviewer)
 	evalCapable := profilesWithCapability(eligible, RoleEvalAuthor)
 
-	// Pick the best default builder family: prefer a family B where there exists
-	// a reviewer-capable profile with Family != B (and secondarily an
-	// eval-capable profile with Family != B).
+	byID := make(map[string]ProviderProfile, len(builderCapable))
+	for _, cand := range builderCapable {
+		byID[cand.ID] = cand
+	}
+
+	out := make([]ProviderProfile, len(builders))
+	pinnedFamilies := make(map[string]bool, len(builders))
+	hasUnpinned := false
+	for i, b := range builders {
+		if b.PreferredProfileID != "" {
+			prof, ok := byID[b.PreferredProfileID]
+			if !ok {
+				return nil, fmt.Errorf("builder %q preferred_profile_id %q is not an authenticated builder-capable profile", b.Name, b.PreferredProfileID)
+			}
+			out[i] = prof
+			pinnedFamilies[prof.Family] = true
+			continue
+		}
+		hasUnpinned = true
+	}
+	if !hasUnpinned {
+		return out, nil
+	}
+
+	// Score each candidate default builder family over the union of already-pinned
+	// builder families and cand.Family so unpinned builders align with pinned
+	// builders when doing so preserves a disjoint family for @reviewer/@eval-author.
 	var chosenDefault ProviderProfile
 	bestScore := -1
 	for _, cand := range builderCapable {
+		combined := maps.Clone(pinnedFamilies)
+		if combined == nil {
+			combined = make(map[string]bool, 1)
+		}
+		combined[cand.Family] = true
+
 		score := 0
-		if hasDisjointFamily(reviewerCapable, cand.Family) {
+		if hasDisjointFamilySet(reviewerCapable, combined) {
+			score += 4
+		}
+		if hasDisjointFamilySet(evalCapable, combined) {
 			score += 2
 		}
-		if hasDisjointFamily(evalCapable, cand.Family) {
+		if pinnedFamilies[cand.Family] {
 			score++
 		}
 		if score > bestScore {
@@ -549,9 +622,6 @@ func selectBuilderProfiles(eligible []ProviderProfile, builders []BuilderScope) 
 		}
 	}
 
-	// Collect all profiles in the chosen default builder family so multiple
-	// builders can round-robin within that same family without polluting other
-	// families needed for cross-family review.
 	var familyPool []ProviderProfile
 	for _, cand := range builderCapable {
 		if cand.Family == chosenDefault.Family {
@@ -559,30 +629,22 @@ func selectBuilderProfiles(eligible []ProviderProfile, builders []BuilderScope) 
 		}
 	}
 
-	byID := make(map[string]ProviderProfile, len(builderCapable))
-	for _, cand := range builderCapable {
-		byID[cand.ID] = cand
-	}
-
-	out := make([]ProviderProfile, len(builders))
+	unpinnedIdx := 0
 	for i, b := range builders {
 		if b.PreferredProfileID != "" {
-			prof, ok := byID[b.PreferredProfileID]
-			if !ok {
-				return nil, fmt.Errorf("builder %q preferred_profile_id %q is not an authenticated builder-capable profile", b.Name, b.PreferredProfileID)
-			}
-			out[i] = prof
 			continue
 		}
-		out[i] = familyPool[i%len(familyPool)]
+		out[i] = familyPool[unpinnedIdx%len(familyPool)]
+		unpinnedIdx++
 	}
 	return out, nil
 }
 
-// hasDisjointFamily reports whether any profile in candidates has a Family != family.
-func hasDisjointFamily(candidates []ProviderProfile, family string) bool {
+// hasDisjointFamilySet reports whether any profile in candidates has a Family
+// outside avoidFamilies.
+func hasDisjointFamilySet(candidates []ProviderProfile, avoidFamilies map[string]bool) bool {
 	for _, c := range candidates {
-		if c.Family != family {
+		if !avoidFamilies[c.Family] {
 			return true
 		}
 	}
