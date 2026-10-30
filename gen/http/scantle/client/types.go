@@ -332,7 +332,7 @@ type SwarmRoleItemResponseBody struct {
 	Family *string `form:"family,omitempty" json:"family,omitempty" xml:"family,omitempty"`
 	// Repository or workspace path globs owned by this role.
 	OwnedPaths []string `form:"owned_paths,omitempty" json:"owned_paths,omitempty" xml:"owned_paths,omitempty"`
-	// Workspace access boundary enforced by the job runner.
+	// Workspace access boundary required of the job runner.
 	AccessMode *string `form:"access_mode,omitempty" json:"access_mode,omitempty" xml:"access_mode,omitempty"`
 }
 

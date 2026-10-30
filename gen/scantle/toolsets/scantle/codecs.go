@@ -919,7 +919,7 @@ var previewArchitectureResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("assignments"), tools.DynamicField{}, tools.FixedField("access_mode")},
 		JSONType:    "string",
-		Description: "Workspace access boundary enforced by the job runner.",
+		Description: "Workspace access boundary required of the job runner.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("swarm"), tools.FixedField("cross_family_review")},
@@ -3732,7 +3732,7 @@ func validatePreviewArchitectureResultSwarmRoleItemTransportJSONValue(path strin
 		case "access_mode":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Workspace access boundary enforced by the job runner.",
+				typed[key], "Workspace access boundary required of the job runner.",
 			); err != nil {
 				return err
 			}

@@ -270,7 +270,7 @@ type (
 		Family string
 		// Repository or workspace path globs owned by this role.
 		OwnedPaths []string
-		// Workspace access boundary enforced by the job runner.
+		// Workspace access boundary required of the job runner.
 		AccessMode string
 	}
 	// ToolContractItem is a nested type used by the generated JSON contract.

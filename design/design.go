@@ -180,7 +180,7 @@ var SwarmRoleItem = Type("SwarmRoleItem", func() {
 	Attribute("model", String, "Assigned model identifier.")
 	Attribute("family", String, "Canonical model family identifier.")
 	Attribute("owned_paths", ArrayOf(String), "Repository or workspace path globs owned by this role.")
-	Attribute("access_mode", String, "Workspace access boundary enforced by the job runner.", func() {
+	Attribute("access_mode", String, "Workspace access boundary required of the job runner.", func() {
 		Enum("read_only_after_cp2", "read_write_worktree", "isolated_eval_workspace", "read_only_review")
 	})
 	Required(

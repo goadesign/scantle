@@ -1696,7 +1696,7 @@ components:
             properties:
                 access_mode:
                     type: string
-                    description: Workspace access boundary enforced by the job runner.
+                    description: Workspace access boundary required of the job runner.
                     example: read_write_worktree
                     enum:
                         - read_only_after_cp2

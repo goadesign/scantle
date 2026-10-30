@@ -11,11 +11,9 @@
 package swarm
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"maps"
-	"regexp"
 	"slices"
 	"strings"
 )
@@ -117,14 +115,6 @@ type (
 		// cross-family or single-family status.
 		Summary string `json:"summary"`
 	}
-
-	// ChorusSender is the narrow interface required to publish a pinned
-	// Collaboration Manifest to a Chorus channel.
-	ChorusSender interface {
-		// Send posts text to targetChannel (prefixed with '#') as agentHandle in
-		// swarmNamespace, pinning the message as the channel manifest when pin is true.
-		Send(ctx context.Context, swarmNamespace, agentHandle, targetChannel, text string, pin bool) error
-	}
 )
 
 const (
@@ -165,11 +155,6 @@ var (
 		RoleEvalAuthor,
 		RoleReviewer,
 	}
-
-	// chorusHandlePattern matches valid Chorus agent handles.
-	chorusHandlePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
-	// chorusChannelPattern matches valid Chorus channel names.
-	chorusChannelPattern = regexp.MustCompile(`^#[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
 )
 
 // Plan computes a deterministic proposed swarm role roster and model routing
@@ -377,37 +362,6 @@ func FormatManifest(changeID, designDigest string, plan PlanResult) (string, err
 		)
 	}
 	return b.String(), nil
-}
-
-// PublishManifest formats and publishes the pinned Collaboration Manifest to a
-// Chorus channel via the provided ChorusSender, returning the published text
-// only after the Chorus Send call succeeds.
-func PublishManifest(
-	ctx context.Context,
-	sender ChorusSender,
-	swarmNamespace, channel, senderHandle, changeID, designDigest string,
-	plan PlanResult,
-) (string, error) {
-	if sender == nil {
-		return "", errors.New("chorus sender is required")
-	}
-	if !chorusHandlePattern.MatchString(senderHandle) {
-		return "", fmt.Errorf("invalid Chorus sender handle %q", senderHandle)
-	}
-	if !chorusChannelPattern.MatchString(channel) {
-		return "", fmt.Errorf("invalid Chorus channel %q (must start with '#')", channel)
-	}
-	if strings.TrimSpace(swarmNamespace) == "" {
-		swarmNamespace = "default"
-	}
-	manifest, err := FormatManifest(changeID, designDigest, plan)
-	if err != nil {
-		return "", err
-	}
-	if err := sender.Send(ctx, swarmNamespace, senderHandle, channel, manifest, true); err != nil {
-		return "", fmt.Errorf("publish pinned Chorus manifest to %s: %w", channel, err)
-	}
-	return manifest, nil
 }
 
 // validateAndSortProfiles validates all configured ProviderProfile entries,

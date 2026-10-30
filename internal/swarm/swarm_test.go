@@ -1,10 +1,9 @@
 // Package swarm tests deterministic role planning, cross-family model routing,
-// handle collision safety, and Chorus manifest publication.
+// handle collision safety, and Chorus manifest formatting.
 package swarm
 
 import (
-	"context"
-	"errors"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -12,44 +11,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type (
-	// recordingChorusSender captures Chorus Send calls for testing PublishManifest.
-	recordingChorusSender struct {
-		// swarm records the Chorus swarm namespace passed to Send.
-		swarm string
-		// agent records the sender agent handle passed to Send.
-		agent string
-		// channel records the target channel passed to Send.
-		channel string
-		// text records the message payload passed to Send.
-		text string
-		// pin records whether Send requested a pinned manifest.
-		pin bool
-		// err is the synthetic error returned by Send when non-nil.
-		err error
-		// calls counts the number of Send invocations.
-		calls int
-	}
+var (
+	// testChorusHandlePattern matches valid Chorus agent handles (`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`).
+	testChorusHandlePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
 )
 
-// Send records the Chorus message parameters and returns r.err when configured.
-func (r *recordingChorusSender) Send(_ context.Context, swarmNamespace, agentHandle, targetChannel, text string, pin bool) error {
-	r.calls++
-	if r.err != nil {
-		return r.err
-	}
-	r.swarm = swarmNamespace
-	r.agent = agentHandle
-	r.channel = targetChannel
-	r.text = text
-	r.pin = pin
-	return nil
-}
-
-// TestPlanCrossFamilyRoutingOrderInvarianceAndManifestPublication verifies
+// TestPlanCrossFamilyRoutingOrderInvarianceAndManifestFormatting verifies
 // deterministic multi-family role assignment, input-order invariance, and
-// pinned Chorus manifest formatting and publication.
-func TestPlanCrossFamilyRoutingOrderInvarianceAndManifestPublication(t *testing.T) {
+// Chorus manifest formatting.
+func TestPlanCrossFamilyRoutingOrderInvarianceAndManifestFormatting(t *testing.T) {
 	t.Parallel()
 
 	profiles := []ProviderProfile{
@@ -117,21 +87,6 @@ func TestPlanCrossFamilyRoutingOrderInvarianceAndManifestPublication(t *testing.
 	assert.Contains(t, manifest1, "Status: proposed/configured")
 	assert.Contains(t, manifest1, "@builder-orders")
 	assert.Contains(t, manifest1, "@builder-refundflow")
-
-	// Verify PublishManifest calls ChorusSender with pin=true and propagates sender errors.
-	sender := &recordingChorusSender{}
-	published, err := PublishManifest(context.Background(), sender, "run-101", "#build", "architect", "chg-101", "sha256:abc123", planForward)
-	require.NoError(t, err)
-	assert.Equal(t, manifest1, published)
-	assert.Equal(t, 1, sender.calls)
-	assert.Equal(t, "run-101", sender.swarm)
-	assert.Equal(t, "architect", sender.agent)
-	assert.Equal(t, "#build", sender.channel)
-	assert.True(t, sender.pin)
-
-	failingSender := &recordingChorusSender{err: errors.New("chorus unavailable")}
-	_, err = PublishManifest(context.Background(), failingSender, "run-101", "#build", "architect", "chg-101", "sha256:abc123", planForward)
-	require.ErrorContains(t, err, "chorus unavailable")
 }
 
 // TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders verifies
@@ -392,7 +347,7 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 		seenHandles := make(map[string]bool)
 		for _, a := range plan.Assignments {
 			assert.LessOrEqual(t, len(a.Handle), maxChorusHandleLen)
-			assert.True(t, chorusHandlePattern.MatchString(a.Handle), "invalid Chorus handle %q", a.Handle)
+			assert.True(t, testChorusHandlePattern.MatchString(a.Handle), "invalid Chorus handle %q", a.Handle)
 			assert.False(t, seenHandles[a.Handle], "colliding Chorus handle %q", a.Handle)
 			seenHandles[a.Handle] = true
 			assert.False(t, strings.HasSuffix(a.Handle, "-"))

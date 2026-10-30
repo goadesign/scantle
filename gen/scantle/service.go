@@ -331,7 +331,7 @@ type SwarmRoleItem struct {
 	Family string
 	// Repository or workspace path globs owned by this role.
 	OwnedPaths []string
-	// Workspace access boundary enforced by the job runner.
+	// Workspace access boundary required of the job runner.
 	AccessMode string
 }
 
@@ -1115,7 +1115,7 @@ type jsonSwarmRoleItemTransport struct {
 	Family *string `json:"family"`
 	// Repository or workspace path globs owned by this role.
 	OwnedPaths []string `json:"owned_paths"`
-	// Workspace access boundary enforced by the job runner.
+	// Workspace access boundary required of the job runner.
 	AccessMode *string `json:"access_mode"`
 }
 
@@ -4804,7 +4804,7 @@ func validateArchitecturePreviewResultJSONValue15(path string, value any, descri
 		case "access_mode":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Workspace access boundary enforced by the job runner.",
+				typed[key], "Workspace access boundary required of the job runner.",
 			); err != nil {
 				return err
 			}
