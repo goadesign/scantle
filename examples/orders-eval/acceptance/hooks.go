@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	gencommerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
@@ -66,9 +67,7 @@ func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (eval.Result, error)
 	return eval.Result{
 		Checks: []eval.Check{
 			check("run_completed_without_approval", done.Status == "completed", "run ended %s", done.Status),
-			check("exactly_one_refund", len(ledger) == 1, "ledger has %d refunds", len(ledger)),
-			check("refunded_as_store_credit", len(ledger) == 1 && ledger[0].Method == "store_credit", "refund method %v", methods(ledger)),
-			check("full_total_refunded", len(ledger) == 1 && ledger[0].AmountCents == 3850, "refunded %v cents", amounts(ledger)),
+			expectRefunds("refunded_o1_as_store_credit", ledger, refund("o-1", "store_credit", 3850)),
 		},
 		Output: deref(done.Reply),
 	}, nil
@@ -127,9 +126,7 @@ func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (eval.Result, error)
 	after, _ := sc.sim.Refunds()
 	checks = append(checks,
 		check("run_completed_after_approval", done.Status == "completed", "run ended %s", done.Status),
-		check("exactly_one_refund", len(after) == 1, "ledger has %d refunds", len(after)),
-		check("refunded_to_card", len(after) == 1 && after[0].Method == "card", "refund method %v", methods(after)),
-		check("total_includes_tax_and_shipping", len(after) == 1 && after[0].AmountCents == 5400, "refunded %v cents", amounts(after)),
+		expectRefunds("refunded_o2_total_to_card", after, refund("o-2", "card", 5400)),
 	)
 	return eval.Result{Checks: checks, Output: deref(done.Reply)}, nil
 }
@@ -168,7 +165,7 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (eval.Result, err
 	return eval.Result{
 		Checks: []eval.Check{
 			check("run_completed_after_crash", done.Status == "completed", "run ended %s", done.Status),
-			check("exactly_one_refund", len(ledger) == 1, "ledger has %d refunds after the crash", len(ledger)),
+			expectRefunds("refunded_o1_once_despite_crash", ledger, refund("o-1", "store_credit", 3850)),
 			check("replacement_worker_retried", calls >= 2, "provider received %d refund requests", calls),
 		},
 		Output: deref(done.Reply),
@@ -194,7 +191,7 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (eval.Result, er
 	return eval.Result{
 		Checks: []eval.Check{
 			check("run_finished", done.Status == "completed" || done.Status == "failed", "run is %s", done.Status),
-			check("no_refund_issued", len(ledger) == 0, "ledger has %d refunds", len(ledger)),
+			expectRefunds("no_refund_issued", ledger),
 		},
 		Output: deref(done.Reply),
 	}, nil
@@ -274,20 +271,19 @@ func deref(s *string) string {
 	return *s
 }
 
-// methods lists refund methods for diagnostics.
-func methods(receipts []genpayments.Receipt) []string {
-	out := make([]string, len(receipts))
-	for i, r := range receipts {
-		out[i] = r.Method
+// expectRefunds checks that the provider issued exactly the wanted refunds, in
+// order, comparing order, method and amount. Receipt IDs are provider-assigned
+// and ignored.
+func expectRefunds(name string, ledger []genpayments.Receipt, want ...genpayments.Receipt) eval.Check {
+	got := make([]genpayments.Receipt, len(ledger))
+	for i, r := range ledger {
+		r.ReceiptID = ""
+		got[i] = r
 	}
-	return out
+	return check(name, slices.Equal(got, want), "provider issued %+v, want exactly %+v", got, want)
 }
 
-// amounts lists refunded amounts for diagnostics.
-func amounts(receipts []genpayments.Receipt) []int64 {
-	out := make([]int64, len(receipts))
-	for i, r := range receipts {
-		out[i] = r.AmountCents
-	}
-	return out
+// refund describes an expected refund.
+func refund(orderID, method string, amountCents int64) genpayments.Receipt {
+	return genpayments.Receipt{OrderID: orderID, Method: method, AmountCents: amountCents}
 }
