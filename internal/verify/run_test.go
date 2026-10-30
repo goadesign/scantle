@@ -139,46 +139,8 @@ func TestRunRefusesACommittedModuleLinkOutsideTheCheckout(t *testing.T) {
 		WorkDir:         t.TempDir(),
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "check out candidate: committed link module: resolves to")
+	assert.Contains(t, err.Error(), `candidate module "module": resolves to`)
 	assert.Contains(t, err.Error(), "outside")
-}
-
-func TestCheckoutRefusesCommittedLinksThatLeaveTheCheckout(t *testing.T) {
-	outside := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(outside, "main.go"), []byte("package main\n"), 0o600))
-	cases := []struct {
-		name    string
-		link    string
-		target  string
-		wantErr string
-	}{
-		{name: "source file linked outside", link: "cmd/suite/main.go", target: filepath.Join(outside, "main.go"), wantErr: "committed link cmd/suite/main.go: resolves to"},
-		{name: "relative link climbing out", link: "cmd/suite/main.go", target: "../../../" + filepath.Base(outside) + "/main.go", wantErr: "committed link cmd/suite/main.go"},
-		{name: "dangling link", link: "cmd/suite/gone.go", target: "missing.go", wantErr: "committed link cmd/suite/gone.go"},
-		{name: "link inside the checkout", link: "cmd/suite/main.go", target: "../../shared/main.go"},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			repo := filepath.Join(t.TempDir(), "repo")
-			require.NoError(t, os.MkdirAll(filepath.Join(repo, "cmd", "suite"), 0o700))
-			require.NoError(t, os.MkdirAll(filepath.Join(repo, "shared"), 0o700))
-			require.NoError(t, os.WriteFile(filepath.Join(repo, "shared", "main.go"), []byte("package main\n"), 0o600))
-			require.NoError(t, os.Symlink(c.target, filepath.Join(repo, filepath.FromSlash(c.link))))
-			git(t, repo, "init", "--quiet")
-			git(t, repo, "add", ".")
-			git(t, repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "--quiet", "-m", "c")
-			head := strings.TrimSpace(git(t, repo, "rev-parse", "HEAD"))
-
-			r := &runner{evidenceDir: t.TempDir()}
-			err := r.checkout(t.Context(), "suite", repo, head, filepath.Join(t.TempDir(), "clone"))
-			if c.wantErr == "" {
-				assert.NoError(t, err)
-				return
-			}
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), c.wantErr)
-		})
-	}
 }
 
 func TestCheckoutRecordsTheExactCommitInEitherObjectFormat(t *testing.T) {

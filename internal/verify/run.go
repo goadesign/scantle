@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -105,17 +104,20 @@ const (
 )
 
 // Run clones the candidate at its exact commit and builds its binaries into
-// WorkDir/candidate-bin, then
-// clones the suite at its exact commit, builds it into WorkDir/suite-bin, asks
-// it for its declaration, runs it
-// against the built binaries, and returns the CP4 report bound to everything
-// that was tested. The report is also written to ReportDir as <digest>.json.
+// WorkDir/candidate-bin, then clones the suite at its exact commit, builds it
+// into WorkDir/suite-bin, asks it for its declaration, runs it against the
+// built binaries, and returns the CP4 report bound to everything that was
+// tested. The report is also written to ReportDir as <digest>.json.
 //
-// The candidate is compiled only through candidate.Build: an OS sandbox in
-// which the build reads nothing but the candidate module, the toolchain and the
-// module cache, writes nothing but its private directories, and has no network.
-// The suite is checked out only after the candidate is built. Every command's output goes to
-// files under WorkDir/evidence; errors quote only a bounded excerpt.
+// Both builds go through candidate.Build: an OS sandbox in which the build
+// reads nothing but its source tree, the toolchain and the module cache,
+// writes nothing but its private directories, and has no network. The
+// candidate's source tree is its module; the suite's is its whole checkout, so
+// it may replace sibling modules there. Either way, a committed link or replace
+// directive cannot make the build read source outside the bound commit. The
+// suite is checked out only after the candidate is built. Every command's
+// output goes to files under WorkDir/evidence; errors quote only a bounded
+// excerpt.
 //
 // A suite that produces no decodable eval.Report is an error. Otherwise the
 // report keeps the suite's evidence and exit status: a suite that ran and
@@ -175,7 +177,7 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 			return Report{}, fmt.Errorf("binary %q package %q: %w", name, pkg, err)
 		}
 	}
-	toolchain, err := r.prepareBuild(ctx, moduleDir, p.WorkDir)
+	toolchain, err := r.prepareBuild(ctx, "candidate", moduleDir, p.WorkDir)
 	if err != nil {
 		return Report{}, err
 	}
@@ -183,7 +185,7 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	for _, name := range slices.Sorted(maps.Keys(p.Binaries)) {
 		out := filepath.Join(candidateBinDir, name)
 		if err := candidate.Build(ctx, candidate.BuildSpec{
-			ModuleDir: moduleDir, Package: p.Binaries[name], Out: out,
+			SourceDir: moduleDir, ModuleDir: moduleDir, Package: p.Binaries[name], Out: out,
 			GOROOT: toolchain.goroot, ModCache: toolchain.modCache, WorkDir: toolchain.workDir,
 			LogFile: filepath.Join(r.evidenceDir, "build-"+name+".log"),
 		}); err != nil {
@@ -208,9 +210,19 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	if _, err := resolveInside(suiteModuleDir, p.SuiteCommand); err != nil {
 		return Report{}, fmt.Errorf("suite command %q: %w", p.SuiteCommand, err)
 	}
+	suiteToolchain, err := r.prepareBuild(ctx, "suite", suiteModuleDir, p.WorkDir)
+	if err != nil {
+		return Report{}, err
+	}
+	// The suite builds in the same sandbox as the candidate, readable only
+	// within its own checkout: its module may replace sibling modules there,
+	// but no link or replace can pull in source outside SuiteCommit.
 	suiteBin := filepath.Join(suiteBinDir, "suite")
-	if err := r.run(ctx, "build-suite", suiteModuleDir, nil,
-		"go", "build", "-o", suiteBin, p.SuiteCommand); err != nil {
+	if err := candidate.Build(ctx, candidate.BuildSpec{
+		SourceDir: suiteDir, ModuleDir: suiteModuleDir, Package: p.SuiteCommand, Out: suiteBin,
+		GOROOT: suiteToolchain.goroot, ModCache: suiteToolchain.modCache, WorkDir: suiteToolchain.workDir,
+		LogFile: filepath.Join(r.evidenceDir, "build-suite.log"),
+	}); err != nil {
 		return Report{}, fmt.Errorf("build suite: %w", err)
 	}
 	suite, err := r.describe(ctx, suiteBin)
@@ -230,34 +242,6 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		return Report{}, err
 	}
 	return report, nil
-}
-
-// linksStayInside walks the checkout at dir, skipping .git, and fails when a
-// symbolic link does not resolve to an existing path inside dir. Builds follow
-// file and directory links, so a committed link to an outside file would
-// otherwise build bytes the checked-out commit does not contain. Links that
-// stay inside the checkout are allowed; dangling links are rejected because
-// their target could appear outside the checkout later.
-func linksStayInside(dir string) error {
-	return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() && d.Name() == ".git" && filepath.Dir(path) == dir {
-			return filepath.SkipDir
-		}
-		if d.Type()&fs.ModeSymlink == 0 {
-			return nil
-		}
-		rel, err := filepath.Rel(dir, path)
-		if err != nil {
-			return err
-		}
-		if _, err := resolveInside(dir, rel); err != nil {
-			return fmt.Errorf("committed link %s: %w", filepath.ToSlash(rel), err)
-		}
-		return nil
-	})
 }
 
 // resolveInside resolves rel, a path relative to the directory root, following
@@ -330,9 +314,6 @@ func (r *runner) checkout(ctx context.Context, label, repo, commit, dir string) 
 	}
 	if got := strings.TrimSpace(string(head)); got != commit {
 		return fmt.Errorf("check out %s: HEAD is %s, want %s", label, got, commit)
-	}
-	if err := linksStayInside(dir); err != nil {
-		return fmt.Errorf("check out %s: %w", label, err)
 	}
 	return nil
 }
@@ -462,18 +443,20 @@ type buildToolchain struct {
 	workDir string
 }
 
-// prepareBuild resolves the toolchain the candidate module selects and
-// downloads its module dependencies, outside the sandbox. These steps fetch
-// checksum-verified modules and official toolchains and execute no candidate
-// code; the sandboxed build afterwards runs with no network.
-func (r *runner) prepareBuild(ctx context.Context, moduleDir, workDir string) (buildToolchain, error) {
-	if err := r.run(ctx, "go-mod-download", moduleDir, nil, "go", "mod", "download"); err != nil {
-		return buildToolchain{}, fmt.Errorf("download candidate modules: %w", err)
+// prepareBuild resolves the toolchain the module at moduleDir selects and
+// downloads its module dependencies, outside the sandbox, for the build named
+// label ("candidate" or "suite"). These steps fetch checksum-verified modules
+// and official toolchains and compile or execute no checked-out code; the
+// sandboxed build afterwards runs with no network. Evidence files and the
+// build home are named by label so the two builds never share them.
+func (r *runner) prepareBuild(ctx context.Context, label, moduleDir, workDir string) (buildToolchain, error) {
+	if err := r.run(ctx, "go-mod-download-"+label, moduleDir, nil, "go", "mod", "download"); err != nil {
+		return buildToolchain{}, fmt.Errorf("download %s modules: %w", label, err)
 	}
-	if err := r.run(ctx, "go-env", moduleDir, nil, "go", "env", "GOROOT", "GOMODCACHE"); err != nil {
-		return buildToolchain{}, fmt.Errorf("resolve candidate toolchain: %w", err)
+	if err := r.run(ctx, "go-env-"+label, moduleDir, nil, "go", "env", "GOROOT", "GOMODCACHE"); err != nil {
+		return buildToolchain{}, fmt.Errorf("resolve %s toolchain: %w", label, err)
 	}
-	out, err := os.ReadFile(filepath.Join(r.evidenceDir, "go-env.stdout"))
+	out, err := os.ReadFile(filepath.Join(r.evidenceDir, "go-env-"+label+".stdout"))
 	if err != nil {
 		return buildToolchain{}, fmt.Errorf("read toolchain: %w", err)
 	}
@@ -481,7 +464,7 @@ func (r *runner) prepareBuild(ctx context.Context, moduleDir, workDir string) (b
 	if len(lines) != 2 {
 		return buildToolchain{}, fmt.Errorf("unexpected go env output %q", out)
 	}
-	t := buildToolchain{goroot: lines[0], modCache: lines[1], workDir: filepath.Join(workDir, "build-home")}
+	t := buildToolchain{goroot: lines[0], modCache: lines[1], workDir: filepath.Join(workDir, "build-home-"+label)}
 	if err := os.MkdirAll(t.workDir, 0o700); err != nil {
 		return buildToolchain{}, fmt.Errorf("create build home: %w", err)
 	}

@@ -221,8 +221,13 @@ func Exec(ctx context.Context, a Artifact, spec Spec) (*Process, error) {
 
 // BuildSpec describes one sandboxed compile of candidate source.
 type BuildSpec struct {
-	// ModuleDir is the candidate module's directory, the only source tree
-	// the build may read.
+	// SourceDir is the only source tree the build may read, such as the
+	// candidate module or a whole checkout whose modules replace each other.
+	// Every source file the build reads, including through symbolic links and
+	// local replace directives, must resolve inside it.
+	SourceDir string
+	// ModuleDir is the directory of the module being built. It must resolve
+	// inside SourceDir.
 	ModuleDir string
 	// Package is the package to build, relative to ModuleDir, such as
 	// "./cmd/orders".
@@ -244,10 +249,9 @@ type BuildSpec struct {
 // after it is killed.
 const buildStopGrace = 10 * time.Second
 
-// Build compiles candidate source in the build sandbox. The Go toolchain may
-// start its own compiler, assembler and linker, but the build can read only
-// the candidate module, the toolchain, the read-only module cache and system
-// libraries; write only its private work directory and output directory; and
+// Build compiles source in the build sandbox. The Go toolchain may start its
+// own compiler, assembler and linker, but the build can read only SourceDir,
+// the toolchain, the read-only module cache and system libraries; write only its private work directory and output directory; and
 // use no network. Directives in candidate source, such as an assembly
 // #include of an outside file, are denied by the operating system. It fails
 // with ErrIsolationUnavailable where the sandbox cannot be enforced.
@@ -258,13 +262,19 @@ func Build(ctx context.Context, spec BuildSpec) error {
 	if _, err := os.Stat(sandboxExec); err != nil {
 		return fmt.Errorf("%w: %v", ErrIsolationUnavailable, err)
 	}
-	paths := map[string]*string{"module": &spec.ModuleDir, "goroot": &spec.GOROOT, "modcache": &spec.ModCache, "work": &spec.WorkDir}
+	paths := map[string]*string{
+		"source": &spec.SourceDir, "module": &spec.ModuleDir, "goroot": &spec.GOROOT,
+		"modcache": &spec.ModCache, "work": &spec.WorkDir,
+	}
 	for name, p := range paths {
 		resolved, err := filepath.EvalSymlinks(*p)
 		if err != nil {
 			return fmt.Errorf("resolve %s directory: %w", name, err)
 		}
 		*p = resolved
+	}
+	if rel, err := filepath.Rel(spec.SourceDir, spec.ModuleDir); err != nil || !filepath.IsLocal(rel) {
+		return fmt.Errorf("module directory %s is outside source directory %s", spec.ModuleDir, spec.SourceDir)
 	}
 	outDir, err := filepath.EvalSymlinks(filepath.Dir(spec.Out))
 	if err != nil {
@@ -276,7 +286,7 @@ func Build(ctx context.Context, spec BuildSpec) error {
 	}
 	defer logFile.Close()
 	goBin := filepath.Join(spec.GOROOT, "bin", "go")
-	profile := BuildProfile(spec.ModuleDir, spec.GOROOT, spec.ModCache, spec.WorkDir, outDir)
+	profile := BuildProfile(spec.SourceDir, spec.GOROOT, spec.ModCache, spec.WorkDir, outDir)
 	cmd := exec.CommandContext(ctx, sandboxExec, "-p", profile, goBin, "build", "-trimpath",
 		"-o", filepath.Join(outDir, filepath.Base(spec.Out)), spec.Package)
 	cmd.Dir = spec.ModuleDir
@@ -309,17 +319,17 @@ func Build(ctx context.Context, spec BuildSpec) error {
 
 // BuildProfile renders the build sandbox profile. Paths must be absolute and
 // free of symlinks.
-func BuildProfile(moduleDir, goroot, modCache, workDir, outDir string) string {
+func BuildProfile(sourceDir, goroot, modCache, workDir, outDir string) string {
 	var b strings.Builder
 	b.WriteString("(version 1)\n(deny default)\n(allow process-fork)\n(allow sysctl-read)\n(allow signal (target self))\n")
 	fmt.Fprintf(&b, "(allow process-exec (subpath %s))\n", quote(goroot))
 	fmt.Fprintf(&b, "(allow file-read* (literal \"/\") (subpath \"/usr/lib\") (subpath \"/System\") (subpath \"/private/var/db/dyld\") "+
 		"(literal \"/dev/null\") (literal \"/dev/urandom\") (literal \"/dev/random\") "+
 		"(subpath %s) (subpath %s) (subpath %s) (subpath %s) (subpath %s))\n",
-		quote(moduleDir), quote(goroot), quote(modCache), quote(workDir), quote(outDir))
+		quote(sourceDir), quote(goroot), quote(modCache), quote(workDir), quote(outDir))
 	fmt.Fprintf(&b, "(allow file-write* (subpath %s) (subpath %s) (literal \"/dev/null\"))\n", quote(workDir), quote(outDir))
 	b.WriteString("(allow file-read-metadata (literal \"/var\") (literal \"/tmp\") (literal \"/etc\")")
-	for _, root := range []string{moduleDir, goroot, modCache, workDir, outDir} {
+	for _, root := range []string{sourceDir, goroot, modCache, workDir, outDir} {
 		for dir := filepath.Dir(root); dir != "/"; dir = filepath.Dir(dir) {
 			fmt.Fprintf(&b, " (literal %s)", quote(dir))
 		}
