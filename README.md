@@ -45,12 +45,13 @@ Most AI-built codebases rot after a few weeks because every prompt invents a new
 ### 3. Mixed-model teams where the builder never grades its own homework
 When configured with provider profiles (`-swarm-profiles`) and explicit builder path scopes, Scantle routes each role to the right model family and class—frontier reasoning models for architecture and security review, fast coding models for scoped implementation, and a **disjoint model family** for test authoring. Final verification (`internal/verify`) runs inside an **OS sandbox** (`verify/candidate`) the builder cannot touch:
 - **Unseen holdout tests:** Hidden scenarios verify security and edge cases while [`Report.ForBuilders()`](internal/verify/report.go) strips holdout names, inputs, and logs from the builder's view, making "teaching to the test" impossible.
-- **Real `kill -9` crash & budget proof:** The included [`examples/orders-eval`](examples/orders-eval/) reference suite kills the Temporal worker mid-transaction (`kill -9`), restarts the API during paused approvals, and fails the build when seeded payload bloat blows past the scenario's runtime LLM token budget (`go test -race -tags e2e`).
+- **Real `kill -9` crash & budget proof:** The included [`examples/orders-eval`](examples/orders-eval/) reference suite (`scantle verify` or `go test -race -tags e2e`) kills the Temporal worker mid-transaction (`kill -9`), restarts the API during paused approvals, and fails the build when seeded payload bloat blows past the scenario's runtime LLM token budget.
 
 ### 4. Fast draft overrides and live role-switched testing
 Instead of reading a 2,000-line diff blindly, Scantle separates fast prompt tuning from compiled business rules and ships stateful dependency simulators in [`examples/orders-eval`](examples/orders-eval/):
 - **Test across real auth boundaries:** In the reference platform, trigger a `\$54.00` refund as a **Customer**, verify that customer credentials cannot approve it (`403 Forbidden`), and switch to **Approving Manager** to approve or decline the paused workflow through the real HTTP API.
-- **Iterate on prompts in 0 seconds:** When a host binds `Options.TargetUpdater`, `draft_override` (`POST /sandbox/draft`) hot-reloads prompt wording on the target's `prompt.Store` in **0 seconds**—while Scantle refuses any attempt to override compiled Go business rules (`target_kind: "compiled_rule"`, `requires_rebuild: true`; standalone `scantle serve` binds no `TargetUpdater`, so `prompt_template` overrides are rejected unless embedded). *(The `ui://scantle/checkpoint` MCP Apps resource currently serves the baseline HTML host shell; interactive role-switcher, replay, and OpenUI controls in the checkpoint web view are described in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough).)*
+- **Iterate on prompts in 0 seconds:** When a host binds `Options.TargetUpdater`, `draft_override` (`POST /sandbox/draft`) hot-reloads prompt wording on the target's `prompt.Store` in **0 seconds**—while Scantle refuses any attempt to override compiled Go business rules (`target_kind: "compiled_rule"`, `requires_rebuild: true`; standalone `scantle serve` binds no `TargetUpdater`, so `prompt_template` overrides are rejected unless embedded).
+- **Stateless MCP Apps checkpoint viewer (`ui://scantle/checkpoint`):** When embedded in an MCP Apps host, `GET /ui/checkpoint` completes the `ui/initialize` → `ui/notifications/initialized` handshake and renders validated CP1 Change Cards, CP2 C4 Architecture Previews, and CP3 Fast Draft results delivered via `ui/notifications/tool-result` without server-retained preview state (interactive role-switcher, replay buttons, and OpenUI action dispatch in the checkpoint web view are described in [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough)).
 
 > **Why the name "Scantle"?** A *scantle* is a slater’s gauge rod, notched once so every slate on a roof is measured against the same hard edge. In Scantle, `design/*.go` is that gauge rod—one compiled contract every builder works to, and an independent verifier measures against.
 
@@ -58,29 +59,33 @@ Instead of reading a 2,000-line diff blindly, Scantle separates fast prompt tuni
 
 ## Try It in 60 Seconds
 
-Start the Scantle control plane, connect your coding assistant, and watch it evolve the included [`examples/orders`](examples/orders/) platform:
+Start the Scantle control plane, connect your coding assistant, and watch it evolve or verify the included [`examples/orders`](examples/orders/README.md) reference platform:
 
 ```bash
-# 1. Start the Scantle MCP & HTTP control plane with a CP1 model provider
+# 1. Start the Scantle MCP & HTTP control plane with CP1 model analysis and multi-family swarm profiles
 export SCANTLE_AUTH_TOKEN="dev-secret-token"
 export ANTHROPIC_API_KEY="sk-ant-..."
 go run ./cmd/scantle serve \
   -addr 127.0.0.1:8090 \
   -principal operator@example.com \
   -model-provider anthropic \
-  -model-name claude-opus-4-6
+  -model-name claude-opus-4-6 \
+  -swarm-profiles ./examples/orders/swarm-profiles.example.json
 ```
 
 Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` setup](docs/REFERENCE.md#quickstart--mcp-configuration) and [`-swarm-profiles` configuration](docs/REFERENCE.md#configure-the-proposed-swarm-roster)) and prompt your agent:
 
 > *"Using Scantle, propose a change to `examples/orders` so VIP customers get instant store-credit refunds up to \$150, then preview the compiled C4 architecture and Chorus swarm plan for builder scope `orders` (`internal/**`)."*
 
-Your agent will create the Change Card (`propose_change`, calling `confirm_intent` only if open ambiguity questions yield `status: "needs_confirmation"`), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and Chorus build roster (pass `-swarm-profiles <path.json>` on `scantle serve` to populate cross-family model assignments).
+Your agent will create the Change Card (`propose_change`, calling `confirm_intent` only if open ambiguity questions yield `status: "needs_confirmation"`), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and cross-family Chorus build roster (`@architect`, `@builder-orders`, `@eval-author`, `@reviewer`).
+
+To run the full OS-sandboxed verification suite (and compare the full operator report with the builder-redacted `-builder-view` report where unseen holdout scenarios appear as `holdout-1`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
 
 ---
 
 ## Dive Deeper
 
+- **[Orders Reference Platform (`examples/orders/README.md`)](examples/orders/README.md)** — Walk through the Golden Path `orders` platform, run `scantle verify` (full vs. `-builder-view`), and watch `TestSeededPayloadBloatFailsTheBudget` catch a token regression.
 - **[How Scantle Works (`docs/HOW_IT_WORKS.md`)](docs/HOW_IT_WORKS.md)** — Walk through the 5 checkpoints (`CP1`–`CP5`), cross-model Chorus routing, the live role-switching sandbox, and OS-isolated verification.
 - **[Golden Path Architecture (`docs/ARCHITECTURE_PLAYBOOK.md`)](docs/ARCHITECTURE_PLAYBOOK.md)** — Explore the 7 Golden Path rules that keep Scantle platforms maintainable and see how the Goa Design suite powers them.
 - **[CLI, MCP & Repo Reference (`docs/REFERENCE.md`)](docs/REFERENCE.md)** — Copy `.mcp.json` configuration, browse the MCP tools and CLI flags, and run the [`examples/orders`](examples/orders/) reference suite.
