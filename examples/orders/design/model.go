@@ -21,7 +21,7 @@ var _ = m.Design("Orders platform", "Refund assistant for a merchant's customers
 			m.Uses("Run store", "Saves runs, transcripts and pending approvals", "SQLite", m.Synchronous)
 			m.Uses("Workflow engine", "Runs agent turns and starts one refund workflow per order", "Temporal, gRPC", m.Synchronous)
 			m.Uses("Commerce system", "Lists and reads the customer's orders", "HTTPS, JSON", m.Synchronous)
-			m.Uses("Language model", "Plans the next tool call", "HTTPS", m.Synchronous)
+			m.Uses("Language model", "Plans the next tool call through the configured model connection", "HTTPS to the provider, or gRPC to a goa-ai model gateway", m.Synchronous)
 		})
 		m.Container("Refund worker", "Completes each refund exactly once, retrying after crashes with the same idempotency key.", "Go, Temporal", func() {
 			m.Uses("Workflow engine", "Polls for refund workflows", "Temporal, gRPC", m.Synchronous)
@@ -39,7 +39,7 @@ var _ = m.Design("Orders platform", "Refund assistant for a merchant's customers
 	m.SoftwareSystem("Payment provider", "Moves money for refunds; honors idempotency keys.", func() {
 		m.External()
 	})
-	m.SoftwareSystem("Language model", "Hosted model the refund agent uses to choose tools.", func() {
+	m.SoftwareSystem("Language model", "Model the refund agent uses to choose tools: a hosted provider by default (--model-provider anthropic), or any model behind a goa-ai model gateway (--model-provider gateway). The scripted demo stand-in (--model-provider scripted) runs inside the Orders API and needs no connection.", func() {
 		m.External()
 	})
 
