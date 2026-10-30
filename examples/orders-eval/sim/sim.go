@@ -44,6 +44,10 @@ type (
 		ledger []*genpayments.Receipt
 		// calls counts every refund request, duplicates included.
 		calls int
+		// hold, when set, receives the order ID of the next new refund after
+		// it is recorded; the simulator then withholds that response until
+		// the caller disconnects. It is disarmed after one use.
+		hold chan string
 	}
 
 	// keyedRefund is the refund command an idempotency key was first used
@@ -86,6 +90,7 @@ func (s *Sim) Reset(fixtures ...Fixture) {
 	s.refunded = map[string]*genpayments.Receipt{}
 	s.ledger = nil
 	s.calls = 0
+	s.hold = nil
 	for _, f := range fixtures {
 		orders := append([]*gencommerce.Order(nil), f.Orders...)
 		sort.SliceStable(orders, func(i, j int) bool { return orders[i].PlacedAt > orders[j].PlacedAt })
@@ -107,6 +112,18 @@ func (s *Sim) Refunds() ([]genpayments.Receipt, int) {
 		out[i] = *r
 	}
 	return out, s.calls
+}
+
+// HoldNextRefund arms a one-shot fault: the next new refund is recorded (the
+// money moves) and its order ID is sent on the returned channel, but the
+// response is withheld until the caller disconnects. Crash tests use it to kill
+// the worker at the exact point after the provider accepted the refund and
+// before the worker learned of it.
+func (s *Sim) HoldNextRefund() <-chan string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.hold = make(chan string, 1)
+	return s.hold
 }
 
 // Serve serves the commerce and payments APIs on a loopback port until ctx
@@ -174,7 +191,19 @@ func (s *Sim) GetOrder(_ context.Context, p *gencommerce.GetOrderPayload) (*genc
 // reused for a different refund is refused. A second refund of the same
 // order under a different key, or a refund larger than the order total, is
 // refused.
-func (s *Sim) Refund(_ context.Context, p *genpayments.RefundPayload) (*genpayments.Receipt, error) {
+func (s *Sim) Refund(ctx context.Context, p *genpayments.RefundPayload) (*genpayments.Receipt, error) {
+	r, hold, err := s.refund(p)
+	if err != nil || hold == nil {
+		return r, err
+	}
+	hold <- p.OrderID
+	<-ctx.Done()
+	return nil, fmt.Errorf("caller disconnected while the refund response was withheld: %w", ctx.Err())
+}
+
+// refund applies one refund request and returns the receipt, plus the armed
+// hold channel when this new refund must have its response withheld.
+func (s *Sim) refund(p *genpayments.RefundPayload) (*genpayments.Receipt, chan string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.calls++
@@ -182,19 +211,19 @@ func (s *Sim) Refund(_ context.Context, p *genpayments.RefundPayload) (*genpayme
 	command.IdempotencyKey = ""
 	if prior, ok := s.receipts[p.IdempotencyKey]; ok {
 		if prior.command != command {
-			return nil, fmt.Errorf("idempotency key %q was already used for a different refund", p.IdempotencyKey)
+			return nil, nil, fmt.Errorf("idempotency key %q was already used for a different refund", p.IdempotencyKey)
 		}
-		return prior.receipt, nil
+		return prior.receipt, nil, nil
 	}
 	orderKey := key(p.TenantID, p.OrderID)
 	if _, ok := s.owners[orderKey]; !ok {
-		return nil, fmt.Errorf("tenant %s has no order %s", p.TenantID, p.OrderID)
+		return nil, nil, fmt.Errorf("tenant %s has no order %s", p.TenantID, p.OrderID)
 	}
 	if prior, ok := s.refunded[orderKey]; ok {
-		return nil, fmt.Errorf("order %s was already refunded by receipt %s", p.OrderID, prior.ReceiptID)
+		return nil, nil, fmt.Errorf("order %s was already refunded by receipt %s", p.OrderID, prior.ReceiptID)
 	}
 	if total := s.totals[orderKey]; p.AmountCents > total {
-		return nil, fmt.Errorf("refund of %d cents exceeds order total of %d cents", p.AmountCents, s.totals[orderKey])
+		return nil, nil, fmt.Errorf("refund of %d cents exceeds order total of %d cents", p.AmountCents, s.totals[orderKey])
 	}
 	r := &genpayments.Receipt{
 		ReceiptID:   fmt.Sprintf("rcpt-%d", len(s.ledger)+1),
@@ -205,7 +234,9 @@ func (s *Sim) Refund(_ context.Context, p *genpayments.RefundPayload) (*genpayme
 	s.receipts[p.IdempotencyKey] = keyedRefund{command: command, receipt: r}
 	s.refunded[orderKey] = r
 	s.ledger = append(s.ledger, r)
-	return r, nil
+	hold := s.hold
+	s.hold = nil
+	return r, hold, nil
 }
 
 // key joins identifiers into a map key.

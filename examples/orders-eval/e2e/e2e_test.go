@@ -124,8 +124,9 @@ func startTemporal(t *testing.T) string {
 	return addr
 }
 
-// start runs a command until the test ends, logging its output on failure.
-func start(t *testing.T, name string, env []string, args ...string) {
+// start runs a command until the test ends, logging its output on failure,
+// and returns it so a test can kill it early.
+func start(t *testing.T, name string, env []string, args ...string) *exec.Cmd {
 	t.Helper()
 	var out bytes.Buffer
 	cmd := exec.Command(name, args...)
@@ -139,6 +140,7 @@ func start(t *testing.T, name string, env []string, args ...string) {
 			t.Logf("%s output:\n%s", filepath.Base(name), out.String())
 		}
 	})
+	return cmd
 }
 
 // freeAddr returns a loopback address with a free port.
