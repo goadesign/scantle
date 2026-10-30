@@ -28,13 +28,14 @@ import (
 )
 
 type (
-	// Artifact is one candidate binary pinned by the digest verify computed
-	// when it built the candidate.
+	// Artifact is one candidate binary pinned into verifier-owned, read-only
+	// storage. Only Pin creates Artifacts, so an Artifact always names a copy
+	// the candidate's builder never wrote and the verifier never rewrites.
 	Artifact struct {
-		// Path is the absolute path of the binary.
-		Path string
-		// Digest is the lowercase hex SHA-256 of the binary's bytes.
-		Digest string
+		// path is the absolute, symlink-free path of the pinned copy.
+		path string
+		// digest is the lowercase hex SHA-256 of the pinned copy's bytes.
+		digest string
 	}
 
 	// Spec describes how to run one candidate process.
@@ -83,17 +84,83 @@ var ErrIsolationUnavailable = errors.New("candidate isolation is unavailable on 
 // ErrDigestMismatch reports that the binary on disk is not the pinned artifact.
 var ErrDigestMismatch = errors.New("candidate binary does not match its pinned digest")
 
-// NewArtifact pins the binary at path by its current SHA-256 digest.
-func NewArtifact(path string) (Artifact, error) {
-	abs, err := filepath.Abs(path)
+// Pin copies the binary at src into store, the verifier's own artifact
+// directory, as <store>/<sha256>/<name> with read-only permissions, and returns
+// the pinned Artifact. The digest is computed over the bytes written to the
+// pinned copy, so later changes to src cannot affect it. Pinning the same bytes
+// twice reuses the existing copy after re-checking its digest.
+func Pin(store, src string) (Artifact, error) {
+	in, err := os.Open(src)
 	if err != nil {
-		return Artifact{}, fmt.Errorf("resolve %s: %w", path, err)
+		return Artifact{}, fmt.Errorf("open %s: %w", src, err)
 	}
-	digest, err := fileDigest(abs)
+	defer in.Close()
+	if err := os.MkdirAll(store, 0o700); err != nil {
+		return Artifact{}, fmt.Errorf("create artifact store: %w", err)
+	}
+	tmp, err := os.CreateTemp(store, ".pin-*")
 	if err != nil {
-		return Artifact{}, err
+		return Artifact{}, fmt.Errorf("create pinned copy: %w", err)
 	}
-	return Artifact{Path: abs, Digest: digest}, nil
+	defer os.Remove(tmp.Name())
+	h := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(tmp, h), in); err != nil {
+		_ = tmp.Close()
+		return Artifact{}, fmt.Errorf("copy %s: %w", src, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return Artifact{}, fmt.Errorf("close pinned copy: %w", err)
+	}
+	digest := hex.EncodeToString(h.Sum(nil))
+	dir := filepath.Join(store, digest)
+	path := filepath.Join(dir, filepath.Base(src))
+	if _, err := os.Stat(path); err == nil {
+		got, err := fileDigest(path)
+		if err != nil || got != digest {
+			return Artifact{}, fmt.Errorf("%w: existing pinned copy %s", ErrDigestMismatch, path)
+		}
+		return resolvedArtifact(path, digest)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return Artifact{}, fmt.Errorf("create pinned directory: %w", err)
+	}
+	if err := os.Chmod(tmp.Name(), 0o500); err != nil {
+		return Artifact{}, fmt.Errorf("protect pinned copy: %w", err)
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		return Artifact{}, fmt.Errorf("place pinned copy: %w", err)
+	}
+	if err := os.Chmod(dir, 0o500); err != nil {
+		return Artifact{}, fmt.Errorf("protect pinned directory: %w", err)
+	}
+	return resolvedArtifact(path, digest)
+}
+
+// RemoveStore deletes an artifact store created by Pin, restoring write
+// permission on its read-only directories first. Callers remove the store
+// once every process started from its artifacts has exited.
+func RemoveStore(store string) error {
+	err := filepath.WalkDir(store, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return os.Chmod(path, 0o700)
+		}
+		return nil
+	})
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("unprotect artifact store: %w", err)
+	}
+	if err := os.RemoveAll(store); err != nil {
+		return fmt.Errorf("remove artifact store: %w", err)
+	}
+	return nil
+}
+
+// Digest returns the pinned binary's lowercase hex SHA-256.
+func (a Artifact) Digest() string {
+	return a.digest
 }
 
 // Exec verifies the artifact's digest and starts it in the sandbox described by
@@ -105,21 +172,21 @@ func Exec(ctx context.Context, a Artifact, spec Spec) (*Process, error) {
 	if _, err := os.Stat(sandboxExec); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrIsolationUnavailable, err)
 	}
-	digest, err := fileDigest(a.Path)
+	if a.path == "" {
+		return nil, errors.New("artifact was not pinned")
+	}
+	digest, err := fileDigest(a.path)
 	if err != nil {
 		return nil, err
 	}
-	if digest != a.Digest {
-		return nil, fmt.Errorf("%w: %s is %s, pinned %s", ErrDigestMismatch, a.Path, digest, a.Digest)
+	if digest != a.digest {
+		return nil, fmt.Errorf("%w: %s is %s, pinned %s", ErrDigestMismatch, a.path, digest, a.digest)
 	}
 	stateDir, err := filepath.EvalSymlinks(spec.StateDir)
 	if err != nil {
 		return nil, fmt.Errorf("resolve state directory: %w", err)
 	}
-	binary, err := filepath.EvalSymlinks(a.Path)
-	if err != nil {
-		return nil, fmt.Errorf("resolve binary: %w", err)
-	}
+	binary := a.path
 	logPath, err := filepath.Abs(spec.LogFile)
 	if err != nil || spec.LogFile == "" {
 		return nil, fmt.Errorf("log file is required: %q", spec.LogFile)
@@ -237,6 +304,16 @@ func fileDigest(path string) (string, error) {
 		return "", fmt.Errorf("hash %s: %w", path, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// resolvedArtifact returns the Artifact for a pinned copy with every symlink
+// in its path resolved, so the sandbox profile and the executed path agree.
+func resolvedArtifact(path, digest string) (Artifact, error) {
+	resolved, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return Artifact{}, fmt.Errorf("resolve pinned copy: %w", err)
+	}
+	return Artifact{path: resolved, digest: digest}, nil
 }
 
 // resolvedOrSelf resolves symlinks in path, or returns path unchanged when it

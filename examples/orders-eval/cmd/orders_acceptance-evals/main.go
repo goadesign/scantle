@@ -61,11 +61,20 @@ func run(ctx context.Context, ordersBin, workerBin string, concurrency int, scen
 	if len(scenarios) > 0 && len(tags) > 0 {
 		return nil, errors.New("--scenario and --tag cannot be combined")
 	}
-	orders, err := candidate.NewArtifact(ordersBin)
+	store, err := os.MkdirTemp("", "orders-eval-artifacts-*")
+	if err != nil {
+		return nil, fmt.Errorf("create artifact store: %w", err)
+	}
+	defer func() {
+		if rmErr := candidate.RemoveStore(store); rmErr != nil {
+			fmt.Fprintln(os.Stderr, rmErr)
+		}
+	}()
+	orders, err := candidate.Pin(store, ordersBin)
 	if err != nil {
 		return nil, err
 	}
-	worker, err := candidate.NewArtifact(workerBin)
+	worker, err := candidate.Pin(store, workerBin)
 	if err != nil {
 		return nil, err
 	}

@@ -26,9 +26,11 @@ func TestAcceptanceSuite(t *testing.T) {
 		out, err := build.CombinedOutput()
 		require.NoError(t, err, "build %s: %s", cmd, out)
 	}
-	orders, err := candidate.NewArtifact(filepath.Join(bin, "orders"))
+	store := filepath.Join(t.TempDir(), "artifacts")
+	t.Cleanup(func() { require.NoError(t, candidate.RemoveStore(store)) })
+	orders, err := candidate.Pin(store, filepath.Join(bin, "orders"))
 	require.NoError(t, err)
-	worker, err := candidate.NewArtifact(filepath.Join(bin, "orders-worker"))
+	worker, err := candidate.Pin(store, filepath.Join(bin, "orders-worker"))
 	require.NoError(t, err)
 	env, err := harness.NewEnv(orders, worker)
 	require.NoError(t, err)

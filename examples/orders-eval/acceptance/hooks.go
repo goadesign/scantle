@@ -50,11 +50,13 @@ func New(env *harness.Env) *Hooks {
 
 // StoreCreditWithinLimit checks that a $38.50 order is refunded as store credit
 // without asking a manager.
-func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (eval.Result, error) {
-	sc, err := h.start(ctx)
+func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (res eval.Result, err error) {
+	var sc *scenario
+	sc, err = h.start(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
+	defer sc.close(&err)
 	run, err := sc.chat(ctx, "Please refund order o-1")
 	if err != nil {
 		return eval.Result{}, err
@@ -76,11 +78,13 @@ func (h *Hooks) StoreCreditWithinLimit(ctx context.Context) (eval.Result, error)
 // CardRefundNeedsManager checks that a $54.00 order (items $48.00 plus $6.00
 // shipping) waits for a manager, that only the tenant's manager can approve it,
 // and that exactly one card refund follows approval.
-func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (eval.Result, error) {
-	sc, err := h.start(ctx)
+func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (res eval.Result, err error) {
+	var sc *scenario
+	sc, err = h.start(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
+	defer sc.close(&err)
 	run, err := sc.chat(ctx, "Please refund order o-2")
 	if err != nil {
 		return eval.Result{}, err
@@ -134,11 +138,13 @@ func (h *Hooks) CardRefundNeedsManager(ctx context.Context) (eval.Result, error)
 // RefundSurvivesWorkerCrash kills the refund worker with SIGKILL after the
 // payment provider accepted a refund and before the worker learned of it, then
 // checks that a replacement worker completes the run without paying twice.
-func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (eval.Result, error) {
-	sc, err := h.start(ctx)
+func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (res eval.Result, err error) {
+	var sc *scenario
+	sc, err = h.start(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
+	defer sc.close(&err)
 	accepted := sc.sim.HoldNextRefund()
 	run, err := sc.chat(ctx, "Please refund order o-1")
 	if err != nil {
@@ -174,11 +180,13 @@ func (h *Hooks) RefundSurvivesWorkerCrash(ctx context.Context) (eval.Result, err
 
 // OtherCustomersOrderRefused checks that a customer asking to refund an order
 // another customer owns receives no refund.
-func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (eval.Result, error) {
-	sc, err := h.start(ctx)
+func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result, err error) {
+	var sc *scenario
+	sc, err = h.start(ctx)
 	if err != nil {
 		return eval.Result{}, err
 	}
+	defer sc.close(&err)
 	run, err := sc.chat(ctx, "Please refund order o-9")
 	if err != nil {
 		return eval.Result{}, err
@@ -195,6 +203,15 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (eval.Result, er
 		},
 		Output: deref(done.Reply),
 	}, nil
+}
+
+// close tears the scenario's platform down before the hook returns, so no
+// candidate or Temporal process outlives its scenario. A teardown failure is
+// an environment error and replaces a nil hook error.
+func (sc *scenario) close(err *error) {
+	if closeErr := sc.platform.Close(); closeErr != nil && *err == nil {
+		*err = fmt.Errorf("tear down scenario: %w", closeErr)
+	}
 }
 
 // start gives a hook its own simulator, loaded with the fixture, and its own

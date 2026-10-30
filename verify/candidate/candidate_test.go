@@ -118,9 +118,27 @@ func TestExecRefusesAModifiedBinary(t *testing.T) {
 		return
 	}
 	probe := buildProbe(t)
-	probe.Digest = strings.Repeat("0", 64)
+	require.NoError(t, os.Chmod(filepath.Dir(probe.path), 0o700))
+	require.NoError(t, os.Chmod(probe.path, 0o700))
+	require.NoError(t, os.WriteFile(probe.path, []byte("tampered"), 0o700))
 	_, err := Exec(t.Context(), probe, Spec{StateDir: t.TempDir(), LogFile: filepath.Join(t.TempDir(), "x.log")})
 	require.ErrorIs(t, err, ErrDigestMismatch)
+}
+
+func TestPinIsolatesTheArtifactFromItsSource(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "bin")
+	require.NoError(t, os.WriteFile(src, []byte("original"), 0o700))
+	store := filepath.Join(t.TempDir(), "artifacts")
+	t.Cleanup(func() { require.NoError(t, RemoveStore(store)) })
+	a, err := Pin(store, src)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(src, []byte("replaced after pinning"), 0o700))
+	got, err := fileDigest(a.path)
+	require.NoError(t, err)
+	assert.Equal(t, a.Digest(), got, "the pinned copy keeps the original bytes")
+	info, err := os.Stat(a.path)
+	require.NoError(t, err)
+	assert.Equal(t, os.FileMode(0o500), info.Mode().Perm())
 }
 
 func TestExcerptIsBoundedAndReportsTruncation(t *testing.T) {
@@ -170,7 +188,9 @@ func buildProbe(t *testing.T) Artifact {
 	build := exec.Command("go", "build", "-o", bin, "./testdata/probe")
 	out, err := build.CombinedOutput()
 	require.NoError(t, err, string(out))
-	a, err := NewArtifact(bin)
+	store := filepath.Join(t.TempDir(), "artifacts")
+	t.Cleanup(func() { require.NoError(t, RemoveStore(store)) })
+	a, err := Pin(store, bin)
 	require.NoError(t, err)
 	return a
 }
