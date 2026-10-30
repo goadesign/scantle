@@ -239,8 +239,11 @@ func (s *Store) FindRunPreparation(ctx context.Context, operation storage.Prepar
 		result, found, err = t.acceptedPreparation(operation)
 		return err
 	})
-	result, err = contractResult(result, err)
-	return result, found, err
+	if err != nil {
+		_, err = contractResult(result, err)
+		return storage.RunPreparation{}, false, err
+	}
+	return result, found, nil
 }
 
 // SettleRunPreparation returns the accepted value or permanently closes the
@@ -283,8 +286,11 @@ func (s *Store) SettleRunPreparation(ctx context.Context, attempt storage.Prepar
 		state.abandoned = true
 		return t.updateAttempt(state)
 	})
-	result, err = contractResult(result, err)
-	return result, found, err
+	if err != nil {
+		_, err = contractResult(result, err)
+		return storage.RunPreparation{}, false, err
+	}
+	return result, found, nil
 }
 
 // LoadRunSeed returns an exact publication while its owning session exists.

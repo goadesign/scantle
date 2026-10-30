@@ -6,6 +6,7 @@ package runstore
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,6 +55,10 @@ type (
 		terminal string
 	}
 
+	// binaryTime stores a time.Time column as its binary encoding, so reads
+	// return the same instant and zone offset for any representable date.
+	binaryTime time.Time
+
 	// runStartKind records who owns execution for the whole Run lifetime.
 	// Zero is invalid; missing metadata never implies a synchronous start.
 	runStartKind int64
@@ -80,6 +85,25 @@ const (
 	resolutionRelinquished = "relinquished"
 )
 
+// Value encodes the time with time.Time.MarshalBinary.
+func (v binaryTime) Value() (driver.Value, error) {
+	return time.Time(v).MarshalBinary()
+}
+
+// Scan decodes a column written by Value.
+func (v *binaryTime) Scan(src any) error {
+	data, ok := src.([]byte)
+	if !ok {
+		return fmt.Errorf("time column holds %T, want []byte", src)
+	}
+	var value time.Time
+	if err := value.UnmarshalBinary(data); err != nil {
+		return fmt.Errorf("decode time column: %w", err)
+	}
+	*v = binaryTime(value)
+	return nil
+}
+
 // scanRun decodes the columns listed by runColumns.
 func scanRun(rows *sql.Rows) (runRow, error) {
 	var (
@@ -87,7 +111,7 @@ func scanRun(rows *sql.Rows) (runRow, error) {
 		subject, origin, labels, digest       []byte
 		status, outcome, resolutionKind       string
 		resolutionRunID, resolutionReason     string
-		startedAt, updatedAt, resolvedAt      int64
+		startedAt, updatedAt, resolvedAt      binaryTime
 		startKind                             runStartKind
 		terminalResult                        []byte
 		startKey, linkKey, cancelKey, suspKey string
@@ -119,13 +143,13 @@ func scanRun(rows *sql.Rows) (runRow, error) {
 	row.meta.Origin = *decodedOrigin
 	row.meta.Status = session.RunStatus(status)
 	row.meta.StartOutcome = session.RunStartOutcome(outcome)
-	row.meta.StartedAt = fromNanos(startedAt)
-	row.meta.UpdatedAt = fromNanos(updatedAt)
+	row.meta.StartedAt = time.Time(startedAt)
+	row.meta.UpdatedAt = time.Time(updatedAt)
 	switch resolutionKind {
 	case resolutionContinued:
 		row.meta.SuspensionResolution = session.ContinuedSuspension{RunID: resolutionRunID}
 	case resolutionRelinquished:
-		row.meta.SuspensionResolution = session.RelinquishedSuspension{Reason: resolutionReason, ResolvedAt: fromNanos(resolvedAt)}
+		row.meta.SuspensionResolution = session.RelinquishedSuspension{Reason: resolutionReason, ResolvedAt: time.Time(resolvedAt)}
 	}
 	row.keys = lifecycleKeys{
 		startKind: startKind, start: startKey, parentLink: linkKey,
@@ -144,7 +168,7 @@ func scanRecord(rows *sql.Rows) (*runlog.Event, error) {
 		subject   []byte
 		typ       string
 		payload   []byte
-		timestamp int64
+		timestamp binaryTime
 	)
 	if err := rows.Scan(&seq, &record.EventKey, &record.RunID, &subject, &record.SessionID,
 		&record.TurnID, &typ, &payload, &timestamp); err != nil {
@@ -158,7 +182,7 @@ func scanRecord(rows *sql.Rows) (*runlog.Event, error) {
 	record.Subject = *decoded
 	record.Type = runlog.Type(typ)
 	record.Payload = payload
-	record.Timestamp = fromNanos(timestamp)
+	record.Timestamp = time.Time(timestamp)
 	return &record, nil
 }
 
@@ -183,14 +207,14 @@ func encodeRunIdentity(meta session.RunMeta) (subject, origin, labels []byte, er
 }
 
 // encodeResolution flattens a suspension resolution into its columns.
-func encodeResolution(resolution session.SuspensionResolution) (kind, runID, reason string, at int64) {
+func encodeResolution(resolution session.SuspensionResolution) (kind, runID, reason string, at binaryTime) {
 	switch value := resolution.(type) {
 	case session.ContinuedSuspension:
-		return resolutionContinued, value.RunID, "", 0
+		return resolutionContinued, value.RunID, "", binaryTime{}
 	case session.RelinquishedSuspension:
-		return resolutionRelinquished, "", value.Reason, value.ResolvedAt.UnixNano()
+		return resolutionRelinquished, "", value.Reason, binaryTime(value.ResolvedAt)
 	default:
-		return "", "", "", 0
+		return "", "", "", binaryTime{}
 	}
 }
 
@@ -200,11 +224,6 @@ func nullableBytes(value []byte) any {
 		return nil
 	}
 	return value
-}
-
-// fromNanos returns the UTC time for Unix nanoseconds read from a column.
-func fromNanos(value int64) time.Time {
-	return time.Unix(0, value).UTC()
 }
 
 // parseCursor converts a run or session record cursor to the last returned
@@ -260,17 +279,20 @@ func (t *txn) isPurged(sessionID string) (bool, error) {
 func (t *txn) loadSession(sessionID string) (session.Session, bool, error) {
 	var (
 		status    string
-		createdAt int64
-		endedAt   sql.NullInt64
+		createdAt binaryTime
+		endedAt   []byte
 	)
 	found, err := t.scanOne(`SELECT status, created_at, ended_at FROM sessions WHERE session_id = ?`,
 		[]any{sessionID}, &status, &createdAt, &endedAt)
 	if err != nil || !found {
 		return session.Session{}, found, err
 	}
-	result := session.Session{ID: sessionID, Status: session.SessionStatus(status), CreatedAt: fromNanos(createdAt)}
-	if endedAt.Valid {
-		at := fromNanos(endedAt.Int64)
+	result := session.Session{ID: sessionID, Status: session.SessionStatus(status), CreatedAt: time.Time(createdAt)}
+	if endedAt != nil {
+		var at time.Time
+		if err := at.UnmarshalBinary(endedAt); err != nil {
+			return session.Session{}, false, fmt.Errorf("stored session %q end time: %w", sessionID, err)
+		}
 		result.EndedAt = &at
 	}
 	return result, true, nil
@@ -279,14 +301,14 @@ func (t *txn) loadSession(sessionID string) (session.Session, bool, error) {
 // insertSession stores a new active session.
 func (t *txn) insertSession(value session.Session) error {
 	_, err := t.exec(`INSERT INTO sessions (session_id, status, created_at) VALUES (?, ?, ?)`,
-		value.ID, string(value.Status), value.CreatedAt.UnixNano())
+		value.ID, string(value.Status), binaryTime(value.CreatedAt))
 	return err
 }
 
 // endSession marks an active session ended at the given time.
 func (t *txn) endSession(sessionID string, at time.Time) error {
 	_, err := t.exec(`UPDATE sessions SET status = ?, ended_at = ? WHERE session_id = ?`,
-		string(session.StatusEnded), at.UnixNano(), sessionID)
+		string(session.StatusEnded), binaryTime(at), sessionID)
 	return err
 }
 
@@ -374,8 +396,8 @@ func (t *txn) insertRun(row runRow) error {
 	kind, runID, reason, at := encodeResolution(row.meta.SuspensionResolution)
 	_, err = t.exec(`INSERT INTO runs (`+runColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		row.meta.RunID, row.meta.SessionID, row.meta.ParentRunID, subject, origin, row.meta.SeedEndID,
-		string(row.meta.Status), string(row.meta.StartOutcome), row.meta.StartedAt.UnixNano(),
-		row.meta.UpdatedAt.UnixNano(), labels, row.meta.CancellationReason, kind, runID, reason, at,
+		string(row.meta.Status), string(row.meta.StartOutcome), binaryTime(row.meta.StartedAt),
+		binaryTime(row.meta.UpdatedAt), labels, row.meta.CancellationReason, kind, runID, reason, at,
 		int64(row.keys.startKind), row.keys.requestDigest[:], row.keys.start, row.keys.parentLink,
 		row.keys.cancellation, row.keys.suspension, row.keys.terminal, nullableBytes(row.terminalResult))
 	return err
@@ -390,7 +412,7 @@ func (t *txn) updateRun(row runRow) error {
 		resolution_kind = ?, resolution_run_id = ?, resolution_reason = ?, resolution_at = ?,
 		cancellation_key = ?, suspension_key = ?, terminal_key = ?, terminal_result = ?
 		WHERE run_id = ?`,
-		string(row.meta.Status), row.meta.UpdatedAt.UnixNano(), row.meta.CancellationReason,
+		string(row.meta.Status), binaryTime(row.meta.UpdatedAt), row.meta.CancellationReason,
 		kind, runID, reason, at, row.keys.cancellation, row.keys.suspension, row.keys.terminal,
 		nullableBytes(row.terminalResult), row.meta.RunID)
 	return err
@@ -402,7 +424,7 @@ func (t *txn) updateRun(row runRow) error {
 func (t *txn) claimSuccessor(predecessorID, successorID string) error {
 	result, err := t.exec(`UPDATE runs SET resolution_kind = ?, resolution_run_id = ?, updated_at = ?
 		WHERE run_id = ? AND resolution_kind = ''`,
-		resolutionContinued, successorID, time.Now().UTC().UnixNano(), predecessorID)
+		resolutionContinued, successorID, binaryTime(time.Now().UTC()), predecessorID)
 	if err != nil {
 		return err
 	}
@@ -491,10 +513,16 @@ func (t *txn) insertRecord(record *runlog.Event) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encode record subject: %w", err)
 	}
+	// Encode the caller's timestamp here so an unencodable zone offset is a
+	// rejected command, not a database failure.
+	timestamp, err := record.Timestamp.MarshalBinary()
+	if err != nil {
+		return "", fmt.Errorf("encode record timestamp: %w", err)
+	}
 	if _, err := t.exec(`INSERT INTO records (run_id, seq, event_key, session_id, session_seq, subject, turn_id, type, payload, timestamp)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.RunID, seq, record.EventKey, record.SessionID, sessionSeq, subject, record.TurnID,
-		string(record.Type), []byte(record.Payload), record.Timestamp.UnixNano()); err != nil {
+		string(record.Type), []byte(record.Payload), timestamp); err != nil {
 		return "", err
 	}
 	return strconv.FormatInt(seq, 10), nil

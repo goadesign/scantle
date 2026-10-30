@@ -300,8 +300,9 @@ func contractResult[T any](result T, err error) (T, error) {
 	if err == nil {
 		return result, nil
 	}
-	if failure, ok := errors.AsType[*dbError](err); ok {
-		return result, failure
+	if _, ok := errors.AsType[*dbError](err); ok {
+		// Keep a rejection joined with a rollback failure inspectable.
+		return result, err
 	}
 	return result, storage.NewContractError(err)
 }

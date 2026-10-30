@@ -6,7 +6,7 @@ package runstore
 import (
 	"bytes"
 	"database/sql"
-	"encoding/json"
+	"encoding/gob"
 	"fmt"
 	"strconv"
 
@@ -160,7 +160,7 @@ func (t *txn) queryAttempt(query string, args ...any) (attemptRow, bool, error) 
 	d.Kind = storage.SeedKind(kind)
 	d.ExcludeReasoning = excludeReasoning
 	if prompts != nil {
-		if err := json.Unmarshal(prompts, &d.RenderedPrompts); err != nil {
+		if err := gob.NewDecoder(bytes.NewReader(prompts)).Decode(&d.RenderedPrompts); err != nil {
 			return attemptRow{}, false, fmt.Errorf("stored preparation attempt %q prompts: %w", d.AttemptID, err)
 		}
 	}
@@ -180,11 +180,15 @@ func (t *txn) insertAttempt(row attemptRow) error {
 	if err != nil {
 		return fmt.Errorf("encode preparation attempt subject: %w", err)
 	}
+	// Gob keeps prompt strings byte for byte; JSON would replace invalid
+	// UTF-8 and break exact declaration retries.
 	var prompts []byte
-	if d.RenderedPrompts != nil {
-		if prompts, err = json.Marshal(d.RenderedPrompts); err != nil {
+	if len(d.RenderedPrompts) > 0 {
+		var buffer bytes.Buffer
+		if err := gob.NewEncoder(&buffer).Encode(d.RenderedPrompts); err != nil {
 			return fmt.Errorf("encode preparation attempt prompts: %w", err)
 		}
+		prompts = buffer.Bytes()
 	}
 	source := row.seed.Source
 	if source == nil {

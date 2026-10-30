@@ -2,7 +2,8 @@ package runstore
 
 // The schema stores each reference-store value in its own table. Identity
 // values (run subjects, invocations, early terminal outcomes) use the
-// generated goa-ai codecs; times are Unix nanoseconds in UTC. Unique keys and
+// generated goa-ai codecs; times use time.Time's binary encoding, which keeps
+// the full range and the zone offset. Unique keys and
 // partial unique indexes enforce the single-winner rules that the reference
 // store checks under its mutex.
 
@@ -12,8 +13,8 @@ var schema = []string{
 	`CREATE TABLE sessions (
 		session_id TEXT PRIMARY KEY,
 		status TEXT NOT NULL CHECK (status IN ('active', 'ended')),
-		created_at INTEGER NOT NULL,
-		ended_at INTEGER
+		created_at BLOB NOT NULL,
+		ended_at BLOB
 	) STRICT`,
 	// purged_sessions seals session IDs that were permanently removed.
 	`CREATE TABLE purged_sessions (
@@ -31,14 +32,14 @@ var schema = []string{
 		seed_end_id TEXT NOT NULL,
 		status TEXT NOT NULL,
 		start_outcome TEXT NOT NULL,
-		started_at INTEGER NOT NULL,
-		updated_at INTEGER NOT NULL,
+		started_at BLOB NOT NULL,
+		updated_at BLOB NOT NULL,
 		labels BLOB,
 		cancellation_reason TEXT NOT NULL,
 		resolution_kind TEXT NOT NULL CHECK (resolution_kind IN ('', 'continued', 'relinquished')),
 		resolution_run_id TEXT NOT NULL,
 		resolution_reason TEXT NOT NULL,
-		resolution_at INTEGER NOT NULL,
+		resolution_at BLOB NOT NULL,
 		start_kind INTEGER NOT NULL,
 		request_digest BLOB NOT NULL,
 		start_key TEXT NOT NULL,
@@ -68,7 +69,7 @@ var schema = []string{
 		turn_id TEXT NOT NULL,
 		type TEXT NOT NULL,
 		payload BLOB NOT NULL,
-		timestamp INTEGER NOT NULL,
+		timestamp BLOB NOT NULL,
 		PRIMARY KEY (run_id, seq),
 		UNIQUE (run_id, event_key)
 	) STRICT`,

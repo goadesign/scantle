@@ -62,7 +62,8 @@ const (
 	transcriptPageMaxPayloadBytes = 1 << 20
 )
 
-// contractCases lists every ported reference test.
+// contractCases lists every ported reference test, plus one value-fidelity
+// case that both stores must also pass.
 var contractCases = []contractCase{
 	{"ChildContinuationPreservesCallAcrossExecutionParents", factory.ChildContinuationPreservesCallAcrossExecutionParents},
 	{"ClosedRequestSelectsOriginalStart", factory.ClosedRequestSelectsOriginalStart},
@@ -135,6 +136,7 @@ var contractCases = []contractCase{
 	{"TranscriptPageStopsBeforeCopyingTheNextRecord", factory.TranscriptPageStopsBeforeCopyingTheNextRecord},
 	{"TranscriptPageCapsAnOversizedRequestedCount", factory.TranscriptPageCapsAnOversizedRequestedCount},
 	{"TranscriptPageRejectsAnUnsupportedSingleRecord", factory.TranscriptPageRejectsAnUnsupportedSingleRecord},
+	{"ValuesRoundTripExactly", factory.ValuesRoundTripExactly},
 }
 
 // TestContract runs the ported reference suite against both stores.
