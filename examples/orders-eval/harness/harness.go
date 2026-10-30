@@ -132,7 +132,7 @@ func (p *Platform) start(ctx context.Context, depsURL string) error {
 	if p.logDir, err = os.MkdirTemp("", "orders-eval-logs-*"); err != nil {
 		return fmt.Errorf("create log directory: %w", err)
 	}
-	temporalAddr, temporalPort, err := p.startTemporal()
+	temporalAddr, temporalPort, err := p.startTemporal(ctx)
 	if err != nil {
 		return err
 	}
@@ -320,8 +320,10 @@ func (p *Platform) newStateDir() (string, error) {
 }
 
 // startTemporal starts the platform's in-memory Temporal dev server and
-// returns its frontend address and port. Close stops it.
-func (p *Platform) startTemporal() (string, int, error) {
+// returns its frontend address and port once it listens. The server's
+// lifetime belongs to the platform and ends in Close; ctx bounds only the wait
+// for it to listen, so a canceled scenario stops waiting at once.
+func (p *Platform) startTemporal(ctx context.Context) (string, int, error) {
 	port, err := freePort()
 	if err != nil {
 		return "", 0, err
@@ -336,8 +338,8 @@ func (p *Platform) startTemporal() (string, int, error) {
 		return "", 0, fmt.Errorf("create temporal log: %w", err)
 	}
 	defer logFile.Close()
-	ctx, stop := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "temporal", "server", "start-dev", "--headless",
+	serverCtx, stop := context.WithCancel(context.Background())
+	cmd := exec.CommandContext(serverCtx, "temporal", "server", "start-dev", "--headless",
 		"--ip", "127.0.0.1", "--port", strconv.Itoa(port), "--ui-port", strconv.Itoa(uiPort), "--log-level", "error")
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	if err := cmd.Start(); err != nil {

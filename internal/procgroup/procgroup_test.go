@@ -15,28 +15,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCancelAndStopEndEveryChild(t *testing.T) {
+func TestRunEndsEveryChildOnCancel(t *testing.T) {
 	pidFile := filepath.Join(t.TempDir(), "child.pid")
 	ctx, cancel := context.WithCancel(t.Context())
-	// The shell ignores TERM, so only Stop's KILL ends it; its background
+	// The shell ignores TERM, so only Run's final KILL ends it; its background
 	// child records its PID and would otherwise outlive the shell.
 	cmd := exec.CommandContext(ctx, "sh", "-c", `trap "" TERM; sleep 300 & echo $! > `+pidFile+`; wait`)
-	Own(cmd, syscall.SIGTERM, 200*time.Millisecond)
-	require.NoError(t, cmd.Start())
+	type result struct{ runErr, stopErr error }
+	done := make(chan result, 1)
+	go func() {
+		runErr, stopErr := Run(cmd, syscall.SIGTERM, 200*time.Millisecond, 5*time.Second)
+		done <- result{runErr, stopErr}
+	}()
 	child := waitForPID(t, pidFile)
 	cancel()
-	_ = cmd.Wait()
-	require.NoError(t, syscall.Kill(child, 0), "before Stop the background child is still running")
-
-	require.NoError(t, Stop(cmd.Process.Pid, 5*time.Second))
-	assert.ErrorIs(t, syscall.Kill(child, 0), syscall.ESRCH, "Stop returns only once the child is gone")
+	res := <-done
+	assert.Error(t, res.runErr, "the canceled command reports how it ended")
+	require.NoError(t, res.stopErr)
+	assert.ErrorIs(t, syscall.Kill(child, 0), syscall.ESRCH, "Run returns only once the TERM-ignoring child is gone")
 }
 
-func TestStopOnAnEmptyGroupSucceeds(t *testing.T) {
-	cmd := exec.CommandContext(t.Context(), "true")
-	Own(cmd, syscall.SIGTERM, time.Second)
-	require.NoError(t, cmd.Run())
-	assert.NoError(t, Stop(cmd.Process.Pid, time.Second))
+func TestRunOfACleanCommandSucceeds(t *testing.T) {
+	runErr, stopErr := Run(exec.CommandContext(t.Context(), "true"), syscall.SIGTERM, time.Second, time.Second)
+	assert.NoError(t, runErr)
+	assert.NoError(t, stopErr)
+}
+
+func TestRunWithoutStartingReportsTheStartError(t *testing.T) {
+	runErr, stopErr := Run(exec.CommandContext(t.Context(), "/nonexistent/binary"), syscall.SIGTERM, time.Second, time.Second)
+	assert.Error(t, runErr)
+	assert.NoError(t, stopErr, "nothing started, so nothing is left to stop")
 }
 
 // waitForPID reads the PID the test command writes.

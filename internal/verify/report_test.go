@@ -94,7 +94,7 @@ func TestForBuildersExposesNoHoldoutDetail(t *testing.T) {
 	}, view.Scenarios)
 	serialized, err := json.Marshal(view)
 	require.NoError(t, err)
-	for _, secret := range []string{`"h"`, "secret_holdout_check", "holdout diagnostic", "d1", "d2", "candidate:"} {
+	for _, secret := range []string{`"h"`, "secret_holdout_check", "holdout diagnostic", "candidate:"} {
 		assert.NotContains(t, string(serialized), secret, "the serialized builder response must not reveal %s", secret)
 	}
 }

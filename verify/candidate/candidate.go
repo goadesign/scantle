@@ -295,14 +295,11 @@ func Build(ctx context.Context, spec BuildSpec) error {
 		"CGO_ENABLED=0",
 	}
 	cmd.Stdout, cmd.Stderr = logFile, logFile
-	procgroup.Own(cmd, syscall.SIGKILL, buildStopGrace)
-	runErr := cmd.Run()
-	if cmd.Process != nil {
-		// The compiler, assembler and linker run in the build's group; none
-		// may outlive Build, whatever ended it.
-		if err := procgroup.Stop(cmd.Process.Pid, buildStopGrace); err != nil {
-			return fmt.Errorf("stop build of %s: %w", spec.Package, err)
-		}
+	// The compiler, assembler and linker run in the build's process group;
+	// none may outlive Build, whatever ended it.
+	runErr, stopErr := procgroup.Run(cmd, syscall.SIGKILL, buildStopGrace, buildStopGrace)
+	if stopErr != nil {
+		return fmt.Errorf("stop build of %s: %w", spec.Package, stopErr)
 	}
 	if runErr != nil {
 		return fmt.Errorf("sandboxed build of %s: %w", spec.Package, runErr)

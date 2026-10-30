@@ -228,12 +228,9 @@ func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []
 	defer stderr.Close()
 	cmd := exec.CommandContext(ctx, suiteBin, artifactFlags...)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	procgroup.Own(cmd, syscall.SIGTERM, suiteStopGrace)
-	runErr := cmd.Run()
-	if cmd.Process != nil {
-		if err := procgroup.Stop(cmd.Process.Pid, groupStopTimeout); err != nil {
-			return eval.Report{}, 0, fmt.Errorf("stop suite processes: %w", err)
-		}
+	runErr, stopErr := procgroup.Run(cmd, syscall.SIGTERM, suiteStopGrace, groupStopTimeout)
+	if stopErr != nil {
+		return eval.Report{}, 0, fmt.Errorf("stop suite processes: %w", stopErr)
 	}
 	var report eval.Report
 	decodeErr := decodeFile(filepath.Join(r.evidenceDir, "suite.stdout"), &report)
