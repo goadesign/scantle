@@ -359,7 +359,9 @@ function makeElement(tag, ns) {
   return {
     tagName: String(tag).toUpperCase(),
     namespaceURI: ns || "",
-    className: "",
+    get className() {
+      return ns ? { baseVal: this.attributes["class"] || "" } : (this.attributes["class"] || "");
+    },
     textContent: "",
     value: "",
     dataset: {},
@@ -506,8 +508,12 @@ const cp1Text = renderText(viewEl);
 if (root.dataset.state !== "cp1-change-card" || root.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("unexpected CP1 dataset: " + JSON.stringify(root.dataset));
 }
-if (!cp1Text.includes(input.wantCP1Revision) || !cp1Text.includes(input.wantAmbiguityText)) {
-  throw new Error("CP1 view missing revision or ambiguity question: " + cp1Text);
+if (!cp1Text.includes(input.wantCP1Revision) ||
+    !cp1Text.includes(input.wantAmbiguityText) ||
+    !cp1Text.includes("Scenario:") ||
+    !cp1Text.includes("Input:") ||
+    !cp1Text.includes("Expected result:")) {
+  throw new Error("CP1 view missing revision, ambiguity question, or visible field labels: " + cp1Text);
 }
 
 // 3a. Click an ambiguity option pill, edit an example outcome input, and submit confirm_intent via tools/call.
@@ -589,10 +595,11 @@ messageListener({
 });
 const staleViewText = renderText(viewEl);
 if (root.dataset.state !== "cp1-change-card" ||
+    !statusEl.textContent.includes("CP1 Change Card update failed; unsaved edits preserved.") ||
     !staleViewText.includes(input.staleErrorText) ||
     !staleViewText.includes("Your edited answers and examples remain in this form") ||
     staleOutcomeInputs[0].value !== "Edited outcome preserved across stale error") {
-  throw new Error("stale form submission did not preserve edits or show recovery guidance: " + staleViewText);
+  throw new Error("stale form submission did not update status, preserve edits, or show recovery guidance: " + statusEl.textContent + " / " + staleViewText);
 }
 
 // 3c. Click #scantle-load-latest-card after stale error -> guest calls get_change and renders latest card alongside #scantle-preserved-draft.
@@ -670,7 +677,7 @@ if (!cp2Text.includes(input.wantCP2Revision) ||
   throw new Error("CP2 view missing expected digests or guardrails: " + cp2Text);
 }
 const cp2Svg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
-const cp2SvgNodes = findAll(viewEl, (n) => n.className === "scantle-svg-node");
+const cp2SvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-node" && n.className && n.className.baseVal === "scantle-svg-node");
 if (cp2Svg.length !== 1 || cp2SvgNodes.length !== input.cp2Structured.containers.length) {
   throw new Error("expected CP2 SVG graph with all containers, got svg=" + cp2Svg.length + " nodes=" + cp2SvgNodes.length);
 }
@@ -705,8 +712,8 @@ messageListener({
   }
 });
 const largeSvg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
-const largeSvgNodes = findAll(viewEl, (n) => n.className === "scantle-svg-node");
-const largeSvgEdges = findAll(viewEl, (n) => n.className === "scantle-svg-edge");
+const largeSvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-node");
+const largeSvgEdges = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-edge");
 const largeText = renderText(viewEl);
 const edge23Path = largeSvgEdges[1].children[0].attributes["d"];
 const edge32Path = largeSvgEdges[2].children[0].attributes["d"];

@@ -43,6 +43,9 @@
     .scantle-field-row {
       display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0;
     }
+    .scantle-field-label {
+      display: inline-flex; align-items: center; gap: 0.25rem; flex: 1 1 12rem; font-size: 0.85rem;
+    }
     .scantle-input {
       padding: 0.25rem 0.45rem; border-radius: 4px;
       border: 1px solid rgba(127, 127, 127, 0.5); background: transparent;
@@ -100,7 +103,7 @@
       if (!isPlainObject(attrs)) { return; }
       Object.keys(attrs).forEach(function (k) {
         if (k === "className") {
-          node.className = attrs[k];
+          node.setAttribute("class", String(attrs[k]));
         } else if (k === "textContent") {
           node.textContent = String(attrs[k]);
         } else if (k === "value" && "value" in node) {
@@ -350,6 +353,7 @@
       function showFormError(msg) {
         rpcInFlight = false;
         submitBtn.disabled = false;
+        statusEl.textContent = "CP1 Change Card update failed; unsaved edits preserved.";
         activePreservedDraft = snapshotDraft();
         var loadLatestBtn = el("button", {
           type: "button",
@@ -422,19 +426,22 @@
 
       var exampleItems = draftExamples.map(function (ex, idx) {
         function makeFieldInput(field, label) {
-          return el("input", {
-            type: "text",
-            className: "scantle-input",
-            "aria-label": ex.id + " " + label,
-            "data-example-id": ex.id,
-            "data-field": field,
-            value: ex[field],
-            onInput: function (evt) {
-              if (evt && evt.target && typeof evt.target.value === "string") {
-                ex[field] = evt.target.value;
+          return el("label", { className: "scantle-field-label" }, [
+            el("span", { textContent: label + ": " }),
+            el("input", {
+              type: "text",
+              className: "scantle-input",
+              "aria-label": ex.id + " " + label,
+              "data-example-id": ex.id,
+              "data-field": field,
+              value: ex[field],
+              onInput: function (evt) {
+                if (evt && evt.target && typeof evt.target.value === "string") {
+                  ex[field] = evt.target.value;
+                }
               }
-            }
-          });
+            })
+          ]);
         }
         var kindBtn = el("button", {
           type: "button",
@@ -454,9 +461,9 @@
             " -> Expected: ", ex.expected_outcome
           ]),
           el("div", { className: "scantle-field-row" }, [
-            makeFieldInput("scenario", "scenario"),
-            makeFieldInput("input_summary", "input_summary"),
-            makeFieldInput("expected_outcome", "expected_outcome"),
+            makeFieldInput("scenario", "Scenario"),
+            makeFieldInput("input_summary", "Input"),
+            makeFieldInput("expected_outcome", "Expected result"),
             kindBtn
           ])
         ]);
