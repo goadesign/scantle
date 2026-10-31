@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -172,6 +174,40 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestServeHelpNeverPrintsTheEnvironmentToken(t *testing.T) {
+	const token = "synthetic-token-7f3a"
+	t.Setenv("SURLA_AUTH_TOKEN", token)
+	for _, args := range [][]string{{"serve", "-h"}, {"help", "serve"}} {
+		stderr := captureStderr(t, func() {
+			var stdout bytes.Buffer
+			require.NoError(t, run(args, &stdout))
+			assert.NotContains(t, stdout.String(), token)
+		})
+		assert.Contains(t, stderr, "-auth-token")
+		assert.NotContains(t, stderr, token, "help for %v", args)
+	}
+	// The environment token still satisfies serve's credential check, so
+	// serve gets past it and fails later, on the invalid listen address.
+	err := run([]string{"serve", "-addr", "256.0.0.1:0", "-principal", "op"}, &bytes.Buffer{})
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "requires -principal and -auth-token")
+}
+
+// captureStderr runs fn with os.Stderr redirected and returns what fn wrote.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	saved := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = saved }()
+	fn()
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
 }
 
 // without returns a copy of args with every occurrence of the flag named name

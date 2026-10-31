@@ -162,7 +162,7 @@ func runServe(args []string) (err error) {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	addr := fs.String("addr", "127.0.0.1:8090", "HTTP and MCP listen address")
 	principalID := fs.String("principal", "", "Authenticated operator principal ID")
-	authToken := fs.String("auth-token", os.Getenv("SURLA_AUTH_TOKEN"), "Bearer token required on HTTP and MCP requests")
+	authToken := fs.String("auth-token", "", "Bearer token required on HTTP and MCP requests (default: $SURLA_AUTH_TOKEN)")
 	var cfg serveConfig
 	fs.StringVar(&cfg.gatewayAddr, "model-gateway-addr", "", "CP1 model gateway host:port (plaintext gRPC; excludes -model-provider and -model-name)")
 	fs.StringVar(&cfg.provider, "model-provider", "", "CP1 model provider: anthropic or openai (key from ANTHROPIC_API_KEY or OPENAI_API_KEY)")
@@ -170,6 +170,11 @@ func runServe(args []string) (err error) {
 	fs.StringVar(&cfg.swarmProfilesPath, "swarm-profiles", "", "JSON file listing the coding-agent provider profiles used for CP2 swarm plans")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	// The environment is read only after parsing so the token never becomes
+	// the flag's printed default in `surla serve -h`.
+	if *authToken == "" {
+		*authToken = os.Getenv("SURLA_AUTH_TOKEN")
 	}
 	if strings.TrimSpace(*principalID) == "" || strings.TrimSpace(*authToken) == "" {
 		return errors.New("serve requires -principal and -auth-token (or SURLA_AUTH_TOKEN)")
