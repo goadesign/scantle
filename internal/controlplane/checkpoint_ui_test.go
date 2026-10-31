@@ -586,14 +586,7 @@ if (noEditRefineReq.params.arguments.examples[0].expected_outcome !== "  Instant
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: noEditRefineReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
 
 // 3b. Exercise stale-revision CP1 form submission with broadcast error notification arriving BEFORE direct RPC error reply.
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    method: "ui/notifications/tool-result",
-    params: { structuredContent: input.cp1Structured }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });
 const stalePills = findAll(viewEl, (n) => n.attributes["data-ambiguity-id"] === "chg-ui-test-ambiguity-01" && n.attributes["data-option"] === "total_with_tax");
 stalePills[0].dispatch("click");
 const staleOutcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
@@ -604,31 +597,11 @@ const msgCountBeforeStale = hostMessages.length;
 staleSubmitBtns[0].dispatch("click");
 const staleReq = hostMessages[msgCountBeforeStale].msg;
 // Host broadcasts ui/notifications/tool-result {isError:true} BEFORE delivering the matching RPC error response -> must retain CP1 editor and keep controls disabled until RPC response arrives.
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    method: "ui/notifications/tool-result",
-    params: {
-      isError: true,
-      content: [{ type: "text", text: input.staleErrorText }]
-    }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
 if (root.dataset.state !== "cp1-change-card" || staleOutcomeInputs[0].disabled !== true) {
   throw new Error("broadcast error notification replaced CP1 editor or prematurely re-enabled controls");
 }
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    id: staleReq.id,
-    result: {
-      isError: true,
-      content: [{ type: "text", text: input.staleErrorText }]
-    }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: staleReq.id, result: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
 const staleViewText = renderText(viewEl);
 if (root.dataset.state !== "cp1-change-card" ||
     staleOutcomeInputs[0].disabled !== false ||
@@ -656,14 +629,7 @@ if (getChangeReq.method !== "tools/call" ||
   throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
 }
 // Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must retain active editor while get_change is pending, then render latest card + #scantle-preserved-draft on the matching tools/call reply.
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    method: "ui/notifications/tool-result",
-    params: { structuredContent: input.cp1ConfirmedStructured }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1ConfirmedStructured } } });
 if (root.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("interleaved ui/notifications/tool-result replaced active editor before get_change reply");
 }
@@ -681,7 +647,32 @@ if (root.dataset.state !== "cp1-change-card" ||
   throw new Error("get_change recovery did not retain latest card + preserved draft panel after late tool-result: " + recoveredViewText);
 }
 
-// 4. Deliver CP2 ArchitecturePreviewResult -> must replace CP1 view completely and render both SVG graph and inspectable list.
+// 3d. Cross-view draft preservation & pending-RPC result retention:
+// Delivering diff while editor has preserved/dirty state keeps CP1 editor + preserved draft mounted AND renders diff in result region.
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.diffStructured } } });
+if (root.dataset.state !== "cp2-diff" ||
+    findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1 ||
+    !renderText(viewEl).includes("refund_agent")) {
+  throw new Error("diff notification during recovery dropped preserved draft or failed to render diff");
+}
+// Delivering a different-revision ChangeCardResult while editor has unsaved state renders #scantle-incoming-change-card without overwriting editor.
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });
+if (findAll(viewEl, (n) => n.attributes["id"] === "scantle-incoming-change-card").length !== 1 ||
+    findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1) {
+  throw new Error("incoming ChangeCardResult during unsaved state did not render incoming card notice alongside preserved draft");
+}
+// Submitting confirm_intent while a diff arrives in flight retains the diff after the matching confirm_intent reply completes.
+const pendingConfirmSubmit = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0];
+const msgCountBeforePendingDiff = hostMessages.length;
+pendingConfirmSubmit.dispatch("click");
+const pendingDiffConfirmReq = hostMessages[msgCountBeforePendingDiff].msg;
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.diffStructured } } });
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: pendingDiffConfirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
+if (root.dataset.state !== "cp1-change-card" || !renderText(viewEl).includes("refund_agent")) {
+  throw new Error("diff arriving during pending confirm_intent was lost after matching confirm_intent reply");
+}
+
+// 4. Deliver CP2 ArchitecturePreviewResult when CP1 editor is clean -> replaces clean CP1 view completely and renders both SVG graph and inspectable list.
 messageListener({
   source: parentWindow,
   data: {

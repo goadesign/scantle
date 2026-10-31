@@ -51,9 +51,13 @@
     var nextRequestId = 2;
     var pendingRequests = {};
     var activeCP1Editor = null;
+    var resultRegionKind = "";
     var root = document.getElementById("scantle-checkpoint-root");
     var statusEl = document.getElementById("scantle-checkpoint-status");
     var viewEl = document.getElementById("scantle-checkpoint-view");
+    var editorRegionEl = el("div", { id: "scantle-cp1-editor" }, []);
+    var resultRegionEl = el("div", { id: "scantle-result-view" }, []);
+    replaceChildren(viewEl, [editorRegionEl, resultRegionEl]);
 
     function isPlainObject(v) {
       return Boolean(v) && typeof v === "object" && !Array.isArray(v);
@@ -117,8 +121,22 @@
       return node;
     }
 
-    function clearDatasetKeys() {
+    function shouldRetainEditor() {
+      return Boolean(activeCP1Editor) &&
+        (Object.keys(pendingRequests).length > 0 || activeCP1Editor.hasUnsavedState());
+    }
+
+    function clearEditorRegion() {
       activeCP1Editor = null;
+      replaceChildren(editorRegionEl, []);
+    }
+
+    function clearResultRegion() {
+      resultRegionKind = "";
+      replaceChildren(resultRegionEl, []);
+    }
+
+    function clearDatasetKeys() {
       delete root.dataset.changeId;
       delete root.dataset.requestRevision;
       delete root.dataset.designDigest;
@@ -136,21 +154,24 @@
     }
 
     function renderWaiting(message) {
+      clearEditorRegion();
+      clearResultRegion();
       clearDatasetKeys();
       root.dataset.state = "waiting";
       statusEl.textContent = message;
-      replaceChildren(viewEl, []);
     }
 
     function renderCancelled(reason) {
       pendingRequests = {};
+      clearEditorRegion();
       clearDatasetKeys();
       root.dataset.state = "cancelled";
+      resultRegionKind = "cancelled";
       statusEl.textContent = "Checkpoint tool call cancelled";
       var detail = typeof reason === "string" && reason.length > 0
         ? "Tool call was cancelled (" + reason + "). Re-run the Scantle checkpoint tool to inspect a fresh result."
         : "Tool call was cancelled before completion. Re-run the Scantle checkpoint tool to inspect a fresh result.";
-      replaceChildren(viewEl, [
+      replaceChildren(resultRegionEl, [
         el("div", { className: "scantle-meta", role: "status" }, [
           el("strong", { textContent: "Cancelled: " }), detail
         ])
@@ -158,10 +179,12 @@
     }
 
     function renderError(message) {
+      if (!shouldRetainEditor()) { clearEditorRegion(); }
       clearDatasetKeys();
       root.dataset.state = "error";
+      resultRegionKind = "error";
       statusEl.textContent = "Checkpoint payload error";
-      replaceChildren(viewEl, [
+      replaceChildren(resultRegionEl, [
         el("div", { className: "scantle-error", role: "alert" }, [
           el("strong", { textContent: "Error: " }), String(message)
         ])
@@ -280,7 +303,10 @@
       }, "*");
     }
 
-    function renderChangeCard(card, preservedDraft) {
+    function renderChangeCard(card, preservedDraft, preserveNonCP1Result) {
+      if (!preserveNonCP1Result || resultRegionKind === "incoming-card") {
+        clearResultRegion();
+      }
       clearDatasetKeys();
       root.dataset.state = "cp1-change-card";
       root.dataset.changeId = card.change_id;
@@ -291,11 +317,8 @@
       var draftAnswers = isPlainObject(card.answers) ? Object.assign({}, card.answers) : {};
       var draftExamples = card.examples.map(function (ex) {
         return {
-          id: ex.id,
-          scenario: ex.scenario,
-          input_summary: ex.input_summary,
-          expected_outcome: ex.expected_outcome,
-          verification_kind: ex.verification_kind
+          id: ex.id, scenario: ex.scenario, input_summary: ex.input_summary,
+          expected_outcome: ex.expected_outcome, verification_kind: ex.verification_kind
         };
       });
       var rpcInFlight = false;
@@ -323,11 +346,8 @@
           statusEl.textContent = "CP1 Change Card update failed; unsaved edits preserved.";
         }
         var loadLatestBtn = el("button", {
-          type: "button",
-          id: "scantle-load-latest-card",
-          className: "scantle-btn",
-          disabled: rpcInFlight,
-          textContent: "Load Latest Card (get_change)",
+          type: "button", id: "scantle-load-latest-card", className: "scantle-btn",
+          disabled: rpcInFlight, textContent: "Load Latest Card (get_change)",
           onClick: function () {
             if (rpcInFlight) { return; }
             setFormDisabled(true);
@@ -335,34 +355,29 @@
             var savedDraft = snapshotDraft();
             statusEl.textContent = "Loading latest Change Card via get_change...";
             callServerTool("get_change", { change_id: card.change_id }, isValidChangeCard, function (latestCard) {
-              renderChangeCard(latestCard, savedDraft);
+              renderChangeCard(latestCard, savedDraft, true);
             }, showFormError);
           }
         });
         replaceChildren(feedbackEl, [
           el("div", { className: "scantle-error", role: "alert" }, [
-            el("strong", { textContent: "Confirm Intent Error: " }),
-            String(msg),
+            el("strong", { textContent: "Confirm Intent Error: " }), String(msg),
             " — Your edited answers and examples remain in this form. Use Load Latest Card (get_change) to inspect the current saved Change Card alongside your unsaved edits before resubmitting.",
             el("div", { className: "scantle-field-row" }, [loadLatestBtn])
           ])
         ]);
       }
+
       function isDirty() {
         for (var i = 0; i < ambiguities.length; i++) {
           var qid = ambiguities[i].id;
-          if ((draftAnswers[qid] || "") !== ((card.answers && card.answers[qid]) || "")) {
-            return true;
-          }
+          if ((draftAnswers[qid] || "") !== ((card.answers && card.answers[qid]) || "")) { return true; }
         }
         for (var j = 0; j < draftExamples.length; j++) {
           var dEx = draftExamples[j];
           var cEx = card.examples[j];
-          if (!cEx ||
-              dEx.scenario !== cEx.scenario ||
-              dEx.input_summary !== cEx.input_summary ||
-              dEx.expected_outcome !== cEx.expected_outcome ||
-              dEx.verification_kind !== cEx.verification_kind) {
+          if (!cEx || dEx.scenario !== cEx.scenario || dEx.input_summary !== cEx.input_summary ||
+              dEx.expected_outcome !== cEx.expected_outcome || dEx.verification_kind !== cEx.verification_kind) {
             return true;
           }
         }
@@ -373,6 +388,7 @@
         changeId: card.change_id,
         requestRevision: card.request_revision,
         isDirty: isDirty,
+        snapshotDraft: snapshotDraft,
         preservedDraft: isPlainObject(preservedDraft) ? preservedDraft : null,
         hasUnsavedState: function () {
           return isDirty() || isPlainObject(preservedDraft) || Boolean(feedbackEl.firstChild);
@@ -387,11 +403,7 @@
 
       var metaRows = [
         el("h2", { textContent: "CP1 Change Card: " + card.change_id }),
-        el("p", {}, [
-          el("span", { className: "scantle-badge", textContent: card.status }),
-          "request_revision: ",
-          el("code", { textContent: card.request_revision })
-        ]),
+        el("p", {}, [el("span", { className: "scantle-badge", textContent: card.status }), "request_revision: ", el("code", { textContent: card.request_revision })]),
         el("p", {}, [el("strong", { textContent: "Summary: " }), card.summary]),
         el("p", {}, [el("strong", { textContent: "Prompt: " }), card.prompt])
       ];
@@ -403,19 +415,10 @@
         var pillGroup = el("div", { role: "group", "aria-label": amb.question }, []);
         function rebuildPills() {
           replaceChildren(pillGroup, amb.options.map(function (opt) {
-            var selected = draftAnswers[amb.id] === opt;
             return el("button", {
-              type: "button",
-              className: "scantle-pill",
-              disabled: rpcInFlight,
-              "data-ambiguity-id": amb.id,
-              "data-option": opt,
-              "aria-pressed": selected ? "true" : "false",
-              onClick: function () {
-                if (rpcInFlight) { return; }
-                draftAnswers[amb.id] = opt;
-                rebuildPills();
-              },
+              type: "button", className: "scantle-pill", disabled: rpcInFlight,
+              "data-ambiguity-id": amb.id, "data-option": opt, "aria-pressed": draftAnswers[amb.id] === opt ? "true" : "false",
+              onClick: function () { if (!rpcInFlight) { draftAnswers[amb.id] = opt; rebuildPills(); } },
               textContent: opt
             });
           }));
@@ -424,41 +427,25 @@
         rebuildPills();
         var answerText = draftAnswers[amb.id] ? " [Confirmed answer: " + draftAnswers[amb.id] + "]" : "";
         return el("li", {}, [
-          el("code", { textContent: amb.id }), ": ", amb.question,
-          " (options: " + amb.options.join(", ") + ")", answerText, pillGroup
+          el("code", { textContent: amb.id }), ": ", amb.question, " (options: " + amb.options.join(", ") + ")", answerText, pillGroup
         ]);
       });
 
       var exampleItems = draftExamples.map(function (ex, idx) {
         function makeFieldInput(field, label) {
           var inputEl = el("input", {
-            type: "text",
-            className: "scantle-input",
-            "aria-label": ex.id + " " + label,
-            "data-example-id": ex.id,
-            "data-field": field,
-            value: ex[field],
+            type: "text", className: "scantle-input", "aria-label": ex.id + " " + label,
+            "data-example-id": ex.id, "data-field": field, value: ex[field],
             onInput: function (evt) {
-              if (rpcInFlight) {
-                if (evt && evt.target) { evt.target.value = ex[field]; }
-                return;
-              }
-              if (evt && evt.target && typeof evt.target.value === "string") {
-                ex[field] = evt.target.value;
-              }
+              if (rpcInFlight) { if (evt && evt.target) { evt.target.value = ex[field]; } return; }
+              if (evt && evt.target && typeof evt.target.value === "string") { ex[field] = evt.target.value; }
             }
           });
           formControls.push(inputEl);
-          return el("label", { className: "scantle-field-label" }, [
-            el("span", { textContent: label + ": " }),
-            inputEl
-          ]);
+          return el("label", { className: "scantle-field-label" }, [el("span", { textContent: label + ": " }), inputEl]);
         }
         var kindBtn = el("button", {
-          type: "button",
-          className: "scantle-pill",
-          "data-example-id": ex.id,
-          "data-field": "verification_kind",
+          type: "button", className: "scantle-pill", "data-example-id": ex.id, "data-field": "verification_kind",
           textContent: "Kind: " + ex.verification_kind,
           onClick: function () {
             if (rpcInFlight) { return; }
@@ -470,26 +457,18 @@
         return el("li", { "data-example-index": String(idx) }, [
           el("div", {}, [
             el("code", { textContent: ex.id }), " [", ex.verification_kind, "] ",
-            el("strong", { textContent: ex.scenario }), " — Input: ", ex.input_summary,
-            " -> Expected: ", ex.expected_outcome
+            el("strong", { textContent: ex.scenario }), " — Input: ", ex.input_summary, " -> Expected: ", ex.expected_outcome
           ]),
           el("div", { className: "scantle-field-row" }, [
-            makeFieldInput("scenario", "Scenario"),
-            makeFieldInput("input_summary", "Input"),
-            makeFieldInput("expected_outcome", "Expected result"),
-            kindBtn
+            makeFieldInput("scenario", "Scenario"), makeFieldInput("input_summary", "Input"), makeFieldInput("expected_outcome", "Expected result"), kindBtn
           ])
         ]);
       });
 
-      var preservedItems = card.preserved_behaviors.map(function (pb) {
-        return el("li", { textContent: pb });
-      });
+      var preservedItems = card.preserved_behaviors.map(function (pb) { return el("li", { textContent: pb }); });
 
       var submitBtn = el("button", {
-        type: "button",
-        id: "scantle-confirm-submit",
-        className: "scantle-btn scantle-btn-primary",
+        type: "button", id: "scantle-confirm-submit", className: "scantle-btn scantle-btn-primary",
         textContent: card.status === "needs_confirmation" ? "Confirm Intent & Lock Examples" : "Refine Confirmed Answers & Examples",
         onClick: function () {
           if (rpcInFlight) { return; }
@@ -515,23 +494,30 @@
             answers: Object.assign({}, draftAnswers),
             examples: draftExamples.map(function (item) {
               return {
-                id: item.id,
-                scenario: item.scenario,
-                input_summary: item.input_summary,
-                expected_outcome: item.expected_outcome,
-                verification_kind: item.verification_kind
+                id: item.id, scenario: item.scenario, input_summary: item.input_summary,
+                expected_outcome: item.expected_outcome, verification_kind: item.verification_kind
               };
             })
           }, isValidChangeCard, function (updatedCard) {
-            renderChangeCard(updatedCard, null);
+            renderChangeCard(updatedCard, null, true);
           }, showFormError);
         }
       });
-      formControls.push(submitBtn);
+      var discardBtn = el("button", {
+        type: "button", id: "scantle-discard-draft", className: "scantle-btn",
+        textContent: "Discard Unsaved Edits",
+        onClick: function () {
+          if (rpcInFlight) { return; }
+          if (resultRegionKind === "cp2" || resultRegionKind === "diff" || resultRegionKind === "cp3") {
+            clearEditorRegion();
+            return;
+          }
+          renderChangeCard(card, null, true);
+        }
+      });
+      formControls.push(submitBtn, discardBtn);
 
-      var viewBlocks = [
-        el("div", { className: "scantle-meta" }, metaRows)
-      ];
+      var viewBlocks = [el("div", { className: "scantle-meta" }, metaRows)];
       if (isPlainObject(preservedDraft)) {
         var draftSummaryLines = Object.keys(preservedDraft.answers || {}).map(function (k) {
           return k + "=" + preservedDraft.answers[k];
@@ -551,10 +537,40 @@
         el("ul", {}, exampleItems),
         el("h3", { textContent: "Preserved Contract Invariants (" + card.preserved_behaviors.length + ")" }),
         preservedItems.length > 0 ? el("ul", {}, preservedItems) : el("p", { textContent: "None declared." }),
-        el("div", { className: "scantle-field-row" }, [submitBtn]),
+        el("div", { className: "scantle-field-row" }, [submitBtn, discardBtn]),
         feedbackEl
       ]));
-      replaceChildren(viewEl, viewBlocks);
+      replaceChildren(editorRegionEl, viewBlocks);
+    }
+
+    function renderIncomingChangeCard(incomingCard) {
+      resultRegionKind = "incoming-card";
+      statusEl.textContent = "Received Checkpoint 1 Change Card (" + incomingCard.request_revision + "); unsaved editor draft preserved.";
+      var loadBtn = el("button", {
+        type: "button", id: "scantle-load-incoming-card", className: "scantle-btn",
+        textContent: "Load Incoming Card into Editor (Preserve Draft)",
+        onClick: function () {
+          if (Object.keys(pendingRequests).length > 0) { return; }
+          var savedDraft = activeCP1Editor ? activeCP1Editor.snapshotDraft() : null;
+          renderChangeCard(incomingCard, savedDraft, false);
+        }
+      });
+      var switchBtn = el("button", {
+        type: "button", id: "scantle-replace-incoming-card", className: "scantle-btn",
+        textContent: "Switch to Incoming Card (Discard Unsaved Edits)",
+        onClick: function () {
+          if (Object.keys(pendingRequests).length > 0) { return; }
+          renderChangeCard(incomingCard, null, false);
+        }
+      });
+      replaceChildren(resultRegionEl, [
+        el("div", { id: "scantle-incoming-change-card", className: "scantle-card", role: "region", "aria-label": "Incoming Change Card" }, [
+          el("h3", { textContent: "Incoming CP1 Change Card: " + incomingCard.change_id + " (" + incomingCard.status + ")" }),
+          el("p", {}, ["incoming request_revision: ", el("code", { textContent: incomingCard.request_revision })]),
+          el("p", { textContent: incomingCard.summary }),
+          el("div", { className: "scantle-field-row" }, [loadBtn, switchBtn])
+        ])
+      ]);
     }
 
     function columnForKind(kind) {
@@ -661,48 +677,39 @@
     }
 
     function renderArchitecturePreview(preview) {
+      if (!shouldRetainEditor()) { clearEditorRegion(); }
       clearDatasetKeys();
       root.dataset.state = "cp2-architecture-preview";
       root.dataset.changeId = preview.change_id;
       root.dataset.requestRevision = preview.request_revision;
       root.dataset.designDigest = preview.design_digest;
+      resultRegionKind = "cp2";
       statusEl.textContent = "Rendered Checkpoint 2 Architecture Preview (" + preview.system_name + ")";
 
       var containerItems = preview.containers.map(function (c) {
-        return el("li", {}, [
-          el("span", { className: "scantle-badge", textContent: c.kind }),
-          el("code", { textContent: c.id }), " (", c.name, "): ", c.description
-        ]);
+        return el("li", {}, [el("span", { className: "scantle-badge", textContent: c.kind }), el("code", { textContent: c.id }), " (", c.name, "): ", c.description]);
       });
 
       var edgeItems = preview.edges.map(function (e) {
-        return el("li", {}, [
-          el("code", { textContent: e.from_id }), " -> ", el("code", { textContent: e.to_id }), " [", e.protocol, "]"
-        ]);
+        return el("li", {}, [el("code", { textContent: e.from_id }), " -> ", el("code", { textContent: e.to_id }), " [", e.protocol, "]"]);
       });
 
       var policyItems = preview.agent_policies.map(function (p) {
         return el("li", {}, [
           el("code", { textContent: p.agent_id }),
           ": time_budget=" + p.max_execution_seconds + "s, max_tool_calls=" + p.max_tool_calls +
-          ", max_recovery_turns=" + p.max_recovery_turns +
-          ", history=" + p.compress_at_turns + "/" + p.keep_recent_turns +
-          ", cache_after_system=" + p.cache_after_system +
-          ", cache_after_tools=" + p.cache_after_tools
+          ", max_recovery_turns=" + p.max_recovery_turns + ", history=" + p.compress_at_turns + "/" + p.keep_recent_turns +
+          ", cache_after_system=" + p.cache_after_system + ", cache_after_tools=" + p.cache_after_tools
         ]);
       });
 
       var toolItems = preview.tools.map(function (t) {
         var badges = [];
-        if (t.injected_fields.length > 0) {
-          badges.push(el("span", { className: "scantle-badge", textContent: "Inject: " + t.injected_fields.join(", ") }));
-        }
+        if (t.injected_fields.length > 0) { badges.push(el("span", { className: "scantle-badge", textContent: "Inject: " + t.injected_fields.join(", ") })); }
         if (t.requires_confirmation) { badges.push(el("span", { className: "scantle-badge", textContent: "Confirmation" })); }
         if (t.bounded_result) { badges.push(el("span", { className: "scantle-badge", textContent: "BoundedResult" })); }
         if (t.requires_ui) { badges.push(el("span", { className: "scantle-badge", textContent: "UI required" })); }
-        return el("li", {}, [
-          el("code", { textContent: t.id }), " (", t.toolset, "): ", t.description, " "
-        ].concat(badges));
+        return el("li", {}, [el("code", { textContent: t.id }), " (", t.toolset, "): ", t.description, " "].concat(badges));
       });
 
       var swarmRoleItems = preview.swarm.assignments.map(function (r) {
@@ -724,7 +731,7 @@
       if (swarmRoleItems.length > 0) { swarmNodes.push(el("ul", {}, swarmRoleItems)); }
       if (preview.swarm.manifest) { swarmNodes.push(el("pre", { textContent: preview.swarm.manifest })); }
 
-      replaceChildren(viewEl, [
+      replaceChildren(resultRegionEl, [
         el("div", { className: "scantle-meta" }, [
           el("h2", { textContent: "CP2 Architecture Preview: " + preview.system_name }),
           el("p", { textContent: preview.banner }),
@@ -756,12 +763,14 @@
     }
 
     function renderDiffResult(diff) {
+      if (!shouldRetainEditor()) { clearEditorRegion(); }
       clearDatasetKeys();
       root.dataset.state = "cp2-diff";
       root.dataset.hasChanges = String(diff.has_changes);
+      resultRegionKind = "diff";
       statusEl.textContent = "Rendered Structural Design Diff (has_changes=" + diff.has_changes + ")";
 
-      replaceChildren(viewEl, [
+      replaceChildren(resultRegionEl, [
         el("div", { className: "scantle-meta" }, [
           el("h2", { textContent: "Structural Goa & Goa-AI Design Diff" }),
           el("p", { textContent: "Standalone structural comparison (unbound to a CP1 Change Card or request_revision)." }),
@@ -781,8 +790,10 @@
     }
 
     function renderDraftOverride(draft) {
+      if (!shouldRetainEditor()) { clearEditorRegion(); }
       clearDatasetKeys();
       root.dataset.state = "cp3-draft-override";
+      resultRegionKind = "cp3";
       statusEl.textContent = "Rendered Checkpoint 3 Fast Draft Override";
 
       var rows = [
@@ -796,7 +807,7 @@
       if (draft.prompt_version) {
         rows.push(el("p", {}, ["prompt_version: ", el("code", { textContent: draft.prompt_version })]));
       }
-      replaceChildren(viewEl, [el("div", { className: "scantle-meta" }, rows)]);
+      replaceChildren(resultRegionEl, [el("div", { className: "scantle-meta" }, rows)]);
     }
 
     function extractErrorText(params) {
@@ -816,14 +827,8 @@
         renderError("Malformed ui/notifications/tool-result: params must be an object.");
         return;
       }
-      if (root.dataset.state === "cp1-change-card" && Object.keys(pendingRequests).length > 0) {
-        if (params.isError === true && activeCP1Editor) {
-          activeCP1Editor.onError(extractErrorText(params));
-        }
-        return;
-      }
       if (params.isError === true) {
-        if (root.dataset.state === "cp1-change-card" && activeCP1Editor) {
+        if (activeCP1Editor && Object.keys(pendingRequests).length > 0) {
           activeCP1Editor.onError(extractErrorText(params));
           return;
         }
@@ -841,14 +846,16 @@
       }
       if (isValidChangeCard(payload)) {
         if (activeCP1Editor) {
-          if (activeCP1Editor.isDirty() ||
-              (payload.change_id === activeCP1Editor.changeId && payload.request_revision === activeCP1Editor.requestRevision)) {
+          if (payload.change_id === activeCP1Editor.changeId &&
+              payload.request_revision === activeCP1Editor.requestRevision) {
             return;
           }
-          renderChangeCard(payload, activeCP1Editor.preservedDraft);
-          return;
+          if (shouldRetainEditor()) {
+            renderIncomingChangeCard(payload);
+            return;
+          }
         }
-        renderChangeCard(payload, null);
+        renderChangeCard(payload, null, false);
         return;
       }
       if (isValidDiffResult(payload)) {
@@ -870,10 +877,11 @@
         if (msg.id !== undefined && msg.id !== null) {
           if (msg.method === "ui/resource-teardown") {
             pendingRequests = {};
+            clearEditorRegion();
+            clearResultRegion();
             clearDatasetKeys();
             root.dataset.state = "terminated";
             statusEl.textContent = "Checkpoint resource torn down.";
-            replaceChildren(viewEl, []);
             window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
             return;
           }
@@ -891,7 +899,7 @@
             renderError("Malformed ui/notifications/tool-input notification.");
             return;
           }
-          if (activeCP1Editor && (Object.keys(pendingRequests).length > 0 || activeCP1Editor.hasUnsavedState())) {
+          if (shouldRetainEditor()) {
             return;
           }
           renderWaiting("Received tool input; awaiting validated checkpoint result...");
