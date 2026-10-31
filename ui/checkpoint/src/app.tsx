@@ -489,7 +489,9 @@ export function bootstrapCheckpointApp() {
     };
     statusEl.textContent =
       card.status === "confirmed"
-        ? "Showing confirmed Change Card. You can refine answers or examples below."
+        ? card.approval
+          ? "Showing approved Change Card (in-memory approval recorded; nothing merged or deployed)."
+          : "Showing confirmed Change Card. You can refine answers or examples below."
         : "Review the open questions and examples below, then confirm your intent.";
     rootEl.dataset.state = "cp1-change-card";
     syncEditorRegion();
@@ -556,9 +558,24 @@ export function bootstrapCheckpointApp() {
           payload.change_id === activeEditor.card.change_id &&
           payload.request_revision === activeEditor.card.request_revision
         ) {
-          return;
-        }
-        if (shouldRetainEditor()) {
+          if (
+            JSON.stringify(payload.approval || null) ===
+            JSON.stringify(activeEditor.card.approval || null)
+          ) {
+            return;
+          }
+          if (shouldRetainEditor()) {
+            activeEditor = {
+              ...activeEditor,
+              card: payload,
+            };
+            statusEl.textContent = payload.approval
+              ? "Showing approved Change Card (in-memory approval recorded; nothing merged or deployed)."
+              : "Showing confirmed Change Card. You can refine answers or examples below.";
+            syncEditorRegion();
+            return;
+          }
+        } else if (shouldRetainEditor()) {
           activeResult = { kind: "cp1-incoming-card", card: payload };
           syncResultRegion();
           rootEl.dataset.state = "cp1-change-card";

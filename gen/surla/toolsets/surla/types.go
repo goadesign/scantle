@@ -8,6 +8,49 @@
 package surla
 
 type (
+	// ApproveMergePayload defines the JSON payload for the surla.approve_merge tool.
+	ApproveMergePayload = struct {
+		// Confirmed Change Card identifier.
+		ChangeID string
+		// Current request_revision of the confirmed Change Card.
+		RequestRevision string
+		// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+		// characters).
+		CandidateCommit string
+		// SHA-256 digest of the CP4 verification report written by surla verify (64
+		// lowercase hex characters).
+		ReportDigest string
+	}
+	// ApproveMergeResult defines the JSON result for the surla.approve_merge tool.
+	ApproveMergeResult = struct {
+		// Change identifier.
+		ChangeID string
+		// Checkpoint status (needs_confirmation or confirmed).
+		Status string
+		// Original operator feature request.
+		Prompt string
+		// Plain-English summary of requested behavior.
+		Summary string
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
+		Ambiguities []*AmbiguityQuestion
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string
+		// Concrete examples mapped to evaluator checks.
+		Examples []*ExampleItem
+		// Existing contract invariants preserved by this change.
+		PreservedBehaviors []string
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string
+		// SHA-256 digest of the canonical versioned Change Card.
+		RequestRevision string
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItem
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItem
+	}
 	// ConfirmIntentPayload defines the JSON payload for the surla.confirm_intent tool.
 	ConfirmIntentPayload = struct {
 		// Change identifier.
@@ -45,6 +88,9 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItem
 	}
 	// DiffPayload defines the JSON payload for the surla.diff tool.
 	DiffPayload = struct {
@@ -120,6 +166,9 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItem
 	}
 	// PreviewArchitecturePayload defines the JSON payload for the surla.preview_architecture tool.
 	PreviewArchitecturePayload = struct {
@@ -191,6 +240,9 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItem
 	}
 	// AgentPolicyItem is a nested type used by the generated JSON contract.
 	AgentPolicyItem = struct {
@@ -219,6 +271,28 @@ type (
 		Question string
 		// Concrete resolution choices.
 		Options []string
+	}
+	// ApprovalItem is a nested type used by the generated JSON contract.
+	ApprovalItem = struct {
+		// Authenticated bearer principal that owns the card and called approve_merge.
+		// Bearer authentication does not prove that a human, rather than a coding
+		// agent, made the call.
+		ApprovedBy string
+		// SHA-256 digest of the approved CP4 verification report.
+		ReportDigest string
+		// Candidate commit the report was checked against.
+		CandidateCommit string
+		// Evaluator suite the promotion target requires.
+		SuiteID string
+		// Evaluator suite commit the promotion target requires.
+		SuiteCommit string
+		// Dependency profile the promotion target requires, such as sim.
+		Environment string
+		// SHA-256 digest of each candidate binary the promotion target measured, keyed
+		// by binary name.
+		Artifacts map[string]string
+		// Number of declared evaluator scenarios, every one of which passed.
+		ScenarioCount int
 	}
 	// BuilderScopeItem is a nested type used by the generated JSON contract.
 	BuilderScopeItem = struct {

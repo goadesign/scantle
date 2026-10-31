@@ -239,6 +239,48 @@ func DecodeDraftOverrideRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 	}
 }
 
+// EncodeApproveMergeResponse returns an encoder for responses returned by the
+// surla approve_merge endpoint.
+func EncodeApproveMergeResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*surla.ChangeCardResult)
+		enc := encoder(ctx, w)
+		body := NewApproveMergeResponseBody(res)
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
+// DecodeApproveMergeRequest returns a decoder for requests sent to the surla
+// approve_merge endpoint.
+func DecodeApproveMergeRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*surla.ApproveMergePayload, error) {
+	return func(r *http.Request) (*surla.ApproveMergePayload, error) {
+		var payload *surla.ApproveMergePayload
+		var (
+			body ApproveMergeRequestBody
+			err  error
+		)
+		err = decoder(r).Decode(&body)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return payload, goa.MissingPayloadError()
+			}
+			var gerr *goa.ServiceError
+			if errors.As(err, &gerr) {
+				return payload, gerr
+			}
+			return payload, goa.DecodePayloadError(err.Error())
+		}
+		err = ValidateApproveMergeRequestBody(&body)
+		if err != nil {
+			return payload, err
+		}
+		payload = NewApproveMergePayload(&body)
+
+		return payload, nil
+	}
+}
+
 // EncodeDiffResponse returns an encoder for responses returned by the surla
 // diff endpoint.
 func EncodeDiffResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
@@ -322,6 +364,30 @@ func marshalSurlaUICompositionItemToUICompositionItemResponseBody(v *surla.UICom
 	res := &UICompositionItemResponseBody{
 		Program:             v.Program,
 		ComposedForRevision: v.ComposedForRevision,
+	}
+
+	return res
+}
+
+// marshalSurlaApprovalItemToApprovalItemResponseBody builds a value of type
+// *ApprovalItemResponseBody from a value of type *surla.ApprovalItem.
+func marshalSurlaApprovalItemToApprovalItemResponseBody(v *surla.ApprovalItem) *ApprovalItemResponseBody {
+	res := &ApprovalItemResponseBody{
+		ApprovedBy:      v.ApprovedBy,
+		ReportDigest:    v.ReportDigest,
+		CandidateCommit: v.CandidateCommit,
+		SuiteID:         v.SuiteID,
+		SuiteCommit:     v.SuiteCommit,
+		Environment:     v.Environment,
+		ScenarioCount:   v.ScenarioCount,
+	}
+	if v.Artifacts != nil {
+		res.Artifacts = make(map[string]string, len(v.Artifacts))
+		for key, val := range v.Artifacts {
+			tk := key
+			tv := val
+			res.Artifacts[tk] = tv
+		}
 	}
 
 	return res

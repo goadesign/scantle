@@ -132,7 +132,11 @@ func TestRunDispatchesVerify(t *testing.T) {
 
 	err = run([]string{"approve"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `expected "serve", "diff" or "verify"`)
+	assert.Contains(t, err.Error(), "approve requires -report")
+
+	err = run([]string{"unknown"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `expected "serve", "diff", "verify" or "approve"`)
 }
 
 // without returns a copy of args with every occurrence of the flag named name

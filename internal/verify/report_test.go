@@ -1,7 +1,10 @@
 package verify
 
 import (
+	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -156,6 +159,41 @@ func TestApproveRefusesAStaleOrInconsistentReport(t *testing.T) {
 	t.Run("failed report", func(t *testing.T) {
 		assert.ErrorIs(t, Approve(testBinding(), failing), ErrStaleReport)
 	})
+}
+
+func TestDecodeReportReadsExactlyOneSavedReport(t *testing.T) {
+	both := testBinding().Artifacts
+	r, err := Assemble(testBinding(), testSuite(), eval.Report{SuiteID: "orders_acceptance", Scenarios: []eval.ScenarioReport{
+		scenario("a", true, both), scenario("b", true, both), scenario("h", true, both),
+	}}, 0)
+	require.NoError(t, err)
+	dir := t.TempDir()
+	require.NoError(t, writeReport(dir, r))
+	saved, err := os.ReadFile(filepath.Join(dir, r.Digest+".json"))
+	require.NoError(t, err)
+
+	decoded, err := DecodeReport(bytes.NewReader(saved))
+	require.NoError(t, err)
+	assert.Equal(t, r.Digest, decoded.Digest)
+	require.NoError(t, Approve(testBinding(), decoded), "a saved report still approves after decoding")
+
+	var withExtra map[string]any
+	require.NoError(t, json.Unmarshal(saved, &withExtra))
+	withExtra["approved"] = true
+	extra, err := json.Marshal(withExtra)
+	require.NoError(t, err)
+
+	cases := map[string][]byte{
+		"unknown field":  extra,
+		"trailing value": append(append([]byte{}, saved...), []byte(`{}`)...),
+		"empty input":    nil,
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := DecodeReport(bytes.NewReader(in))
+			assert.Error(t, err)
+		})
+	}
 }
 
 // holdoutResult is a failed holdout scenario whose name, checks and

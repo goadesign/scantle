@@ -9,6 +9,17 @@ export interface AmbiguityQuestion {
   question: string;
 }
 
+export interface ApprovalItem {
+  approved_by: string;
+  artifacts: Record<string, string>;
+  candidate_commit: string;
+  environment: string;
+  report_digest: string;
+  scenario_count: number;
+  suite_commit: string;
+  suite_id: string;
+}
+
 export interface ExampleItem {
   expected_outcome: string;
   id: string;
@@ -25,6 +36,7 @@ export interface UICompositionItem {
 export interface ChangeCardResult {
   ambiguities?: AmbiguityQuestion[];
   answers?: Record<string, string>;
+  approval?: ApprovalItem;
   change_id: string;
   confirmed_by?: string;
   examples: ExampleItem[];
@@ -172,6 +184,9 @@ const GENERATED_RESULT_SCHEMAS: Record<string, JSONSchemaNode> = {
           "type": "string"
         }
       },
+      "approval": {
+        "$ref": "#/$defs/ApprovalItem"
+      },
       "change_id": {
         "type": "string"
       },
@@ -230,6 +245,49 @@ const GENERATED_RESULT_SCHEMAS: Record<string, JSONSchemaNode> = {
             }
           },
           "question": {
+            "type": "string"
+          }
+        }
+      },
+      "ApprovalItem": {
+        "type": "object",
+        "required": [
+          "approved_by",
+          "report_digest",
+          "candidate_commit",
+          "suite_id",
+          "suite_commit",
+          "environment",
+          "artifacts",
+          "scenario_count"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "approved_by": {
+            "type": "string"
+          },
+          "artifacts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "candidate_commit": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "report_digest": {
+            "type": "string"
+          },
+          "scenario_count": {
+            "type": "integer"
+          },
+          "suite_commit": {
+            "type": "string"
+          },
+          "suite_id": {
             "type": "string"
           }
         }

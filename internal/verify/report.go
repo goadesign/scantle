@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"slices"
 	"strings"
@@ -285,6 +286,23 @@ func Approve(current Binding, report Report) error {
 		return fmt.Errorf("%w: changed %s", ErrStaleReport, strings.Join(diff, ", "))
 	}
 	return nil
+}
+
+// DecodeReport reads one report written by Run (or `surla verify`) from r. It
+// rejects unknown fields and anything after the report, so a file that is not
+// exactly one report fails instead of being partly read. Decoding proves
+// nothing about the report's content; Approve checks that.
+func DecodeReport(r io.Reader) (Report, error) {
+	dec := json.NewDecoder(r)
+	dec.DisallowUnknownFields()
+	var report Report
+	if err := dec.Decode(&report); err != nil {
+		return Report{}, fmt.Errorf("decode verification report: %w", err)
+	}
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return Report{}, errors.New("decode verification report: data after the report")
+	}
+	return report, nil
 }
 
 // checkArtifacts requires the scenario to report exactly the binding's

@@ -17,6 +17,285 @@ import (
 	goa "goa.design/goa/v3/pkg"
 )
 
+// ApproveMergePayloadTransport stores JSON fields until they have been validated.
+type ApproveMergePayloadTransport struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision *string `json:"request_revision"`
+	// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit *string `json:"candidate_commit"`
+	// SHA-256 digest of the CP4 verification report written by surla verify (64
+	// lowercase hex characters).
+	ReportDigest *string `json:"report_digest"`
+}
+
+// ValidateApproveMergePayloadTransport checks decoded JSON before it becomes a service value.
+func ValidateApproveMergePayloadTransport(value *ApproveMergePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *value.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	}
+	if value.ReportDigest != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.report_digest", *value.ReportDigest, "^[0-9a-f]{64}$"))
+	}
+	return err
+}
+
+// ApproveMergeResultAmbiguityQuestionTransport stores JSON fields until they have been validated.
+type ApproveMergeResultAmbiguityQuestionTransport struct {
+	// Stable question identifier.
+	ID *string `json:"id"`
+	// Plain-English question for the operator.
+	Question *string `json:"question"`
+	// Concrete resolution choices.
+	Options []string `json:"options"`
+}
+
+// ValidateApproveMergeResultAmbiguityQuestionTransport checks decoded JSON before it becomes a service value.
+func ValidateApproveMergeResultAmbiguityQuestionTransport(value *ApproveMergeResultAmbiguityQuestionTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Question == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("question", "body"))
+	}
+	if value.Options == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("options", "body"))
+	}
+	return err
+}
+
+// ApproveMergeResultApprovalItemTransport stores JSON fields until they have been validated.
+type ApproveMergeResultApprovalItemTransport struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy *string `json:"approved_by"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest *string `json:"report_digest"`
+	// Candidate commit the report was checked against.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite the promotion target requires.
+	SuiteID *string `json:"suite_id"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit *string `json:"suite_commit"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment *string `json:"environment"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `json:"artifacts"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount *int `json:"scenario_count"`
+}
+
+// ValidateApproveMergeResultApprovalItemTransport checks decoded JSON before it becomes a service value.
+func ValidateApproveMergeResultApprovalItemTransport(value *ApproveMergeResultApprovalItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if value.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
+	}
+	return err
+}
+
+// ApproveMergeResultExampleItemTransport stores JSON fields until they have been validated.
+type ApproveMergeResultExampleItemTransport struct {
+	// Code-assigned stable example identifier.
+	ID *string `json:"id"`
+	// Plain-English scenario description.
+	Scenario *string `json:"scenario"`
+	// Representative user request and domain fixture state.
+	InputSummary *string `json:"input_summary"`
+	// Expected side effect and response behavior.
+	ExpectedOutcome *string `json:"expected_outcome"`
+	// Evaluator check classification (deterministic or model_judged).
+	VerificationKind *string `json:"verification_kind"`
+}
+
+// ValidateApproveMergeResultExampleItemTransport checks decoded JSON before it becomes a service value.
+func ValidateApproveMergeResultExampleItemTransport(value *ApproveMergeResultExampleItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Scenario == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario", "body"))
+	}
+	if value.InputSummary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("input_summary", "body"))
+	}
+	if value.ExpectedOutcome == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("expected_outcome", "body"))
+	}
+	if value.VerificationKind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("verification_kind", "body"))
+	}
+	if value.VerificationKind != nil {
+		if !(*value.VerificationKind == "deterministic" || *value.VerificationKind == "model_judged") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.verification_kind", *value.VerificationKind, []any{"deterministic", "model_judged"}))
+		}
+	}
+	return err
+}
+
+// ApproveMergeResultTransport stores JSON fields until they have been validated.
+type ApproveMergeResultTransport struct {
+	// Change identifier.
+	ChangeID *string `json:"change_id"`
+	// Checkpoint status (needs_confirmation or confirmed).
+	Status *string `json:"status"`
+	// Original operator feature request.
+	Prompt *string `json:"prompt"`
+	// Plain-English summary of requested behavior.
+	Summary *string `json:"summary"`
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
+	Ambiguities []*ApproveMergeResultAmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `json:"answers,omitempty"`
+	// Concrete examples mapped to evaluator checks.
+	Examples []*ApproveMergeResultExampleItemTransport `json:"examples"`
+	// Existing contract invariants preserved by this change.
+	PreservedBehaviors []string `json:"preserved_behaviors"`
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `json:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
+	RequestRevision *string `json:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *ApproveMergeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApproveMergeResultApprovalItemTransport `json:"approval,omitempty"`
+}
+
+// ValidateApproveMergeResultTransport checks decoded JSON before it becomes a service value.
+func ValidateApproveMergeResultTransport(value *ApproveMergeResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if value.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
+	}
+	if value.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if value.Examples == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("examples", "body"))
+	}
+	if value.PreservedBehaviors == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("preserved_behaviors", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.Status != nil {
+		if !(*value.Status == "needs_confirmation" || *value.Status == "confirmed") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *value.Status, []any{"needs_confirmation", "confirmed"}))
+		}
+	}
+	for _, e := range value.Ambiguities {
+		if e != nil {
+			if err2 := ValidateApproveMergeResultAmbiguityQuestionTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range value.Examples {
+		if e != nil {
+			if err2 := ValidateApproveMergeResultExampleItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	if value.UIComposition != nil {
+		if err2 := ValidateApproveMergeResultUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if value.Approval != nil {
+		if err2 := ValidateApproveMergeResultApprovalItemTransport(value.Approval); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// ApproveMergeResultUICompositionItemTransport stores JSON fields until they have been validated.
+type ApproveMergeResultUICompositionItemTransport struct {
+	// OpenUI Lang program composed by the CP1 model from the Surla decision
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
+	Program *string `json:"program"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision *string `json:"composed_for_revision"`
+}
+
+// ValidateApproveMergeResultUICompositionItemTransport checks decoded JSON before it becomes a service value.
+func ValidateApproveMergeResultUICompositionItemTransport(value *ApproveMergeResultUICompositionItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if value.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	return err
+}
+
 // ConfirmIntentPayloadExampleItemTransport stores JSON fields until they have been validated.
 type ConfirmIntentPayloadExampleItemTransport struct {
 	// Code-assigned stable example identifier.
@@ -125,6 +404,61 @@ func ValidateConfirmIntentResultAmbiguityQuestionTransport(value *ConfirmIntentR
 	return err
 }
 
+// ConfirmIntentResultApprovalItemTransport stores JSON fields until they have been validated.
+type ConfirmIntentResultApprovalItemTransport struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy *string `json:"approved_by"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest *string `json:"report_digest"`
+	// Candidate commit the report was checked against.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite the promotion target requires.
+	SuiteID *string `json:"suite_id"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit *string `json:"suite_commit"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment *string `json:"environment"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `json:"artifacts"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount *int `json:"scenario_count"`
+}
+
+// ValidateConfirmIntentResultApprovalItemTransport checks decoded JSON before it becomes a service value.
+func ValidateConfirmIntentResultApprovalItemTransport(value *ConfirmIntentResultApprovalItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if value.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
+	}
+	return err
+}
+
 // ConfirmIntentResultExampleItemTransport stores JSON fields until they have been validated.
 type ConfirmIntentResultExampleItemTransport struct {
 	// Code-assigned stable example identifier.
@@ -193,6 +527,9 @@ type ConfirmIntentResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *ConfirmIntentResultUICompositionItemTransport `json:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ConfirmIntentResultApprovalItemTransport `json:"approval,omitempty"`
 }
 
 // ValidateConfirmIntentResultTransport checks decoded JSON before it becomes a service value.
@@ -242,6 +579,11 @@ func ValidateConfirmIntentResultTransport(value *ConfirmIntentResultTransport) (
 	}
 	if value.UIComposition != nil {
 		if err2 := ValidateConfirmIntentResultUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if value.Approval != nil {
+		if err2 := ValidateConfirmIntentResultApprovalItemTransport(value.Approval); err2 != nil {
 			err = goa.MergeErrors(err, err2)
 		}
 	}
@@ -469,6 +811,61 @@ func ValidateGetChangeResultAmbiguityQuestionTransport(value *GetChangeResultAmb
 	return err
 }
 
+// GetChangeResultApprovalItemTransport stores JSON fields until they have been validated.
+type GetChangeResultApprovalItemTransport struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy *string `json:"approved_by"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest *string `json:"report_digest"`
+	// Candidate commit the report was checked against.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite the promotion target requires.
+	SuiteID *string `json:"suite_id"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit *string `json:"suite_commit"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment *string `json:"environment"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `json:"artifacts"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount *int `json:"scenario_count"`
+}
+
+// ValidateGetChangeResultApprovalItemTransport checks decoded JSON before it becomes a service value.
+func ValidateGetChangeResultApprovalItemTransport(value *GetChangeResultApprovalItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if value.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
+	}
+	return err
+}
+
 // GetChangeResultExampleItemTransport stores JSON fields until they have been validated.
 type GetChangeResultExampleItemTransport struct {
 	// Code-assigned stable example identifier.
@@ -537,6 +934,9 @@ type GetChangeResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *GetChangeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *GetChangeResultApprovalItemTransport `json:"approval,omitempty"`
 }
 
 // ValidateGetChangeResultTransport checks decoded JSON before it becomes a service value.
@@ -586,6 +986,11 @@ func ValidateGetChangeResultTransport(value *GetChangeResultTransport) (err erro
 	}
 	if value.UIComposition != nil {
 		if err2 := ValidateGetChangeResultUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if value.Approval != nil {
+		if err2 := ValidateGetChangeResultApprovalItemTransport(value.Approval); err2 != nil {
 			err = goa.MergeErrors(err, err2)
 		}
 	}
@@ -1196,6 +1601,61 @@ func ValidateProposeChangeResultAmbiguityQuestionTransport(value *ProposeChangeR
 	return err
 }
 
+// ProposeChangeResultApprovalItemTransport stores JSON fields until they have been validated.
+type ProposeChangeResultApprovalItemTransport struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy *string `json:"approved_by"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest *string `json:"report_digest"`
+	// Candidate commit the report was checked against.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite the promotion target requires.
+	SuiteID *string `json:"suite_id"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit *string `json:"suite_commit"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment *string `json:"environment"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `json:"artifacts"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount *int `json:"scenario_count"`
+}
+
+// ValidateProposeChangeResultApprovalItemTransport checks decoded JSON before it becomes a service value.
+func ValidateProposeChangeResultApprovalItemTransport(value *ProposeChangeResultApprovalItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if value.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
+	}
+	return err
+}
+
 // ProposeChangeResultExampleItemTransport stores JSON fields until they have been validated.
 type ProposeChangeResultExampleItemTransport struct {
 	// Code-assigned stable example identifier.
@@ -1264,6 +1724,9 @@ type ProposeChangeResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *ProposeChangeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ProposeChangeResultApprovalItemTransport `json:"approval,omitempty"`
 }
 
 // ValidateProposeChangeResultTransport checks decoded JSON before it becomes a service value.
@@ -1316,6 +1779,11 @@ func ValidateProposeChangeResultTransport(value *ProposeChangeResultTransport) (
 			err = goa.MergeErrors(err, err2)
 		}
 	}
+	if value.Approval != nil {
+		if err2 := ValidateProposeChangeResultApprovalItemTransport(value.Approval); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return err
 }
 
@@ -1343,6 +1811,93 @@ func ValidateProposeChangeResultUICompositionItemTransport(value *ProposeChangeR
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
 	}
 	return err
+}
+
+// DecodeApproveMergePayload checks JSON field names from the Goa design and returns a service value.
+func DecodeApproveMergePayload(data []byte) (out *surla.ApproveMergePayload, err error) {
+	var body *ApproveMergePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode ApproveMergePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode ApproveMergePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode ApproveMergePayload JSON after first value: %w", err)
+	}
+	if err := ValidateApproveMergePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate ApproveMergePayload JSON: %w", err)
+	}
+	{
+		out = &surla.ApproveMergePayload{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			CandidateCommit: *body.CandidateCommit,
+			ReportDigest:    *body.ReportDigest,
+		}
+	}
+	return out, nil
+}
+
+// EncodeApproveMergeResult turns a service value into JSON using the field names in the Goa design.
+func EncodeApproveMergeResult(in *surla.ChangeCardResult) ([]byte, error) {
+	var body *ApproveMergeResultTransport
+	{
+		body = &ApproveMergeResultTransport{
+			ChangeID:        &in.ChangeID,
+			Status:          &in.Status,
+			Prompt:          &in.Prompt,
+			Summary:         &in.Summary,
+			ConfirmedBy:     in.ConfirmedBy,
+			RequestRevision: &in.RequestRevision,
+		}
+		if in.Ambiguities != nil {
+			body.Ambiguities = make([]*ApproveMergeResultAmbiguityQuestionTransport, len(in.Ambiguities))
+			for i, val := range in.Ambiguities {
+				if val == nil {
+					body.Ambiguities[i] = nil
+					continue
+				}
+				body.Ambiguities[i] = encodeAmbiguityQuestionToApproveMergeResultAmbiguityQuestionTransport(val)
+			}
+		}
+		if in.Answers != nil {
+			body.Answers = make(map[string]string, len(in.Answers))
+			for key, val := range in.Answers {
+				tk := key
+				tv := val
+				body.Answers[tk] = tv
+			}
+		}
+		body.Examples = make([]*ApproveMergeResultExampleItemTransport, len(in.Examples))
+		for i, val := range in.Examples {
+			if val == nil {
+				body.Examples[i] = nil
+				continue
+			}
+			body.Examples[i] = encodeExampleItemToApproveMergeResultExampleItemTransport(val)
+		}
+		body.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
+		for i, val := range in.PreservedBehaviors {
+			body.PreservedBehaviors[i] = val
+		}
+		if in.UIComposition != nil {
+			body.UIComposition = encodeUICompositionItemToApproveMergeResultUICompositionItemTransport(in.UIComposition)
+		}
+		if in.Approval != nil {
+			body.Approval = encodeApprovalItemToApproveMergeResultApprovalItemTransport(in.Approval)
+		}
+	}
+	if err := ValidateApproveMergeResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate ApproveMergeResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode ApproveMergeResult JSON: %w", err)
+	}
+	return data, nil
 }
 
 // DecodeConfirmIntentPayload checks JSON field names from the Goa design and returns a service value.
@@ -1429,6 +1984,9 @@ func EncodeConfirmIntentResult(in *surla.ChangeCardResult) ([]byte, error) {
 		}
 		if in.UIComposition != nil {
 			body.UIComposition = encodeUICompositionItemToConfirmIntentResultUICompositionItemTransport(in.UIComposition)
+		}
+		if in.Approval != nil {
+			body.Approval = encodeApprovalItemToConfirmIntentResultApprovalItemTransport(in.Approval)
 		}
 	}
 	if err := ValidateConfirmIntentResultTransport(body); err != nil {
@@ -1619,6 +2177,9 @@ func EncodeGetChangeResult(in *surla.ChangeCardResult) ([]byte, error) {
 		if in.UIComposition != nil {
 			body.UIComposition = encodeUICompositionItemToGetChangeResultUICompositionItemTransport(in.UIComposition)
 		}
+		if in.Approval != nil {
+			body.Approval = encodeApprovalItemToGetChangeResultApprovalItemTransport(in.Approval)
+		}
 	}
 	if err := ValidateGetChangeResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate GetChangeResult JSON: %w", err)
@@ -1794,6 +2355,9 @@ func EncodeProposeChangeResult(in *surla.ChangeCardResult) ([]byte, error) {
 		if in.UIComposition != nil {
 			body.UIComposition = encodeUICompositionItemToProposeChangeResultUICompositionItemTransport(in.UIComposition)
 		}
+		if in.Approval != nil {
+			body.Approval = encodeApprovalItemToProposeChangeResultApprovalItemTransport(in.Approval)
+		}
 	}
 	if err := ValidateProposeChangeResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate ProposeChangeResult JSON: %w", err)
@@ -1881,6 +2445,19 @@ func encodeAgentPolicyItemToPreviewArchitectureResultAgentPolicyItemTransport(v 
 	return res
 }
 
+func encodeAmbiguityQuestionToApproveMergeResultAmbiguityQuestionTransport(v *surla.AmbiguityQuestion) *ApproveMergeResultAmbiguityQuestionTransport {
+	res := &ApproveMergeResultAmbiguityQuestionTransport{
+		ID:       &v.ID,
+		Question: &v.Question,
+	}
+	res.Options = make([]string, len(v.Options))
+	for i, val := range v.Options {
+		res.Options[i] = val
+	}
+
+	return res
+}
+
 func encodeAmbiguityQuestionToConfirmIntentResultAmbiguityQuestionTransport(v *surla.AmbiguityQuestion) *ConfirmIntentResultAmbiguityQuestionTransport {
 	res := &ConfirmIntentResultAmbiguityQuestionTransport{
 		ID:       &v.ID,
@@ -1920,6 +2497,86 @@ func encodeAmbiguityQuestionToProposeChangeResultAmbiguityQuestionTransport(v *s
 	return res
 }
 
+func encodeApprovalItemToApproveMergeResultApprovalItemTransport(v *surla.ApprovalItem) *ApproveMergeResultApprovalItemTransport {
+	res := &ApproveMergeResultApprovalItemTransport{
+		ApprovedBy:      &v.ApprovedBy,
+		ReportDigest:    &v.ReportDigest,
+		CandidateCommit: &v.CandidateCommit,
+		SuiteID:         &v.SuiteID,
+		SuiteCommit:     &v.SuiteCommit,
+		Environment:     &v.Environment,
+		ScenarioCount:   &v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
+	}
+
+	return res
+}
+
+func encodeApprovalItemToConfirmIntentResultApprovalItemTransport(v *surla.ApprovalItem) *ConfirmIntentResultApprovalItemTransport {
+	res := &ConfirmIntentResultApprovalItemTransport{
+		ApprovedBy:      &v.ApprovedBy,
+		ReportDigest:    &v.ReportDigest,
+		CandidateCommit: &v.CandidateCommit,
+		SuiteID:         &v.SuiteID,
+		SuiteCommit:     &v.SuiteCommit,
+		Environment:     &v.Environment,
+		ScenarioCount:   &v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
+	}
+
+	return res
+}
+
+func encodeApprovalItemToGetChangeResultApprovalItemTransport(v *surla.ApprovalItem) *GetChangeResultApprovalItemTransport {
+	res := &GetChangeResultApprovalItemTransport{
+		ApprovedBy:      &v.ApprovedBy,
+		ReportDigest:    &v.ReportDigest,
+		CandidateCommit: &v.CandidateCommit,
+		SuiteID:         &v.SuiteID,
+		SuiteCommit:     &v.SuiteCommit,
+		Environment:     &v.Environment,
+		ScenarioCount:   &v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
+	}
+
+	return res
+}
+
+func encodeApprovalItemToProposeChangeResultApprovalItemTransport(v *surla.ApprovalItem) *ProposeChangeResultApprovalItemTransport {
+	res := &ProposeChangeResultApprovalItemTransport{
+		ApprovedBy:      &v.ApprovedBy,
+		ReportDigest:    &v.ReportDigest,
+		CandidateCommit: &v.CandidateCommit,
+		SuiteID:         &v.SuiteID,
+		SuiteCommit:     &v.SuiteCommit,
+		Environment:     &v.Environment,
+		ScenarioCount:   &v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
+	}
+
+	return res
+}
+
 func encodeC4ContainerItemToPreviewArchitectureResultC4ContainerItemTransport(v *surla.C4ContainerItem) *PreviewArchitectureResultC4ContainerItemTransport {
 	res := &PreviewArchitectureResultC4ContainerItemTransport{
 		ID:          &v.ID,
@@ -1936,6 +2593,18 @@ func encodeC4EdgeItemToPreviewArchitectureResultC4EdgeItemTransport(v *surla.C4E
 		FromID:   &v.FromID,
 		ToID:     &v.ToID,
 		Protocol: &v.Protocol,
+	}
+
+	return res
+}
+
+func encodeExampleItemToApproveMergeResultExampleItemTransport(v *surla.ExampleItem) *ApproveMergeResultExampleItemTransport {
+	res := &ApproveMergeResultExampleItemTransport{
+		ID:               &v.ID,
+		Scenario:         &v.Scenario,
+		InputSummary:     &v.InputSummary,
+		ExpectedOutcome:  &v.ExpectedOutcome,
+		VerificationKind: &v.VerificationKind,
 	}
 
 	return res
@@ -2057,6 +2726,15 @@ func encodeToolInputBindingItemToPreviewArchitectureResultToolInputBindingItemTr
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
 		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func encodeUICompositionItemToApproveMergeResultUICompositionItemTransport(v *surla.UICompositionItem) *ApproveMergeResultUICompositionItemTransport {
+	res := &ApproveMergeResultUICompositionItemTransport{
+		Program:             &v.Program,
+		ComposedForRevision: &v.ComposedForRevision,
 	}
 
 	return res

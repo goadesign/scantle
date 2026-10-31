@@ -17,18 +17,20 @@ import (
 func ToolSchema(name tools.Ident) (*genregistry.ToolSchema, bool) {
 	declarations := registryDeclarations{}
 	switch name {
-	case "surla.confirm_intent":
+	case "surla.approve_merge":
 		return declarations.schema1(), true
+	case "surla.confirm_intent":
+		return declarations.schema52(), true
 	case "surla.diff":
-		return declarations.schema56(), true
+		return declarations.schema117(), true
 	case "surla.draft_override":
-		return declarations.schema85(), true
+		return declarations.schema146(), true
 	case "surla.get_change":
-		return declarations.schema102(), true
+		return declarations.schema163(), true
 	case "surla.preview_architecture":
-		return declarations.schema137(), true
+		return declarations.schema208(), true
 	case "surla.propose_change":
-		return declarations.schema234(), true
+		return declarations.schema305(), true
 	default:
 		return nil, false
 	}

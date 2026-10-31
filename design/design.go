@@ -60,6 +60,21 @@ var UICompositionItem = Type("UICompositionItem", func() {
 	Required("program", "composed_for_revision")
 })
 
+// ApprovalItem records a passed CP5 promotion check for one Change Card
+// revision.
+var ApprovalItem = Type("ApprovalItem", func() {
+	Description("Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision.")
+	Attribute("approved_by", String, "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.")
+	Attribute("report_digest", String, "SHA-256 digest of the approved CP4 verification report.")
+	Attribute("candidate_commit", String, "Candidate commit the report was checked against.")
+	Attribute("suite_id", String, "Evaluator suite the promotion target requires.")
+	Attribute("suite_commit", String, "Evaluator suite commit the promotion target requires.")
+	Attribute("environment", String, "Dependency profile the promotion target requires, such as sim.")
+	Attribute("artifacts", MapOf(String, String), "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.")
+	Attribute("scenario_count", Int, "Number of declared evaluator scenarios, every one of which passed.")
+	Required("approved_by", "report_digest", "candidate_commit", "suite_id", "suite_commit", "environment", "artifacts", "scenario_count")
+})
+
 // ChangeCardResult is the output of CP1 propose_change, confirm_intent and get_change.
 var ChangeCardResult = Type("ChangeCardResult", func() {
 	Description("Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.")
@@ -76,6 +91,7 @@ var ChangeCardResult = Type("ChangeCardResult", func() {
 	Attribute("confirmed_by", String, "Authenticated principal that confirmed the Change Card.")
 	Attribute("request_revision", String, "SHA-256 digest of the canonical versioned Change Card.")
 	Attribute("ui_composition", UICompositionItem, "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.")
+	Attribute("approval", ApprovalItem, "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.")
 	Required("change_id", "status", "prompt", "summary", "examples", "preserved_behaviors", "request_revision")
 })
 
@@ -301,6 +317,20 @@ var DraftOverrideResult = Type("DraftOverrideResult", func() {
 	Required("applied_in_store", "requires_rebuild", "message")
 })
 
+// ApproveMergePayload is the input to the CP5 approve_merge tool.
+var ApproveMergePayload = Type("ApproveMergePayload", func() {
+	Description("Identifies the confirmed Change Card revision, the candidate commit being promoted, and the evaluator-written verification report to check. The report itself and the expected suite, environment and binary digests come from the control plane's promotion target, never from the caller.")
+	Attribute("change_id", String, "Confirmed Change Card identifier.")
+	Attribute("request_revision", String, "Current request_revision of the confirmed Change Card.")
+	Attribute("candidate_commit", String, "Full commit ID of the candidate being promoted (40 or 64 lowercase hex characters).", func() {
+		Pattern("^([0-9a-f]{40}|[0-9a-f]{64})$")
+	})
+	Attribute("report_digest", String, "SHA-256 digest of the CP4 verification report written by surla verify (64 lowercase hex characters).", func() {
+		Pattern("^[0-9a-f]{64}$")
+	})
+	Required("change_id", "request_revision", "candidate_commit", "report_digest")
+})
+
 // DiffPayload is the input to the structural design and module diff tool.
 var DiffPayload = Type("DiffPayload", func() {
 	Description("Previous and candidate design modules to compare structurally, each evaluated with its own go.mod dependencies.")
@@ -410,6 +440,19 @@ var _ = Service("surla", func() {
 		})
 		HTTP(func() {
 			POST("/sandbox/draft")
+			Response(StatusOK)
+		})
+	})
+
+	Method("approve_merge", func() {
+		Description("Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.")
+		Payload(ApproveMergePayload)
+		Result(ChangeCardResult)
+		Tool("approve_merge", "Approve the confirmed Change Card revision after its CP4 verification report passed for the candidate commit.", func() {
+			ToolUI("ui://surla/checkpoint")
+		})
+		HTTP(func() {
+			POST("/changes/approve")
 			Response(StatusOK)
 		})
 	})

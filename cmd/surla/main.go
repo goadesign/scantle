@@ -1,5 +1,6 @@
 // Command surla runs the Surla MCP software factory control-plane server
-// and CLI utilities (`surla serve`, `surla diff` and `surla verify`).
+// and CLI utilities (`surla serve`, `surla diff`, `surla verify` and
+// `surla approve`).
 package main
 
 import (
@@ -51,6 +52,22 @@ type serveConfig struct {
 // into verify.Plan.Binaries, rejecting malformed entries and repeated names.
 type binaryFlags map[string]string
 
+// artifactFlags collects repeated `-artifact name=sha256` flags for
+// `surla approve` into verify.Binding.Artifacts: the digest of each candidate
+// binary being promoted, measured by whoever runs the promotion.
+type artifactFlags map[string]string
+
+// approveSummary is what `surla approve` prints when the report matches the
+// change being promoted.
+type approveSummary struct {
+	// ReportDigest identifies the approved report.
+	ReportDigest string `json:"report_digest"`
+	// Binding is the change the report was checked against.
+	Binding verify.Binding `json:"binding"`
+	// Counts covers every declared scenario, all of which passed.
+	Counts verify.Counts `json:"counts"`
+}
+
 // apiKeyEnv maps each supported direct model provider to the environment
 // variable that holds its API key. Keys are read only from the environment so
 // they never appear in process listings or shell history.
@@ -66,7 +83,8 @@ func main() {
 	}
 }
 
-// run dispatches the surla subcommands (`serve`, `diff` and `verify`).
+// run dispatches the surla subcommands (`serve`, `diff`, `verify` and
+// `approve`).
 func run(args []string) error {
 	sub := "serve"
 	if len(args) > 0 {
@@ -80,8 +98,10 @@ func run(args []string) error {
 		return runDiff(args)
 	case "verify":
 		return runVerify(args)
+	case "approve":
+		return runApprove(args, os.Stdout)
 	default:
-		return fmt.Errorf("unknown subcommand %q (expected \"serve\", \"diff\" or \"verify\")", sub)
+		return fmt.Errorf("unknown subcommand %q (expected \"serve\", \"diff\", \"verify\" or \"approve\")", sub)
 	}
 }
 
@@ -215,6 +235,106 @@ func writeVerifyReport(w io.Writer, report verify.Report, builderView bool) erro
 	return nil
 }
 
+// runApprove checks, with verify.Approve, that the saved report at -report
+// passed and describes exactly the change given by the other flags, and
+// prints an approveSummary to w. It saves nothing: no Change Card approval is
+// recorded and nothing is merged. A report that is stale, did not pass, or
+// cannot be read prints nothing and returns the error, so the exit status is 1.
+func runApprove(args []string, w io.Writer) error {
+	reportPath, current, err := parseApproveFlags(args)
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(reportPath)
+	if err != nil {
+		return fmt.Errorf("open report: %w", err)
+	}
+	defer f.Close()
+	report, err := verify.DecodeReport(f)
+	if err != nil {
+		return err
+	}
+	if err := verify.Approve(current, report); err != nil {
+		return err
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(approveSummary{ReportDigest: report.Digest, Binding: current, Counts: report.Counts})
+}
+
+// parseApproveFlags turns `surla approve` arguments into the report path and
+// the binding of the change being promoted. Every flag is required and must
+// be given explicitly, because each one is a fact the report is compared with.
+func parseApproveFlags(args []string) (string, verify.Binding, error) {
+	fs := flag.NewFlagSet("approve", flag.ContinueOnError)
+	artifacts := artifactFlags{}
+	var reportPath string
+	var b verify.Binding
+	fs.StringVar(&reportPath, "report", "", "path of the full verification report written by surla verify")
+	fs.StringVar(&b.CandidateCommit, "candidate-commit", "", "full commit ID of the candidate being promoted")
+	fs.StringVar(&b.RequestRevision, "request-revision", "", "current request_revision of the confirmed change")
+	fs.StringVar(&b.SuiteID, "suite-id", "", "evaluator suite the promotion requires")
+	fs.StringVar(&b.SuiteCommit, "suite-commit", "", "evaluator suite commit the promotion requires")
+	fs.StringVar(&b.Environment, "environment", "", "dependency profile the promotion requires, such as sim")
+	fs.Var(artifacts, "artifact", "candidate binary being promoted as name=sha256 (repeatable)")
+	if err := fs.Parse(args); err != nil {
+		return "", verify.Binding{}, err
+	}
+	if fs.NArg() > 0 {
+		return "", verify.Binding{}, fmt.Errorf("unexpected arguments %q", fs.Args())
+	}
+	required := []struct {
+		flag  string
+		value string
+	}{
+		{"-report", reportPath},
+		{"-candidate-commit", b.CandidateCommit},
+		{"-request-revision", b.RequestRevision},
+		{"-suite-id", b.SuiteID},
+		{"-suite-commit", b.SuiteCommit},
+		{"-environment", b.Environment},
+	}
+	var missing []string
+	for _, r := range required {
+		if r.value == "" {
+			missing = append(missing, r.flag)
+		}
+	}
+	if len(artifacts) == 0 {
+		missing = append(missing, "-artifact")
+	}
+	if len(missing) > 0 {
+		return "", verify.Binding{}, fmt.Errorf("approve requires %s", strings.Join(missing, ", "))
+	}
+	b.Artifacts = artifacts
+	return reportPath, b, nil
+}
+
+// String renders the collected artifacts as sorted name=sha256 pairs.
+func (a artifactFlags) String() string {
+	pairs := make([]string, 0, len(a))
+	for name, digest := range a {
+		pairs = append(pairs, name+"="+digest)
+	}
+	slices.Sort(pairs)
+	return strings.Join(pairs, ",")
+}
+
+// Set records one name=sha256 entry. The name must be non-empty and appear
+// only once, and the digest must be 64 lowercase hex characters, the form
+// surla verify records.
+func (a artifactFlags) Set(v string) error {
+	name, digest, ok := strings.Cut(v, "=")
+	if !ok || name == "" || !isSHA256Hex(digest) {
+		return fmt.Errorf("artifact %q must be name=<64 lowercase hex sha256>", v)
+	}
+	if _, dup := a[name]; dup {
+		return fmt.Errorf("artifact name %q is repeated", name)
+	}
+	a[name] = digest
+	return nil
+}
+
 // String renders the collected binaries as sorted name=pkg pairs.
 func (b binaryFlags) String() string {
 	pairs := make([]string, 0, len(b))
@@ -294,6 +414,19 @@ func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 	}
 	p.Binaries = binaries
 	return p, *builderView, nil
+}
+
+// isSHA256Hex reports whether s is a lowercase hex SHA-256 digest.
+func isSHA256Hex(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, r := range s {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // readModuleSnapshot reads the module rooted at dir into a design snapshot:

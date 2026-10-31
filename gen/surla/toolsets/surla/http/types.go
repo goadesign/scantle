@@ -8,6 +8,55 @@
 package http
 
 type (
+	// ApproveMergePayloadTransport is the internal JSON transport type for ApproveMergePayload.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	ApproveMergePayloadTransport struct {
+		// Confirmed Change Card identifier.
+		ChangeID *string `json:"change_id"`
+		// Current request_revision of the confirmed Change Card.
+		RequestRevision *string `json:"request_revision"`
+		// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+		// characters).
+		CandidateCommit *string `json:"candidate_commit"`
+		// SHA-256 digest of the CP4 verification report written by surla verify (64
+		// lowercase hex characters).
+		ReportDigest *string `json:"report_digest"`
+	}
+	// ApproveMergeResultTransport is the internal JSON transport type for ApproveMergeResult.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	ApproveMergeResultTransport struct {
+		// Change identifier.
+		ChangeID *string `json:"change_id"`
+		// Checkpoint status (needs_confirmation or confirmed).
+		Status *string `json:"status"`
+		// Original operator feature request.
+		Prompt *string `json:"prompt"`
+		// Plain-English summary of requested behavior.
+		Summary *string `json:"summary"`
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
+		Ambiguities []*AmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string `json:"answers,omitempty"`
+		// Concrete examples mapped to evaluator checks.
+		Examples []*ExampleItemTransport `json:"examples"`
+		// Existing contract invariants preserved by this change.
+		PreservedBehaviors []string `json:"preserved_behaviors"`
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string `json:"confirmed_by,omitempty"`
+		// SHA-256 digest of the canonical versioned Change Card.
+		RequestRevision *string `json:"request_revision"`
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItemTransport `json:"approval,omitempty"`
+	}
 	// ConfirmIntentPayloadTransport is the internal JSON transport type for ConfirmIntentPayload.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
@@ -51,6 +100,9 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// DiffPayloadTransport is the internal JSON transport type for DiffPayload.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -144,6 +196,9 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// PreviewArchitecturePayloadTransport is the internal JSON transport type for PreviewArchitecturePayload.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -227,6 +282,9 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
+		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+		// never hashed into request_revision.
+		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// AgentPolicyItemTransport is the internal JSON transport type for AgentPolicyItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -261,6 +319,31 @@ type (
 		Question *string `json:"question"`
 		// Concrete resolution choices.
 		Options []string `json:"options"`
+	}
+	// ApprovalItemTransport is the internal JSON transport type for ApprovalItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	ApprovalItemTransport struct {
+		// Authenticated bearer principal that owns the card and called approve_merge.
+		// Bearer authentication does not prove that a human, rather than a coding
+		// agent, made the call.
+		ApprovedBy *string `json:"approved_by"`
+		// SHA-256 digest of the approved CP4 verification report.
+		ReportDigest *string `json:"report_digest"`
+		// Candidate commit the report was checked against.
+		CandidateCommit *string `json:"candidate_commit"`
+		// Evaluator suite the promotion target requires.
+		SuiteID *string `json:"suite_id"`
+		// Evaluator suite commit the promotion target requires.
+		SuiteCommit *string `json:"suite_commit"`
+		// Dependency profile the promotion target requires, such as sim.
+		Environment *string `json:"environment"`
+		// SHA-256 digest of each candidate binary the promotion target measured, keyed
+		// by binary name.
+		Artifacts map[string]string `json:"artifacts"`
+		// Number of declared evaluator scenarios, every one of which passed.
+		ScenarioCount *int `json:"scenario_count"`
 	}
 	// BuilderScopeItemTransport is the internal JSON transport type for BuilderScopeItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON

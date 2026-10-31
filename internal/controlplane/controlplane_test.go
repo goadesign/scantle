@@ -1,5 +1,5 @@
-// Package controlplane tests Checkpoints 1 through 3 (CP1–CP3) of the Surla
-// MCP software factory control plane.
+// Package controlplane tests Checkpoints 1, 2, 3 and 5 of the Surla MCP
+// software factory control plane.
 package controlplane
 
 import (
@@ -10,10 +10,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	anthropicsdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"goa.design/goa-ai/eval"
 	"goa.design/goa-ai/features/model/anthropic"
 
 	genmcpadapter "github.com/goadesign/surla/gen/mcp_surla"
@@ -21,6 +25,7 @@ import (
 	"github.com/goadesign/surla/internal/goldenpath"
 	"github.com/goadesign/surla/internal/swarm"
 	"github.com/goadesign/surla/internal/testmodule"
+	"github.com/goadesign/surla/internal/verify"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/prompt"
 )
@@ -400,12 +405,19 @@ var _ = Service("orders", func() {
 		t.Fatalf("expected 200 OK with valid bearer token, got %d", authResp.StatusCode)
 	}
 
-	// MCP Adapter ToolsList (6 tools) and ResourcesRead.
+	// MCP Adapter ToolsList and ResourcesRead.
 	adapter := genmcpadapter.NewMCPAdapter(gensurla.NewEndpoints(cp), nil)
 	toolsRes, err := adapter.ToolsList(ctx, &genmcpadapter.ToolsListPayload{})
-	if err != nil || len(toolsRes.Tools) != 6 {
-		t.Fatalf("expected 6 MCP tools from ToolsList, got %+v (err=%v)", toolsRes, err)
+	if err != nil {
+		t.Fatalf("ToolsList: %v", err)
 	}
+	toolNames := make([]string, 0, len(toolsRes.Tools))
+	for _, tool := range toolsRes.Tools {
+		toolNames = append(toolNames, tool.Name)
+	}
+	assert.ElementsMatch(t, []string{
+		"propose_change", "confirm_intent", "get_change", "preview_architecture", "draft_override", "approve_merge", "diff",
+	}, toolNames)
 	// Every tool, diff included, links the checkpoint viewer so an MCP Apps
 	// host can render its result.
 	for _, tool := range toolsRes.Tools {
@@ -867,4 +879,273 @@ func TestGetChangeLetsAStaleEditorRecover(t *testing.T) {
 	if resp.StatusCode != http.StatusOK || body.RequestRevision != resubmitted.RequestRevision {
 		t.Fatalf("GET /changes/chg = %d revision %q, want 200 and %q", resp.StatusCode, body.RequestRevision, resubmitted.RequestRevision)
 	}
+}
+
+// TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision verifies CP5:
+// approve_merge checks the evaluator report against the promotion target's
+// current inputs, records the approval on the owner's confirmed card, keeps it
+// across a no-op confirmation, and drops it when the revision changes, even
+// when the change lands while the report is being loaded.
+func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
+	aliceCtx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
+	bobCtx := WithPrincipal(context.Background(), Principal{ID: "bob@example.com"})
+	const commit = "0123456789abcdef0123456789abcdef01234567"
+	analysis, err := json.Marshal(CP1SemanticAnalysis{
+		Summary:     "Refunds up to $50 are instant.",
+		Ambiguities: []CP1ModelAmbiguity{},
+		Examples: []CP1ModelExample{{
+			Scenario: "Refund at the limit", InputSummary: "Order total $50.00",
+			ExpectedOutcome: "Instant store credit", VerificationKind: "deterministic",
+		}},
+		PreservedBehaviors: []string{},
+	})
+	require.NoError(t, err)
+	inputs := PromotionInputs{
+		SuiteID: "orders_acceptance", SuiteCommit: "suite-1", Environment: "sim",
+		Artifacts: map[string]string{"orders": "d1"},
+	}
+
+	// setup proposes a confirmed card and assembles a passing report bound to
+	// its revision and to inputs.
+	setup := func(t *testing.T) (*ControlPlane, *promotionTargetStub, *gensurla.ChangeCardResult) {
+		t.Helper()
+		target := &promotionTargetStub{inputs: inputs}
+		cp := New(Options{
+			Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(analysis))),
+			PromotionTarget: target,
+		})
+		card, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+		require.NoError(t, err)
+		require.Equal(t, StatusConfirmed, card.Status)
+		target.report = passingReport(t, card.RequestRevision, commit, inputs)
+		return cp, target, card
+	}
+	approveAt := func(ctx context.Context, cp *ControlPlane, revision, candidate, digest string) (*gensurla.ChangeCardResult, error) {
+		return cp.ApproveMerge(ctx, &gensurla.ApproveMergePayload{
+			ChangeID: "chg", RequestRevision: revision, CandidateCommit: candidate, ReportDigest: digest,
+		})
+	}
+	approve := func(ctx context.Context, cp *ControlPlane, card *gensurla.ChangeCardResult, digest string) (*gensurla.ChangeCardResult, error) {
+		return approveAt(ctx, cp, card.RequestRevision, commit, digest)
+	}
+	reconfirm := func(cp *ControlPlane, card *gensurla.ChangeCardResult, outcome string) (*gensurla.ChangeCardResult, error) {
+		ex := *card.Examples[0]
+		ex.ExpectedOutcome = outcome
+		return cp.ConfirmIntent(aliceCtx, &gensurla.ConfirmIntentPayload{
+			ChangeID: "chg", RequestRevision: card.RequestRevision, Answers: map[string]string{}, Examples: []*gensurla.ExampleItem{&ex},
+		})
+	}
+
+	t.Run("approval is recorded and survives a no-op confirmation", func(t *testing.T) {
+		cp, target, card := setup(t)
+		approved, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		assert.Equal(t, &gensurla.ApprovalItem{
+			ApprovedBy: "alice@example.com", ReportDigest: target.report.Digest, CandidateCommit: commit,
+			SuiteID: "orders_acceptance", SuiteCommit: "suite-1", Environment: "sim",
+			Artifacts: map[string]string{"orders": "d1"}, ScenarioCount: 2,
+		}, approved.Approval)
+		assert.Equal(t, card.RequestRevision, approved.RequestRevision, "approval is not part of the revision")
+		assert.Nil(t, card.Approval, "the card returned before approval is not changed")
+
+		read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		require.NoError(t, err)
+		assert.Equal(t, approved.Approval, read.Approval)
+
+		same, err := reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+		require.NoError(t, err)
+		assert.Equal(t, approved.Approval, same.Approval)
+
+		changed, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err)
+		assert.NotEqual(t, card.RequestRevision, changed.RequestRevision)
+		assert.Nil(t, changed.Approval, "a new revision drops the approval")
+	})
+
+	t.Run("a revision minted while the report loads is not approved", func(t *testing.T) {
+		cp, target, card := setup(t)
+		target.loading = make(chan struct{})
+		target.release = make(chan struct{})
+		errc := make(chan error, 1)
+		go func() {
+			_, err := approve(aliceCtx, cp, card, target.report.Digest)
+			errc <- err
+		}()
+		<-target.loading
+		_, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err)
+		close(target.release)
+		assert.ErrorContains(t, <-errc, "request_revision mismatch")
+
+		read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		require.NoError(t, err)
+		assert.Nil(t, read.Approval)
+	})
+
+	t.Run("candidate commit other than the report's is stale", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approveAt(aliceCtx, cp, card.RequestRevision, strings.Repeat("f", 40), target.report.Digest)
+		require.ErrorIs(t, err, verify.ErrStaleReport)
+		assert.ErrorContains(t, err, "candidate commit")
+	})
+
+	t.Run("revision already superseded at entry", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err)
+		_, err = approve(aliceCtx, cp, card, target.report.Digest)
+		assert.ErrorContains(t, err, "request_revision mismatch")
+	})
+
+	t.Run("card still needs confirmation", func(t *testing.T) {
+		ambiguous, err := json.Marshal(CP1SemanticAnalysis{
+			Summary:     "Refunds up to $50 are instant.",
+			Ambiguities: []CP1ModelAmbiguity{{Question: "Is $50.00 itself instant?", Options: []string{"instant", "manager"}}},
+			Examples: []CP1ModelExample{{
+				Scenario: "Refund at the limit", InputSummary: "Order total $50.00",
+				ExpectedOutcome: "Instant store credit", VerificationKind: "deterministic",
+			}},
+			PreservedBehaviors: []string{},
+		})
+		require.NoError(t, err)
+		cp := New(Options{
+			Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(ambiguous))),
+			PromotionTarget: &promotionTargetStub{inputs: inputs},
+		})
+		card, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+		require.NoError(t, err)
+		_, err = approve(aliceCtx, cp, card, strings.Repeat("0", 64))
+		assert.ErrorContains(t, err, "must be confirmed")
+	})
+
+	rejections := []struct {
+		name    string
+		ctx     context.Context
+		change  func(cp *ControlPlane, target *promotionTargetStub, card *gensurla.ChangeCardResult) string
+		wantErr string
+		isStale bool
+	}{
+		{"no promotion target is bound", aliceCtx, func(cp *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			cp.promotionTarget = nil
+			return target.report.Digest
+		}, "no promotion target", false},
+		{"caller does not own the card", bobCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			return target.report.Digest
+		}, "is not the owner", false},
+		{"target returns a different report", aliceCtx, func(_ *ControlPlane, _ *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			return strings.Repeat("0", 64)
+		}, "returned report", false},
+		{"measured binary differs", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.inputs.Artifacts = map[string]string{"orders": "rebuilt"}
+			return target.report.Digest
+		}, "candidate binaries", true},
+		{"report cannot be loaded", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.loadErr = errors.New("no report under that digest")
+			return target.report.Digest
+		}, "no report under that digest", false},
+		{"current inputs cannot be measured", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.inputsErr = errors.New("commit not built")
+			return target.report.Digest
+		}, "commit not built", false},
+		{"required environment differs", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.inputs.Environment = "staging"
+			return target.report.Digest
+		}, "environment", true},
+		{"required suite commit differs", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.inputs.SuiteCommit = "suite-2"
+			return target.report.Digest
+		}, "evaluator suite", true},
+		{"report did not pass", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, card *gensurla.ChangeCardResult) string {
+			target.report = failingReport(t, card.RequestRevision, commit, inputs)
+			return target.report.Digest
+		}, "did not pass", true},
+	}
+	for _, c := range rejections {
+		t.Run(c.name, func(t *testing.T) {
+			cp, target, card := setup(t)
+			digest := c.change(cp, target, card)
+			_, err := approve(c.ctx, cp, card, digest)
+			require.ErrorContains(t, err, c.wantErr)
+			assert.Equal(t, c.isStale, errors.Is(err, verify.ErrStaleReport))
+			read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+			require.NoError(t, err)
+			assert.Nil(t, read.Approval)
+		})
+	}
+}
+
+// promotionTargetStub is a PromotionTarget serving one report and fixed
+// inputs. When loading and release are set, LoadReport signals loading and
+// waits for release, so a test can change the card mid-approval.
+type promotionTargetStub struct {
+	// report is the only report LoadReport returns, whatever the digest.
+	report verify.Report
+	// inputs is what CurrentInputs returns.
+	inputs PromotionInputs
+	// loading, when set, is closed when LoadReport starts.
+	loading chan struct{}
+	// release, when set, is waited on before LoadReport returns.
+	release chan struct{}
+	// loadErr, when set, is returned by LoadReport.
+	loadErr error
+	// inputsErr, when set, is returned by CurrentInputs.
+	inputsErr error
+}
+
+// LoadReport returns s.report, or s.loadErr when set, after the optional
+// loading/release handshake.
+func (s *promotionTargetStub) LoadReport(context.Context, string) (verify.Report, error) {
+	if s.loading != nil {
+		close(s.loading)
+		<-s.release
+	}
+	if s.loadErr != nil {
+		return verify.Report{}, s.loadErr
+	}
+	return s.report, nil
+}
+
+// CurrentInputs returns s.inputs, or s.inputsErr when set.
+func (s *promotionTargetStub) CurrentInputs(context.Context, string) (PromotionInputs, error) {
+	if s.inputsErr != nil {
+		return PromotionInputs{}, s.inputsErr
+	}
+	return s.inputs, nil
+}
+
+// passingReport assembles a report in which both declared scenarios passed
+// against the binaries in inputs.
+func passingReport(t *testing.T, revision, commit string, inputs PromotionInputs) verify.Report {
+	t.Helper()
+	return assembleReport(t, revision, commit, inputs, true)
+}
+
+// failingReport assembles a report in which the second scenario failed.
+func failingReport(t *testing.T, revision, commit string, inputs PromotionInputs) verify.Report {
+	t.Helper()
+	return assembleReport(t, revision, commit, inputs, false)
+}
+
+// assembleReport builds a verify.Report for a two-scenario suite (one
+// holdout) whose second scenario has outcome secondPassed.
+func assembleReport(t *testing.T, revision, commit string, inputs PromotionInputs, secondPassed bool) verify.Report {
+	t.Helper()
+	binding := verify.Binding{
+		CandidateCommit: commit, RequestRevision: revision, SuiteID: inputs.SuiteID,
+		SuiteCommit: inputs.SuiteCommit, Artifacts: inputs.Artifacts, Environment: inputs.Environment,
+	}
+	suite := verify.Suite{ID: inputs.SuiteID, Environment: inputs.Environment, Scenarios: []verify.Scenario{{ID: "a"}, {ID: "h", Holdout: true}}}
+	var artifacts []eval.Artifact
+	for name, digest := range inputs.Artifacts {
+		artifacts = append(artifacts, eval.Artifact{Name: "candidate:" + name, URI: "sha256:" + digest})
+	}
+	ran := func(id string, passed bool) eval.ScenarioReport {
+		return eval.ScenarioReport{ID: id, StartedAt: time.Now(), Passed: passed,
+			Result: &eval.Result{Checks: []eval.Check{{Name: "check", Passed: passed}}, Artifacts: artifacts}}
+	}
+	r, err := verify.Assemble(binding, suite, eval.Report{SuiteID: inputs.SuiteID, Scenarios: []eval.ScenarioReport{
+		ran("a", true), ran("h", secondPassed),
+	}}, 0)
+	require.NoError(t, err)
+	return r
 }

@@ -194,6 +194,35 @@ func BuildDraftOverridePayload(surlaDraftOverrideBody *string) (*surla.DraftOver
 	return v, nil
 }
 
+// BuildApproveMergePayload builds the payload for the surla approve_merge
+// endpoint from CLI flags.
+func BuildApproveMergePayload(surlaApproveMergeBody *string) (*surla.ApproveMergePayload, error) {
+	var err error
+	var body ApproveMergeRequestBody
+	{
+		if surlaApproveMergeBody == nil {
+			return nil, fmt.Errorf("missing required flag --body")
+		}
+		err = json.Unmarshal([]byte(*surlaApproveMergeBody), &body)
+		if err != nil {
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"candidate_commit\": \"19c1186d5664535f9abd84c72ac71d573dae3f7b86f82ba373af45b656a347fc\",\n      \"change_id\": \"Dolores harum.\",\n      \"report_digest\": \"1b46c7cb40afe8bdef74ed527c63d4203f5f889c2c0d15b83c3f882a3cb0a61b\",\n      \"request_revision\": \"Voluptates eveniet magnam ab et ipsam.\"\n   }'")
+		}
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", body.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.report_digest", body.ReportDigest, "^[0-9a-f]{64}$"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	v := &surla.ApproveMergePayload{
+		ChangeID:        body.ChangeID,
+		RequestRevision: body.RequestRevision,
+		CandidateCommit: body.CandidateCommit,
+		ReportDigest:    body.ReportDigest,
+	}
+
+	return v, nil
+}
+
 // BuildDiffPayload builds the payload for the surla diff endpoint from CLI
 // flags.
 func BuildDiffPayload(surlaDiffBody *string) (*surla.DiffPayload, error) {

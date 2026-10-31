@@ -60,6 +60,21 @@ type DraftOverrideRequestBody struct {
 	NewContent string `form:"new_content" json:"new_content" xml:"new_content"`
 }
 
+// ApproveMergeRequestBody is the type of the "surla" service "approve_merge"
+// endpoint HTTP request body.
+type ApproveMergeRequestBody struct {
+	// Confirmed Change Card identifier.
+	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit string `form:"candidate_commit" json:"candidate_commit" xml:"candidate_commit"`
+	// SHA-256 digest of the CP4 verification report written by surla verify (64
+	// lowercase hex characters).
+	ReportDigest string `form:"report_digest" json:"report_digest" xml:"report_digest"`
+}
+
 // DiffRequestBody is the type of the "surla" service "diff" endpoint HTTP
 // request body.
 type DiffRequestBody struct {
@@ -96,6 +111,9 @@ type ProposeChangeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // ConfirmIntentResponseBody is the type of the "surla" service
@@ -125,6 +143,9 @@ type ConfirmIntentResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // GetChangeResponseBody is the type of the "surla" service "get_change"
@@ -154,6 +175,9 @@ type GetChangeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // PreviewArchitectureResponseBody is the type of the "surla" service
@@ -193,6 +217,38 @@ type DraftOverrideResponseBody struct {
 	PromptVersion *string `form:"prompt_version,omitempty" json:"prompt_version,omitempty" xml:"prompt_version,omitempty"`
 	// Operator-facing status explanation.
 	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+}
+
+// ApproveMergeResponseBody is the type of the "surla" service "approve_merge"
+// endpoint HTTP response body.
+type ApproveMergeResponseBody struct {
+	// Change identifier.
+	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
+	// Checkpoint status (needs_confirmation or confirmed).
+	Status *string `form:"status,omitempty" json:"status,omitempty" xml:"status,omitempty"`
+	// Original operator feature request.
+	Prompt *string `form:"prompt,omitempty" json:"prompt,omitempty" xml:"prompt,omitempty"`
+	// Plain-English summary of requested behavior.
+	Summary *string `form:"summary,omitempty" json:"summary,omitempty" xml:"summary,omitempty"`
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
+	Ambiguities []*AmbiguityQuestionResponseBody `form:"ambiguities,omitempty" json:"ambiguities,omitempty" xml:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
+	// Concrete examples mapped to evaluator checks.
+	Examples []*ExampleItemResponseBody `form:"examples,omitempty" json:"examples,omitempty" xml:"examples,omitempty"`
+	// Existing contract invariants preserved by this change.
+	PreservedBehaviors []string `form:"preserved_behaviors,omitempty" json:"preserved_behaviors,omitempty" xml:"preserved_behaviors,omitempty"`
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
+	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // DiffResponseBody is the type of the "surla" service "diff" endpoint HTTP
@@ -249,6 +305,29 @@ type UICompositionItemResponseBody struct {
 	Program *string `form:"program,omitempty" json:"program,omitempty" xml:"program,omitempty"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision *string `form:"composed_for_revision,omitempty" json:"composed_for_revision,omitempty" xml:"composed_for_revision,omitempty"`
+}
+
+// ApprovalItemResponseBody is used to define fields on response body types.
+type ApprovalItemResponseBody struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy *string `form:"approved_by,omitempty" json:"approved_by,omitempty" xml:"approved_by,omitempty"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest *string `form:"report_digest,omitempty" json:"report_digest,omitempty" xml:"report_digest,omitempty"`
+	// Candidate commit the report was checked against.
+	CandidateCommit *string `form:"candidate_commit,omitempty" json:"candidate_commit,omitempty" xml:"candidate_commit,omitempty"`
+	// Evaluator suite the promotion target requires.
+	SuiteID *string `form:"suite_id,omitempty" json:"suite_id,omitempty" xml:"suite_id,omitempty"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit *string `form:"suite_commit,omitempty" json:"suite_commit,omitempty" xml:"suite_commit,omitempty"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment *string `form:"environment,omitempty" json:"environment,omitempty" xml:"environment,omitempty"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `form:"artifacts,omitempty" json:"artifacts,omitempty" xml:"artifacts,omitempty"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount *int `form:"scenario_count,omitempty" json:"scenario_count,omitempty" xml:"scenario_count,omitempty"`
 }
 
 // C4ContainerItemResponseBody is used to define fields on response body types.
@@ -492,6 +571,18 @@ func NewDraftOverrideRequestBody(p *surla.DraftOverridePayload) *DraftOverrideRe
 	return body
 }
 
+// NewApproveMergeRequestBody builds the HTTP request body from the payload of
+// the "approve_merge" endpoint of the "surla" service.
+func NewApproveMergeRequestBody(p *surla.ApproveMergePayload) *ApproveMergeRequestBody {
+	body := &ApproveMergeRequestBody{
+		ChangeID:        p.ChangeID,
+		RequestRevision: p.RequestRevision,
+		CandidateCommit: p.CandidateCommit,
+		ReportDigest:    p.ReportDigest,
+	}
+	return body
+}
+
 // NewDiffRequestBody builds the HTTP request body from the payload of the
 // "diff" endpoint of the "surla" service.
 func NewDiffRequestBody(p *surla.DiffPayload) *DiffRequestBody {
@@ -549,6 +640,9 @@ func NewProposeChangeChangeCardResultOK(body *ProposeChangeResponseBody) *surla.
 	if body.UIComposition != nil {
 		v.UIComposition = unmarshalUICompositionItemResponseBodyToSurlaUICompositionItem(body.UIComposition)
 	}
+	if body.Approval != nil {
+		v.Approval = unmarshalApprovalItemResponseBodyToSurlaApprovalItem(body.Approval)
+	}
 
 	return v
 }
@@ -597,6 +691,9 @@ func NewConfirmIntentChangeCardResultOK(body *ConfirmIntentResponseBody) *surla.
 	if body.UIComposition != nil {
 		v.UIComposition = unmarshalUICompositionItemResponseBodyToSurlaUICompositionItem(body.UIComposition)
 	}
+	if body.Approval != nil {
+		v.Approval = unmarshalApprovalItemResponseBodyToSurlaApprovalItem(body.Approval)
+	}
 
 	return v
 }
@@ -644,6 +741,9 @@ func NewGetChangeChangeCardResultOK(body *GetChangeResponseBody) *surla.ChangeCa
 	}
 	if body.UIComposition != nil {
 		v.UIComposition = unmarshalUICompositionItemResponseBodyToSurlaUICompositionItem(body.UIComposition)
+	}
+	if body.Approval != nil {
+		v.Approval = unmarshalApprovalItemResponseBodyToSurlaApprovalItem(body.Approval)
 	}
 
 	return v
@@ -704,6 +804,57 @@ func NewDraftOverrideResultOK(body *DraftOverrideResponseBody) *surla.DraftOverr
 		RequiresRebuild: *body.RequiresRebuild,
 		PromptVersion:   body.PromptVersion,
 		Message:         *body.Message,
+	}
+
+	return v
+}
+
+// NewApproveMergeChangeCardResultOK builds a "surla" service "approve_merge"
+// endpoint result from a HTTP "OK" response.
+func NewApproveMergeChangeCardResultOK(body *ApproveMergeResponseBody) *surla.ChangeCardResult {
+	v := &surla.ChangeCardResult{
+		ChangeID:        *body.ChangeID,
+		Status:          *body.Status,
+		Prompt:          *body.Prompt,
+		Summary:         *body.Summary,
+		ConfirmedBy:     body.ConfirmedBy,
+		RequestRevision: *body.RequestRevision,
+	}
+	if body.Ambiguities != nil {
+		v.Ambiguities = make([]*surla.AmbiguityQuestion, len(body.Ambiguities))
+		for i, val := range body.Ambiguities {
+			if val == nil {
+				v.Ambiguities[i] = nil
+				continue
+			}
+			v.Ambiguities[i] = unmarshalAmbiguityQuestionResponseBodyToSurlaAmbiguityQuestion(val)
+		}
+	}
+	if body.Answers != nil {
+		v.Answers = make(map[string]string, len(body.Answers))
+		for key, val := range body.Answers {
+			tk := key
+			tv := val
+			v.Answers[tk] = tv
+		}
+	}
+	v.Examples = make([]*surla.ExampleItem, len(body.Examples))
+	for i, val := range body.Examples {
+		if val == nil {
+			v.Examples[i] = nil
+			continue
+		}
+		v.Examples[i] = unmarshalExampleItemResponseBodyToSurlaExampleItem(val)
+	}
+	v.PreservedBehaviors = make([]string, len(body.PreservedBehaviors))
+	for i, val := range body.PreservedBehaviors {
+		v.PreservedBehaviors[i] = val
+	}
+	if body.UIComposition != nil {
+		v.UIComposition = unmarshalUICompositionItemResponseBodyToSurlaUICompositionItem(body.UIComposition)
+	}
+	if body.Approval != nil {
+		v.Approval = unmarshalApprovalItemResponseBodyToSurlaApprovalItem(body.Approval)
 	}
 
 	return v
@@ -784,6 +935,11 @@ func ValidateProposeChangeResponseBody(body *ProposeChangeResponseBody) (err err
 			err = goa.MergeErrors(err, err2)
 		}
 	}
+	if body.Approval != nil {
+		if err2 := validateApprovalItemResponseBody(body.Approval, "body.approval"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return
 }
 
@@ -835,6 +991,11 @@ func ValidateConfirmIntentResponseBody(body *ConfirmIntentResponseBody) (err err
 			err = goa.MergeErrors(err, err2)
 		}
 	}
+	if body.Approval != nil {
+		if err2 := validateApprovalItemResponseBody(body.Approval, "body.approval"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return
 }
 
@@ -883,6 +1044,11 @@ func ValidateGetChangeResponseBody(body *GetChangeResponseBody) (err error) {
 	}
 	if body.UIComposition != nil {
 		if err2 := validateUICompositionItemResponseBody(body.UIComposition, "body.ui_composition"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if body.Approval != nil {
+		if err2 := validateApprovalItemResponseBody(body.Approval, "body.approval"); err2 != nil {
 			err = goa.MergeErrors(err, err2)
 		}
 	}
@@ -969,6 +1135,62 @@ func ValidateDraftOverrideResponseBody(body *DraftOverrideResponseBody) (err err
 	}
 	if body.Message == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	return
+}
+
+// ValidateApproveMergeResponseBody runs the validations defined on
+// ApproveMergeResponseBody
+func ValidateApproveMergeResponseBody(body *ApproveMergeResponseBody) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
+	}
+	if body.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if body.Examples == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("examples", "body"))
+	}
+	if body.PreservedBehaviors == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("preserved_behaviors", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.Status != nil {
+		if !(*body.Status == "needs_confirmation" || *body.Status == "confirmed") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *body.Status, []any{"needs_confirmation", "confirmed"}))
+		}
+	}
+	for _, e := range body.Ambiguities {
+		if e != nil {
+			if err2 := validateAmbiguityQuestionResponseBody(e, "body.ambiguities[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Examples {
+		if e != nil {
+			if err2 := validateExampleItemResponseBody(e, "body.examples[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	if body.UIComposition != nil {
+		if err2 := validateUICompositionItemResponseBody(body.UIComposition, "body.ui_composition"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if body.Approval != nil {
+		if err2 := validateApprovalItemResponseBody(body.Approval, "body.approval"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
 	}
 	return
 }
@@ -1097,6 +1319,65 @@ func validateUICompositionItemResponseBody(body *UICompositionItemResponseBody, 
 	}
 	if body.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", path))
+	}
+	return
+}
+
+// ValidateApprovalItemResponseBody runs the validations defined on ApprovalItem
+func ValidateApprovalItemResponseBody(body *ApprovalItemResponseBody) (err error) {
+	if body.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if body.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if body.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if body.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if body.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if body.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if body.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if body.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
+	}
+	return
+}
+
+// validateApprovalItemResponseBody checks ApprovalItem and reports errors
+// using the path supplied by its caller
+func validateApprovalItemResponseBody(body *ApprovalItemResponseBody, path string) (err error) {
+	if body.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", path))
+	}
+	if body.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", path))
+	}
+	if body.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", path))
+	}
+	if body.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", path))
+	}
+	if body.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", path))
+	}
+	if body.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", path))
+	}
+	if body.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", path))
+	}
+	if body.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", path))
 	}
 	return
 }

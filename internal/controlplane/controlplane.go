@@ -1,7 +1,8 @@
 // Package controlplane implements the Surla MCP software factory control
-// plane across Checkpoints 1 through 3 (CP1–CP3): authenticated intent &
-// ambiguity resolution, evaluated C4 architecture & cost/safety guardrail
-// preview, and target-bound Fast Draft Mode prompt overrides.
+// plane: authenticated intent & ambiguity resolution (CP1), evaluated C4
+// architecture & cost/safety guardrail preview (CP2), target-bound Fast Draft
+// Mode prompt overrides (CP3), and recorded promotion approval of a passed
+// verification report (CP5).
 package controlplane
 
 import (
@@ -28,6 +29,7 @@ import (
 	"github.com/goadesign/surla/internal/diff"
 	"github.com/goadesign/surla/internal/goldenpath"
 	"github.com/goadesign/surla/internal/swarm"
+	"github.com/goadesign/surla/internal/verify"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/mcp"
 	goahttp "goa.design/goa/v3/http"
@@ -112,6 +114,36 @@ type (
 		ApplyPromptOverride(ctx context.Context, promptID, newContent string) (version string, err error)
 	}
 
+	// PromotionTarget is the promotion owner's view of a candidate being
+	// promoted at Checkpoint 5. The embedding host binds it; approve_merge never
+	// takes these facts from its caller, because a caller-supplied report or
+	// binary digest would let the caller approve its own claims.
+	PromotionTarget interface {
+		// LoadReport returns the verification report that verify.Run wrote
+		// under digest, from storage only the evaluator writes. It fails when
+		// no such report exists.
+		LoadReport(ctx context.Context, digest string) (verify.Report, error)
+		// CurrentInputs returns the evaluator suite and environment the
+		// promotion requires and the digests of the candidate binaries
+		// measured independently for candidateCommit.
+		CurrentInputs(ctx context.Context, candidateCommit string) (PromotionInputs, error)
+	}
+
+	// PromotionInputs are the facts a verification report must match at
+	// Checkpoint 5, besides the candidate commit and request revision.
+	PromotionInputs struct {
+		// SuiteID names the evaluator suite the promotion requires.
+		SuiteID string
+		// SuiteCommit is the evaluator suite commit the promotion requires.
+		SuiteCommit string
+		// Environment is the dependency profile the promotion requires, such
+		// as "sim".
+		Environment string
+		// Artifacts maps each candidate binary name to its measured SHA-256
+		// digest.
+		Artifacts map[string]string
+	}
+
 	// Options configures a ControlPlane instance.
 	Options struct {
 		// Analyzer performs CP1 semantic analysis via a model call.
@@ -121,6 +153,9 @@ type (
 		// SwarmProfiles lists server-configured coding-agent provider profiles for
 		// proposing Chorus multi-agent role assignments at CP2.
 		SwarmProfiles []swarm.ProviderProfile
+		// PromotionTarget supplies CP5 verification reports and current
+		// promotion inputs. Without it approve_merge fails.
+		PromotionTarget PromotionTarget
 	}
 
 	// storedChangeCard holds a versioned Change Card alongside its authenticated
@@ -169,7 +204,7 @@ type (
 		ConfirmedBy string `json:"confirmed_by"`
 	}
 
-	// ControlPlane implements gensurla.Service for Checkpoints 1 through 3.
+	// ControlPlane implements gensurla.Service.
 	ControlPlane struct {
 		// mu guards cards.
 		mu sync.RWMutex
@@ -181,6 +216,9 @@ type (
 		targetUpdater TargetPromptUpdater
 		// swarmProfiles stores server-configured coding-agent provider profiles.
 		swarmProfiles []swarm.ProviderProfile
+		// promotionTarget supplies CP5 reports and current promotion inputs;
+		// nil when the host bound none.
+		promotionTarget PromotionTarget
 	}
 )
 
@@ -332,10 +370,11 @@ func NewTokenAuthenticator(tokens map[string]Principal) RequestAuthenticator {
 // New constructs a ControlPlane with the provided Options.
 func New(opts Options) *ControlPlane {
 	return &ControlPlane{
-		cards:         make(map[string]storedChangeCard),
-		analyzer:      opts.Analyzer,
-		targetUpdater: opts.TargetUpdater,
-		swarmProfiles: opts.SwarmProfiles,
+		cards:           make(map[string]storedChangeCard),
+		analyzer:        opts.Analyzer,
+		targetUpdater:   opts.TargetUpdater,
+		swarmProfiles:   opts.SwarmProfiles,
+		promotionTarget: opts.PromotionTarget,
 	}
 }
 
@@ -754,6 +793,88 @@ func (c *ControlPlane) DraftOverride(ctx context.Context, p *gensurla.DraftOverr
 	default:
 		return nil, fmt.Errorf("unsupported target_kind %q", p.TargetKind)
 	}
+}
+
+// ApproveMerge records Checkpoint 5 approval of the caller's confirmed Change
+// Card revision. It loads the verification report by digest and the current
+// suite, environment and binary digests from the bound PromotionTarget, and
+// requires verify.Approve to accept the report for exactly that change. The
+// approval is saved on a copy of the card only if the card still has the same
+// request_revision after those calls, so a confirm_intent that changed the
+// examples meanwhile is never approved with the old report. It returns the
+// approved card; nothing is merged or deployed.
+func (c *ControlPlane) ApproveMerge(ctx context.Context, p *gensurla.ApproveMergePayload) (*gensurla.ChangeCardResult, error) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return nil, errors.New("authenticated principal is required")
+	}
+	if c.promotionTarget == nil {
+		return nil, errors.New("no promotion target is bound to this control plane")
+	}
+
+	c.mu.RLock()
+	record, exists := c.cards[p.ChangeID]
+	c.mu.RUnlock()
+	if !exists {
+		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	}
+	if record.owner != principal.ID {
+		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	if record.card.Status != StatusConfirmed {
+		return nil, fmt.Errorf("change_id %q must be confirmed before approval (status %q)", p.ChangeID, record.card.Status)
+	}
+	if record.card.RequestRevision != p.RequestRevision {
+		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
+	}
+
+	// The target calls may be slow, so they run without holding c.mu. A card
+	// is never removed and never changes owner or leaves confirmed status, so
+	// only its request_revision can change meanwhile; that is checked again
+	// before the approval is written.
+	report, err := c.promotionTarget.LoadReport(ctx, p.ReportDigest)
+	if err != nil {
+		return nil, fmt.Errorf("load verification report %s: %w", p.ReportDigest, err)
+	}
+	if report.Digest != p.ReportDigest {
+		return nil, fmt.Errorf("promotion target returned report %s for digest %s", report.Digest, p.ReportDigest)
+	}
+	inputs, err := c.promotionTarget.CurrentInputs(ctx, p.CandidateCommit)
+	if err != nil {
+		return nil, fmt.Errorf("load promotion inputs for %s: %w", p.CandidateCommit, err)
+	}
+	current := verify.Binding{
+		CandidateCommit: p.CandidateCommit,
+		RequestRevision: p.RequestRevision,
+		SuiteID:         inputs.SuiteID,
+		SuiteCommit:     inputs.SuiteCommit,
+		Artifacts:       inputs.Artifacts,
+		Environment:     inputs.Environment,
+	}
+	if err := verify.Approve(current, report); err != nil {
+		return nil, err
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	record = c.cards[p.ChangeID]
+	if record.card.RequestRevision != p.RequestRevision {
+		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
+	}
+	approved := *record.card
+	approved.Approval = &gensurla.ApprovalItem{
+		ApprovedBy:      principal.ID,
+		ReportDigest:    report.Digest,
+		CandidateCommit: p.CandidateCommit,
+		SuiteID:         inputs.SuiteID,
+		SuiteCommit:     inputs.SuiteCommit,
+		Environment:     inputs.Environment,
+		Artifacts:       maps.Clone(inputs.Artifacts),
+		ScenarioCount:   report.Counts.Required,
+	}
+	record.card = &approved
+	c.cards[p.ChangeID] = record
+	return &approved, nil
 }
 
 // Diff compares two Goa design sources and go.mod snapshots and returns the

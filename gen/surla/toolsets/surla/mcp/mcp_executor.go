@@ -23,6 +23,8 @@ import (
 func NewMCPExecutor(caller mcpruntime.Caller) runtime.ToolCallExecutor {
 	return runtime.ToolCallExecutorFunc(func(ctx context.Context, _ *runtime.ToolCallMeta, call *runtime.ToolCall) (*runtime.ToolExecutionResult, error) {
 		switch call.Name {
+		case gensurla.ApproveMerge:
+			return runtime.ExecuteMCPTool(ctx, caller, call, "approve_merge", gensurla.SpecApproveMerge())
 		case gensurla.ConfirmIntent:
 			return runtime.ExecuteMCPTool(ctx, caller, call, "confirm_intent", gensurla.SpecConfirmIntent())
 		case gensurla.Diff:

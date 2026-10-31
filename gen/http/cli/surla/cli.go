@@ -23,7 +23,7 @@ import (
 //	command (subcommand1|subcommand2|...)
 func UsageCommands() []string {
 	return []string{
-		"surla (checkpoint-ui|golden-path|propose-change|confirm-intent|get-change|preview-architecture|draft-override|diff)",
+		"surla (checkpoint-ui|golden-path|propose-change|confirm-intent|get-change|preview-architecture|draft-override|approve-merge|diff)",
 	}
 }
 
@@ -83,6 +83,9 @@ func ParseEndpoint(
 		surlaDraftOverrideFlags    = flag.NewFlagSet("draft-override", flag.ExitOnError)
 		surlaDraftOverrideBodyFlag = new(cliStringFlag)
 
+		surlaApproveMergeFlags    = flag.NewFlagSet("approve-merge", flag.ExitOnError)
+		surlaApproveMergeBodyFlag = new(cliStringFlag)
+
 		surlaDiffFlags    = flag.NewFlagSet("diff", flag.ExitOnError)
 		surlaDiffBodyFlag = new(cliStringFlag)
 	)
@@ -91,6 +94,7 @@ func ParseEndpoint(
 	surlaGetChangeFlags.Var(surlaGetChangeChangeIDFlag, "change-id", "Change identifier.")
 	surlaPreviewArchitectureFlags.Var(surlaPreviewArchitectureBodyFlag, "body", "")
 	surlaDraftOverrideFlags.Var(surlaDraftOverrideBodyFlag, "body", "")
+	surlaApproveMergeFlags.Var(surlaApproveMergeBodyFlag, "body", "")
 	surlaDiffFlags.Var(surlaDiffBodyFlag, "body", "")
 
 	surlaFlags.Usage = surlaUsage
@@ -101,6 +105,7 @@ func ParseEndpoint(
 	surlaGetChangeFlags.Usage = surlaGetChangeUsage
 	surlaPreviewArchitectureFlags.Usage = surlaPreviewArchitectureUsage
 	surlaDraftOverrideFlags.Usage = surlaDraftOverrideUsage
+	surlaApproveMergeFlags.Usage = surlaApproveMergeUsage
 	surlaDiffFlags.Usage = surlaDiffUsage
 
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
@@ -158,6 +163,9 @@ func ParseEndpoint(
 			case "draft-override":
 				epf = surlaDraftOverrideFlags
 
+			case "approve-merge":
+				epf = surlaApproveMergeFlags
+
 			case "diff":
 				epf = surlaDiffFlags
 
@@ -205,6 +213,9 @@ func ParseEndpoint(
 			case "draft-override":
 				endpoint = c.DraftOverride()
 				data, err = surlac.BuildDraftOverridePayload(surlaDraftOverrideBodyFlag.value)
+			case "approve-merge":
+				endpoint = c.ApproveMerge()
+				data, err = surlac.BuildApproveMergePayload(surlaApproveMergeBodyFlag.value)
 			case "diff":
 				endpoint = c.Diff()
 				data, err = surlac.BuildDiffPayload(surlaDiffBodyFlag.value)
@@ -230,6 +241,7 @@ func surlaUsage() {
 	fmt.Fprintln(os.Stderr, `    get-change: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.`)
 	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
+	fmt.Fprintln(os.Stderr, `    approve-merge: Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.`)
 	fmt.Fprintln(os.Stderr, `    diff: Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
@@ -355,6 +367,24 @@ func surlaDraftOverrideUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "surla draft-override --body '{\n      \"new_content\": \"Dolores explicabo.\",\n      \"prompt_id\": \"Quia ea soluta.\",\n      \"target_kind\": \"prompt_template\"\n   }'")
+}
+
+func surlaApproveMergeUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] surla approve-merge", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "surla approve-merge --body '{\n      \"candidate_commit\": \"19c1186d5664535f9abd84c72ac71d573dae3f7b86f82ba373af45b656a347fc\",\n      \"change_id\": \"Dolores harum.\",\n      \"report_digest\": \"1b46c7cb40afe8bdef74ed527c63d4203f5f889c2c0d15b83c3f882a3cb0a61b\",\n      \"request_revision\": \"Voluptates eveniet magnam ab et ipsam.\"\n   }'")
 }
 
 func surlaDiffUsage() {
