@@ -183,7 +183,7 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 
 #### Evaluator Suite Command Contract (`-suite-command`)
 
-`surla verify` compiles the Go package named by `-suite-command` inside the macOS build sandbox and invokes the resulting executable twice. Evaluator suite `main` packages in [`verify/suite`](../verify/suite/suite.go) implement this contract with [`suite.Main(suite.Command{...})`](../verify/suite/suite.go):
+`surla verify` compiles the Go package named by `-suite-command` inside the macOS build sandbox and invokes the resulting executable twice. Evaluator suite `main` packages use [`verify/suite`](../verify/suite/suite.go) to implement this contract with [`suite.Main(suite.Command{...})`](../verify/suite/suite.go):
 
 ```go
 func main() {
