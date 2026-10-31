@@ -149,12 +149,13 @@ li { margin-bottom: 0.35rem; }
   font-weight: 600;
   margin-right: 0.4rem;
   background: var(--muted);
+  color: var(--foreground);
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
 }
-.shadcn-badge-accent { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.shadcn-badge-destructive { border-color: var(--destructive); color: var(--destructive); }
+.shadcn-badge-accent { border-color: var(--accent); background: var(--accent-soft); }
+.shadcn-badge-destructive { border-color: var(--destructive); }
 
 .shadcn-btn, .scantle-pill, .scantle-btn {
   -webkit-appearance: none;
