@@ -145,6 +145,7 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 		{name: "help", args: []string{"help"}, wantUsage: true},
 		{name: "-h", args: []string{"-h"}, wantUsage: true},
 		{name: "--help", args: []string{"--help"}, wantUsage: true},
+		{name: "help help", args: []string{"help", "help"}, wantUsage: true},
 		{name: "help for a command", args: []string{"help", "verify"}},
 		{name: "command -h", args: []string{"preview", "-h"}},
 		{name: "command --help", args: []string{"approve", "--help"}},

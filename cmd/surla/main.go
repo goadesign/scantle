@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -121,14 +122,15 @@ func run(args []string, stdout io.Writer) error {
 	sub, rest := args[0], args[1:]
 	switch sub {
 	case "help", "-h", "-help", "--help":
-		if sub == "help" && len(rest) == 1 {
+		switch {
+		case len(rest) == 0, sub == "help" && slices.Equal(rest, []string{"help"}):
+			_, err := fmt.Fprint(stdout, usage)
+			return err
+		case sub == "help" && len(rest) == 1:
 			return run([]string{rest[0], "-h"}, stdout)
-		}
-		if len(rest) > 0 {
+		default:
 			return fmt.Errorf("unexpected arguments %q after %s", rest, sub)
 		}
-		_, err := fmt.Fprint(stdout, usage)
-		return err
 	}
 	err := dispatch(sub, rest, stdout)
 	if errors.Is(err, flag.ErrHelp) {
@@ -196,7 +198,7 @@ func runServe(args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	writeServeStatus(os.Stderr, ln.Addr(), opts)
+	writeServeStatus(os.Stderr, ln.Addr().(*net.TCPAddr), opts)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -219,18 +221,22 @@ func runServe(args []string) (err error) {
 }
 
 // writeServeStatus tells the operator of `surla serve`, once the listener is
-// bound, where MCP clients connect and which optional features are off. addr is
-// the bound address, so port 0 reports the port actually assigned. The bearer
-// token never appears.
-func writeServeStatus(w io.Writer, addr net.Addr, opts controlplane.Options) {
-	fmt.Fprintf(w, "surla: serving on http://%s\n", addr)
-	fmt.Fprintf(w, "surla: connect MCP clients to http://%s/mcp with the bearer token\n", addr)
+// bound, where MCP clients connect and whether propose_change, which fails
+// without a model, is off. addr is the bound address, so port 0 reports the
+// port actually assigned; an unspecified IP such as [::] is shown as localhost
+// so the printed URL works from this machine. The bearer token never appears.
+// Swarm readiness is not reported here: it depends on each request's builder
+// scopes, and preview_architecture reports it per change.
+func writeServeStatus(w io.Writer, addr *net.TCPAddr, opts controlplane.Options) {
+	host := addr.String()
+	if addr.IP.IsUnspecified() {
+		host = net.JoinHostPort("localhost", strconv.Itoa(addr.Port))
+	}
+	fmt.Fprintf(w, "surla: serving on http://%s\n", host)
+	fmt.Fprintf(w, "surla: connect MCP clients to http://%s/mcp with the bearer token\n", host)
 	if opts.Analyzer == nil {
 		fmt.Fprintln(w, "surla: propose_change is off: no model is configured to analyze change requests"+
 			" (set -model-provider and -model-name, or -model-gateway-addr)")
-	}
-	if len(opts.SwarmProfiles) == 0 {
-		fmt.Fprintln(w, "surla: swarm plans are off: no coding-agent profiles are configured (set -swarm-profiles)")
 	}
 }
 
