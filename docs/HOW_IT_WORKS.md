@@ -55,7 +55,7 @@ Open questions to settle before building:
 
 ## Checkpoint 2 (`CP2`): Review the Compiled Contract & Multi-Model Swarm
 
-Calling `preview_architecture` stages the candidate `DesignSnapshot` inside an isolated subprocess, runs Goa, Goa-AI, and `goa.design/model` evaluation, and returns the verified architecture preview:
+Calling `preview_architecture` against a confirmed Change Card stages the candidate `DesignSnapshot` inside an isolated subprocess, runs Goa, Goa-AI, and `goa.design/model` evaluation, and returns the bound architecture preview and proposed swarm plan (for local read-only design inspection without a Change Card, `request_revision`, `design_digest`, or `swarm` plan, run `surla preview -dir <module>` on the CLI to print the raw `designeval.Result`):
 
 ```text
 Surla · Contract & Build Plan (Request rev #2, Design digest sha256:4f8a...)
@@ -124,7 +124,7 @@ Token & Cost Gate (via Evaluator Model Gateway):
 ```
 
 ### Why the Builder Cannot Game the Evaluator
-1. **OS Process & Filesystem Sandbox (`verify/candidate`)**: On macOS, candidate builds (`candidate.Build`, run by `verify.Run`) and candidate server/worker processes (`candidate.Exec`, started by the evaluator suite) run under a strict `sandbox-exec` Seatbelt profile. They can write only to their temporary build/state directories and bind or connect only to evaluator-assigned `127.0.0.1` ports.
+1. **OS Process & Filesystem Sandbox (`verify/candidate`)**: On macOS, candidate builds (`candidate.Build`, run by `verify.Run`) and candidate server/worker processes (`candidate.Exec`, started by the evaluator suite after pinning each binary with `candidate.Pin`) run under a strict `sandbox-exec` Seatbelt profile. They can write only to their temporary build/state directories and bind or connect only to evaluator-assigned `127.0.0.1` ports, and each scenario attaches `pinned.Evidence("<name>")` so the verifier can compare the suite-reported binary digests with the bound digests (actual process execution remains the trusted evaluator suite's responsibility).
 2. **Evaluator-Owned Contracts & Simulators**: In the [`examples/orders-eval`](../examples/orders-eval/) reference suite, the evaluator binary is compiled from its own commit (`SuiteCommit`) with its own copy of the generated contracts and stateful commerce/payment simulators.
 3. **Gateway-Enforced Token & Cost Accounting**: Every LLM call the candidate makes in `examples/orders-eval` traverses a `goa-ai` gRPC model gateway hosted by the evaluator. If a change bloats tool payloads (`TestSeededPayloadBloatFailsTheBudget`, raising an order page from `10` to `50` items) or makes a call whose usage the gateway cannot fully account for (counted in the evaluator's `Usage.Unreported`), the scenario fails even if functional assertions pass.
 4. **Redacted Holdout View (`Report.ForBuilders()`)**: Builders receive a `BuilderReport` (`Report.ForBuilders()`) showing only anonymous holdout outcomes (`holdout-1`)—never the holdout scenario names, declarations, checks, or failure logs.

@@ -11,7 +11,50 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"goa.design/goa-ai/eval"
+
+	"github.com/goadesign/surla/verify/candidate"
 )
+
+// TestPinnedArtifactEvidenceSatisfiesTheBinding checks the contract between
+// an evaluator suite and the verifier: evidence produced by
+// candidate.Artifact.Evidence under each binary's bound name is what Assemble
+// and Approve accept, and evidence under any other name is not.
+func TestPinnedArtifactEvidenceSatisfiesTheBinding(t *testing.T) {
+	store := filepath.Join(t.TempDir(), "store")
+	t.Cleanup(func() { require.NoError(t, candidate.RemoveStore(store)) })
+	pinned := map[string]candidate.Artifact{}
+	for name, content := range map[string]string{"orders": "orders binary", "worker": "worker binary"} {
+		src := filepath.Join(t.TempDir(), name)
+		require.NoError(t, os.WriteFile(src, []byte(content), 0o700))
+		a, err := candidate.Pin(store, src)
+		require.NoError(t, err)
+		pinned[name] = a
+	}
+	binding := testBinding()
+	binding.Artifacts = map[string]string{"orders": pinned["orders"].Digest(), "worker": pinned["worker"].Digest()}
+	run := func(evidence ...eval.Artifact) []eval.ScenarioReport {
+		var reports []eval.ScenarioReport
+		for _, id := range []string{"a", "b", "h"} {
+			res := &eval.Result{Checks: []eval.Check{{Name: "check", Passed: true}}, Artifacts: evidence}
+			reports = append(reports, eval.ScenarioReport{ID: id, StartedAt: time.Now(), Result: res, Passed: true})
+		}
+		return reports
+	}
+
+	t.Run("bound names", func(t *testing.T) {
+		evidence := eval.Report{SuiteID: "orders_acceptance", Scenarios: run(pinned["orders"].Evidence("orders"), pinned["worker"].Evidence("worker"))}
+		report, err := Assemble(binding, testSuite(), evidence, 0)
+		require.NoError(t, err)
+		assert.True(t, report.Passed)
+		assert.NoError(t, Approve(binding, report))
+	})
+	t.Run("unbound name", func(t *testing.T) {
+		evidence := eval.Report{SuiteID: "orders_acceptance", Scenarios: run(pinned["orders"].Evidence("orders"), pinned["worker"].Evidence("orders-worker"))}
+		report, err := Assemble(binding, testSuite(), evidence, 0)
+		require.NoError(t, err)
+		assert.False(t, report.Passed)
+	})
+}
 
 func TestAssembleAccountsForEveryDeclaredScenario(t *testing.T) {
 	both := testBinding().Artifacts

@@ -6,9 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goadesign/surla/internal/testmodule"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/goadesign/surla"
+	"github.com/goadesign/surla/internal/testmodule"
 )
 
 func TestEvaluateTreatsArchiveLookingTextAsPlainGo(t *testing.T) {
@@ -67,4 +69,29 @@ func TestEvaluateUsesTheBuildToolchainToResolveModules(t *testing.T) {
 	res, err := Evaluate(t.Context(), files)
 	require.NoError(t, err)
 	assert.Contains(t, res.Declarations, "Service:orders/Method:get_order")
+}
+
+// TestEvaluatorGoModIgnoresTheWorkingDirectory checks that the generator
+// versions come from the go.mod compiled into Surla even when surla runs
+// inside another module, such as a user's application that does not require
+// goa.design/model.
+func TestEvaluatorGoModIgnoresTheWorkingDirectory(t *testing.T) {
+	app := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(app, "go.mod"), []byte("module example.com/app\n\ngo 1.24\n"), 0o600))
+	sourceRoot, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	onDisk, err := os.ReadFile(filepath.Join(sourceRoot, "go.mod"))
+	require.NoError(t, err)
+	t.Chdir(app)
+
+	mod, err := evaluatorGoMod()
+	require.NoError(t, err)
+	assert.Equal(t, string(onDisk), surla.GoMod(), "the compiled-in go.mod is Surla's own")
+	assert.Equal(t, "github.com/goadesign/surla", mod.Module.Mod.Path)
+	for _, core := range []string{harnessGoaModule, harnessGoaAIModule, harnessModelModule} {
+		version, ok := requiredVersion(mod, core)
+		assert.True(t, ok, "Surla's go.mod requires %s", core)
+		assert.NotEmpty(t, version)
+	}
 }

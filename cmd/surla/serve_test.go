@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -269,4 +270,45 @@ func startModelGateway(t *testing.T, provider model.Provider) string {
 	go func() { assert.NoError(t, grpcSrv.Serve(lis)) }()
 	t.Cleanup(grpcSrv.Stop)
 	return lis.Addr().String()
+}
+
+func TestWriteServeStatusNamesTheBoundAddressAndOffFeatures(t *testing.T) {
+	cases := []struct {
+		name string
+		addr *net.TCPAddr
+		opts controlplane.Options
+		want string
+	}{
+		{
+			name: "loopback without a model",
+			addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 51234},
+			want: `surla: serving on http://127.0.0.1:51234
+surla: connect MCP clients to http://127.0.0.1:51234/mcp with the bearer token
+surla: propose_change is off: no model is configured to analyze change requests (set -model-provider and -model-name, or -model-gateway-addr)
+`,
+		},
+		{
+			name: "all IPv4 interfaces without a model",
+			addr: &net.TCPAddr{IP: net.IPv4zero, Port: 8090},
+			want: `surla: serving on http://localhost:8090
+surla: connect MCP clients to http://localhost:8090/mcp with the bearer token
+surla: propose_change is off: no model is configured to analyze change requests (set -model-provider and -model-name, or -model-gateway-addr)
+`,
+		},
+		{
+			name: "all interfaces with a model",
+			addr: &net.TCPAddr{IP: net.IPv6unspecified, Port: 8090},
+			opts: controlplane.Options{Analyzer: controlplane.NewModelCP1Analyzer(nil)},
+			want: `surla: serving on http://localhost:8090
+surla: connect MCP clients to http://localhost:8090/mcp with the bearer token
+`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			writeServeStatus(&out, tc.addr, tc.opts)
+			assert.Equal(t, tc.want, out.String())
+		})
+	}
 }

@@ -2,9 +2,9 @@
 
 // This file is never compiled into Surla. It imports the generator packages
 // the evaluator program (harnessMainHead) imports, so go mod tidy keeps their
-// modules in Surla's go.mod: evaluatorGoMod reads those requirements as the
-// versions a design that does not require a generator module is evaluated
-// with.
+// modules in Surla's go.mod: evaluatorGoMod reads those requirements, from
+// the go.mod compiled into Surla (surla.GoMod), as the versions a design that
+// does not require a generator module is evaluated with.
 package designeval
 
 import (

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +53,7 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 		{
 			name:    "no flags names every required flag",
 			args:    nil,
-			wantErr: "verify requires -candidate-repo, -candidate-commit, -candidate-module, -suite-repo, -suite-commit, -suite-module, -suite-command, -request-revision, -work-dir, -report-dir, -binary",
+			wantErr: "verify requires -candidate-repo, -candidate-commit, -suite-repo, -suite-commit, -suite-command, -request-revision, -work-dir, -report-dir, -binary",
 		},
 		{name: "missing request revision", args: without(complete, "-request-revision"), wantErr: "verify requires -request-revision"},
 		{name: "missing binaries", args: without(complete, "-binary"), wantErr: "verify requires -binary"},
@@ -74,6 +76,13 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 			assert.Equal(t, tc.wantBuilderView, builderView)
 		})
 	}
+	t.Run("module directories default to the repository root", func(t *testing.T) {
+		plan, _, err := parseVerifyFlags(without(without(complete, "-candidate-module"), "-suite-module"))
+		require.NoError(t, err)
+		want := wantPlan
+		want.CandidateModule, want.SuiteModule = ".", "."
+		assert.Equal(t, want, plan)
+	})
 }
 
 func TestWriteVerifyReportPrintsBeforeFailing(t *testing.T) {
@@ -125,18 +134,112 @@ func TestWriteVerifyReportPrintsBeforeFailing(t *testing.T) {
 	}
 }
 
-func TestRunDispatchesVerify(t *testing.T) {
-	err := run([]string{"verify"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "verify requires -candidate-repo")
+func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
+	cases := []struct {
+		name      string
+		args      []string
+		wantUsage bool
+		wantErr   string
+	}{
+		{name: "no arguments", args: nil, wantUsage: true},
+		{name: "help", args: []string{"help"}, wantUsage: true},
+		{name: "-h", args: []string{"-h"}, wantUsage: true},
+		{name: "--help", args: []string{"--help"}, wantUsage: true},
+		{name: "help help", args: []string{"help", "help"}, wantUsage: true},
+		{name: "help -h", args: []string{"help", "-h"}, wantUsage: true},
+		{name: "help for a command", args: []string{"help", "verify"}},
+		{name: "command -h", args: []string{"preview", "-h"}},
+		{name: "command --help", args: []string{"approve", "--help"}},
+		{name: "help for an unknown command", args: []string{"help", "deploy"}, wantErr: `unknown command "deploy"`},
+		{name: "help with two commands", args: []string{"help", "verify", "approve"}, wantErr: "unexpected arguments"},
+		{name: "unknown command", args: []string{"unknown"}, wantErr: `unknown command "unknown"; run "surla help"`},
+		{name: "verify without flags", args: []string{"verify"}, wantErr: "verify requires -candidate-repo"},
+		{name: "approve without flags", args: []string{"approve"}, wantErr: "approve requires -report"},
+		{name: "serve without credentials", args: []string{"serve"}, wantErr: "serve requires -principal and -auth-token"},
+		{name: "preview with a bad flag", args: []string{"preview", "-nope"}, wantErr: "flag provided but not defined"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("SURLA_AUTH_TOKEN", "")
+			var out bytes.Buffer
+			err := run(tc.args, &out)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.wantUsage {
+				assert.Equal(t, usage, out.String())
+			} else {
+				assert.Empty(t, out.String())
+			}
+		})
+	}
+}
 
-	err = run([]string{"approve"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "approve requires -report")
+func TestResolveAuthTokenPrefersTheFlag(t *testing.T) {
+	cases := []struct {
+		name, flag, env, want string
+	}{
+		{name: "flag only", flag: "from-flag", want: "from-flag"},
+		{name: "environment only", env: "from-env", want: "from-env"},
+		{name: "flag beats environment", flag: "from-flag", env: "from-env", want: "from-flag"},
+		{name: "whitespace trimmed", env: "  from-env\n", want: "from-env"},
+		{name: "neither", want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			getenv := func(name string) string {
+				require.Equal(t, "SURLA_AUTH_TOKEN", name)
+				return tc.env
+			}
+			assert.Equal(t, tc.want, resolveAuthToken(tc.flag, getenv))
+		})
+	}
+}
 
-	err = run([]string{"unknown"})
+func TestServeHelpNeverPrintsTheEnvironmentToken(t *testing.T) {
+	const token = "synthetic-token-7f3a"
+	t.Setenv("SURLA_AUTH_TOKEN", token)
+	for _, args := range [][]string{{"serve", "-h"}, {"help", "serve"}} {
+		stderr := captureStderr(t, func() {
+			var stdout bytes.Buffer
+			require.NoError(t, run(args, &stdout))
+			assert.NotContains(t, stdout.String(), token)
+		})
+		assert.Contains(t, stderr, "-auth-token")
+		assert.NotContains(t, stderr, token, "help for %v", args)
+	}
+	// The environment token still satisfies serve's credential check, so
+	// serve gets past it and fails later, on the invalid listen address.
+	err := run([]string{"serve", "-addr", "256.0.0.1:0", "-principal", "op"}, &bytes.Buffer{})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), `expected "serve", "diff", "verify" or "approve"`)
+	assert.NotContains(t, err.Error(), "requires -principal and -auth-token")
+}
+
+// captureStderr runs fn with os.Stderr redirected to a pipe and returns what
+// fn wrote. The pipe is read only after fn returns, so fn must write less than
+// the pipe buffer (about 16 KiB); help text is about 1 KiB. Tests using it
+// must not run in parallel because os.Stderr is process-wide.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = r.Close()
+		_ = w.Close()
+	})
+	saved := os.Stderr
+	os.Stderr = w
+	func() {
+		defer func() { os.Stderr = saved }()
+		fn()
+	}()
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
 }
 
 // without returns a copy of args with every occurrence of the flag named name

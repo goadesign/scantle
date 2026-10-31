@@ -40,13 +40,16 @@ flowchart LR
 
 ---
 
-## 1. Run Unit Tests & Structural Diffs (`0` API Keys Needed)
+## 1. Run Unit Tests, Local Architecture Preview & Structural Diffs (`0` API Keys Needed)
 
-Run the platform's unit tests and Surla's structural Goa/Goa-AI design diff from the repository root:
+Run the platform's unit tests, Surla's 0-token local architecture preview (`surla preview`), and Surla's structural Goa/Goa-AI design diff (`surla diff`) from the repository root:
 
 ```bash
 # Run the orders platform unit tests
 (cd examples/orders && go test -race ./...)
+
+# Inspect the compiled C4 topology, agent policies, and tool guardrails at 0 LLM tokens
+go run ./cmd/surla preview -dir examples/orders
 
 # Compare two Goa design modules structurally at 0 LLM tokens
 go run ./cmd/surla diff --old-dir examples/orders --new-dir examples/orders
