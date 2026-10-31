@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"goa.design/goa-ai/runtime/agent/model"
 
-	genscantle "github.com/goadesign/scantle/gen/scantle"
-	"github.com/goadesign/scantle/internal/goldenpath"
+	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/internal/goldenpath"
 )
 
 // compositionProgram is an OpenUI Lang program that refers to the card's
@@ -56,7 +56,7 @@ func TestProposeChangeBindsTheModelCompositionToTheRevisionItAnalyzed(t *testing
 	provider := &recordingCP1Provider{analysis: compositionAnalysis(t, &[]string{compositionProgram}[0])}
 	cp := newCompositionControlPlane(t, provider)
 
-	card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	card, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 	require.NoError(t, err)
 
 	req := provider.lastRequest(t)
@@ -72,7 +72,7 @@ func TestProposeChangeBindsTheModelCompositionToTheRevisionItAnalyzed(t *testing
 	assert.Equal(t, "chg-ambiguity-01", card.Ambiguities[0].ID, "ordinal 1 in the program names this ambiguity")
 
 	plain := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, nil)})
-	plainCard, err := plain.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	plainCard, err := plain.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 	require.NoError(t, err)
 	assert.Nil(t, plainCard.UIComposition, "no composition from the model means none on the card")
 	assert.Equal(t, plainCard.RequestRevision, card.RequestRevision, "the composition must not be part of request_revision")
@@ -93,7 +93,7 @@ func TestProposeChangeCarriesAnyModelCompositionVerbatim(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, tc.program)})
-			card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+			card, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 			require.NoError(t, err, "a composition the viewer cannot use must not cost the operator the analysis")
 			require.Len(t, card.Ambiguities, 1, "the authoritative questions survive")
 			require.Len(t, card.Examples, 1, "the authoritative examples survive")
@@ -111,21 +111,21 @@ func TestProposeChangeCarriesAnyModelCompositionVerbatim(t *testing.T) {
 func TestCompositionDescribesOnlyTheRevisionItWasComposedFor(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
 	cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, &[]string{compositionProgram}[0])})
-	proposed, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	proposed, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 	require.NoError(t, err)
 
-	first, err := cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{
+	first, err := cp.ConfirmIntent(ctx, &gensurla.ConfirmIntentPayload{
 		ChangeID: "chg", RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{"chg-ambiguity-01": "order_total"}, Examples: proposed.Examples,
 	})
 	require.NoError(t, err)
 	assert.Nil(t, first.UIComposition, "confirming answers creates a new revision the composition did not analyze")
 
-	read, err := cp.GetChange(ctx, &genscantle.GetChangePayload{ChangeID: "chg"})
+	read, err := cp.GetChange(ctx, &gensurla.GetChangePayload{ChangeID: "chg"})
 	require.NoError(t, err)
 	assert.Nil(t, read.UIComposition, "get_change must not restore the earlier revision's composition")
 
-	noop, err := cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{
+	noop, err := cp.ConfirmIntent(ctx, &gensurla.ConfirmIntentPayload{
 		ChangeID: "chg", RequestRevision: first.RequestRevision,
 		Answers: map[string]string{"chg-ambiguity-01": "order_total"}, Examples: first.Examples,
 	})
@@ -143,12 +143,12 @@ func TestCompositionSurvivesAnUnchangedResubmission(t *testing.T) {
 	raw, err := json.Marshal(analysis)
 	require.NoError(t, err)
 	cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: string(raw)})
-	proposed, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	proposed, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 	require.NoError(t, err)
 	require.Equal(t, StatusConfirmed, proposed.Status)
 	require.NotNil(t, proposed.UIComposition)
 
-	same, err := cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{
+	same, err := cp.ConfirmIntent(ctx, &gensurla.ConfirmIntentPayload{
 		ChangeID: "chg", RequestRevision: proposed.RequestRevision, Answers: map[string]string{}, Examples: proposed.Examples,
 	})
 	require.NoError(t, err)
@@ -158,8 +158,8 @@ func TestCompositionSurvivesAnUnchangedResubmission(t *testing.T) {
 
 	ex := *proposed.Examples[0]
 	ex.ExpectedOutcome = "Waits for a manager"
-	changed, err := cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{
-		ChangeID: "chg", RequestRevision: proposed.RequestRevision, Answers: map[string]string{}, Examples: []*genscantle.ExampleItem{&ex},
+	changed, err := cp.ConfirmIntent(ctx, &gensurla.ConfirmIntentPayload{
+		ChangeID: "chg", RequestRevision: proposed.RequestRevision, Answers: map[string]string{}, Examples: []*gensurla.ExampleItem{&ex},
 	})
 	require.NoError(t, err)
 	assert.Nil(t, changed.UIComposition, "an edited example creates a revision the composition did not analyze")

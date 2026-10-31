@@ -3,7 +3,7 @@
 // HTTP request path constructors for the commerce service.
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package server
 

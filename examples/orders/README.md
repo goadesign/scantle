@@ -1,8 +1,8 @@
 # Orders Reference Platform (`examples/orders`)
 
-**[← Back to Scantle README](../../README.md)** · **[Agent Quickstart (`AGENTS_QUICKSTART.md`)](AGENTS_QUICKSTART.md)** · **[Isolated Acceptance Suite (`../orders-eval`)](../orders-eval/acceptance/acceptance_test.go)**
+**[← Back to Surla README](../../README.md)** · **[Agent Quickstart (`AGENTS_QUICKSTART.md`)](AGENTS_QUICKSTART.md)** · **[Isolated Acceptance Suite (`../orders-eval`)](../orders-eval/acceptance/acceptance_test.go)**
 
-`examples/orders` is a complete, Golden Path Goa-AI platform that demonstrates why teams build on Scantle:
+`examples/orders` is a complete, Golden Path Goa-AI platform that demonstrates why teams build on Surla:
 
 1. **0-token transport & schema compilation (`design/*.go` → `gen/`):** One compact Goa + Goa-AI design compiles the public HTTP service (`orders`), the external `commerce` and `payments` HTTP/JSON service contracts, and the durable `refund` agent (`orders.refund`)—without paying an LLM to write boilerplate handlers, OpenAPI specs, or JSON validators.
 2. **Contract-backed security & cost guardrails:**
@@ -10,7 +10,7 @@
    - **Cursor pagination (`BoundedResult` + page cap + token budget):** `BoundedResult` declares the `returned`/`truncated`/`next_cursor` continuation contract on `list_orders` and `continue_orders`, `internal/orders/service.go` enforces the page limit (`ordersPageSize = 10`), and the evaluator's `within_token_budget` gate catches oversized tool responses.
    - **Human-in-the-loop pause/resume (`Confirmation`):** `request_refund` declares a design-time `Confirmation` gate that pauses the run until a manager holding `refunds:approve` scope approves or denies via `POST /runs/{run_id}/approval` (while customer tokens holding only `orders:chat` receive `403 Forbidden`).
    - **Bounded execution (`RunPolicy`):** Caps `orders.refund` at `MaxToolCalls(8)`, `MaxRecoveryTurns(2)`, and `TimeBudget("2m")`.
-3. **OS-sandboxed verification & holdout redaction (`scantle verify` + `examples/orders-eval`):** The isolated evaluator builds and runs `orders` and `orders-worker` inside a macOS `sandbox-exec` jail, routes LLM calls through an evaluator-owned gRPC model gateway, kills the worker mid-refund (`kill -9`) to prove payment idempotency, restarts the API server while a refund awaits manager approval, and enforces a hard token/cost budget that catches seeded payload bloat (`TestSeededPayloadBloatFailsTheBudget`).
+3. **OS-sandboxed verification & holdout redaction (`surla verify` + `examples/orders-eval`):** The isolated evaluator builds and runs `orders` and `orders-worker` inside a macOS `sandbox-exec` jail, routes LLM calls through an evaluator-owned gRPC model gateway, kills the worker mid-refund (`kill -9`) to prove payment idempotency, restarts the API server while a refund awaits manager approval, and enforces a hard token/cost budget that catches seeded payload bloat (`TestSeededPayloadBloatFailsTheBudget`).
 
 ---
 
@@ -36,33 +36,33 @@ flowchart LR
 | [`internal/orders/`](internal/orders/service.go) | Authenticated HTTP service, server-side `tenant_id`/`customer_id` tool methods, `ordersPageSize = 10` pagination, and manager approval gate (`POST /runs/{run_id}/approval`). |
 | [`internal/assistant/`](internal/assistant/) & [`internal/refundflow/`](internal/refundflow/) | Refund agent planner and Temporal refund workflow execution. |
 | [`internal/runstore/`](internal/runstore/) | SQLite-backed durable run, transcript, and pending-approval store owned by the Orders API. |
-| [`cmd/orders/`](cmd/orders/main.go) & [`cmd/orders-worker/`](cmd/orders-worker/main.go) | Public Orders API server and Refund worker binaries verified by `scantle verify`. |
+| [`cmd/orders/`](cmd/orders/main.go) & [`cmd/orders-worker/`](cmd/orders-worker/main.go) | Public Orders API server and Refund worker binaries verified by `surla verify`. |
 
 ---
 
 ## 1. Run Unit Tests & Structural Diffs (`0` API Keys Needed)
 
-Run the platform's unit tests and Scantle's structural Goa/Goa-AI design diff from the repository root:
+Run the platform's unit tests and Surla's structural Goa/Goa-AI design diff from the repository root:
 
 ```bash
 # Run the orders platform unit tests
 (cd examples/orders && go test -race ./...)
 
 # Compare two Goa design modules structurally at 0 LLM tokens
-go run ./cmd/scantle diff --old-dir examples/orders --new-dir examples/orders
+go run ./cmd/surla diff --old-dir examples/orders --new-dir examples/orders
 ```
 
 ---
 
-## 2. Inspect CP1–CP3 via `scantle serve` & the MCP Apps Checkpoint Viewer
+## 2. Inspect CP1–CP3 via `surla serve` & the MCP Apps Checkpoint Viewer
 
-Start the Scantle control plane with the included illustrative multi-family swarm profile file ([`swarm-profiles.example.json`](swarm-profiles.example.json)). Note that `swarm-profiles.example.json` is an operator-edited example where `"authenticated": true` is an operator assertion (not a live credential probe), and setting `ANTHROPIC_API_KEY` for CP1 analysis does not itself establish credentials for the OpenAI or Google coding-agent CLIs listed in the file:
+Start the Surla control plane with the included illustrative multi-family swarm profile file ([`swarm-profiles.example.json`](swarm-profiles.example.json)). Note that `swarm-profiles.example.json` is an operator-edited example where `"authenticated": true` is an operator assertion (not a live credential probe), and setting `ANTHROPIC_API_KEY` for CP1 analysis does not itself establish credentials for the OpenAI or Google coding-agent CLIs listed in the file:
 
 ```bash
-export SCANTLE_AUTH_TOKEN="dev-secret-token"
+export SURLA_AUTH_TOKEN="dev-secret-token"
 export ANTHROPIC_API_KEY="sk-ant-..."
 
-go run ./cmd/scantle serve \
+go run ./cmd/surla serve \
   -addr 127.0.0.1:8090 \
   -principal operator@example.com \
   -model-provider anthropic \
@@ -70,13 +70,13 @@ go run ./cmd/scantle serve \
   -swarm-profiles ./examples/orders/swarm-profiles.example.json
 ```
 
-When an MCP Apps-capable client calls `propose_change`, `confirm_intent`, `get_change`, `preview_architecture`, `diff`, or `draft_override`, Scantle pairs the structured tool result with the stateless `ui://scantle/checkpoint` (`text/html;profile=mcp-app`) viewer read over MCP `resources/read` (`POST /mcp`; the companion HTTP route `GET /ui/checkpoint` returns the HTML document as a JSON-encoded string). The viewer completes the MCP Apps `ui/initialize` → `ui/notifications/initialized` handshake with the host frame and renders an interactive CP1 Change Card form (`confirm_intent` and `get_change` via host `tools/call` with unsaved-draft preservation on stale `request_revision` conflicts), an inline scrollable C4 SVG directed graph above the inspectable containers/edges, tool guardrails (`Inject`, `BoundedResult`, `Confirmation`), and cross-family Chorus swarm manifest (`design_digest`), or an unbound structural `DiffResult` view (`diff`).
+When an MCP Apps-capable client calls `propose_change`, `confirm_intent`, `get_change`, `preview_architecture`, `diff`, or `draft_override`, Surla pairs the structured tool result with the stateless `ui://surla/checkpoint` (`text/html;profile=mcp-app`) viewer read over MCP `resources/read` (`POST /mcp`; the companion HTTP route `GET /ui/checkpoint` returns the HTML document as a JSON-encoded string). The viewer completes the MCP Apps `ui/initialize` → `ui/notifications/initialized` handshake with the host frame and renders an interactive CP1 Change Card form (`confirm_intent` and `get_change` via host `tools/call` with unsaved-draft preservation on stale `request_revision` conflicts), an inline scrollable C4 SVG directed graph above the inspectable containers/edges, tool guardrails (`Inject`, `BoundedResult`, `Confirmation`), and cross-family Chorus swarm manifest (`design_digest`), or an unbound structural `DiffResult` view (`diff`).
 
 ---
 
-## 3. Run OS-Sandboxed End-to-End Verification (`scantle verify`)
+## 3. Run OS-Sandboxed End-to-End Verification (`surla verify`)
 
-`scantle verify` checks out the exact committed `CandidateCommit` and `SuiteCommit` (uncommitted working-tree edits are never tested), builds `orders` and `orders-worker` inside an OS sandbox (`WorkDir/candidate-bin/`), runs the `orders_acceptance` suite in [`examples/orders-eval`](../orders-eval/design/suite.go) (`WorkDir/suite-bin/suite`), and writes the cryptographically bound `verify.Report` JSON:
+`surla verify` checks out the exact committed `CandidateCommit` and `SuiteCommit` (uncommitted working-tree edits are never tested), builds `orders` and `orders-worker` inside an OS sandbox (`WorkDir/candidate-bin/`), runs the `orders_acceptance` suite in [`examples/orders-eval`](../orders-eval/design/suite.go) (`WorkDir/suite-bin/suite`), and writes the cryptographically bound `verify.Report` JSON:
 
 | Scenario (`orders_acceptance`) | Tag | What It Proves |
 | :--- | :--- | :--- |
@@ -93,7 +93,7 @@ COMMIT="$(git rev-parse HEAD)"
 WORK_DIR="$(mktemp -d)"
 
 # Full operator/evaluator view (includes holdout scenario details)
-go run ./cmd/scantle verify \
+go run ./cmd/surla verify \
   -candidate-repo . \
   -candidate-commit "$COMMIT" \
   -candidate-module examples/orders \
@@ -111,7 +111,7 @@ go run ./cmd/scantle verify \
 To see the **builder-redacted report** (`Report.ForBuilders()`), pass `-builder-view`:
 
 ```bash
-go run ./cmd/scantle verify \
+go run ./cmd/surla verify \
   -candidate-repo . \
   -candidate-commit "$COMMIT" \
   -candidate-module examples/orders \
@@ -133,7 +133,7 @@ In `-builder-view`, stdout prints `Report.ForBuilders()` where the `"holdout"` s
 
 ## 4. See the Token Budget Catch Seeded Payload Bloat
 
-Want to watch Scantle reject a functional change that regresses LLM token efficiency? Run the acceptance suite directly:
+Want to watch Surla reject a functional change that regresses LLM token efficiency? Run the acceptance suite directly:
 
 ```bash
 (cd examples/orders-eval && go test -race -tags e2e -v ./acceptance)

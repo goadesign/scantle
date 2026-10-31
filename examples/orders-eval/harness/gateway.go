@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/goadesign/scantle/examples/orders-eval/scriptedmodel"
+	"github.com/goadesign/surla/examples/orders-eval/scriptedmodel"
 	"goa.design/goa-ai/features/model/gateway"
 	"goa.design/goa-ai/runtime/agent/model"
 	"google.golang.org/grpc"

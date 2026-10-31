@@ -1,4 +1,4 @@
-module github.com/goadesign/scantle/examples/orders
+module github.com/goadesign/surla/examples/orders
 
 go 1.27.3
 

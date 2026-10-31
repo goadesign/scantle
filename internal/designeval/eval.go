@@ -19,8 +19,8 @@ import (
 	"strings"
 	"sync"
 
-	genscantle "github.com/goadesign/scantle/gen/scantle"
-	"github.com/goadesign/scantle/verify/candidate"
+	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/verify/candidate"
 	"golang.org/x/mod/modfile"
 )
 
@@ -34,14 +34,14 @@ type (
 		// and domain, Model, and agent-policy declaration records under scoped names.
 		Declarations map[string]string `json:"declarations"`
 		// Containers lists the C4 containers derived from evaluated Services, Agents, Toolsets, and Model containers.
-		Containers []*genscantle.C4ContainerItem `json:"containers"`
+		Containers []*gensurla.C4ContainerItem `json:"containers"`
 		// Edges lists the validated directed contract edges between C4 containers.
-		Edges []*genscantle.C4EdgeItem `json:"edges"`
+		Edges []*gensurla.C4EdgeItem `json:"edges"`
 		// AgentPolicies lists the evaluated Goa-AI RunPolicy settings per agent.
-		AgentPolicies []*genscantle.AgentPolicyItem `json:"agent_policies"`
+		AgentPolicies []*gensurla.AgentPolicyItem `json:"agent_policies"`
 		// Tools lists the public tools selected by each agent, with compiled input
 		// choices; it does not claim which binding the application installs.
-		Tools []*genscantle.ToolContractItem `json:"tools"`
+		Tools []*gensurla.ToolContractItem `json:"tools"`
 	}
 
 	// toolchainEnv holds the resolved Go toolchain root, module cache directory,
@@ -68,7 +68,7 @@ var (
 		if len(lines) < 2 || strings.TrimSpace(lines[0]) == "" || strings.TrimSpace(lines[1]) == "" {
 			return toolchainEnv{}, fmt.Errorf("unexpected go env output %q", string(out))
 		}
-		workDir, err := os.MkdirTemp("", "scantle-designeval-work-*")
+		workDir, err := os.MkdirTemp("", "surla-designeval-work-*")
 		if err != nil {
 			return toolchainEnv{}, fmt.Errorf("create designeval work dir: %w", err)
 		}
@@ -104,7 +104,7 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 		return Result{}, err
 	}
 
-	tmpDir, err := os.MkdirTemp("", "scantle-designeval-*")
+	tmpDir, err := os.MkdirTemp("", "surla-designeval-*")
 	if err != nil {
 		return Result{}, fmt.Errorf("create temp dir: %w", err)
 	}
@@ -214,7 +214,7 @@ func evaluatorGoMod() (*modfile.File, error) {
 // its directory path and declared module path.
 func locateModuleRoot() (string, string, error) {
 	var candidates []string
-	if envRoot := strings.TrimSpace(os.Getenv("SCANTLE_MODULE_ROOT")); envRoot != "" {
+	if envRoot := strings.TrimSpace(os.Getenv("SURLA_MODULE_ROOT")); envRoot != "" {
 		candidates = append(candidates, envRoot)
 	}
 	if wd, err := os.Getwd(); err == nil {
@@ -240,5 +240,5 @@ func locateModuleRoot() (string, string, error) {
 			dir = parent
 		}
 	}
-	return "", "", errors.New("go.mod not found via SCANTLE_MODULE_ROOT, working directory, or caller path")
+	return "", "", errors.New("go.mod not found via SURLA_MODULE_ROOT, working directory, or caller path")
 }

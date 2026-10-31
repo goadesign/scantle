@@ -1,7 +1,7 @@
 //go:build ignore
 
 // Command export_schemas_gen emits the Goa-generated tool ResultSchemas (from
-// gen/scantle/toolsets/scantle) and MCP OutputSchemas (from gen/mcp_scantle) as
+// gen/surla/toolsets/surla) and MCP OutputSchemas (from gen/mcp_surla) as
 // JSON on stdout so ui/checkpoint/build.mjs derives frontend TypeScript types
 // and runtime JSON-Schema validators directly from the public generated APIs.
 package main
@@ -12,8 +12,8 @@ import (
 	"fmt"
 	"os"
 
-	genmcp "github.com/goadesign/scantle/gen/mcp_scantle"
-	genscantletoolset "github.com/goadesign/scantle/gen/scantle/toolsets/scantle"
+	genmcp "github.com/goadesign/surla/gen/mcp_surla"
+	gensurlatoolset "github.com/goadesign/surla/gen/surla/toolsets/surla"
 	"goa.design/goa-ai/runtime/agent/tools"
 )
 
@@ -28,12 +28,12 @@ func main() {
 		MCP:      make(map[string]json.RawMessage),
 	}
 
-	for _, decl := range genscantletoolset.ToolSchemas() {
+	for _, decl := range gensurlatoolset.ToolSchemas() {
 		if decl == nil || len(decl.ResultSchema) == 0 {
 			fmt.Fprintf(os.Stderr, "empty ResultSchema on toolset declaration %+v\n", decl)
 			os.Exit(1)
 		}
-		byName, ok := genscantletoolset.ToolSchema(tools.Ident(decl.Name))
+		byName, ok := gensurlatoolset.ToolSchema(tools.Ident(decl.Name))
 		if !ok || byName == nil || string(byName.ResultSchema) != string(decl.ResultSchema) {
 			fmt.Fprintf(os.Stderr, "ToolSchema(%q) lookup mismatch with ToolSchemas()\n", decl.Name)
 			os.Exit(1)

@@ -3,7 +3,7 @@
 // payments HTTP server encoders and decoders
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package server
 
@@ -14,7 +14,7 @@ import (
 	"net/http"
 	"unicode/utf8"
 
-	payments "github.com/goadesign/scantle/examples/orders-eval/gen/payments"
+	payments "github.com/goadesign/surla/examples/orders-eval/gen/payments"
 	goahttp "goa.design/goa/v3/http"
 	goa "goa.design/goa/v3/pkg"
 )

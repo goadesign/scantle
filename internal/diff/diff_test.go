@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goadesign/scantle/internal/designeval"
-	"github.com/goadesign/scantle/internal/testmodule"
+	"github.com/goadesign/surla/internal/designeval"
+	"github.com/goadesign/surla/internal/testmodule"
 )
 
 func TestCompareReportsEvaluatedDeclarationsHelperChangesAndGoModDirectives(t *testing.T) {
@@ -70,7 +70,7 @@ var _ = Service("orders", func() {
 	})
 })
 `
-	oldMod := `module github.com/goadesign/scantle/examples/orders
+	oldMod := `module github.com/goadesign/surla/examples/orders
 
 go 1.26.2
 
@@ -84,7 +84,7 @@ exclude (
 	example.com/legacy v1.1.0
 )
 `
-	newMod := `module github.com/goadesign/scantle/examples/orders
+	newMod := `module github.com/goadesign/surla/examples/orders
 
 go 1.26.2
 

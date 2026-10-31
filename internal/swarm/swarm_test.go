@@ -370,7 +370,7 @@ func TestPlanCounterexamplesSingleFamilyUnauthenticatedAndMixedBuilders(t *testi
 	})
 }
 
-// allRoles returns the complete slice of required Scantle swarm roles.
+// allRoles returns the complete slice of required Surla swarm roles.
 func allRoles() []RoleKind {
 	return []RoleKind{RoleArchitect, RoleBuilder, RoleEvalAuthor, RoleReviewer}
 }

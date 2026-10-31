@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	genscantle "github.com/goadesign/scantle/gen/scantle"
+	gensurla "github.com/goadesign/surla/gen/surla"
 )
 
 // This file holds the Checkpoint 1 checks applied to model output and to the
@@ -19,7 +19,7 @@ import (
 func validateCP1Analysis(
 	changeID string,
 	in CP1SemanticAnalysis,
-) (string, []*genscantle.AmbiguityQuestion, []*genscantle.ExampleItem, []string, error) {
+) (string, []*gensurla.AmbiguityQuestion, []*gensurla.ExampleItem, []string, error) {
 	if strings.TrimSpace(in.Summary) == "" {
 		return "", nil, nil, nil, errors.New("summary is required")
 	}
@@ -30,7 +30,7 @@ func validateCP1Analysis(
 	if len(in.Examples) == 0 {
 		return "", nil, nil, nil, errors.New("at least one example is required")
 	}
-	examples := make([]*genscantle.ExampleItem, 0, len(in.Examples))
+	examples := make([]*gensurla.ExampleItem, 0, len(in.Examples))
 	for i, item := range in.Examples {
 		if strings.TrimSpace(item.Scenario) == "" ||
 			strings.TrimSpace(item.InputSummary) == "" ||
@@ -40,7 +40,7 @@ func validateCP1Analysis(
 		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
 			return "", nil, nil, nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
 		}
-		examples = append(examples, &genscantle.ExampleItem{
+		examples = append(examples, &gensurla.ExampleItem{
 			ID:               fmt.Sprintf("%s-check-%02d", changeID, i+1),
 			Scenario:         item.Scenario,
 			InputSummary:     item.InputSummary,
@@ -61,11 +61,11 @@ func validateCP1Analysis(
 // validateAmbiguities validates that every ambiguity question has a non-empty
 // question and at least two distinct non-empty options, and assigns a
 // code-owned question ID (`<changeID>-ambiguity-NN`).
-func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle.AmbiguityQuestion, error) {
+func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*gensurla.AmbiguityQuestion, error) {
 	if len(in) == 0 {
 		return nil, nil
 	}
-	out := make([]*genscantle.AmbiguityQuestion, 0, len(in))
+	out := make([]*gensurla.AmbiguityQuestion, 0, len(in))
 	for i, q := range in {
 		id := fmt.Sprintf("%s-ambiguity-%02d", changeID, i+1)
 		if strings.TrimSpace(q.Question) == "" {
@@ -88,7 +88,7 @@ func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle
 			seenOpts[trimmed] = true
 			opts = append(opts, opt)
 		}
-		out = append(out, &genscantle.AmbiguityQuestion{
+		out = append(out, &gensurla.AmbiguityQuestion{
 			ID:       id,
 			Question: q.Question,
 			Options:  opts,
@@ -99,7 +99,7 @@ func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle
 
 // validateAmbiguityAnswers verifies exact 1-to-1 resolution of open ambiguity
 // questions against their declared options.
-func validateAmbiguityAnswers(questions []*genscantle.AmbiguityQuestion, answers map[string]string) error {
+func validateAmbiguityAnswers(questions []*gensurla.AmbiguityQuestion, answers map[string]string) error {
 	allowedByID := make(map[string][]string, len(questions))
 	for _, q := range questions {
 		allowedByID[q.ID] = q.Options
@@ -121,12 +121,12 @@ func validateAmbiguityAnswers(questions []*genscantle.AmbiguityQuestion, answers
 
 // validateConfirmedExamples validates that every confirmed ExampleItem has a
 // unique non-empty ID and valid fields.
-func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.ExampleItem, error) {
+func validateConfirmedExamples(in []*gensurla.ExampleItem) ([]*gensurla.ExampleItem, error) {
 	if len(in) == 0 {
 		return nil, errors.New("at least one example is required")
 	}
 	seenIDs := make(map[string]bool, len(in)*2)
-	out := make([]*genscantle.ExampleItem, 0, len(in))
+	out := make([]*gensurla.ExampleItem, 0, len(in))
 	for i, item := range in {
 		if item == nil {
 			return nil, fmt.Errorf("examples[%d] is nil", i)
@@ -146,7 +146,7 @@ func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.Exam
 		}
 		seenIDs[item.ID] = true
 		seenIDs[trimmedID] = true
-		out = append(out, &genscantle.ExampleItem{
+		out = append(out, &gensurla.ExampleItem{
 			ID:               item.ID,
 			Scenario:         item.Scenario,
 			InputSummary:     item.InputSummary,

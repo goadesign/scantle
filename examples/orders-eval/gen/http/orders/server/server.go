@@ -3,7 +3,7 @@
 // orders HTTP server
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package server
 
@@ -11,7 +11,7 @@ import (
 	"context"
 	"net/http"
 
-	orders "github.com/goadesign/scantle/examples/orders-eval/gen/orders"
+	orders "github.com/goadesign/surla/examples/orders-eval/gen/orders"
 	goahttp "goa.design/goa/v3/http"
 	goa "goa.design/goa/v3/pkg"
 )

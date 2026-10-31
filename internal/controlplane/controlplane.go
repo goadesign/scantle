@@ -1,4 +1,4 @@
-// Package controlplane implements the Scantle MCP software factory control
+// Package controlplane implements the Surla MCP software factory control
 // plane across Checkpoints 1 through 3 (CP1–CP3): authenticated intent &
 // ambiguity resolution, evaluated C4 architecture & cost/safety guardrail
 // preview, and target-bound Fast Draft Mode prompt overrides.
@@ -20,21 +20,21 @@ import (
 	"strings"
 	"sync"
 
-	genscantlehttp "github.com/goadesign/scantle/gen/http/scantle/server"
-	genmcpscantle "github.com/goadesign/scantle/gen/jsonrpc/mcp_scantle/server"
-	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
-	genscantle "github.com/goadesign/scantle/gen/scantle"
-	"github.com/goadesign/scantle/internal/designeval"
-	"github.com/goadesign/scantle/internal/diff"
-	"github.com/goadesign/scantle/internal/goldenpath"
-	"github.com/goadesign/scantle/internal/swarm"
+	gensurlahttp "github.com/goadesign/surla/gen/http/surla/server"
+	genmcpsurla "github.com/goadesign/surla/gen/jsonrpc/mcp_surla/server"
+	genmcpadapter "github.com/goadesign/surla/gen/mcp_surla"
+	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/internal/designeval"
+	"github.com/goadesign/surla/internal/diff"
+	"github.com/goadesign/surla/internal/goldenpath"
+	"github.com/goadesign/surla/internal/swarm"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/mcp"
 	goahttp "goa.design/goa/v3/http"
 )
 
 type (
-	// Principal identifies the authenticated operator invoking the Scantle control plane.
+	// Principal identifies the authenticated operator invoking the Surla control plane.
 	Principal struct {
 		// ID is the stable authenticated operator identifier (for example, "alice@example.com").
 		ID string
@@ -57,7 +57,7 @@ type (
 	}
 
 	// CP1ModelAmbiguity is an open domain question returned by a CP1Analyzer
-	// model call before Scantle assigns its mechanical question ID.
+	// model call before Surla assigns its mechanical question ID.
 	CP1ModelAmbiguity struct {
 		// Question is the plain-English ambiguity question.
 		Question string `json:"question"`
@@ -66,7 +66,7 @@ type (
 	}
 
 	// CP1ModelExample is a concrete input/outcome example returned by a
-	// CP1Analyzer model call before Scantle assigns its mechanical check ID.
+	// CP1Analyzer model call before Surla assigns its mechanical check ID.
 	CP1ModelExample struct {
 		// Scenario is the plain-English scenario description.
 		Scenario string `json:"scenario"`
@@ -90,7 +90,7 @@ type (
 		// PreservedBehaviors lists existing contract invariants preserved by the change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
 		// UIComposition is an optional OpenUI Lang decision view composed from
-		// the Scantle decision catalog. Nil means the model composed none. Any
+		// the Surla decision catalog. Nil means the model composed none. Any
 		// string the model returns, including an empty or invalid program, is
 		// carried to the card unchanged: it is presentation only, so a bad
 		// program never costs the operator the authoritative analysis.
@@ -127,7 +127,7 @@ type (
 	// owner principal and original design source snapshot.
 	storedChangeCard struct {
 		// card is the latest versioned ChangeCardResult.
-		card *genscantle.ChangeCardResult
+		card *gensurla.ChangeCardResult
 		// owner is the authenticated Principal.ID that created the card.
 		owner string
 		// designSource is the Goa design source snapshot inspected at CP1.
@@ -158,18 +158,18 @@ type (
 		// Summary is the plain-English summary.
 		Summary string `json:"summary"`
 		// Ambiguities is the ordered slice of surfaced domain questions.
-		Ambiguities []*genscantle.AmbiguityQuestion `json:"ambiguities"`
+		Ambiguities []*gensurla.AmbiguityQuestion `json:"ambiguities"`
 		// Answers is the key-sorted slice of confirmed ambiguity answers.
 		Answers []canonicalAnswerPair `json:"answers"`
 		// Examples is the ordered slice of confirmed example checks.
-		Examples []*genscantle.ExampleItem `json:"examples"`
+		Examples []*gensurla.ExampleItem `json:"examples"`
 		// PreservedBehaviors is the ordered slice of preserved contract invariants.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
 		// ConfirmedBy is the authenticated principal ID that confirmed the card.
 		ConfirmedBy string `json:"confirmed_by"`
 	}
 
-	// ControlPlane implements genscantle.Service for Checkpoints 1 through 3.
+	// ControlPlane implements gensurla.Service for Checkpoints 1 through 3.
 	ControlPlane struct {
 		// mu guards cards.
 		mu sync.RWMutex
@@ -203,7 +203,7 @@ const (
 )
 
 var (
-	// checkpointUIHTML is the stateless MCP Apps (`ui://scantle/checkpoint`,
+	// checkpointUIHTML is the stateless MCP Apps (`ui://surla/checkpoint`,
 	// `text/html;profile=mcp-app`) HTML document host embedded from
 	// checkpoint.html.
 	//
@@ -341,10 +341,10 @@ func New(opts Options) *ControlPlane {
 
 // NewHTTPHandler mounts both the Goa HTTP endpoints and the MCP JSON-RPC
 // server (`/mcp`) for svc onto a single HTTP handler protected by auth.
-func NewHTTPHandler(svc genscantle.Service, auth RequestAuthenticator) http.Handler {
+func NewHTTPHandler(svc gensurla.Service, auth RequestAuthenticator) http.Handler {
 	mux := goahttp.NewMuxer()
-	endpoints := genscantle.NewEndpoints(svc)
-	httpServer := genscantlehttp.New(
+	endpoints := gensurla.NewEndpoints(svc)
+	httpServer := gensurlahttp.New(
 		endpoints,
 		mux,
 		goahttp.RequestDecoder,
@@ -352,18 +352,18 @@ func NewHTTPHandler(svc genscantle.Service, auth RequestAuthenticator) http.Hand
 		nil,
 		nil,
 	)
-	genscantlehttp.Mount(mux, httpServer)
+	gensurlahttp.Mount(mux, httpServer)
 
 	mcpAdapter := genmcpadapter.NewMCPAdapter(endpoints, nil)
 	mcpEndpoints := genmcpadapter.NewEndpoints(mcpAdapter)
-	mcpServer := genmcpscantle.New(
+	mcpServer := genmcpsurla.New(
 		mcpEndpoints,
 		mux,
 		goahttp.RequestDecoder,
 		goahttp.ResponseEncoder,
 		nil,
 	)
-	genmcpscantle.Mount(mux, mcpServer)
+	genmcpsurla.Mount(mux, mcpServer)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if auth != nil {
@@ -438,13 +438,13 @@ func (a *ModelCP1Analyzer) Analyze(ctx context.Context, promptText, designSource
 	return parsed, nil
 }
 
-// CheckpointUI returns the interactive MCP Apps HTML host for `ui://scantle/checkpoint`.
+// CheckpointUI returns the interactive MCP Apps HTML host for `ui://surla/checkpoint`.
 func (c *ControlPlane) CheckpointUI(_ context.Context) (string, error) {
 	return checkpointUIHTML, nil
 }
 
-// GoldenPath returns the Scantle Golden Path architecture playbook Markdown
-// for `scantle://golden-path`.
+// GoldenPath returns the Surla Golden Path architecture playbook Markdown
+// for `surla://golden-path`.
 func (c *ControlPlane) GoldenPath(_ context.Context) (string, error) {
 	return goldenpath.PlaybookMarkdown(), nil
 }
@@ -454,7 +454,7 @@ func (c *ControlPlane) GoldenPath(_ context.Context) (string, error) {
 // strictly, assigns code-owned ambiguity and example IDs, binds ownership to
 // the authenticated principal, and stops for human confirmation only when
 // genuine domain ambiguities are present.
-func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeChangePayload) (*genscantle.ChangeCardResult, error) {
+func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeChangePayload) (*gensurla.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
 		return nil, errors.New("authenticated principal is required")
@@ -502,7 +502,7 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 		confirmedBy = &ownerCopy
 	}
 
-	card := &genscantle.ChangeCardResult{
+	card := &gensurla.ChangeCardResult{
 		ChangeID:           p.ChangeID,
 		Status:             status,
 		Prompt:             p.Prompt,
@@ -520,7 +520,7 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 	// The composition is bound to the revision it was composed with but is
 	// not part of it: request_revision covers only the authoritative card.
 	if analysis.UIComposition != nil {
-		card.UIComposition = &genscantle.UICompositionItem{Program: *analysis.UIComposition, ComposedForRevision: rev}
+		card.UIComposition = &gensurla.UICompositionItem{Program: *analysis.UIComposition, ComposedForRevision: rev}
 	}
 
 	c.mu.Lock()
@@ -541,7 +541,7 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 // GetChange returns the current Change Card for change_id to its owner. It
 // fails for an unknown change_id or a caller who does not own the card, and
 // never changes the card.
-func (c *ControlPlane) GetChange(ctx context.Context, p *genscantle.GetChangePayload) (*genscantle.ChangeCardResult, error) {
+func (c *ControlPlane) GetChange(ctx context.Context, p *gensurla.GetChangePayload) (*gensurla.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
 		return nil, errors.New("authenticated principal is required")
@@ -567,7 +567,7 @@ func (c *ControlPlane) GetChange(ctx context.Context, p *genscantle.GetChangePay
 // request_revision, so previews and verification reports bound to the earlier
 // revision no longer match it. The prompt, summary and preserved behaviors
 // never change here: a new requirement needs a new propose_change.
-func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmIntentPayload) (*genscantle.ChangeCardResult, error) {
+func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *gensurla.ConfirmIntentPayload) (*gensurla.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
 		return nil, errors.New("authenticated principal is required")
@@ -603,7 +603,7 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	// new revision. An unchanged submission returns existing, composition
 	// included, below.
 	confirmedBy := principal.ID
-	confirmed := &genscantle.ChangeCardResult{
+	confirmed := &gensurla.ChangeCardResult{
 		ChangeID:           existing.ChangeID,
 		Status:             StatusConfirmed,
 		Prompt:             existing.Prompt,
@@ -635,7 +635,7 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 // real Goa evaluation engine (`designeval.Evaluate`) bound to a confirmed CP1
 // Change Card and returns the validated C4 topology, directed edges, per-agent
 // runtime policies, and tool contracts.
-func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.PreviewArchitecturePayload) (*genscantle.ArchitecturePreviewResult, error) {
+func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *gensurla.PreviewArchitecturePayload) (*gensurla.ArchitecturePreviewResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
 		return nil, errors.New("authenticated principal is required")
@@ -696,7 +696,7 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 		len(evaluated.Tools),
 	)
 
-	return &genscantle.ArchitecturePreviewResult{
+	return &gensurla.ArchitecturePreviewResult{
 		ChangeID:        p.ChangeID,
 		RequestRevision: p.RequestRevision,
 		DesignDigest:    designDigest,
@@ -713,7 +713,7 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 // DraftOverride applies a 0-second prompt override on the bound target platform
 // via TargetPromptUpdater when target_kind is "prompt_template", or refuses to
 // mask a compiled Go business rule when target_kind is "compiled_rule".
-func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOverridePayload) (*genscantle.DraftOverrideResult, error) {
+func (c *ControlPlane) DraftOverride(ctx context.Context, p *gensurla.DraftOverridePayload) (*gensurla.DraftOverrideResult, error) {
 	if _, ok := PrincipalFromContext(ctx); !ok {
 		return nil, errors.New("authenticated principal is required")
 	}
@@ -722,7 +722,7 @@ func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOve
 	}
 	switch p.TargetKind {
 	case TargetKindCompiledRule:
-		return &genscantle.DraftOverrideResult{
+		return &gensurla.DraftOverrideResult{
 			AppliedInStore:  false,
 			RequiresRebuild: true,
 			Message:         "Compiled Go business rule cannot be overridden in prompt.Store; requires Go rebuild and CP4 verification.",
@@ -745,7 +745,7 @@ func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOve
 		if strings.TrimSpace(version) == "" {
 			return nil, errors.New("target prompt updater returned an empty version")
 		}
-		return &genscantle.DraftOverrideResult{
+		return &gensurla.DraftOverrideResult{
 			AppliedInStore:  true,
 			RequiresRebuild: false,
 			PromptVersion:   &version,
@@ -758,7 +758,7 @@ func (c *ControlPlane) DraftOverride(ctx context.Context, p *genscantle.DraftOve
 
 // Diff compares two Goa design sources and go.mod snapshots and returns the
 // structural diff without emitting a blanket compatibility verdict.
-func (c *ControlPlane) Diff(ctx context.Context, p *genscantle.DiffPayload) (*genscantle.DiffResult, error) {
+func (c *ControlPlane) Diff(ctx context.Context, p *gensurla.DiffPayload) (*gensurla.DiffResult, error) {
 	if p == nil {
 		return nil, errors.New("diff payload is required")
 	}
@@ -766,7 +766,7 @@ func (c *ControlPlane) Diff(ctx context.Context, p *genscantle.DiffPayload) (*ge
 	if err != nil {
 		return nil, err
 	}
-	return &genscantle.DiffResult{
+	return &gensurla.DiffResult{
 		HasChanges:           rep.HasChanges,
 		AddedDeclarations:    rep.AddedDeclarations,
 		RemovedDeclarations:  rep.RemovedDeclarations,
@@ -795,7 +795,7 @@ func extractAssistantText(resp *model.Response) string {
 // computeCanonicalRevision computes a collision-free SHA-256 hex digest over
 // the canonical JSON encoding of the ChangeCardResult, its owner principal, and
 // its inspected design source.
-func computeCanonicalRevision(card *genscantle.ChangeCardResult, owner, designSource string) (string, error) {
+func computeCanonicalRevision(card *gensurla.ChangeCardResult, owner, designSource string) (string, error) {
 	keys := make([]string, 0, len(card.Answers))
 	for k := range card.Answers {
 		keys = append(keys, k)
@@ -844,12 +844,12 @@ func reportProgress(ctx context.Context, value, total float64, message string) e
 }
 
 // planSwarmRoster invokes swarm.Plan over server-owned provider profiles and
-// explicit builder path scopes and projects the result into a genscantle.SwarmPlanItem.
+// explicit builder path scopes and projects the result into a gensurla.SwarmPlanItem.
 func planSwarmRoster(
 	changeID, designDigest string,
 	profiles []swarm.ProviderProfile,
-	in []*genscantle.BuilderScopeItem,
-) (*genscantle.SwarmPlanItem, error) {
+	in []*gensurla.BuilderScopeItem,
+) (*gensurla.SwarmPlanItem, error) {
 	builders := make([]swarm.BuilderScope, 0, len(in))
 	for i, item := range in {
 		if item == nil {
@@ -875,9 +875,9 @@ func planSwarmRoster(
 		return nil, fmt.Errorf("plan swarm roster: %w", err)
 	}
 
-	assignments := make([]*genscantle.SwarmRoleItem, 0, len(plan.Assignments))
+	assignments := make([]*gensurla.SwarmRoleItem, 0, len(plan.Assignments))
 	for _, a := range plan.Assignments {
-		assignments = append(assignments, &genscantle.SwarmRoleItem{
+		assignments = append(assignments, &gensurla.SwarmRoleItem{
 			Handle:     a.Handle,
 			Role:       string(a.Role),
 			ScopeName:  a.ScopeName,
@@ -907,7 +907,7 @@ func planSwarmRoster(
 		manifestPtr = &manifest
 	}
 
-	return &genscantle.SwarmPlanItem{
+	return &gensurla.SwarmPlanItem{
 		Status:            string(plan.Status),
 		Assignments:       assignments,
 		CrossFamilyReview: plan.CrossFamilyReview,

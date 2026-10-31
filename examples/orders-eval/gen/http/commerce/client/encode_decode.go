@@ -3,7 +3,7 @@
 // commerce HTTP client encoders and decoders
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package client
 
@@ -17,7 +17,7 @@ import (
 	"net/url"
 	"strconv"
 
-	commerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
+	commerce "github.com/goadesign/surla/examples/orders-eval/gen/commerce"
 	goahttp "goa.design/goa/v3/http"
 )
 

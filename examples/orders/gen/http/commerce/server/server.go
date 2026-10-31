@@ -3,7 +3,7 @@
 // commerce HTTP server
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package server
 
@@ -11,7 +11,7 @@ import (
 	"context"
 	"net/http"
 
-	commerce "github.com/goadesign/scantle/examples/orders/gen/commerce"
+	commerce "github.com/goadesign/surla/examples/orders/gen/commerce"
 	goahttp "goa.design/goa/v3/http"
 	goa "goa.design/goa/v3/pkg"
 )

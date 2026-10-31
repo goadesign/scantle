@@ -3,11 +3,11 @@
 // orders adapter transforms
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package orders
 
-import orders "github.com/goadesign/scantle/examples/orders/gen/orders"
+import orders "github.com/goadesign/surla/examples/orders/gen/orders"
 
 // InitContinueOrdersMethodPayload converts *ContinueOrdersPayload to *orders.ListOrdersPayload.
 func InitContinueOrdersMethodPayload(in *ContinueOrdersPayload) *orders.ListOrdersPayload {

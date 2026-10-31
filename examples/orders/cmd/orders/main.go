@@ -23,17 +23,17 @@ import (
 	"syscall"
 	"time"
 
-	gencommerce "github.com/goadesign/scantle/examples/orders/gen/commerce"
-	gencommerceclient "github.com/goadesign/scantle/examples/orders/gen/http/commerce/client"
-	genordersserver "github.com/goadesign/scantle/examples/orders/gen/http/orders/server"
-	genorders "github.com/goadesign/scantle/examples/orders/gen/orders"
-	genrefund "github.com/goadesign/scantle/examples/orders/gen/orders/agents/refund"
-	genrefundorders "github.com/goadesign/scantle/examples/orders/gen/orders/agents/refund/orders"
-	"github.com/goadesign/scantle/examples/orders/internal/assistant"
-	"github.com/goadesign/scantle/examples/orders/internal/orders"
-	"github.com/goadesign/scantle/examples/orders/internal/refundflow"
-	"github.com/goadesign/scantle/examples/orders/internal/runstore"
-	"github.com/goadesign/scantle/examples/orders/internal/scriptedmodel"
+	gencommerce "github.com/goadesign/surla/examples/orders/gen/commerce"
+	gencommerceclient "github.com/goadesign/surla/examples/orders/gen/http/commerce/client"
+	genordersserver "github.com/goadesign/surla/examples/orders/gen/http/orders/server"
+	genorders "github.com/goadesign/surla/examples/orders/gen/orders"
+	genrefund "github.com/goadesign/surla/examples/orders/gen/orders/agents/refund"
+	genrefundorders "github.com/goadesign/surla/examples/orders/gen/orders/agents/refund/orders"
+	"github.com/goadesign/surla/examples/orders/internal/assistant"
+	"github.com/goadesign/surla/examples/orders/internal/orders"
+	"github.com/goadesign/surla/examples/orders/internal/refundflow"
+	"github.com/goadesign/surla/examples/orders/internal/runstore"
+	"github.com/goadesign/surla/examples/orders/internal/scriptedmodel"
 	"go.temporal.io/sdk/client"
 	"goa.design/goa-ai/features/model/anthropic"
 	"goa.design/goa-ai/features/model/gateway"
@@ -180,7 +180,7 @@ func parseConfig() (config, error) {
 	flag.StringVar(&cfg.commerceURL, "commerce-url", "", "base URL of the commerce system")
 	flag.StringVar(&cfg.temporalAddr, "temporal", "localhost:7233", "Temporal frontend address")
 	flag.StringVar(&cfg.refundQueue, "refund-queue", "orders.refunds", "task queue of the refund worker")
-	flag.StringVar(&cfg.stateDir, "state-dir", ".scantle/state", "directory of the durable runtime store ("+runtimeDatabase+")")
+	flag.StringVar(&cfg.stateDir, "state-dir", ".surla/state", "directory of the durable runtime store ("+runtimeDatabase+")")
 	flag.StringVar(&cfg.modelProvider, "model-provider", "anthropic", `refund agent model: "anthropic", "gateway", or "scripted" for the zero-key demo`)
 	flag.StringVar(&cfg.modelGateway, "model-gateway", "", "gRPC address of the goa-ai model gateway (with --model-provider=gateway)")
 	flag.StringVar(&cfg.model, "model", "claude-sonnet-5-5", "Anthropic model used by the refund agent")

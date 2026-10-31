@@ -3,12 +3,12 @@
 // RefundAgent implementation
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package refund
 
 import (
-	specs "github.com/goadesign/scantle/examples/orders/gen/orders/agents/refund/specs"
+	specs "github.com/goadesign/surla/examples/orders/gen/orders/agents/refund/specs"
 	agent "goa.design/goa-ai/runtime/agent"
 	"goa.design/goa-ai/runtime/agent/planner"
 	agentsruntime "goa.design/goa-ai/runtime/agent/runtime"

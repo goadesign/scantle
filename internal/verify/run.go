@@ -20,8 +20,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/goadesign/scantle/internal/procgroup"
-	"github.com/goadesign/scantle/verify/candidate"
+	"github.com/goadesign/surla/internal/procgroup"
+	"github.com/goadesign/surla/verify/candidate"
 	"goa.design/goa-ai/eval"
 )
 

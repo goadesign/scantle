@@ -3,7 +3,7 @@
 // RefundAgent registry
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package refund
 
@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	orders "github.com/goadesign/scantle/examples/orders/gen/orders/toolsets/orders"
+	orders "github.com/goadesign/surla/examples/orders/gen/orders/toolsets/orders"
 	"goa.design/goa-ai/runtime/agent/engine"
 	agentsruntime "goa.design/goa-ai/runtime/agent/runtime"
 )

@@ -3,12 +3,12 @@
 // RefundAgent aggregated tool specs
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package specs
 
 import (
-	orders "github.com/goadesign/scantle/examples/orders/gen/orders/toolsets/orders"
+	orders "github.com/goadesign/surla/examples/orders/gen/orders/toolsets/orders"
 	genregistry "goa.design/goa-ai/registry/gen/registry"
 	"goa.design/goa-ai/runtime/agent/policy"
 	tools "goa.design/goa-ai/runtime/agent/tools"

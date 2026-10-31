@@ -69,9 +69,9 @@ export function C4GraphSVG({
   const pairCounts: Record<string, number> = {};
 
   return (
-    <div className="scantle-graph-wrap">
+    <div className="surla-graph-wrap">
       <svg
-        id="scantle-c4-svg"
+        id="surla-c4-svg"
         role="img"
         aria-label={
           "C4 Architecture Directed Graph (" +
@@ -86,7 +86,7 @@ export function C4GraphSVG({
       >
         <defs>
           <marker
-            id="scantle-arrow"
+            id="surla-arrow"
             viewBox="0 0 10 10"
             refX="9"
             refY="5"
@@ -160,7 +160,7 @@ export function C4GraphSVG({
           return (
             <g
               key={String(idx)}
-              className="scantle-svg-edge"
+              className="surla-svg-edge"
               data-from-id={e.from_id}
               data-to-id={e.to_id}
               data-edge-index={String(idx)}
@@ -170,7 +170,7 @@ export function C4GraphSVG({
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.5"
-                markerEnd="url(#scantle-arrow)"
+                markerEnd="url(#surla-arrow)"
               />
               <text
                 x={String(Math.round(labelX))}
@@ -189,7 +189,7 @@ export function C4GraphSVG({
           return (
             <g
               key={c.id}
-              className="scantle-svg-node"
+              className="surla-svg-node"
               data-container-id={c.id}
               data-container-kind={c.kind}
               transform={"translate(" + pos.x + "," + pos.y + ")"}
@@ -221,10 +221,10 @@ export function C4GraphSVG({
 export function ArchitecturePreviewView({ preview }: { preview: ArchitecturePreviewResult }) {
   return (
     <>
-      <Card className="scantle-meta">
+      <Card className="surla-meta">
         <h2>{"Architecture Preview: " + preview.system_name}</h2>
         <p>{preview.banner}</p>
-        <details className="scantle-details">
+        <details className="surla-details">
           <summary>Details</summary>
           <p>
             change_id: <code>{preview.change_id}</code> · request_revision:{" "}
@@ -233,7 +233,7 @@ export function ArchitecturePreviewView({ preview }: { preview: ArchitecturePrev
           </p>
         </details>
       </Card>
-      <Card className="scantle-card">
+      <Card className="surla-card">
         <h3>
           {"C4 Directed Graph (" +
             preview.containers.length +
@@ -301,7 +301,7 @@ export function ArchitecturePreviewView({ preview }: { preview: ArchitecturePrev
           ))}
         </ul>
       </Card>
-      <Card className="scantle-card">
+      <Card className="surla-card">
         <h3>{"Proposed Chorus Swarm (" + preview.swarm.status + ")"}</h3>
         <p>{preview.swarm.summary}</p>
         <p>
@@ -366,20 +366,20 @@ function DiffList({
 export function DiffResultView({ diff }: { diff: DiffResult }) {
   return (
     <>
-      <Card className="scantle-meta">
+      <Card className="surla-meta">
         <h2>Structural Goa &amp; Goa-AI Design Diff</h2>
         <p>{diff.summary}</p>
         <p>
           Standalone structural comparison (unbound to a CP1 Change Card or request_revision).
         </p>
-        <details className="scantle-details">
+        <details className="surla-details">
           <summary>Details</summary>
           <p>
             <Badge>{"has_changes=" + diff.has_changes}</Badge>
           </p>
         </details>
       </Card>
-      <Card className="scantle-card">
+      <Card className="surla-card">
         <h3>{"Added Declarations (" + diff.added_declarations.length + ")"}</h3>
         <DiffList
           prefix="+"
@@ -412,10 +412,10 @@ export function DiffResultView({ diff }: { diff: DiffResult }) {
 // DraftOverrideView renders a Checkpoint 3 Fast Draft Override result.
 export function DraftOverrideView({ draft }: { draft: DraftOverrideResult }) {
   return (
-    <Card className="scantle-meta">
+    <Card className="surla-meta">
       <h2>Fast Draft Update</h2>
       <p>{draft.message}</p>
-      <details className="scantle-details">
+      <details className="surla-details">
         <summary>Details</summary>
         <p>
           <Badge>{"applied_in_store=" + draft.applied_in_store}</Badge>
@@ -442,19 +442,19 @@ export function IncomingChangeCardView({
 }) {
   return (
     <Card
-      id="scantle-incoming-change-card"
-      className="scantle-card"
+      id="surla-incoming-change-card"
+      className="surla-card"
       role="region"
       aria-label="Incoming Change Card"
     >
       <h3>Updated Change Card Available</h3>
       <p>{incomingCard.summary}</p>
-      <div className="scantle-field-row">
-        <Button id="scantle-replace-incoming-card" onClick={onSwitch}>
+      <div className="surla-field-row">
+        <Button id="surla-replace-incoming-card" onClick={onSwitch}>
           Switch to Incoming Card (Discard Unsaved Edits)
         </Button>
       </div>
-      <details className="scantle-details">
+      <details className="surla-details">
         <summary>Details</summary>
         <p>
           change_id: <code>{incomingCard.change_id}</code> ({incomingCard.status}) · incoming
@@ -474,8 +474,8 @@ export function ToolInputPartialView({
 }) {
   const keys = Object.keys(partialArgs);
   return (
-    <Alert id="scantle-partial-input-preview" role="status">
-      <div className="scantle-field-row">
+    <Alert id="surla-partial-input-preview" role="status">
+      <div className="surla-field-row">
         <strong>Streaming Tool Input Preview</strong>
         <Badge variant="accent">tool-input-partial</Badge>
       </div>

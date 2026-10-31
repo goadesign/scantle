@@ -3,7 +3,7 @@
 // payments HTTP client CLI support package
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package client
 
@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	payments "github.com/goadesign/scantle/examples/orders-eval/gen/payments"
+	payments "github.com/goadesign/surla/examples/orders-eval/gen/payments"
 	goa "goa.design/goa/v3/pkg"
 )
 

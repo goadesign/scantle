@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	genevals "github.com/goadesign/scantle/examples/orders-eval/gen/evals/orders_acceptance"
-	"github.com/goadesign/scantle/examples/orders-eval/harness"
-	"github.com/goadesign/scantle/verify/candidate"
+	genevals "github.com/goadesign/surla/examples/orders-eval/gen/evals/orders_acceptance"
+	"github.com/goadesign/surla/examples/orders-eval/harness"
+	"github.com/goadesign/surla/verify/candidate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"goa.design/goa-ai/eval"

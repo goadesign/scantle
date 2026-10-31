@@ -1,6 +1,6 @@
 // Package controlplane tests the Phase 10 OpenUI Decision Studio, shadcn/ui
 // component rendering, host theme synchronization, partial tool-input preview,
-// and build-artifact drift invariants of `ui://scantle/checkpoint`.
+// and build-artifact drift invariants of `ui://surla/checkpoint`.
 package controlplane
 
 import (
@@ -13,8 +13,8 @@ import (
 	"sync"
 	"testing"
 
-	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
-	genscantle "github.com/goadesign/scantle/gen/scantle"
+	genmcpadapter "github.com/goadesign/surla/gen/mcp_surla"
+	gensurla "github.com/goadesign/surla/gen/surla"
 )
 
 var checkpointUIDepsOnce sync.Once
@@ -46,14 +46,14 @@ func ensureCheckpointUIDeps(t *testing.T) {
 //     `@openuidev/react-lang` `<Renderer />` (`DecisionWorkspace`,
 //     `PolicySimulatorTable`, `PolicySimulatorRow`, `AmbiguityChoiceCard`,
 //     `WorkflowTimeline`, `WorkflowStep`, `ImpactCallout`) inside
-//     `#scantle-openui-workspace` over the single `CP1DraftContext` draft owner.
+//     `#surla-openui-workspace` over the single `CP1DraftContext` draft owner.
 //  3. Clicking an option in `PolicySimulatorTable` updates the canonical CP1
 //     draft answer, highlights the active table column, and submits the
 //     selected answer through `confirm_intent`.
-//  4. Editing a confirmation example locally surfaces `#scantle-openui-local-edit-notice`
+//  4. Editing a confirmation example locally surfaces `#surla-openui-local-edit-notice`
 //     qualifying the model-proposed simulator illustration.
 //  5. Malformed, incomplete, out-of-range-ordinal, mismatched-outcomes, or
-//     revision-skewed `ui_composition` payloads render `#scantle-openui-error`
+//     revision-skewed `ui_composition` payloads render `#surla-openui-error`
 //     while keeping the canonical shadcn/ui CP1 inspector functional.
 //  6. `ui/notifications/host-context-changed` and `ui/notifications/tool-input-partial`
 //     update host theme and partial input previews without clobbering dirty
@@ -133,11 +133,11 @@ func TestCheckpointUIOpenUIDecisionStudioAndStreaming(t *testing.T) {
 	cp := New(Options{
 		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysisJSON))),
 	})
-	adapter := genmcpadapter.NewMCPAdapter(genscantle.NewEndpoints(cp), nil)
+	adapter := genmcpadapter.NewMCPAdapter(gensurla.NewEndpoints(cp), nil)
 
-	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://scantle/checkpoint"})
+	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://surla/checkpoint"})
 	if err != nil {
-		t.Fatalf("ResourcesRead(ui://scantle/checkpoint): %v", err)
+		t.Fatalf("ResourcesRead(ui://surla/checkpoint): %v", err)
 	}
 	completeRes, ok := resRead.Outcome.AsComplete()
 	if !ok || len(completeRes.Contents) != 1 || completeRes.Contents[0].Text == nil {
@@ -186,9 +186,9 @@ const dom = new JSDOM(input.htmlDoc, {
 });
 const win = dom.window;
 const doc = win.document;
-const root = doc.getElementById("scantle-checkpoint-root");
-const statusEl = doc.getElementById("scantle-checkpoint-status");
-const viewEl = doc.getElementById("scantle-checkpoint-view");
+const root = doc.getElementById("surla-checkpoint-root");
+const statusEl = doc.getElementById("surla-checkpoint-status");
+const viewEl = doc.getElementById("surla-checkpoint-view");
 
 const hostMessages = [];
 let messageListener = null;
@@ -214,7 +214,7 @@ messageListener({
     id: 1,
     result: {
       protocolVersion: "2026-01-26",
-      hostInfo: { name: "scantle-openui-host", version: "1.0.0" },
+      hostInfo: { name: "surla-openui-host", version: "1.0.0" },
       hostCapabilities: {},
       hostContext: { theme: "dark" }
     }
@@ -251,11 +251,11 @@ messageListener({
     }
   }
 });
-const resultRegion = doc.getElementById("scantle-result-view");
-const editorRegion = doc.getElementById("scantle-cp1-editor");
+const resultRegion = doc.getElementById("surla-result-view");
+const editorRegion = doc.getElementById("surla-cp1-editor");
 if (root.dataset.state !== "waiting" ||
     resultRegion.dataset.state !== "partial-input" ||
-    !doc.getElementById("scantle-partial-input-preview") ||
+    !doc.getElementById("surla-partial-input-preview") ||
     !resultRegion.textContent.includes("Route refunds >= $50...")) {
   throw new Error("expected tool-input-partial preview in result region, got: " + resultRegion.textContent);
 }
@@ -269,11 +269,11 @@ messageListener({
     params: { structuredContent: input.cp1Structured }
   }
 });
-const openuiWorkspace = doc.getElementById("scantle-openui-workspace");
+const openuiWorkspace = doc.getElementById("surla-openui-workspace");
 if (!openuiWorkspace ||
     openuiWorkspace.getAttribute("data-composed-for-revision") !== input.cp1Structured.request_revision ||
-    doc.getElementById("scantle-openui-error")) {
-  throw new Error("expected #scantle-openui-workspace to render valid OpenUI composition");
+    doc.getElementById("surla-openui-error")) {
+  throw new Error("expected #surla-openui-workspace to render valid OpenUI composition");
 }
 const wsText = openuiWorkspace.textContent;
 for (const want of [
@@ -318,15 +318,15 @@ if (!canonicalPill ||
   throw new Error("OpenUI option click did not synchronize canonical pill, draft label, or active column cells (activeCells=" + activeCells.length + ")");
 }
 
-// 6. Edit a confirmation example locally -> surfaces #scantle-openui-local-edit-notice qualification alert.
-if (doc.getElementById("scantle-openui-local-edit-notice")) {
+// 6. Edit a confirmation example locally -> surfaces #surla-openui-local-edit-notice qualification alert.
+if (doc.getElementById("surla-openui-local-edit-notice")) {
   throw new Error("unexpected local-edit notice before editing examples");
 }
 const outcomeTextarea = editorRegion.querySelector('textarea[data-example-id="chg-openui-check-01"][data-field="expected_outcome"]');
 outcomeTextarea.value = "Auto-approved with audit log";
 outcomeTextarea.dispatchEvent(new win.Event("input", { bubbles: true }));
-if (!doc.getElementById("scantle-openui-local-edit-notice")) {
-  throw new Error("expected #scantle-openui-local-edit-notice after editing example locally");
+if (!doc.getElementById("surla-openui-local-edit-notice")) {
+  throw new Error("expected #surla-openui-local-edit-notice after editing example locally");
 }
 
 // 7. Partial tool input arriving while editor is dirty must NOT clobber the active CP1 editor.
@@ -343,15 +343,15 @@ if (editorRegion.dataset.requestRevision !== input.cp1Structured.request_revisio
   throw new Error("tool-input-partial clobbered dirty CP1 editor");
 }
 
-// 8. Submit confirm_intent via #scantle-confirm-submit -> sends OpenUI-selected answer and edited example.
+// 8. Submit confirm_intent via #surla-confirm-submit -> sends OpenUI-selected answer and edited example.
 const msgCountBeforeSubmit = hostMessages.length;
-doc.getElementById("scantle-confirm-submit").click();
+doc.getElementById("surla-confirm-submit").click();
 if (hostMessages.length !== msgCountBeforeSubmit + 1) {
   throw new Error("expected confirm_intent tools/call message");
 }
 const confirmReq = hostMessages[msgCountBeforeSubmit].msg;
 
-// 9. Verify fail-closed #scantle-openui-error fallback on invalid/mismatched compositions while keeping canonical CP1 inspector working:
+// 9. Verify fail-closed #surla-openui-error fallback on invalid/mismatched compositions while keeping canonical CP1 inspector working:
 const badCases = [
   {
     name: "out-of-bounds ambiguityIndex",
@@ -480,9 +480,9 @@ messageListener({
     result: { content: [], structuredContent: confirmedWithoutUI }
   }
 });
-if (doc.getElementById("scantle-openui-workspace") ||
+if (doc.getElementById("surla-openui-workspace") ||
     !editorRegion.textContent.includes("[Confirmed answer: subtotal_only]")) {
-  throw new Error("expected #scantle-openui-workspace to unmount and confirmed answer label to appear after confirm_intent");
+  throw new Error("expected #surla-openui-workspace to unmount and confirmed answer label to appear after confirm_intent");
 }
 
 for (const tc of badCases) {
@@ -494,14 +494,14 @@ for (const tc of badCases) {
       params: { structuredContent: tc.card }
     }
   });
-  const errEl = doc.getElementById("scantle-openui-error");
-  const errDetails = errEl && errEl.querySelector("details.scantle-details");
+  const errEl = doc.getElementById("surla-openui-error");
+  const errDetails = errEl && errEl.querySelector("details.surla-details");
   if (!errEl ||
       !errEl.textContent.includes("Interactive decision preview unavailable:") ||
       !errDetails ||
       !errDetails.textContent.includes(tc.wantErr) ||
-      doc.getElementById("scantle-openui-workspace")) {
-    throw new Error("case " + tc.name + " did not render expected #scantle-openui-error with Details disclosure (" + tc.wantErr + "), got: " + (errEl && errEl.textContent));
+      doc.getElementById("surla-openui-workspace")) {
+    throw new Error("case " + tc.name + " did not render expected #surla-openui-error with Details disclosure (" + tc.wantErr + "), got: " + (errEl && errEl.textContent));
   }
   const fallbackPill = editorRegion.querySelector('[data-ambiguity-id="chg-openui-ambiguity-01"][data-option="total_with_tax"]');
   if (!fallbackPill) {
@@ -541,15 +541,15 @@ messageListener({
     params: { structuredContent: timelineOnlyCard }
   }
 });
-const timelineWs = doc.getElementById("scantle-openui-workspace");
+const timelineWs = doc.getElementById("surla-openui-workspace");
 if (!timelineWs || !timelineWs.textContent.includes("Model-Proposed Illustration")) {
   throw new Error("expected workspace-level Model-Proposed Illustration badge on timeline/callout workspace");
 }
 const timelineTextarea = editorRegion.querySelector('textarea[data-example-id="chg-openui-check-01"][data-field="expected_outcome"]');
 timelineTextarea.value = "Locally edited outcome on timeline workspace";
 timelineTextarea.dispatchEvent(new win.Event("input", { bubbles: true }));
-if (!doc.getElementById("scantle-openui-local-edit-notice")) {
-  throw new Error("expected workspace-level #scantle-openui-local-edit-notice on timeline/callout workspace after example edit");
+if (!doc.getElementById("surla-openui-local-edit-notice")) {
+  throw new Error("expected workspace-level #surla-openui-local-edit-notice on timeline/callout workspace after example edit");
 }
 
 process.stdout.write(JSON.stringify({ confirmCall: confirmReq.params }));

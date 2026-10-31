@@ -1,4 +1,4 @@
-// Package candidate is the only place Scantle executes candidate code. Exec
+// Package candidate is the only place Surla executes candidate code. Exec
 // starts one digest-pinned candidate binary as a single sandboxed process: it
 // sees only its explicit environment, reads and writes only its own state
 // directory (plus the system libraries needed to load), connects only to the
@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/goadesign/scantle/internal/procgroup"
+	"github.com/goadesign/surla/internal/procgroup"
 )
 
 type (

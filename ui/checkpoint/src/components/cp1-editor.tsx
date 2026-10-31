@@ -12,7 +12,7 @@ import {
 } from "../context/cp1-draft";
 import {
   Renderer,
-  scantleDecisionLibrary,
+  surlaDecisionLibrary,
   validateCompletedOpenUI,
 } from "../openui/library";
 import { ChangeCardResult, ExampleItem } from "../types";
@@ -93,12 +93,12 @@ function FieldTextarea({
   }, [value]);
 
   return (
-    <label className="scantle-field-label">
+    <label className="surla-field-label">
       <span>{label + ": "}</span>
       <textarea
         ref={elRef}
         rows={2}
-        className="scantle-input shadcn-textarea"
+        className="surla-input shadcn-textarea"
         aria-label={exampleId + " " + label}
         data-example-id={exampleId}
         data-field={field}
@@ -149,11 +149,11 @@ export function CP1EditorView({
     if (check.ok) {
       openUINode = (
         <div
-          id="scantle-openui-workspace"
+          id="surla-openui-workspace"
           data-composed-for-revision={card.ui_composition.composed_for_revision}
         >
           <Renderer
-            library={scantleDecisionLibrary}
+            library={surlaDecisionLibrary}
             response={card.ui_composition.program}
             isStreaming={false}
             publishObservability={false}
@@ -162,11 +162,11 @@ export function CP1EditorView({
       );
     } else {
       openUINode = (
-        <Alert id="scantle-openui-error" variant="destructive" role="alert">
+        <Alert id="surla-openui-error" variant="destructive" role="alert">
           <strong>Interactive decision preview unavailable: </strong>
           You can still answer every open question and edit or confirm every example directly in the
           form below.
-          <details className="scantle-details">
+          <details className="surla-details">
             <summary>Details</summary>
             <p>{check.error}</p>
           </details>
@@ -177,7 +177,7 @@ export function CP1EditorView({
 
   return (
     <CP1DraftContext.Provider value={ctxValue}>
-      <Card className="scantle-meta">
+      <Card className="surla-meta">
         <h2>
           {card.status === "confirmed"
             ? "Confirmed Change Decision"
@@ -198,7 +198,7 @@ export function CP1EditorView({
             {card.confirmed_by}
           </p>
         ) : null}
-        <details className="scantle-details">
+        <details className="surla-details">
           <summary>Details</summary>
           <p>
             change_id: <code>{card.change_id}</code> · status: <code>{card.status}</code> ·
@@ -209,8 +209,8 @@ export function CP1EditorView({
 
       {preservedDraft && Array.isArray(preservedDraft.lines) ? (
         <Card
-          id="scantle-preserved-draft"
-          className="scantle-card"
+          id="surla-preserved-draft"
+          className="surla-card"
           role="region"
           aria-label="Preserved Unsaved Draft Edits"
         >
@@ -223,7 +223,7 @@ export function CP1EditorView({
               <li key={String(idx)}>{line}</li>
             ))}
           </ul>
-          <details className="scantle-details">
+          <details className="surla-details">
             <summary>Details</summary>
             <p>
               Superseded revision: <code>{preservedDraft.fromRevision}</code>
@@ -234,7 +234,7 @@ export function CP1EditorView({
 
       {openUINode}
 
-      <Card className="scantle-card">
+      <Card className="surla-card">
         <h3>{"Open Questions (" + ambiguities.length + ")"}</h3>
         {ambiguities.length > 0 ? (
           <ul>
@@ -267,7 +267,7 @@ export function CP1EditorView({
                       </Button>
                     ))}
                   </div>
-                  <details className="scantle-details">
+                  <details className="surla-details">
                     <summary>Details</summary>
                     <p>
                       <code>{amb.id}</code>
@@ -295,7 +295,7 @@ export function CP1EditorView({
                     : "Model-judged check"}
                 </Badge>
               </div>
-              <div className="scantle-field-row">
+              <div className="surla-field-row">
                 <FieldTextarea
                   exampleId={ex.id}
                   field="scenario"
@@ -336,7 +336,7 @@ export function CP1EditorView({
                   {"Kind: " + ex.verification_kind}
                 </Button>
               </div>
-              <details className="scantle-details">
+              <details className="surla-details">
                 <summary>Details</summary>
                 <p>
                   <code>{ex.id}</code>
@@ -358,9 +358,9 @@ export function CP1EditorView({
           <p>None declared.</p>
         )}
 
-        <div className="scantle-field-row">
+        <div className="surla-field-row">
           <Button
-            id="scantle-confirm-submit"
+            id="surla-confirm-submit"
             variant="primary"
             disabled={rpcInFlight}
             onClick={onSubmitConfirm}
@@ -370,7 +370,7 @@ export function CP1EditorView({
               : "Refine Confirmed Answers & Examples"}
           </Button>
           <Button
-            id="scantle-discard-draft"
+            id="surla-discard-draft"
             disabled={rpcInFlight}
             onClick={onDiscardDraft}
           >
@@ -378,23 +378,23 @@ export function CP1EditorView({
           </Button>
         </div>
 
-        <div id="scantle-confirm-feedback">
+        <div id="surla-confirm-feedback">
           {formError ? (
             <Alert variant="destructive" role="alert">
               <strong>Could not save your changes: </strong>
               Your edited answers and examples remain in this form. Click{" "}
               <strong>Load Latest Card</strong> to inspect the current saved Change Card alongside
               your unsaved edits before resubmitting.
-              <div className="scantle-field-row">
+              <div className="surla-field-row">
                 <Button
-                  id="scantle-load-latest-card"
+                  id="surla-load-latest-card"
                   disabled={rpcInFlight}
                   onClick={onLoadLatestCard}
                 >
                   Load Latest Card
                 </Button>
               </div>
-              <details className="scantle-details">
+              <details className="surla-details">
                 <summary>Details</summary>
                 <p>
                   Confirm Intent Error: <code>{formError}</code>

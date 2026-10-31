@@ -12,9 +12,9 @@ import (
 	"net/url"
 	"os"
 
-	genpaymentsclient "github.com/goadesign/scantle/examples/orders/gen/http/payments/client"
-	genpayments "github.com/goadesign/scantle/examples/orders/gen/payments"
-	"github.com/goadesign/scantle/examples/orders/internal/refundflow"
+	genpaymentsclient "github.com/goadesign/surla/examples/orders/gen/http/payments/client"
+	genpayments "github.com/goadesign/surla/examples/orders/gen/payments"
+	"github.com/goadesign/surla/examples/orders/internal/refundflow"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	goahttp "goa.design/goa/v3/http"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	genorders "github.com/goadesign/scantle/examples/orders/gen/orders"
+	genorders "github.com/goadesign/surla/examples/orders/gen/orders"
 	"github.com/golang-jwt/jwt/v5"
 	"goa.design/goa/v3/security"
 )
