@@ -88,23 +88,11 @@ export const PolicySimulatorTable = defineComponent({
         <CardHeader>
           <div className="scantle-field-row">
             <CardTitle>{props.title}</CardTitle>
-            <Badge variant="accent">
-              Model-Proposed Illustration ({draft?.card.request_revision || "preview"})
-            </Badge>
+            <Badge>{amb.id}</Badge>
           </div>
-          <CardDescription>
-            <code>{amb.id}</code>: {amb.question}
-          </CardDescription>
+          <CardDescription>{amb.question}</CardDescription>
         </CardHeader>
         <CardContent>
-          {draft?.localExamplesEdited && (
-            <Alert id="scantle-openui-local-edit-notice" variant="warning">
-              <strong>Local Examples Modified: </strong>
-              Confirmation examples have been edited locally since{" "}
-              <code>{draft.card.request_revision}</code>. Simulator cells below reflect the model-proposed
-              illustration for the saved revision until re-analyzed.
-            </Alert>
-          )}
           <div
             className="scantle-field-row"
             role="group"
@@ -118,7 +106,7 @@ export const PolicySimulatorTable = defineComponent({
                 data-openui-ambiguity-id={amb.id}
                 data-openui-option={opt}
                 aria-pressed={selectedOption === opt ? "true" : "false"}
-                onClick={() => draft?.setAnswer(amb.id, opt)}
+                onClick={() => draft.setAnswer(amb.id, opt)}
               >
                 {opt}
               </Button>
@@ -152,12 +140,12 @@ export const PolicySimulatorTable = defineComponent({
                 }
                 const outcomes = Array.isArray(row.outcomes) ? row.outcomes : [];
                 const exItem =
-                  typeof row.exampleIndex === "number" && draft
+                  typeof row.exampleIndex === "number"
                     ? draft.draftExamples[row.exampleIndex - 1]
                     : undefined;
                 return (
                   <tr key={String(rIdx)}>
-                    <td>
+                    <td data-label="Scenario">
                       <strong>{row.scenario || ""}</strong>
                       {exItem ? (
                         <div>
@@ -165,10 +153,11 @@ export const PolicySimulatorTable = defineComponent({
                         </div>
                       ) : null}
                     </td>
-                    <td>{row.inputSummary || ""}</td>
+                    <td data-label="Input">{row.inputSummary || ""}</td>
                     {amb.options.map((opt, optIdx) => (
                       <td
                         key={opt}
+                        data-label={opt}
                         className={optIdx === selectedIdx ? "shadcn-cell-active" : ""}
                       >
                         {outcomes[optIdx] || "—"}
@@ -322,15 +311,34 @@ export const DecisionWorkspace = defineComponent({
   }),
   description:
     "Root container for a Scantle CP1 Decision Workspace combining policy simulators, decision cards, workflow timelines, and impact callouts.",
-  component: ({ props, renderNode }) => (
-    <div className="scantle-decision-workspace" data-openui-component="DecisionWorkspace">
-      <div className="scantle-field-row">
-        <h3>{props.title}</h3>
-        <Badge variant="accent">OpenUI Decision Studio</Badge>
+  component: ({ props, renderNode }) => {
+    const draft = useCP1Draft();
+    const composedRev =
+      draft?.card.ui_composition?.composed_for_revision ||
+      draft?.card.request_revision ||
+      "preview";
+    return (
+      <div className="scantle-decision-workspace" data-openui-component="DecisionWorkspace">
+        <div className="scantle-field-row">
+          <h3>{props.title}</h3>
+          <Badge variant="accent">OpenUI Decision Studio</Badge>
+          <Badge variant="accent">Model-Proposed Illustration</Badge>
+        </div>
+        <p className="shadcn-card-desc">
+          composed_for_revision: <code>{composedRev}</code>
+        </p>
+        {draft?.localExamplesEdited ? (
+          <Alert id="scantle-openui-local-edit-notice" variant="warning">
+            <strong>Local Examples Modified: </strong>
+            Confirmation examples have been edited locally since{" "}
+            <code>{draft.card.request_revision}</code>. Instruments in this workspace reflect the
+            model-proposed illustration for the saved revision until re-analyzed.
+          </Alert>
+        ) : null}
+        <div className="scantle-decision-grid">{renderNode(props.children)}</div>
       </div>
-      <div className="scantle-decision-grid">{renderNode(props.children)}</div>
-    </div>
-  ),
+    );
+  },
 });
 
 // scantleDecisionLibrary is the canonical OpenUI component library for Scantle CP1.
@@ -533,6 +541,30 @@ export function validateCompletedOpenUI(
       if (steps.length === 0) {
         return { ok: false, error: "WorkflowTimeline must contain at least one WorkflowStep." };
       }
+      for (let s = 0; s < steps.length; s++) {
+        const stepNode = steps[s] as ElementNodeLike;
+        if (
+          !stepNode ||
+          stepNode.type !== "element" ||
+          stepNode.typeName !== "WorkflowStep" ||
+          !stepNode.props
+        ) {
+          return {
+            ok: false,
+            error: "WorkflowTimeline step " + (s + 1) + " is not a WorkflowStep.",
+          };
+        }
+      }
+    } else if (child.typeName !== "ImpactCallout") {
+      return {
+        ok: false,
+        error:
+          "DecisionWorkspace child " +
+          (i + 1) +
+          " has unsupported component type " +
+          String(child.typeName) +
+          ".",
+      };
     }
   }
 

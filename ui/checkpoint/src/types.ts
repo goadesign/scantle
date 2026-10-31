@@ -160,7 +160,6 @@ function isValidUIComposition(v: unknown): boolean {
   return (
     isPlainObject(v) &&
     typeof v.program === "string" &&
-    v.program.length > 0 &&
     typeof v.composed_for_revision === "string" &&
     v.composed_for_revision.length > 0
   );

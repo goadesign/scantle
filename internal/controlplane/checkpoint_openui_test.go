@@ -293,6 +293,14 @@ const tableRegion = openuiWorkspace.querySelector('[role="region"][tabindex="0"]
 if (!tableRegion) {
   throw new Error("expected responsive shadcn-table inside focusable region");
 }
+const rowCells = tableRegion.querySelectorAll("tbody tr:first-child td[data-label]");
+if (rowCells.length !== 4 ||
+    rowCells[0].getAttribute("data-label") !== "Scenario" ||
+    rowCells[1].getAttribute("data-label") !== "Input" ||
+    rowCells[2].getAttribute("data-label") !== "subtotal_only" ||
+    rowCells[3].getAttribute("data-label") !== "total_with_tax") {
+  throw new Error("expected PolicySimulatorTable cells to carry data-label attributes for narrow responsive layouts");
+}
 
 // 5. Click an option button inside OpenUI PolicySimulatorTable -> updates canonical CP1 draft and active column highlight.
 const simOptionBtn = openuiWorkspace.querySelector('[data-openui-ambiguity-id="chg-openui-ambiguity-01"][data-openui-option="subtotal_only"]');
@@ -384,6 +392,39 @@ const badCases = [
       }
     }),
     wantErr: "incomplete"
+  },
+  {
+    name: "disallowed root child PolicySimulatorRow",
+    card: Object.assign({}, input.cp1Structured, {
+      change_id: "chg-bad-5",
+      ui_composition: {
+        program: 'root = DecisionWorkspace("D", [PolicySimulatorRow("S", "I", ["X", "Y"])])',
+        composed_for_revision: input.cp1Structured.request_revision
+      }
+    }),
+    wantErr: "unsupported component type PolicySimulatorRow"
+  },
+  {
+    name: "disallowed WorkflowTimeline child AmbiguityChoiceCard",
+    card: Object.assign({}, input.cp1Structured, {
+      change_id: "chg-bad-6",
+      ui_composition: {
+        program: 'root = DecisionWorkspace("D", [WorkflowTimeline("Flow", [AmbiguityChoiceCard(99)])])',
+        composed_for_revision: input.cp1Structured.request_revision
+      }
+    }),
+    wantErr: "is not a WorkflowStep"
+  },
+  {
+    name: "empty or whitespace-only program",
+    card: Object.assign({}, input.cp1Structured, {
+      change_id: "chg-bad-7",
+      ui_composition: {
+        program: " \n\t",
+        composed_for_revision: input.cp1Structured.request_revision
+      }
+    }),
+    wantErr: "OpenUI program is empty"
   }
 ];
 
@@ -423,6 +464,33 @@ for (const tc of badCases) {
   if (!fallbackPill) {
     throw new Error("case " + tc.name + " broke canonical CP1 inspector fallback");
   }
+}
+
+// 10. Workspace with only WorkflowTimeline + ImpactCallout still displays Model-Proposed Illustration and local-example-edit notice.
+const timelineOnlyCard = Object.assign({}, input.cp1Structured, {
+  change_id: "chg-timeline-only",
+  ui_composition: {
+    program: 'root = DecisionWorkspace("Flow Only", [WorkflowTimeline("Steps", [WorkflowStep("S1", "api", "D1")]), ImpactCallout("info", "Invariant", "Preserved")])',
+    composed_for_revision: input.cp1Structured.request_revision
+  }
+});
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: { structuredContent: timelineOnlyCard }
+  }
+});
+const timelineWs = doc.getElementById("scantle-openui-workspace");
+if (!timelineWs || !timelineWs.textContent.includes("Model-Proposed Illustration")) {
+  throw new Error("expected workspace-level Model-Proposed Illustration badge on timeline/callout workspace");
+}
+const timelineTextarea = editorRegion.querySelector('textarea[data-example-id="chg-openui-check-01"][data-field="expected_outcome"]');
+timelineTextarea.value = "Locally edited outcome on timeline workspace";
+timelineTextarea.dispatchEvent(new win.Event("input", { bubbles: true }));
+if (!doc.getElementById("scantle-openui-local-edit-notice")) {
+  throw new Error("expected workspace-level #scantle-openui-local-edit-notice on timeline/callout workspace after example edit");
 }
 
 process.stdout.write(JSON.stringify({ confirmCall: confirmReq.params }));
