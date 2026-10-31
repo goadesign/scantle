@@ -141,7 +141,7 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 				"id":                "chg-ui-test-check-01",
 				"scenario":          "Refund under $50",
 				"input_summary":     "$40 subtotal",
-				"expected_outcome":  "  Instant store credit up to $50.00  ",
+				"expected_outcome":  "  Instant store credit\nup to $50.00  ",
 				"verification_kind": "deterministic",
 			},
 		},
@@ -363,7 +363,9 @@ function makeElement(tag, ns) {
       return ns ? { baseVal: this.attributes["class"] || "" } : (this.attributes["class"] || "");
     },
     textContent: "",
-    value: "",
+    _val: "",
+    get value() { return this._val; },
+    set value(v) { this._val = this.tagName === "INPUT" ? String(v).replace(/[\r\n]/g, "") : String(v); },
     dataset: {},
     attributes: {},
     listeners: {},
@@ -525,10 +527,10 @@ if (optionPills.length !== 1) {
 }
 optionPills[0].dispatch("click");
 const outcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
-if (outcomeInputs.length !== 1) {
-  throw new Error("expected example expected_outcome input, got: " + outcomeInputs.length);
+if (outcomeInputs.length !== 1 || outcomeInputs[0].tagName !== "TEXTAREA") {
+  throw new Error("expected example expected_outcome textarea, got: " + outcomeInputs.length);
 }
-outcomeInputs[0].value = "  Instant store credit up to $50.00  ";
+outcomeInputs[0].value = "  Instant store credit\nup to $50.00  ";
 outcomeInputs[0].dispatch("input", { target: outcomeInputs[0] });
 const submitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
 if (submitBtns.length !== 1) {
@@ -545,7 +547,7 @@ if (hostMessages.length !== msgCountBeforeConfirm + 1 ||
     submitBtns[0].disabled !== true ||
     outcomeInputs[0].disabled !== true ||
     !inFlightPills.every((p) => p.disabled === true) ||
-    outcomeInputs[0].value !== "  Instant store credit up to $50.00  ") {
+    outcomeInputs[0].value !== "  Instant store credit\nup to $50.00  ") {
   throw new Error("expected single tools/call request and all edit controls disabled while in flight");
 }
 const confirmReq = hostMessages[msgCountBeforeConfirm].msg;
@@ -553,7 +555,7 @@ if (confirmReq.method !== "tools/call" ||
     confirmReq.params.name !== "confirm_intent" ||
     confirmReq.params.arguments.request_revision !== input.wantCP1Revision ||
     confirmReq.params.arguments.answers["chg-ui-test-ambiguity-01"] !== "subtotal_only" ||
-    confirmReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit up to $50.00  ") {
+    confirmReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit\nup to $50.00  ") {
   throw new Error("unexpected confirm_intent tools/call payload: " + JSON.stringify(confirmReq));
 }
 
@@ -575,15 +577,15 @@ messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/noti
 if (postConfirmInputs[0].value !== "post-confirm draft edit") {
   throw new Error("late tool-result notification overwrote post-confirm edit");
 }
-postConfirmInputs[0].value = "  Instant store credit up to $50.00  ";
+postConfirmInputs[0].value = "  Instant store credit\nup to $50.00  ";
 postConfirmInputs[0].dispatch("input", { target: postConfirmInputs[0] });
-// Clicking Refine with no edits on a whitespace-bearing saved card must preserve verbatim whitespace.
+// Clicking Refine with no edits on a whitespace/newline-bearing saved card must preserve verbatim text.
 const noEditSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
 const msgCountBeforeNoEdit = hostMessages.length;
 noEditSubmitBtns[0].dispatch("click");
 const noEditRefineReq = hostMessages[msgCountBeforeNoEdit].msg;
-if (noEditRefineReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit up to $50.00  ") {
-  throw new Error("no-edit refine trimmed whitespace: " + JSON.stringify(noEditRefineReq));
+if (noEditRefineReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit\nup to $50.00  ") {
+  throw new Error("no-edit refine mutated multiline/whitespace field: " + JSON.stringify(noEditRefineReq));
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: noEditRefineReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
 
@@ -677,6 +679,10 @@ if (!renderText(editorRegion).includes("Edited outcome preserved across stale er
 findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0].dispatch("click");
 const pendingIncomingConfirmReq = hostMessages[hostMessages.length - 1].msg;
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });
+findAll(resultRegion, (n) => n.attributes["id"] === "scantle-replace-incoming-card")[0].dispatch("click");
+if (!statusEl.textContent.includes("Wait for the pending CP1 Change Card request")) {
+  throw new Error("clicking switch button during pending RPC did not update status message");
+}
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: pendingIncomingConfirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
 if (findAll(resultRegion, (n) => n.attributes["id"] === "scantle-replace-incoming-card").length !== 1 ||
     editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
@@ -969,8 +975,8 @@ process.stdout.write(JSON.stringify({
 	if err := json.Unmarshal(refineComplete.StructuredContent, &refinedWire); err != nil {
 		t.Fatalf("unmarshal refinedWire: %v", err)
 	}
-	if refinedWire.RequestRevision != confirmedWire.RequestRevision || !strings.Contains(string(refineComplete.StructuredContent), "  Instant store credit up to $50.00  ") {
-		t.Fatalf("no-edit refine altered request_revision or whitespace: got %q, want %q", refinedWire.RequestRevision, confirmedWire.RequestRevision)
+	if refinedWire.RequestRevision != confirmedWire.RequestRevision || !strings.Contains(string(refineComplete.StructuredContent), `  Instant store credit\nup to $50.00  `) {
+		t.Fatalf("no-edit refine altered request_revision or multiline/whitespace field: got %q, want %q", refinedWire.RequestRevision, confirmedWire.RequestRevision)
 	}
 }
 

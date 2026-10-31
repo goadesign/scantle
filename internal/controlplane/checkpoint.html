@@ -22,7 +22,7 @@
     .scantle-pill[aria-pressed="true"], .scantle-btn-primary { border-color: #2563eb; background: rgba(37, 99, 235, 0.16); font-weight: 600; }
     .scantle-field-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0; }
     .scantle-field-label { display: inline-flex; align-items: center; gap: 0.25rem; flex: 1 1 12rem; font-size: 0.85rem; }
-    .scantle-input { padding: 0.25rem 0.45rem; border-radius: 4px; border: 1px solid rgba(127, 127, 127, 0.5); background: transparent; color: inherit; font-size: 0.85rem; flex: 1 1 10rem; }
+    .scantle-input { padding: 0.25rem 0.45rem; border-radius: 4px; border: 1px solid rgba(127, 127, 127, 0.5); background: transparent; color: inherit; font-family: inherit; font-size: 0.85rem; flex: 1 1 10rem; resize: vertical; }
     .scantle-graph-wrap { overflow: auto; border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 6px; padding: 0.5rem; margin: 0.5rem 0 0.75rem 0; }
     #scantle-c4-svg text { fill: currentColor; }
     .scantle-error { border: 2px solid #c62828; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; }
@@ -440,8 +440,8 @@
 
       var exampleItems = draftExamples.map(function (ex, idx) {
         function makeFieldInput(field, label) {
-          var inputEl = el("input", {
-            type: "text", className: "scantle-input", "aria-label": ex.id + " " + label,
+          var inputEl = el("textarea", {
+            rows: "2", className: "scantle-input", "aria-label": ex.id + " " + label,
             "data-example-id": ex.id, "data-field": field, value: ex[field],
             onInput: function (evt) {
               if (rpcInFlight) { if (evt && evt.target) { evt.target.value = ex[field]; } return; }
@@ -557,7 +557,10 @@
         type: "button", id: "scantle-replace-incoming-card", className: "scantle-btn",
         textContent: "Switch to Incoming Card (Discard Unsaved Edits)",
         onClick: function () {
-          if (Object.keys(pendingRequests).length > 0) { return; }
+          if (Object.keys(pendingRequests).length > 0) {
+            statusEl.textContent = "Wait for the pending CP1 Change Card request to finish before switching cards.";
+            return;
+          }
           clearResultRegion();
           renderChangeCard(incomingCard, null);
         }
