@@ -219,15 +219,57 @@ func TestInitWritesTheProjectWithTheServiceName(t *testing.T) {
 	assertOnly(t, parent, "bakery")
 }
 
-func TestInitRejectsANameGoaGeneratesUnderAnotherPackage(t *testing.T) {
-	parent := t.TempDir()
-	run := func(_ context.Context, dir, _ string, args ...string) error {
-		return fakeGoaGen(dir, "errors_", args)
+func TestInitImportsThePackageGoaGenerated(t *testing.T) {
+	// Brackets in the destination path must not be read as glob syntax.
+	parent := filepath.Join(t.TempDir(), "demo[1]")
+	require.NoError(t, os.Mkdir(parent, 0o755))
+	dir := filepath.Join(parent, "errors")
+	run := func(_ context.Context, moduleDir, _ string, args ...string) error {
+		return fakeGoaGen(moduleDir, "errors_", args)
 	}
-	_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "errors"), Module: "example.com/errors", SurlaVersion: published}, run)
-	require.ErrorContains(t, err, `Goa does not generate a service named "errors" as package "errors"`)
-	assert.ErrorContains(t, err, "such as errorsapi")
-	assertOnly(t, parent)
+	name, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/errors", SurlaVersion: published}, run)
+	require.NoError(t, err)
+	assert.Equal(t, "errors", name)
+	main, err := os.ReadFile(filepath.Join(dir, "cmd", "errors", "main.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(main), `generrors_ "example.com/errors/gen/errors_"`)
+	assert.Contains(t, string(main), `genhttperrors_ "example.com/errors/gen/http/errors_/server"`)
+	svc, err := os.ReadFile(filepath.Join(dir, "internal", "service", "service.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(svc), `"example.com/errors/gen/errors_/agents/helper"`)
+	acc, err := os.ReadFile(filepath.Join(dir, "eval", "acceptance", "acceptance.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(acc), `"example.com/errors/eval/gen/http/errors_/client"`)
+	assert.Contains(t, string(acc), `generrors_ "example.com/errors/eval/gen/errors_"`)
+	design, err := os.ReadFile(filepath.Join(dir, "design", "design.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(design), `Service("errors"`, "the DSL keeps the service name")
+}
+
+func TestInitRequiresExactlyOneGeneratedService(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		pkgs    []string
+		wantErr string
+	}{
+		{name: "none", wantErr: "produced 0 service packages"},
+		{name: "two", pkgs: []string{"shop", "other"}, wantErr: "produced 2 service packages"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := t.TempDir()
+			run := func(_ context.Context, moduleDir, _ string, args ...string) error {
+				for _, pkg := range tc.pkgs {
+					if err := fakeGoaGen(moduleDir, pkg, args); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+			_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "shop"), Module: "example.com/shop", SurlaVersion: published}, run)
+			require.ErrorContains(t, err, tc.wantErr)
+			assertOnly(t, parent)
+		})
+	}
 }
 
 // fakeGoaGen stands in for goa gen: for a gen command it writes the service

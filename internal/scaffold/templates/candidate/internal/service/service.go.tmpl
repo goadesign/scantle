@@ -13,13 +13,13 @@ import (
 	"goa.design/goa-ai/runtime/agent/runtime"
 	storageinmem "goa.design/goa-ai/runtime/agent/storage/inmem"
 
-	gen[[.Name]] "[[.Module]]/gen/[[.Name]]"
-	gen[[.Name]]helper "[[.Module]]/gen/[[.Name]]/agents/helper"
-	gen[[.Name]]helpercatalog "[[.Module]]/gen/[[.Name]]/agents/helper/catalog"
+	gen[[.Pkg]] "[[.Module]]/gen/[[.Pkg]]"
+	gen[[.Pkg]]helper "[[.Module]]/gen/[[.Pkg]]/agents/helper"
+	gen[[.Pkg]]helpercatalog "[[.Module]]/gen/[[.Pkg]]/agents/helper/catalog"
 	"[[.Module]]/internal/helper"
 )
 
-// Service implements gen[[.Name]].Service.
+// Service implements gen[[.Pkg]].Service.
 type Service struct {
 	// model is the model client every agent step uses; it outlives
 	// questions.
@@ -45,19 +45,19 @@ func New(mc model.Client) *Service {
 // answer. Each question gets its own in-memory runtime, store and session,
 // all released once the answer is returned: nothing asks for an earlier
 // run, so nothing is kept.
-func (s *Service) Ask(ctx context.Context, p *gen[[.Name]].AskPayload) (*gen[[.Name]].AskResult, error) {
+func (s *Service) Ask(ctx context.Context, p *gen[[.Pkg]].AskPayload) (*gen[[.Pkg]].AskResult, error) {
 	store := storageinmem.New()
 	rt := runtime.New(store)
 	if err := rt.RegisterModel(modelID, s.model); err != nil {
 		return nil, fmt.Errorf("register model: %w", err)
 	}
-	if err := gen[[.Name]]helper.RegisterHelperAgent(ctx, rt, gen[[.Name]]helper.HelperAgentConfig{Planner: helper.NewPlanner(modelID)}); err != nil {
+	if err := gen[[.Pkg]]helper.RegisterHelperAgent(ctx, rt, gen[[.Pkg]]helper.HelperAgentConfig{Planner: helper.NewPlanner(modelID)}); err != nil {
 		return nil, fmt.Errorf("register helper agent: %w", err)
 	}
-	endpoints := gen[[.Name]].NewEndpoints(s)
-	tools := gen[[.Name]].NewClient(endpoints.Ask, endpoints.Price)
-	if err := gen[[.Name]]helper.RegisterUsedToolsets(ctx, rt,
-		gen[[.Name]]helper.WithCatalogExecutor(gen[[.Name]]helpercatalog.NewHelperCatalogExec(gen[[.Name]]helpercatalog.WithClient(tools))),
+	endpoints := gen[[.Pkg]].NewEndpoints(s)
+	tools := gen[[.Pkg]].NewClient(endpoints.Ask, endpoints.Price)
+	if err := gen[[.Pkg]]helper.RegisterUsedToolsets(ctx, rt,
+		gen[[.Pkg]]helper.WithCatalogExecutor(gen[[.Pkg]]helpercatalog.NewHelperCatalogExec(gen[[.Pkg]]helpercatalog.WithClient(tools))),
 	); err != nil {
 		return nil, fmt.Errorf("register catalog tools: %w", err)
 	}
@@ -68,7 +68,7 @@ func (s *Service) Ask(ctx context.Context, p *gen[[.Name]].AskPayload) (*gen[[.N
 	if _, err := store.CreateSession(ctx, sessionID, time.Now().UTC()); err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
-	out, err := gen[[.Name]]helper.NewClient(rt).Run(ctx, sessionID, []*model.Message{{
+	out, err := gen[[.Pkg]]helper.NewClient(rt).Run(ctx, sessionID, []*model.Message{{
 		Role:  model.ConversationRoleUser,
 		Parts: []model.Part{model.TextPart{Text: p.Question}},
 	}}, runtime.WithRunID("run-"+rand.Text()))
@@ -78,12 +78,12 @@ func (s *Service) Ask(ctx context.Context, p *gen[[.Name]].AskPayload) (*gen[[.N
 	if out.Final == nil {
 		return nil, errors.New("helper agent finished without an answer")
 	}
-	return &gen[[.Name]].AskResult{Answer: out.Final.Text(), RunID: out.RunID}, nil
+	return &gen[[.Pkg]].AskResult{Answer: out.Final.Text(), RunID: out.RunID}, nil
 }
 
 // Price returns the catalog price of the item. An item the catalog does not
 // price is reported with Known false, not as an error.
-func (s *Service) Price(_ context.Context, p *gen[[.Name]].PricePayload) (*gen[[.Name]].Price, error) {
+func (s *Service) Price(_ context.Context, p *gen[[.Pkg]].PricePayload) (*gen[[.Pkg]].Price, error) {
 	cents, known := catalog[p.Item]
-	return &gen[[.Name]].Price{Item: p.Item, Known: known, Cents: cents}, nil
+	return &gen[[.Pkg]].Price{Item: p.Item, Known: known, Cents: cents}, nil
 }

@@ -27,8 +27,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	genhttp[[.Name]] "[[.Module]]/gen/http/[[.Name]]/server"
-	gen[[.Name]] "[[.Module]]/gen/[[.Name]]"
+	genhttp[[.Pkg]] "[[.Module]]/gen/http/[[.Pkg]]/server"
+	gen[[.Pkg]] "[[.Module]]/gen/[[.Pkg]]"
 	"[[.Module]]/internal/service"
 )
 
@@ -61,9 +61,9 @@ func run(ctx context.Context, listen, modelGateway string) error {
 		return fmt.Errorf("create model client: %w", err)
 	}
 
-	endpoints := gen[[.Name]].NewEndpoints(service.New(mc))
+	endpoints := gen[[.Pkg]].NewEndpoints(service.New(mc))
 	mux := goahttp.NewMuxer()
-	genhttp[[.Name]].Mount(mux, genhttp[[.Name]].New(endpoints, mux, goahttp.RequestDecoder, goahttp.ResponseEncoder, errorHandler, nil))
+	genhttp[[.Pkg]].Mount(mux, genhttp[[.Pkg]].New(endpoints, mux, goahttp.RequestDecoder, goahttp.ResponseEncoder, errorHandler, nil))
 	// otelhttp starts a span for every request; it records to the global
 	// OpenTelemetry tracer provider, which discards spans until one is set.
 	srv := &http.Server{Addr: listen, Handler: otelhttp.NewHandler(mux, "[[.Name]]"), ReadHeaderTimeout: 10 * time.Second}
