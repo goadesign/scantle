@@ -628,9 +628,11 @@ if (getChangeReq.method !== "tools/call" ||
     getChangeReq.params.arguments.change_id !== "chg-ui-test") {
   throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
 }
+const editorRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-cp1-editor")[0];
+const resultRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-result-view")[0];
 // Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must retain active editor while get_change is pending, then render latest card + #scantle-preserved-draft on the matching tools/call reply.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1ConfirmedStructured } } });
-if (root.dataset.requestRevision !== input.wantCP1Revision) {
+if (editorRegion.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("interleaved ui/notifications/tool-result replaced active editor before get_change reply");
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: getChangeReq.id, result: { content: [], structuredContent: input.getChangeStructured } } });
@@ -639,7 +641,7 @@ messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/noti
 const recoveredViewText = renderText(viewEl);
 const preservedPanels = findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft");
 if (root.dataset.state !== "cp1-change-card" ||
-    root.dataset.requestRevision !== input.wantCP2Revision ||
+    editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
     preservedPanels.length !== 1 ||
     !recoveredViewText.includes("Preserved Unsaved Draft Edits") ||
     !recoveredViewText.includes("total_with_tax") ||
@@ -647,29 +649,54 @@ if (root.dataset.state !== "cp1-change-card" ||
   throw new Error("get_change recovery did not retain latest card + preserved draft panel after late tool-result: " + recoveredViewText);
 }
 
-// 3d. Cross-view draft preservation & pending-RPC result retention:
-// Delivering diff while editor has preserved/dirty state keeps CP1 editor + preserved draft mounted AND renders diff in result region.
+// 3d. Cross-view draft preservation, per-region dataset bindings, and pending-RPC result retention:
+// Delivering diff while editor has preserved/dirty state keeps CP1 editor + preserved draft mounted AND renders diff in result region with region-scoped dataset bindings.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.diffStructured } } });
 if (root.dataset.state !== "cp2-diff" ||
+    editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
+    resultRegion.dataset.state !== "cp2-diff" ||
+    resultRegion.dataset.changeId !== undefined ||
+    resultRegion.dataset.requestRevision !== undefined ||
+    root.dataset.changeId !== undefined ||
+    root.dataset.requestRevision !== undefined ||
     findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1 ||
     !renderText(viewEl).includes("refund_agent")) {
-  throw new Error("diff notification during recovery dropped preserved draft or failed to render diff");
+  throw new Error("diff notification during recovery dropped preserved draft, failed to render diff, or leaked dataset bindings");
 }
-// Delivering a different-revision ChangeCardResult while editor has unsaved state renders #scantle-incoming-change-card without overwriting editor.
+// Repeated get_change recovery without new form edits must retain the already-preserved draft lines.
+findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0].dispatch("click");
+const staleReq2 = hostMessages[hostMessages.length - 1].msg;
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: staleReq2.id, result: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
+findAll(viewEl, (n) => n.attributes["id"] === "scantle-load-latest-card")[0].dispatch("click");
+const getChangeReq2 = hostMessages[hostMessages.length - 1].msg;
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: getChangeReq2.id, result: { content: [], structuredContent: input.getChangeStructured } } });
+if (!renderText(editorRegion).includes("Edited outcome preserved across stale error")) {
+  throw new Error("repeated get_change recovery lost prior preserved draft");
+}
+// Submitting confirm_intent while an incoming card B arrives in flight retains B and its switch button after A's reply completes.
+findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0].dispatch("click");
+const pendingIncomingConfirmReq = hostMessages[hostMessages.length - 1].msg;
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });
-if (findAll(viewEl, (n) => n.attributes["id"] === "scantle-incoming-change-card").length !== 1 ||
-    findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1) {
-  throw new Error("incoming ChangeCardResult during unsaved state did not render incoming card notice alongside preserved draft");
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: pendingIncomingConfirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
+if (findAll(resultRegion, (n) => n.attributes["id"] === "scantle-replace-incoming-card").length !== 1 ||
+    editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
+    resultRegion.dataset.requestRevision !== input.wantCP1Revision) {
+  throw new Error("matching confirm_intent reply cleared incoming card B or broke per-region dataset bindings");
 }
-// Submitting confirm_intent while a diff arrives in flight retains the diff after the matching confirm_intent reply completes.
+// Submitting confirm_intent while a diff arrives in flight retains the diff and per-region dataset bindings after the matching confirm_intent reply completes.
 const pendingConfirmSubmit = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0];
 const msgCountBeforePendingDiff = hostMessages.length;
 pendingConfirmSubmit.dispatch("click");
 const pendingDiffConfirmReq = hostMessages[msgCountBeforePendingDiff].msg;
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.diffStructured } } });
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: pendingDiffConfirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
-if (root.dataset.state !== "cp1-change-card" || !renderText(viewEl).includes("refund_agent")) {
-  throw new Error("diff arriving during pending confirm_intent was lost after matching confirm_intent reply");
+if (root.dataset.state !== "cp1-change-card" ||
+    editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
+    resultRegion.dataset.state !== "cp2-diff" ||
+    resultRegion.dataset.requestRevision !== undefined ||
+    root.dataset.requestRevision !== undefined ||
+    !renderText(viewEl).includes("refund_agent")) {
+  throw new Error("diff arriving during pending confirm_intent was lost or leaked root dataset bindings after matching confirm_intent reply");
 }
 
 // 4. Deliver CP2 ArchitecturePreviewResult when CP1 editor is clean -> replaces clean CP1 view completely and renders both SVG graph and inspectable list.
