@@ -240,6 +240,7 @@ func TestInitImportsThePackageGoaGenerated(t *testing.T) {
 	acc, err := os.ReadFile(filepath.Join(dir, "eval", "acceptance", "acceptance.go"))
 	require.NoError(t, err)
 	assert.Contains(t, string(acc), `"example.com/errors/eval/gen/http/errors_/client"`)
+	assert.Contains(t, string(acc), `generrors_ "example.com/errors/eval/gen/errors_"`)
 	design, err := os.ReadFile(filepath.Join(dir, "design", "design.go"))
 	require.NoError(t, err)
 	assert.Contains(t, string(design), `Service("errors"`, "the DSL keeps the service name")

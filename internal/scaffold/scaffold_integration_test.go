@@ -13,10 +13,9 @@ import (
 	"goa.design/goa-ai/eval"
 )
 
-// TestInitCreatesAProjectWhoseSuitePasses creates real projects with the
-// published Surla version (it needs the network and, for the sandbox, macOS),
-// builds the service and its evaluator suite, and runs the suite against the
-// service: both scenarios must pass.
+// TestInitBuildsForNamesThatCollideWithTemplatesOrGo creates real projects
+// (network needed) for names that match template identifiers or that Goa
+// generates under another package name; Init vets both modules.
 func TestInitBuildsForNamesThatCollideWithTemplatesOrGo(t *testing.T) {
 	for _, name := range []string{"helper", "service", "catalog", "errors", "string"} {
 		t.Run(name, func(t *testing.T) {
@@ -27,6 +26,10 @@ func TestInitBuildsForNamesThatCollideWithTemplatesOrGo(t *testing.T) {
 	}
 }
 
+// TestInitCreatesAProjectWhoseSuitePasses creates real projects with the
+// published Surla version (it needs the network and, for the sandbox, macOS),
+// builds the service and its evaluator suite, and runs the suite against the
+// service: both scenarios must pass.
 func TestInitCreatesAProjectWhoseSuitePasses(t *testing.T) {
 	// errors is generated as package errors_, so it also proves the imports
 	// follow the package goa gen produced.
