@@ -90,6 +90,30 @@ func TestRunReportsASuiteThatCannotBeBuilt(t *testing.T) {
 	assertEmptyDir(t, tmp)
 }
 
+func TestRunFailsWhenTheArtifactStoreCannotBeRemoved(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "app")
+	require.NoError(t, os.WriteFile(bin, []byte("app binary"), 0o700))
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	t.Cleanup(func() { require.NoError(t, os.Chmod(tmp, 0o700)) })
+	c := testCommand(false)
+	build := c.Suite
+	c.Suite = func(pinned map[string]candidate.Artifact) (eval.Suite, error) {
+		// The store already exists inside tmp; a read-only tmp keeps it from
+		// being removed after the scenarios ran.
+		require.NoError(t, os.Chmod(tmp, 0o500))
+		return build(pinned)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := runCommand(t.Context(), []string{"--artifact", "app=" + bin}, &stdout, &stderr, c)
+	assert.Equal(t, ExitError, code, "a store left behind fails the run")
+	assert.Contains(t, stderr.String(), "remove artifact store")
+	var report eval.Report
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &report), "the truthful report is still printed")
+	assert.True(t, report.Passed)
+}
+
 func TestRunDescribesTheSuiteWithoutBinaries(t *testing.T) {
 	c := testCommand(false)
 	c.Suite = func(map[string]candidate.Artifact) (eval.Suite, error) {
