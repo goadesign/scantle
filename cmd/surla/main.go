@@ -286,24 +286,33 @@ func runInit(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(stdout, initNextSteps, *dir, name)
+	_, err = fmt.Fprintf(stdout, initNextSteps, shellQuote(*dir), name)
 	return err
 }
 
 // initNextSteps is what `surla init` prints after creating a project; the
-// verbs are the project directory and the service name.
-const initNextSteps = `Created %[1]s: the %[2]s service and its starter evaluator suite in eval/.
+// verbs are the shell-quoted project directory and the service name.
+const initNextSteps = `Created the %[2]s service and its starter evaluator suite (eval/).
 
 Next:
   cd %[1]s
-  git init && git add -A && git commit -m "Start %[2]s from surla init"
+  git init
+  git add .gitignore README.md AGENTS_QUICKSTART.md go.mod go.sum design gen internal cmd eval
+  git commit -m "Start %[2]s from surla init"
   surla preview -dir .
   surla verify -candidate-repo . -candidate-commit "$(git rev-parse HEAD)" -binary %[2]s=./cmd/%[2]s \
     -suite-repo . -suite-commit "$(git rev-parse HEAD)" -suite-module eval -suite-command ./cmd/%[2]s-evals \
     -request-revision starter -work-dir "$(mktemp -d)/work" -report-dir reports
 
-See README.md in the project for what each part does.
+README.md in the project explains each part and the -request-revision value.
 `
+
+// shellQuote quotes s as one POSIX shell word: wrapped in single quotes, with
+// each single quote inside written as '\”. For example, my dir becomes
+// 'my dir'.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
 
 // buildVersion returns the module version this binary was built from, such
 // as a pseudo-version stamped from a clean checkout, or "(devel)".

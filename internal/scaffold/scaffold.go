@@ -6,7 +6,8 @@
 // running `go mod tidy` and `goa gen` in each module, and renames the staging
 // directory to the target only when every step succeeded. A failed or
 // canceled step removes the staging directory, so the target is never left
-// half-written.
+// half-written. Each command's output goes to a log file; a failed step's log
+// is kept and named in the error.
 package scaffold
 
 import (
@@ -15,6 +16,9 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"go/format"
+	"go/token"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -37,7 +41,7 @@ import (
 type (
 	// Options describes the project Init creates.
 	Options struct {
-		// Dir is the directory to create. It must not exist or must be empty.
+		// Dir is the directory to create. It must not exist.
 		Dir string
 		// Module is the candidate's Go module path, such as
 		// example.com/shop. Its last element names the service.
@@ -48,9 +52,10 @@ type (
 		SurlaVersion string
 	}
 
-	// Runner runs one command in dir and returns its combined output. Init
-	// uses RunCommand; tests substitute their own.
-	Runner func(ctx context.Context, dir string, args ...string) (output []byte, err error)
+	// Runner runs one command in dir, writing its combined output to the
+	// file at logPath, and returns once every process it started has
+	// exited. Init uses RunCommand; tests substitute their own.
+	Runner func(ctx context.Context, dir, logPath string, args ...string) error
 
 	// data is what the templates are rendered with.
 	data struct {
@@ -84,10 +89,12 @@ type (
 	StepError struct {
 		// Args is the command line.
 		Args []string
-		// Dir is the directory it ran in, inside the staging directory.
-		Dir string
-		// Output is the end of its combined output.
-		Output string
+		// Module is the module directory it ran in: "." or "eval".
+		Module string
+		// Log is the file holding its complete output; Init keeps it.
+		Log string
+		// Tail is the end of that output.
+		Tail string
 		// Err is the command's error.
 		Err error
 	}
@@ -107,8 +114,8 @@ const (
 	stopGrace = 5 * time.Second
 	// stopTimeout bounds the wait for a command's process group to empty.
 	stopTimeout = 10 * time.Second
-	// maxOutputExcerpt bounds the command output a StepError quotes.
-	maxOutputExcerpt = 4 << 10
+	// maxTail bounds how much of a failed command's log a StepError quotes.
+	maxTail = 4 << 10
 )
 
 var (
@@ -119,19 +126,10 @@ var (
 	//go:embed all:templates
 	templatesFS embed.FS
 
-	// serviceName is the form a service name must have: lowercase letters
-	// and digits starting with a letter, so it is the same Go package name
-	// Goa generates.
-	serviceName = regexp.MustCompile(`^[a-z][a-z0-9]{0,30}$`)
-
-	// goKeywords cannot be service names because the name becomes a Go
-	// identifier.
-	goKeywords = map[string]bool{
-		"break": true, "case": true, "chan": true, "const": true, "continue": true, "default": true,
-		"defer": true, "else": true, "fallthrough": true, "for": true, "func": true, "go": true, "goto": true,
-		"if": true, "import": true, "interface": true, "map": true, "package": true, "range": true,
-		"return": true, "select": true, "struct": true, "switch": true, "type": true, "var": true,
-	}
+	// lowerAlnum is the form a service name must have: lowercase letters and
+	// digits starting with a letter, so Goa generates a Go package of the
+	// same name.
+	lowerAlnum = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 )
 
 // Init creates the project described by o, running every command with run.
@@ -145,48 +143,59 @@ func Init(ctx context.Context, o Options, run Runner) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := checkEmpty(target); err != nil {
-		return "", err
+	if _, err := os.Lstat(target); err == nil {
+		return "", fmt.Errorf("%s already exists; surla init only creates a new directory", target)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("check %s: %w", target, err)
+	}
+	logs, err := os.MkdirTemp("", "surla-init-logs-*")
+	if err != nil {
+		return "", fmt.Errorf("create log directory: %w", err)
 	}
 	staging, err := os.MkdirTemp(filepath.Dir(target), filepath.Base(target)+".surla-init-*")
 	if err != nil {
-		return "", fmt.Errorf("create staging directory: %w", err)
+		return "", errors.Join(fmt.Errorf("create staging directory: %w", err), os.RemoveAll(logs))
 	}
-	if err := build(ctx, staging, d, run); err != nil {
+	if err := build(ctx, staging, logs, d, run); err != nil {
 		var stuck *stuckError
 		if errors.As(err, &stuck) {
 			return "", fmt.Errorf("%w; the staging directory %s is kept because processes may still use it", err, staging)
 		}
 		return "", errors.Join(err, os.RemoveAll(staging))
 	}
-	if err := checkEmpty(target); err != nil {
-		return "", errors.Join(err, os.RemoveAll(staging))
+	// MkdirTemp creates the staging directory private (0700); the project
+	// gets the usual directory permissions before it is published.
+	if err := os.Chmod(staging, 0o755); err != nil {
+		return "", errors.Join(fmt.Errorf("set project permissions: %w", err), os.RemoveAll(staging), os.RemoveAll(logs))
 	}
-	if err := os.Remove(target); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return "", errors.Join(fmt.Errorf("replace empty %s: %w", target, err), os.RemoveAll(staging))
-	}
+	// os.Rename refuses a target that exists when it checks. A directory
+	// created between that check and the rename is replaced only if it is
+	// empty (rename(2) fails on a non-empty one), so no data is lost.
 	if err := os.Rename(staging, target); err != nil {
-		return "", errors.Join(fmt.Errorf("move project into %s: %w", target, err), os.RemoveAll(staging))
+		return "", errors.Join(fmt.Errorf("move project into %s: %w", target, err), os.RemoveAll(staging), os.RemoveAll(logs))
 	}
-	return d.Name, nil
+	return d.Name, os.RemoveAll(logs)
 }
 
 // RunCommand runs args in dir as its own process group with GOWORK=off, so a
-// go.work file around dir cannot change the new modules, and returns the
-// combined output. When ctx ends the group gets SIGTERM, then SIGKILL; a group
-// that does not exit is reported as a stuck error so Init keeps the staging
-// directory its processes may still use.
-func RunCommand(ctx context.Context, dir string, args ...string) ([]byte, error) {
+// go.work file around dir cannot change the new modules, and writes the
+// combined output to a new file at logPath. When ctx ends the group gets
+// SIGTERM, then SIGKILL; a group that does not exit is reported as a stuck
+// error so Init keeps the staging directory its processes may still use.
+func RunCommand(ctx context.Context, dir, logPath string, args ...string) error {
+	log, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create command log: %w", err)
+	}
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off")
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
+	cmd.Stdout, cmd.Stderr = log, log
 	runErr, stopErr := procgroup.Run(cmd, syscall.SIGTERM, stopGrace, stopTimeout)
 	if stopErr != nil {
-		return out.Bytes(), &stuckError{err: stopErr}
+		return errors.Join(&stuckError{err: stopErr}, log.Close())
 	}
-	return out.Bytes(), runErr
+	return errors.Join(runErr, log.Close())
 }
 
 // ValidVersion reports whether v is an exact module version: a canonical
@@ -199,7 +208,7 @@ func ValidVersion(v string) bool {
 
 // Error describes the failed command and the end of its output.
 func (e *StepError) Error() string {
-	return fmt.Sprintf("%s (in %s) failed: %v\n%s", strings.Join(e.Args, " "), e.Dir, e.Err, e.Output)
+	return fmt.Sprintf("%s (in module %s) failed: %v; full output in %s\n%s", strings.Join(e.Args, " "), e.Module, e.Err, e.Log, e.Tail)
 }
 
 // Unwrap returns the command's error.
@@ -224,8 +233,8 @@ func newData(o Options) (data, error) {
 		return data{}, fmt.Errorf("-module %q: %w", o.Module, err)
 	}
 	name := path.Base(o.Module)
-	if !serviceName.MatchString(name) || goKeywords[name] {
-		return data{}, fmt.Errorf("-module %q must end in a service name of lowercase letters and digits starting with a letter, such as example.com/shop", o.Module)
+	if !lowerAlnum.MatchString(name) || !token.IsIdentifier(name) || name == "main" {
+		return data{}, fmt.Errorf("-module %q must end in a service name of lowercase letters and digits starting with a letter, other than a Go keyword or main, such as example.com/shop", o.Module)
 	}
 	if !ValidVersion(o.SurlaVersion) {
 		return data{}, fmt.Errorf("Surla version %q is not an exact module version such as v0.0.0-20261031211028-8ec6e0997e6b", o.SurlaVersion)
@@ -255,26 +264,13 @@ func newData(o Options) (data, error) {
 	return d, nil
 }
 
-// checkEmpty returns an error unless dir is missing or an empty directory.
-func checkEmpty(dir string) error {
-	entries, err := os.ReadDir(dir)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		return nil
-	case err != nil:
-		return fmt.Errorf("read %s: %w", dir, err)
-	case len(entries) > 0:
-		return fmt.Errorf("%s is not empty; surla init only creates new projects", dir)
-	}
-	return nil
-}
-
 // build creates both modules under root. For each module it writes go.mod and
 // design/, resolves the design's dependencies, generates code with goa gen,
-// writes the remaining files, and tidies again. The evaluator module then
-// pins the exact Surla version before its final tidy, so tidy cannot pick a
-// different one.
-func build(ctx context.Context, root string, d data, run Runner) error {
+// writes the remaining files, tidies again and vets. The evaluator module
+// pins the exact Surla version with go get before goa gen: the final tidy then
+// keeps that version instead of picking another, and the code is generated
+// with whatever Goa versions it requires.
+func build(ctx context.Context, root, logs string, d data, run Runner) error {
 	for _, m := range []moduleStep{
 		{dir: ".", templates: "templates/candidate", path: d.Module},
 		{dir: "eval", templates: "templates/eval", path: d.Module + "/eval", requireSurla: true},
@@ -283,41 +279,60 @@ func build(ctx context.Context, root string, d data, run Runner) error {
 		if err := render(dir, m.templates, d, isDesignFile); err != nil {
 			return err
 		}
-		steps := [][]string{
-			{"go", "mod", "tidy"},
-			{"go", "run", "goa.design/goa/v3/cmd/goa", "gen", m.path + "/design"},
+		steps := [][]string{{"go", "mod", "tidy"}}
+		if m.requireSurla {
+			// Pinning Surla first may raise Goa or Goa-AI to what this Surla
+			// version requires, so goa gen runs once with the final versions.
+			steps = append(steps, []string{"go", "get", surlaModule + "@" + d.SurlaVersion})
 		}
-		if err := runAll(ctx, dir, steps, run); err != nil {
+		steps = append(steps, []string{"go", "run", "goa.design/goa/v3/cmd/goa", "gen", m.path + "/design"})
+		if err := runAll(ctx, dir, m.dir, logs, steps, run); err != nil {
 			return err
 		}
 		if err := render(dir, m.templates, d, func(p string) bool { return !isDesignFile(p) }); err != nil {
 			return err
 		}
-		steps = nil
-		if m.requireSurla {
-			steps = append(steps, []string{"go", "get", surlaModule + "@" + d.SurlaVersion})
-		}
-		steps = append(steps, []string{"go", "mod", "tidy"}, []string{"go", "vet", "./..."})
-		if err := runAll(ctx, dir, steps, run); err != nil {
+		steps = [][]string{{"go", "mod", "tidy"}, {"go", "vet", "./..."}}
+		if err := runAll(ctx, dir, m.dir, logs, steps, run); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// runAll runs each command in dir in order and stops at the first failure.
-func runAll(ctx context.Context, dir string, steps [][]string, run Runner) error {
+// runAll runs each command in dir in order, each logging to its own new file
+// in logs, and stops at the first failure.
+func runAll(ctx context.Context, dir, moduleDir, logs string, steps [][]string, run Runner) error {
 	for _, args := range steps {
-		out, err := run(ctx, dir, args...)
+		log, err := newLogPath(logs, moduleDir, args)
 		if err != nil {
+			return err
+		}
+		if err := run(ctx, dir, log, args...); err != nil {
 			var stuck *stuckError
 			if errors.As(err, &stuck) {
 				return err
 			}
-			return &StepError{Args: args, Dir: dir, Output: excerpt(out), Err: err}
+			tail, tailErr := readTail(log)
+			return errors.Join(&StepError{Args: args, Module: moduleDir, Log: log, Tail: tail, Err: err}, tailErr)
 		}
 	}
 	return nil
+}
+
+// newLogPath returns a new, unused file path in logs for one command, named
+// after its module and the command's verb, such as eval-get-123.log.
+func newLogPath(logs, moduleDir string, args []string) (string, error) {
+	module := moduleDir
+	if module == "." {
+		module = "root"
+	}
+	// Every step is "go <verb> ...", so the verb names the step.
+	f, err := os.CreateTemp(logs, module+"-"+args[1]+"-*.log")
+	if err != nil {
+		return "", fmt.Errorf("create command log: %w", err)
+	}
+	return f.Name(), errors.Join(f.Close(), os.Remove(f.Name()))
 }
 
 // isDesignFile reports whether a template path is written before goa gen:
@@ -350,6 +365,14 @@ func render(dir, root string, d data, keep func(string) bool) error {
 			return fmt.Errorf("render template %s: %w", rel, err)
 		}
 		out := strings.ReplaceAll(strings.TrimSuffix(rel, ".tmpl"), "_name_", d.Name)
+		content := b.Bytes()
+		if strings.HasSuffix(out, ".go") {
+			// Import order depends on the service name, so the rendered
+			// source is formatted rather than the template.
+			if content, err = format.Source(content); err != nil {
+				return fmt.Errorf("format %s: %w", out, err)
+			}
+		}
 		if out == "gitignore" {
 			out = ".gitignore"
 		}
@@ -357,14 +380,32 @@ func render(dir, root string, d data, keep func(string) bool) error {
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
 		}
-		return os.WriteFile(dst, b.Bytes(), 0o644)
+		return os.WriteFile(dst, content, 0o644)
 	})
 }
 
-// excerpt returns at most the last maxOutputExcerpt bytes of out.
-func excerpt(out []byte) string {
-	if len(out) <= maxOutputExcerpt {
-		return string(out)
+// readTail returns at most the last maxTail bytes of the file at path, which
+// its command has finished writing.
+func readTail(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("read command log: %w", err)
 	}
-	return "...\n" + string(out[len(out)-maxOutputExcerpt:])
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return "", fmt.Errorf("read command log: %w", err)
+	}
+	prefix := ""
+	if info.Size() > maxTail {
+		if _, err := f.Seek(-maxTail, io.SeekEnd); err != nil {
+			return "", fmt.Errorf("read command log: %w", err)
+		}
+		prefix = "...\n"
+	}
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return "", fmt.Errorf("read command log: %w", err)
+	}
+	return prefix + string(b), nil
 }

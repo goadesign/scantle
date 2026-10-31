@@ -181,6 +181,17 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 	}
 }
 
+func TestShellQuoteMakesOneShellWord(t *testing.T) {
+	for in, want := range map[string]string{
+		"./shop":      `'./shop'`,
+		"my dir":      `'my dir'`,
+		"it's":        `'it'\''s'`,
+		"$(rm -rf /)": `'$(rm -rf /)'`,
+	} {
+		assert.Equal(t, want, shellQuote(in), in)
+	}
+}
+
 func TestResolveAuthTokenPrefersTheFlag(t *testing.T) {
 	cases := []struct {
 		name, flag, env, want string

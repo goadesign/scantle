@@ -166,7 +166,9 @@ func check(name string, passed bool, format string, args ...any) eval.Check {
 	return eval.Check{Name: name, Diagnostic: fmt.Sprintf(format, args...)}
 }
 
-// freePort returns a loopback TCP port that was free a moment ago.
+// freePort returns a loopback TCP port that was free a moment ago. Another
+// process can take it before the [[.Name]] listens; the scenario then fails
+// with the [[.Name]]'s log rather than testing the wrong server.
 func freePort() (int, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -14,8 +14,8 @@ import (
 	storageinmem "goa.design/goa-ai/runtime/agent/storage/inmem"
 
 	gen[[.Name]] "[[.Module]]/gen/[[.Name]]"
-	genhelper "[[.Module]]/gen/[[.Name]]/agents/helper"
-	genhelpercatalog "[[.Module]]/gen/[[.Name]]/agents/helper/catalog"
+	gen[[.Name]]helper "[[.Module]]/gen/[[.Name]]/agents/helper"
+	gen[[.Name]]helpercatalog "[[.Module]]/gen/[[.Name]]/agents/helper/catalog"
 	"[[.Module]]/internal/helper"
 )
 
@@ -51,13 +51,13 @@ func (s *Service) Ask(ctx context.Context, p *gen[[.Name]].AskPayload) (*gen[[.N
 	if err := rt.RegisterModel(modelID, s.model); err != nil {
 		return nil, fmt.Errorf("register model: %w", err)
 	}
-	if err := genhelper.RegisterHelperAgent(ctx, rt, genhelper.HelperAgentConfig{Planner: helper.NewPlanner(modelID)}); err != nil {
+	if err := gen[[.Name]]helper.RegisterHelperAgent(ctx, rt, gen[[.Name]]helper.HelperAgentConfig{Planner: helper.NewPlanner(modelID)}); err != nil {
 		return nil, fmt.Errorf("register helper agent: %w", err)
 	}
 	endpoints := gen[[.Name]].NewEndpoints(s)
 	tools := gen[[.Name]].NewClient(endpoints.Ask, endpoints.Price)
-	if err := genhelper.RegisterUsedToolsets(ctx, rt,
-		genhelper.WithCatalogExecutor(genhelpercatalog.NewHelperCatalogExec(genhelpercatalog.WithClient(tools))),
+	if err := gen[[.Name]]helper.RegisterUsedToolsets(ctx, rt,
+		gen[[.Name]]helper.WithCatalogExecutor(gen[[.Name]]helpercatalog.NewHelperCatalogExec(gen[[.Name]]helpercatalog.WithClient(tools))),
 	); err != nil {
 		return nil, fmt.Errorf("register catalog tools: %w", err)
 	}
@@ -68,7 +68,7 @@ func (s *Service) Ask(ctx context.Context, p *gen[[.Name]].AskPayload) (*gen[[.N
 	if _, err := store.CreateSession(ctx, sessionID, time.Now().UTC()); err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
 	}
-	out, err := genhelper.NewClient(rt).Run(ctx, sessionID, []*model.Message{{
+	out, err := gen[[.Name]]helper.NewClient(rt).Run(ctx, sessionID, []*model.Message{{
 		Role:  model.ConversationRoleUser,
 		Parts: []model.Part{model.TextPart{Text: p.Question}},
 	}}, runtime.WithRunID("run-"+rand.Text()))

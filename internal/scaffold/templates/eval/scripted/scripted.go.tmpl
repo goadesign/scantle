@@ -13,6 +13,7 @@
 package scripted
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -113,22 +114,15 @@ func (m *Model) Stream(_ context.Context, req *model.Request) (model.Streamer, e
 	if err != nil {
 		return nil, fmt.Errorf("encode tool result: %w", err)
 	}
-	var price struct {
-		Item  string `json:"item"`
-		Known bool   `json:"known"`
-		Cents int    `json:"cents"`
-	}
-	if err := json.Unmarshal(content, &price); err != nil {
-		return nil, fmt.Errorf("decode %s result: %w", toolName, err)
-	}
-	if price.Item != item {
-		return nil, fmt.Errorf("scripted model: %s returned %q for a call about %q", toolName, price.Item, item)
+	known, cents, err := decodePrice(content, item)
+	if err != nil {
+		return nil, err
 	}
 	answer := fmt.Sprintf("[scripted] I could not find a price for %s.", item)
-	if price.Known {
-		answer = fmt.Sprintf("[scripted] %s costs $%d.%02d.", strings.ToUpper(item[:1])+item[1:], price.Cents/100, price.Cents%100)
+	if known {
+		answer = fmt.Sprintf("[scripted] %s costs $%d.%02d.", strings.ToUpper(item[:1])+item[1:], cents/100, cents%100)
 	}
-	m.record(Exchange{Item: item, CallID: callID, Result: string(content), Known: price.Known, Answer: answer})
+	m.record(Exchange{Item: item, CallID: callID, Result: string(content), Known: known, Answer: answer})
 	return reply(&answer, nil), nil
 }
 
@@ -137,6 +131,31 @@ func (m *Model) record(e Exchange) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.exchanges = append(m.exchanges, e)
+}
+
+// decodePrice decodes a lookup_price result for item and enforces its
+// contract: item, known and cents are all present and nothing else is, the
+// item is the one asked about, and cents is 0 when known is false.
+func decodePrice(content []byte, item string) (known bool, cents int, err error) {
+	var price struct {
+		Item  *string `json:"item"`
+		Known *bool   `json:"known"`
+		Cents *int    `json:"cents"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(content))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&price); err != nil {
+		return false, 0, fmt.Errorf("decode %s result %s: %w", toolName, content, err)
+	}
+	switch {
+	case price.Item == nil || price.Known == nil || price.Cents == nil:
+		return false, 0, fmt.Errorf("scripted model: %s result %s lacks item, known or cents", toolName, content)
+	case *price.Item != item:
+		return false, 0, fmt.Errorf("scripted model: %s returned %q for a call about %q", toolName, *price.Item, item)
+	case !*price.Known && *price.Cents != 0:
+		return false, 0, fmt.Errorf("scripted model: %s result %s has cents for an unknown item", toolName, content)
+	}
+	return *price.Known, *price.Cents, nil
 }
 
 // reply builds a one-message stream holding the answer or the tool call.

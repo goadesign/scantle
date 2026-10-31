@@ -17,6 +17,16 @@ import (
 // published Surla version (it needs the network and, for the sandbox, macOS),
 // builds the service and its evaluator suite, and runs the suite against the
 // service: both scenarios must pass.
+func TestInitBuildsForServiceNamesThatShadowTemplateNames(t *testing.T) {
+	for _, name := range []string{"helper", "service", "catalog"} {
+		t.Run(name, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), name)
+			_, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/" + name, SurlaVersion: published}, RunCommand)
+			require.NoError(t, err, "Init runs go vet on both modules")
+		})
+	}
+}
+
 func TestInitCreatesAProjectWhoseSuitePasses(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "shop")
 	name, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/shop", SurlaVersion: published}, RunCommand)
@@ -29,6 +39,11 @@ func TestInitCreatesAProjectWhoseSuitePasses(t *testing.T) {
 		b, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(b))
 	}
+	test := exec.CommandContext(t.Context(), "go", "test", "./...")
+	test.Dir = filepath.Join(dir, "eval")
+	test.Env = append(test.Environ(), "GOWORK=off")
+	testOut, err := test.CombinedOutput()
+	require.NoError(t, err, "the generated evaluator's own tests pass:\n%s", testOut)
 	build(dir, name, "./cmd/"+name)
 	build(filepath.Join(dir, "eval"), name+"-evals", "./cmd/"+name+"-evals")
 
