@@ -66,10 +66,28 @@ Instead of reading a 2,000-line diff blindly, Surla separates fast prompt tuning
 
 ## Try It in 60 Seconds
 
-Start the Surla control plane, connect your coding assistant, and watch it evolve or verify the included [`examples/orders`](examples/orders/README.md) reference platform:
+### 1. Inspect & Diff Any Goa-AI Design Locally (`0` API Keys Needed)
+
+Before configuring an LLM key or starting a server, run Surla's sandboxed Goa/Goa-AI compiler directly on the included [`examples/orders`](examples/orders/README.md) reference platform:
 
 ```bash
-# 1. Start the Surla MCP & HTTP control plane with CP1 model analysis and multi-family swarm profiles
+# Compile examples/orders/design/*.go in an OS sandbox at 0 LLM tokens and print
+# its C4 containers, boundary edges, agent policies, and tool guardrails:
+go run ./cmd/surla preview -dir examples/orders
+
+# Compare two Goa design modules structurally at 0 LLM tokens:
+go run ./cmd/surla diff --old-dir examples/orders --new-dir examples/orders
+
+# List all commands and flags:
+go run ./cmd/surla help
+```
+
+### 2. Connect Your Coding Agent to the Surla Control Plane (`surla serve`)
+
+Start the Surla control plane, connect your coding assistant over MCP, and walk a feature change through Surla's five checkpoints (**CP1** Confirm Intent → **CP2** Preview Architecture → **CP3** Fast Draft & Sandbox → **CP4** Isolated Verification → **CP5** Promotion Check):
+
+```bash
+# Start the Surla MCP & HTTP control plane with CP1 model analysis and multi-family swarm profiles
 export SURLA_AUTH_TOKEN="dev-secret-token"
 export ANTHROPIC_API_KEY="sk-ant-..."
 go run ./cmd/surla serve \
@@ -80,13 +98,13 @@ go run ./cmd/surla serve \
   -swarm-profiles ./examples/orders/swarm-profiles.example.json
 ```
 
-Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` setup](docs/REFERENCE.md#quickstart--mcp-configuration) and [`-swarm-profiles` configuration](docs/REFERENCE.md#configure-the-proposed-swarm-roster); [`examples/orders/swarm-profiles.example.json`](examples/orders/swarm-profiles.example.json) is an illustrative operator-edited profile file where `"authenticated": true` is an operator assertion rather than a live credential check, and setting `ANTHROPIC_API_KEY` for CP1 analysis does not authenticate the OpenAI or Google coding-agent CLIs) and prompt your agent:
+Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (see [`.mcp.json` setup](docs/REFERENCE.md#quickstart--mcp-configuration), [Terminology at a Glance](docs/REFERENCE.md#terminology-at-a-glance), and [`-swarm-profiles` configuration](docs/REFERENCE.md#configure-the-proposed-swarm-roster); [`examples/orders/swarm-profiles.example.json`](examples/orders/swarm-profiles.example.json) is an illustrative operator-edited profile file where `"authenticated": true` is an operator assertion rather than a live credential check, and setting `ANTHROPIC_API_KEY` for CP1 analysis does not authenticate the OpenAI or Google coding-agent CLIs) and prompt your agent:
 
 > *"Using Surla, propose a change to `examples/orders` so VIP customers get instant store-credit refunds up to \$150, then preview the compiled C4 architecture and Chorus swarm plan for builder scope `orders` (`internal/**`)."*
 
-Your agent will create the Change Card (`propose_change`, calling `confirm_intent` to answer open ambiguity questions or refine confirmed answers and examples), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and a proposed cross-family team roster (`@architect`, `@builder-orders`, `@eval-author`, `@reviewer`). The preview proposes the team; it does not launch agents.
+Your agent will create the **Change Card** (`propose_change`, calling `confirm_intent` to answer open ambiguity questions or refine confirmed answers and examples, which locks a SHA-256 `request_revision` fingerprint), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and a proposed cross-family team roster (`@architect`, `@builder-orders`, `@eval-author`, `@reviewer`). The preview proposes the team; it does not launch agents.
 
-To run the full independent verification suite (and compare the full operator report with the builder-redacted `-builder-view` report where `"holdout"` scenarios are redacted to `"id": "holdout-1"`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
+To run the full independent verification suite (`surla verify` and `surla approve`) and compare the full operator report with the builder-redacted `-builder-view` report (where unseen `"holdout"` acceptance tests are redacted to `"id": "holdout-1"`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
 
 ---
 

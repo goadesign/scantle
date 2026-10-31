@@ -4,6 +4,19 @@
 
 ---
 
+## Terminology at a Glance
+
+| Term | Plain-English Meaning |
+| :--- | :--- |
+| **`CP1` – `CP5`** | Surla's five verification checkpoints: **CP1** Confirm Intent (`propose_change`, `confirm_intent`), **CP2** Preview Compiled Architecture & Swarm (`preview_architecture`, or local `surla preview`), **CP3** Fast Draft & Live Sandbox (`draft_override`), **CP4** Isolated Sandboxed Verification (`surla verify`), and **CP5** Promotion Check (`surla approve`, `approve_merge`). |
+| **`Change Card`** | The versioned change plan (`ChangeCardResult`) created at `CP1`, holding concrete input/outcome examples, open domain ambiguity questions, confirmed answers, preserved contract behaviors, and optional `CP5` approval metadata. |
+| **`request_revision`** | The SHA-256 hex digest of a Change Card's canonical content. `preview_architecture`, `surla verify`, `surla approve`, and `approve_merge` bind to `request_revision` so changing the agreed examples or answers automatically invalidates stale previews, reports, and approvals. When running standalone `surla verify` and `surla approve` on the CLI without a control-plane Change Card, pass any explicit revision string (such as a commit or label) consistently to both commands. |
+| **`holdout`** | An unseen acceptance scenario (tagged `"holdout"` in the evaluator suite) whose name, inputs, checks, and logs are redacted to `"id": "holdout-N"` in `surla verify -builder-view` (`Report.ForBuilders()`) so coding agents cannot hardcode around the test cases. |
+| **`input_binding`** | Per-field classification on a tool contract (`server_injected` vs. `model_supplied`). Fields declared with `Inject(...)` in Goa-AI are supplied by trusted server code and omitted from the LLM-visible JSON Schema. |
+| **`TargetUpdater` / `PromotionTarget`** | Optional Go interfaces in `controlplane.Options` bound when embedding the Surla control plane inside a custom host (`TargetUpdater` applies in-memory `CP3` prompt overrides; `PromotionTarget` loads `CP4` verification reports and measured promotion inputs for `approve_merge`). Standalone `surla serve` binds neither interface; use CLI `surla approve` for standalone report verification. |
+
+---
+
 ## Quickstart & MCP Configuration
 
 ### Prerequisites
@@ -130,11 +143,17 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 
 ## CLI Reference
 
-### `surla serve` *(default)*
-Starts the Surla HTTP and MCP JSON-RPC control-plane server protected by bearer-token authentication.
+Running `surla`, `surla help`, `surla -h`, or `surla --help` prints top-level usage to `stdout` and exits `0`. Running `surla help <command>` or `surla <command> -h` prints that subcommand's flags to `stderr` and exits `0`.
+
+### `surla preview`
+Reads a Go design module on disk into a symlink-safe snapshot (`go.mod`, `go.sum`, and non-test `.go` files; run `go mod tidy` first if `go.sum` is missing), evaluates it inside the sandboxed Goa/Goa-AI/Model compiler (`designeval.Evaluate`) at **0 LLM tokens**, and prints the indented JSON `designeval.Result` (`system_name`, `declarations`, C4 `containers` and `edges`, `agent_policies`, and `tools`) to `stdout`. Needs no running server, no Change Card, and no LLM API key.
+- `-dir <path>` — Root directory of the design module holding `go.mod`, `go.sum`, and `design/` (default `.`).
+
+### `surla serve`
+Starts the Surla HTTP and MCP JSON-RPC control-plane server protected by bearer-token authentication. Once the listener is bound, `surla serve` prints a startup summary to `stderr` showing the bound HTTP URL, the MCP endpoint (`http://<addr>/mcp`), and whether `propose_change` or swarm plans are off (the bearer token is never printed in startup logs or `-h` defaults).
 - `-addr <host:port>` — Listen address (default `127.0.0.1:8090`).
 - `-principal <id>` — Authenticated operator principal ID *(required)*.
-- `-auth-token <token>` — Bearer token required on HTTP and MCP requests (or `$SURLA_AUTH_TOKEN`, *required*).
+- `-auth-token <token>` — Bearer token required on HTTP and MCP requests (default: `$SURLA_AUTH_TOKEN`, *required*).
 - `-model-gateway-addr <host:port>` — Optional model gateway for CP1 analysis over plaintext gRPC. The gateway chooses the model; cannot be combined with `-model-provider` or `-model-name`.
 - `-model-provider <anthropic|openai>` — Optional direct provider for CP1 analysis. Requires `-model-name` and the matching `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` environment variable. Provider names must match exactly.
 - `-model-name <model>` — Model ID for direct provider mode; required with `-model-provider` and rejected in gateway mode.
@@ -143,7 +162,7 @@ Starts the Surla HTTP and MCP JSON-RPC control-plane server protected by bearer-
 Model and swarm-profile flags are independent. Incomplete or mixed model options stop startup with an error. A supplied profiles file must contain one JSON array: unknown fields, trailing JSON values, duplicate profile IDs, empty required metadata, and unknown capabilities stop startup. Omitted profiles leave the proposed roster unconfigured.
 
 ### `surla diff`
-Reads two Go design modules into symlink-safe snapshots, evaluates both inside the sandboxed Goa/Goa-AI compiler at their own `go.mod` dependency versions, and prints the JSON `DiffResult` to `stdout`.
+Reads two Go design modules into symlink-safe snapshots (`go.mod`, `go.sum`, and non-test `.go` files), evaluates both inside the sandboxed Goa/Goa-AI compiler at their own `go.mod` dependency versions, and prints the JSON `DiffResult` to `stdout`.
 - `--old-dir <path>` — Root directory of the previous design module *(required)*.
 - `--new-dir <path>` — Root directory of the candidate design module *(required)*.
 
@@ -151,16 +170,49 @@ Reads two Go design modules into symlink-safe snapshots, evaluates both inside t
 Clones the committed candidate and evaluator suite into an isolated work directory, builds the candidate binaries (`WorkDir/candidate-bin/<name>`) and suite runner (`WorkDir/suite-bin/suite`) inside `verify/candidate`'s macOS `sandbox-exec` jail, runs the suite, writes the canonical `verify.Report` JSON to `<report-dir>/<digest>.json`, and prints the JSON report to `stdout` (setup or build errors exit non-zero without printing report JSON, while an assembled report with a failing scenario is written and printed before exiting non-zero).
 - `-candidate-repo <path|url>` — Git repository holding the candidate *(required)*.
 - `-candidate-commit <sha>` — Full commit ID of the candidate to build *(required)*.
-- `-candidate-module <dir>` — Candidate Go module directory relative to `-candidate-repo` *(required)*.
+- `-candidate-module <dir>` — Candidate Go module directory relative to `-candidate-repo` (default `.`).
 - `-binary <name=package>` — Candidate binary artifact name and relative package path (`.` or a path beginning with `./`, such as `./cmd/orders`) inside `-candidate-module` (repeatable, at least one *required*; `<name>` must be a single path element).
 - `-suite-repo <path|url>` — Git repository holding the evaluator suite *(required)*.
 - `-suite-commit <sha>` — Full commit ID of the evaluator suite *(required)*.
-- `-suite-module <dir>` — Suite Go module directory relative to `-suite-repo` *(required)*.
+- `-suite-module <dir>` — Suite Go module directory relative to `-suite-repo` (default `.`).
 - `-suite-command <package>` — Suite command relative package path (`.` or a path beginning with `./`, such as `./cmd/orders_acceptance-evals`) inside `-suite-module` *(required)*.
 - `-request-revision <digest>` — Confirmed `request_revision` digest bound into the verification report *(required)*.
 - `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must be missing or empty at run start and must not be shared with or readable by builder agents *(required)*.
 - `-report-dir <path>` — Directory that receives the full canonical report as `<digest>.json`; must not be readable by builder agents when holdout privacy is required *(required)*.
 - `-builder-view` — Optional boolean flag; when set, `stdout` prints `Report.ForBuilders()`, which redacts `"holdout"` scenarios to `"id": "holdout-N"` with scenario names, inputs, declarations, checks, and failure logs stripped (the full unredacted report is still written to `-report-dir`).
+
+#### Evaluator Suite Command Contract (`-suite-command`)
+
+`surla verify` compiles the Go package named by `-suite-command` inside the macOS build sandbox and invokes the resulting executable twice:
+
+1. **Suite discovery (`--describe`):**
+   - `surla verify` runs `<suite-bin> --describe` with no `--artifact` flags.
+   - The command must write a single JSON object (`verify.Suite`) to `stdout` and exit `0`:
+     ```json
+     {
+       "id": "orders_acceptance",
+       "environment": "sim",
+       "scenarios": [
+         {"id": "store_credit_within_limit", "tags": ["repair"]},
+         {"id": "other_customers_order_refused", "tags": ["holdout"]}
+       ]
+     }
+     ```
+   - Scenarios whose `tags` contain `"holdout"` are marked `Holdout: true` in the assembled `verify.Report` and redacted in `Report.ForBuilders()` (`-builder-view`).
+2. **Suite execution (`--artifact <name>=<path>`):**
+   - `surla verify` runs `<suite-bin> --artifact <name>=<path> ...` passing one `--artifact` flag for every `-binary <name>=<package>` bound in the verification plan.
+   - The suite pins each candidate binary into a private read-only store with [`candidate.Pin(store, path)`](../verify/candidate/candidate.go), starts candidate processes inside the runtime Seatbelt jail with [`candidate.Exec(ctx, pinned, spec)`](../verify/candidate/candidate.go), and attaches [`pinned.Evidence("<name>")`](../verify/candidate/candidate.go) to every scenario's `eval.Result.Artifacts`:
+     ```go
+     pinned, err := candidate.Pin(store, artifactPaths["orders"])
+     // ...
+     res.Artifacts = append(res.Artifacts, pinned.Evidence("orders"))
+     ```
+     `pinned.Evidence("orders")` produces `eval.Artifact{Name: "candidate:orders", URI: "sha256:<digest>"}`, which `surla verify` checks against the SHA-256 digest it measured when building `orders`. A scenario that omits a bound binary's evidence record or reports a different digest fails report assembly.
+   - The suite writes `goa.design/goa-ai/eval.Report` JSON to `stdout` and exits with:
+     - **`0`** when all scenarios passed,
+     - **`1`** when the suite ran and wrote a valid `eval.Report` JSON to `stdout` with one or more failed scenarios (`!report.Passed`), or
+     - **`2` (or any other code)** when the suite could not run (invalid flags, harness setup failure, or crash before producing a report).
+   - See [`examples/orders-eval/cmd/orders_acceptance-evals/main.go`](../examples/orders-eval/cmd/orders_acceptance-evals/main.go) and [`examples/orders-eval/acceptance/hooks.go`](../examples/orders-eval/acceptance/hooks.go) for the complete reference implementation.
 
 ### `surla approve`
 Decodes a saved full `verify.Report` JSON file with `verify.DecodeReport`, checks it against explicit promotion flags with `verify.Approve`, and prints an indented JSON approval summary (`report_digest`, `binding`, `counts`) to `stdout` (exiting `0` when the report passed and matches every flag, or exiting `1` without stdout output if any flag is missing or the report is stale, failed, or unreadable). `surla approve` validates the report file only; it does not contact a control plane, record a Change Card approval, or merge/deploy.
@@ -217,7 +269,7 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   └── design.go                 # Surla Goa & Goa-AI MCP 1.0.0 DSL contract
 ├── cmd/
 │   └── surla/
-│       └── main.go               # CLI entrypoint (`surla serve`, `surla diff`, `surla verify`, and `surla approve`)
+│       └── main.go               # CLI entrypoint (`surla serve`, `surla preview`, `surla diff`, `surla verify`, and `surla approve`)
 ├── docs/
 │   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & independent verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview
