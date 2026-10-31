@@ -60,6 +60,21 @@ type DraftOverrideRequestBody struct {
 	NewContent *string `form:"new_content,omitempty" json:"new_content,omitempty" xml:"new_content,omitempty"`
 }
 
+// ApproveMergeRequestBody is the type of the "surla" service "approve_merge"
+// endpoint HTTP request body.
+type ApproveMergeRequestBody struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit *string `form:"candidate_commit,omitempty" json:"candidate_commit,omitempty" xml:"candidate_commit,omitempty"`
+	// SHA-256 digest of the CP4 verification report written by surla verify (64
+	// lowercase hex characters).
+	ReportDigest *string `form:"report_digest,omitempty" json:"report_digest,omitempty" xml:"report_digest,omitempty"`
+}
+
 // DiffRequestBody is the type of the "surla" service "diff" endpoint HTTP
 // request body.
 type DiffRequestBody struct {
@@ -96,6 +111,9 @@ type ProposeChangeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // ConfirmIntentResponseBody is the type of the "surla" service
@@ -125,6 +143,9 @@ type ConfirmIntentResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // GetChangeResponseBody is the type of the "surla" service "get_change"
@@ -154,6 +175,9 @@ type GetChangeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // PreviewArchitectureResponseBody is the type of the "surla" service
@@ -193,6 +217,38 @@ type DraftOverrideResponseBody struct {
 	PromptVersion *string `form:"prompt_version,omitempty" json:"prompt_version,omitempty" xml:"prompt_version,omitempty"`
 	// Operator-facing status explanation.
 	Message string `form:"message" json:"message" xml:"message"`
+}
+
+// ApproveMergeResponseBody is the type of the "surla" service "approve_merge"
+// endpoint HTTP response body.
+type ApproveMergeResponseBody struct {
+	// Change identifier.
+	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Checkpoint status (needs_confirmation or confirmed).
+	Status string `form:"status" json:"status" xml:"status"`
+	// Original operator feature request.
+	Prompt string `form:"prompt" json:"prompt" xml:"prompt"`
+	// Plain-English summary of requested behavior.
+	Summary string `form:"summary" json:"summary" xml:"summary"`
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
+	Ambiguities []*AmbiguityQuestionResponseBody `form:"ambiguities,omitempty" json:"ambiguities,omitempty" xml:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
+	// Concrete examples mapped to evaluator checks.
+	Examples []*ExampleItemResponseBody `form:"examples" json:"examples" xml:"examples"`
+	// Existing contract invariants preserved by this change.
+	PreservedBehaviors []string `form:"preserved_behaviors" json:"preserved_behaviors" xml:"preserved_behaviors"`
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
 // DiffResponseBody is the type of the "surla" service "diff" endpoint HTTP
@@ -249,6 +305,29 @@ type UICompositionItemResponseBody struct {
 	Program string `form:"program" json:"program" xml:"program"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision string `form:"composed_for_revision" json:"composed_for_revision" xml:"composed_for_revision"`
+}
+
+// ApprovalItemResponseBody is used to define fields on response body types.
+type ApprovalItemResponseBody struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy string `form:"approved_by" json:"approved_by" xml:"approved_by"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest string `form:"report_digest" json:"report_digest" xml:"report_digest"`
+	// Candidate commit the report was checked against.
+	CandidateCommit string `form:"candidate_commit" json:"candidate_commit" xml:"candidate_commit"`
+	// Evaluator suite the promotion target requires.
+	SuiteID string `form:"suite_id" json:"suite_id" xml:"suite_id"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit string `form:"suite_commit" json:"suite_commit" xml:"suite_commit"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment string `form:"environment" json:"environment" xml:"environment"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `form:"artifacts" json:"artifacts" xml:"artifacts"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount int `form:"scenario_count" json:"scenario_count" xml:"scenario_count"`
 }
 
 // C4ContainerItemResponseBody is used to define fields on response body types.
@@ -469,6 +548,9 @@ func NewProposeChangeResponseBody(res *surla.ChangeCardResult) *ProposeChangeRes
 	if res.UIComposition != nil {
 		body.UIComposition = marshalSurlaUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
 	}
+	if res.Approval != nil {
+		body.Approval = marshalSurlaApprovalItemToApprovalItemResponseBody(res.Approval)
+	}
 	return body
 }
 
@@ -524,6 +606,9 @@ func NewConfirmIntentResponseBody(res *surla.ChangeCardResult) *ConfirmIntentRes
 	if res.UIComposition != nil {
 		body.UIComposition = marshalSurlaUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
 	}
+	if res.Approval != nil {
+		body.Approval = marshalSurlaApprovalItemToApprovalItemResponseBody(res.Approval)
+	}
 	return body
 }
 
@@ -578,6 +663,9 @@ func NewGetChangeResponseBody(res *surla.ChangeCardResult) *GetChangeResponseBod
 	}
 	if res.UIComposition != nil {
 		body.UIComposition = marshalSurlaUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
+	}
+	if res.Approval != nil {
+		body.Approval = marshalSurlaApprovalItemToApprovalItemResponseBody(res.Approval)
 	}
 	return body
 }
@@ -654,6 +742,64 @@ func NewDraftOverrideResponseBody(res *surla.DraftOverrideResult) *DraftOverride
 		RequiresRebuild: res.RequiresRebuild,
 		PromptVersion:   res.PromptVersion,
 		Message:         res.Message,
+	}
+	return body
+}
+
+// NewApproveMergeResponseBody builds the HTTP response body from the result of
+// the "approve_merge" endpoint of the "surla" service.
+func NewApproveMergeResponseBody(res *surla.ChangeCardResult) *ApproveMergeResponseBody {
+	body := &ApproveMergeResponseBody{
+		ChangeID:        res.ChangeID,
+		Status:          res.Status,
+		Prompt:          res.Prompt,
+		Summary:         res.Summary,
+		ConfirmedBy:     res.ConfirmedBy,
+		RequestRevision: res.RequestRevision,
+	}
+	if res.Ambiguities != nil {
+		body.Ambiguities = make([]*AmbiguityQuestionResponseBody, len(res.Ambiguities))
+		for i, val := range res.Ambiguities {
+			if val == nil {
+				body.Ambiguities[i] = nil
+				continue
+			}
+			body.Ambiguities[i] = marshalSurlaAmbiguityQuestionToAmbiguityQuestionResponseBody(val)
+		}
+	}
+	if res.Answers != nil {
+		body.Answers = make(map[string]string, len(res.Answers))
+		for key, val := range res.Answers {
+			tk := key
+			tv := val
+			body.Answers[tk] = tv
+		}
+	}
+	if res.Examples != nil {
+		body.Examples = make([]*ExampleItemResponseBody, len(res.Examples))
+		for i, val := range res.Examples {
+			if val == nil {
+				body.Examples[i] = nil
+				continue
+			}
+			body.Examples[i] = marshalSurlaExampleItemToExampleItemResponseBody(val)
+		}
+	} else {
+		body.Examples = []*ExampleItemResponseBody{}
+	}
+	if res.PreservedBehaviors != nil {
+		body.PreservedBehaviors = make([]string, len(res.PreservedBehaviors))
+		for i, val := range res.PreservedBehaviors {
+			body.PreservedBehaviors[i] = val
+		}
+	} else {
+		body.PreservedBehaviors = []string{}
+	}
+	if res.UIComposition != nil {
+		body.UIComposition = marshalSurlaUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
+	}
+	if res.Approval != nil {
+		body.Approval = marshalSurlaApprovalItemToApprovalItemResponseBody(res.Approval)
 	}
 	return body
 }
@@ -779,6 +925,18 @@ func NewDraftOverridePayload(body *DraftOverrideRequestBody) *surla.DraftOverrid
 	return v
 }
 
+// NewApproveMergePayload builds a surla service approve_merge endpoint payload.
+func NewApproveMergePayload(body *ApproveMergeRequestBody) *surla.ApproveMergePayload {
+	v := &surla.ApproveMergePayload{
+		ChangeID:        *body.ChangeID,
+		RequestRevision: *body.RequestRevision,
+		CandidateCommit: *body.CandidateCommit,
+		ReportDigest:    *body.ReportDigest,
+	}
+
+	return v
+}
+
 // NewDiffPayload builds a surla service diff endpoint payload.
 func NewDiffPayload(body *DiffRequestBody) *surla.DiffPayload {
 	v := &surla.DiffPayload{}
@@ -865,6 +1023,30 @@ func ValidateDraftOverrideRequestBody(body *DraftOverrideRequestBody) (err error
 		if !(*body.TargetKind == "prompt_template" || *body.TargetKind == "compiled_rule") {
 			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.target_kind", *body.TargetKind, []any{"prompt_template", "compiled_rule"}))
 		}
+	}
+	return
+}
+
+// ValidateApproveMergeRequestBody runs the validations defined on
+// ApproveMergeRequestBody
+func ValidateApproveMergeRequestBody(body *ApproveMergeRequestBody) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if body.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if body.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *body.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	}
+	if body.ReportDigest != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.report_digest", *body.ReportDigest, "^[0-9a-f]{64}$"))
 	}
 	return
 }

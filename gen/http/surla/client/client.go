@@ -45,6 +45,10 @@ type Client struct {
 	// draft_override endpoint.
 	DraftOverrideDoer goahttp.Doer
 
+	// ApproveMerge Doer is the HTTP client used to make requests to the
+	// approve_merge endpoint.
+	ApproveMergeDoer goahttp.Doer
+
 	// Diff Doer is the HTTP client used to make requests to the diff endpoint.
 	DiffDoer goahttp.Doer
 
@@ -75,6 +79,7 @@ func NewClient(
 		GetChangeDoer:           doer,
 		PreviewArchitectureDoer: doer,
 		DraftOverrideDoer:       doer,
+		ApproveMergeDoer:        doer,
 		DiffDoer:                doer,
 		RestoreResponseBody:     restoreBody,
 		scheme:                  scheme,
@@ -232,6 +237,30 @@ func (c *Client) DraftOverride() goa.Endpoint {
 		resp, err := c.DraftOverrideDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("surla", "draft_override", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// ApproveMerge returns an endpoint that makes HTTP requests to the surla
+// service approve_merge server.
+func (c *Client) ApproveMerge() goa.Endpoint {
+	var (
+		encodeRequest  = EncodeApproveMergeRequest(c.encoder)
+		decodeResponse = DecodeApproveMergeResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildApproveMergeRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		err = encodeRequest(req, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.ApproveMergeDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("surla", "approve_merge", err)
 		}
 		return decodeResponse(resp)
 	}

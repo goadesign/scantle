@@ -66,6 +66,16 @@ paths:
                                     Et porro exercitationem quia vel ab officia.: Earum et laudantium rerum hic.
                                     Laboriosam rerum.: Corporis veniam animi temporibus.
                                     Similique placeat nisi.: Quia atque ea.
+                                approval:
+                                    approved_by: Quia fuga rem fugiat quasi.
+                                    artifacts:
+                                        Aspernatur fugit quam.: Minus nesciunt.
+                                    candidate_commit: Explicabo necessitatibus esse cumque.
+                                    environment: Illum sequi ducimus mollitia esse.
+                                    report_digest: Harum rem sequi harum quis.
+                                    scenario_count: 675343994147794327
+                                    suite_commit: Voluptatem et placeat ullam quisquam.
+                                    suite_id: Accusantium quae ducimus.
                                 change_id: Architecto minima et tempora.
                                 confirmed_by: Necessitatibus laborum culpa accusantium quidem ut.
                                 examples:
@@ -97,6 +107,94 @@ paths:
                                 request_revision: Eum minus sequi repudiandae velit enim.
                                 status: needs_confirmation
                                 summary: Provident ullam voluptatum.
+                                ui_composition:
+                                    composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
+                                    program: Numquam provident excepturi et deleniti vel sed.
+    /changes/approve:
+        post:
+            tags:
+                - surla
+            summary: approve_merge surla
+            description: Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed.
+            operationId: surla#approve_merge
+            requestBody:
+                description: Request body for approve_merge.
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ApproveMergePayload'
+                        example:
+                            candidate_commit: 19c1186d5664535f9abd84c72ac71d573dae3f7b86f82ba373af45b656a347fc
+                            change_id: Dolores harum.
+                            report_digest: 1b46c7cb40afe8bdef74ed527c63d4203f5f889c2c0d15b83c3f882a3cb0a61b
+                            request_revision: Voluptates eveniet magnam ab et ipsam.
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ChangeCardResult'
+                            example:
+                                ambiguities:
+                                    - id: Incidunt quasi molestias itaque tempore animi.
+                                      options:
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
+                                      options:
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                answers:
+                                    Voluptatem ex.: Est ut ut error.
+                                approval:
+                                    approved_by: Quia fuga rem fugiat quasi.
+                                    artifacts:
+                                        Aspernatur fugit quam.: Minus nesciunt.
+                                    candidate_commit: Explicabo necessitatibus esse cumque.
+                                    environment: Illum sequi ducimus mollitia esse.
+                                    report_digest: Harum rem sequi harum quis.
+                                    scenario_count: 675343994147794327
+                                    suite_commit: Voluptatem et placeat ullam quisquam.
+                                    suite_id: Accusantium quae ducimus.
+                                change_id: Incidunt natus harum minus similique.
+                                confirmed_by: Ratione veritatis voluptas et praesentium sint.
+                                examples:
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                preserved_behaviors:
+                                    - Deleniti non non ab voluptas aspernatur.
+                                    - Aspernatur debitis incidunt sapiente inventore consequatur earum.
+                                    - Aliquid ipsum illo.
+                                prompt: Magni qui voluptatem ut.
+                                request_revision: Similique facilis sequi maiores placeat autem.
+                                status: needs_confirmation
+                                summary: Qui recusandae quas mollitia.
                                 ui_composition:
                                     composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
                                     program: Numquam provident excepturi et deleniti vel sed.
@@ -157,6 +255,16 @@ paths:
                                 answers:
                                     Magni sed sint nihil id quia soluta.: Laudantium repellat sit.
                                     Praesentium sit quos adipisci.: Quibusdam velit ut voluptatibus.
+                                approval:
+                                    approved_by: Quia fuga rem fugiat quasi.
+                                    artifacts:
+                                        Aspernatur fugit quam.: Minus nesciunt.
+                                    candidate_commit: Explicabo necessitatibus esse cumque.
+                                    environment: Illum sequi ducimus mollitia esse.
+                                    report_digest: Harum rem sequi harum quis.
+                                    scenario_count: 675343994147794327
+                                    suite_commit: Voluptatem et placeat ullam quisquam.
+                                    suite_id: Accusantium quae ducimus.
                                 change_id: Id consequatur sunt odio.
                                 confirmed_by: Aliquid explicabo deserunt rerum.
                                 examples:
@@ -453,6 +561,16 @@ paths:
                                       question: Labore harum illo eos ipsum deleniti possimus.
                                 answers:
                                     Consequatur ex.: Veritatis alias non blanditiis.
+                                approval:
+                                    approved_by: Quia fuga rem fugiat quasi.
+                                    artifacts:
+                                        Aspernatur fugit quam.: Minus nesciunt.
+                                    candidate_commit: Explicabo necessitatibus esse cumque.
+                                    environment: Illum sequi ducimus mollitia esse.
+                                    report_digest: Harum rem sequi harum quis.
+                                    scenario_count: 675343994147794327
+                                    suite_commit: Voluptatem et placeat ullam quisquam.
+                                    suite_id: Accusantium quae ducimus.
                                 change_id: Molestiae autem quas reprehenderit fugit.
                                 confirmed_by: Accusamus harum velit earum libero ad.
                                 examples:
@@ -686,6 +804,98 @@ components:
                 - id
                 - question
                 - options
+        ApprovalItem:
+            type: object
+            properties:
+                approved_by:
+                    type: string
+                    description: Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.
+                    example: Quia fuga rem fugiat quasi.
+                artifacts:
+                    type: object
+                    description: SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.
+                    example:
+                        Aspernatur fugit quam.: Minus nesciunt.
+                    additionalProperties:
+                        type: string
+                        example: Minus nesciunt.
+                candidate_commit:
+                    type: string
+                    description: Candidate commit the report was checked against.
+                    example: Explicabo necessitatibus esse cumque.
+                environment:
+                    type: string
+                    description: Dependency profile the promotion target requires, such as sim.
+                    example: Illum sequi ducimus mollitia esse.
+                report_digest:
+                    type: string
+                    description: SHA-256 digest of the approved CP4 verification report.
+                    example: Harum rem sequi harum quis.
+                scenario_count:
+                    type: integer
+                    description: Number of declared evaluator scenarios, every one of which passed.
+                    example: 675343994147794327
+                    format: int64
+                suite_commit:
+                    type: string
+                    description: Evaluator suite commit the promotion target requires.
+                    example: Voluptatem et placeat ullam quisquam.
+                suite_id:
+                    type: string
+                    description: Evaluator suite the promotion target requires.
+                    example: Accusantium quae ducimus.
+            description: Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, and is dropped when confirm_intent mints a new request_revision.
+            example:
+                approved_by: Quia fuga rem fugiat quasi.
+                artifacts:
+                    Aspernatur fugit quam.: Minus nesciunt.
+                candidate_commit: Explicabo necessitatibus esse cumque.
+                environment: Illum sequi ducimus mollitia esse.
+                report_digest: Harum rem sequi harum quis.
+                scenario_count: 675343994147794327
+                suite_commit: Voluptatem et placeat ullam quisquam.
+                suite_id: Accusantium quae ducimus.
+            required:
+                - approved_by
+                - report_digest
+                - candidate_commit
+                - suite_id
+                - suite_commit
+                - environment
+                - artifacts
+                - scenario_count
+        ApproveMergePayload:
+            type: object
+            properties:
+                candidate_commit:
+                    type: string
+                    description: Full commit ID of the candidate being promoted (40 or 64 lowercase hex characters).
+                    example: 19c1186d5664535f9abd84c72ac71d573dae3f7b86f82ba373af45b656a347fc
+                    pattern: ^([0-9a-f]{40}|[0-9a-f]{64})$
+                change_id:
+                    type: string
+                    description: Confirmed Change Card identifier.
+                    example: Dolores harum.
+                report_digest:
+                    type: string
+                    description: SHA-256 digest of the CP4 verification report written by surla verify (64 lowercase hex characters).
+                    example: 1b46c7cb40afe8bdef74ed527c63d4203f5f889c2c0d15b83c3f882a3cb0a61b
+                    pattern: ^[0-9a-f]{64}$
+                request_revision:
+                    type: string
+                    description: Current request_revision of the confirmed Change Card.
+                    example: Voluptates eveniet magnam ab et ipsam.
+            description: Request body for approve_merge.
+            example:
+                candidate_commit: 19c1186d5664535f9abd84c72ac71d573dae3f7b86f82ba373af45b656a347fc
+                change_id: Dolores harum.
+                report_digest: 1b46c7cb40afe8bdef74ed527c63d4203f5f889c2c0d15b83c3f882a3cb0a61b
+                request_revision: Voluptates eveniet magnam ab et ipsam.
+            required:
+                - change_id
+                - request_revision
+                - candidate_commit
+                - report_digest
         ArchitecturePreviewResult:
             type: object
             properties:
@@ -1140,6 +1350,8 @@ components:
                     additionalProperties:
                         type: string
                         example: Veritatis alias non blanditiis.
+                approval:
+                    $ref: '#/components/schemas/ApprovalItem'
                 change_id:
                     type: string
                     description: Change identifier.
@@ -1222,6 +1434,16 @@ components:
                       question: Labore harum illo eos ipsum deleniti possimus.
                 answers:
                     Consequatur ex.: Veritatis alias non blanditiis.
+                approval:
+                    approved_by: Quia fuga rem fugiat quasi.
+                    artifacts:
+                        Aspernatur fugit quam.: Minus nesciunt.
+                    candidate_commit: Explicabo necessitatibus esse cumque.
+                    environment: Illum sequi ducimus mollitia esse.
+                    report_digest: Harum rem sequi harum quis.
+                    scenario_count: 675343994147794327
+                    suite_commit: Voluptatem et placeat ullam quisquam.
+                    suite_id: Accusantium quae ducimus.
                 change_id: Molestiae autem quas reprehenderit fugit.
                 confirmed_by: Accusamus harum velit earum libero ad.
                 examples:

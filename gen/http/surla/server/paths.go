@@ -44,6 +44,11 @@ func DraftOverrideSurlaPath() string {
 	return "/sandbox/draft"
 }
 
+// ApproveMergeSurlaPath returns the URL path to the surla service approve_merge HTTP endpoint.
+func ApproveMergeSurlaPath() string {
+	return "/changes/approve"
+}
+
 // DiffSurlaPath returns the URL path to the surla service diff HTTP endpoint.
 func DiffSurlaPath() string {
 	return "/diff"

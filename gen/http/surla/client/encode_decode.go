@@ -535,6 +535,86 @@ func DecodeDraftOverrideResponse(decoder func(*http.Response) goahttp.Decoder, r
 	}
 }
 
+// BuildApproveMergeRequest instantiates a HTTP request object with method and
+// path set to call the "surla" service "approve_merge" endpoint
+func (c *Client) BuildApproveMergeRequest(ctx context.Context, v any) (*http.Request, error) {
+	u := &url.URL{Scheme: c.scheme, Host: c.host, Path: ApproveMergeSurlaPath()}
+	req, err := http.NewRequest("POST", u.String(), nil)
+	if err != nil {
+		return nil, goahttp.ErrInvalidURL("surla", "approve_merge", u.String(), err)
+	}
+	if ctx != nil {
+		req = req.WithContext(ctx)
+	}
+
+	return req, nil
+}
+
+// EncodeApproveMergeRequest returns an encoder for requests sent to the surla
+// approve_merge server.
+func EncodeApproveMergeRequest(encoder func(*http.Request) goahttp.Encoder) func(*http.Request, any) error {
+	return func(req *http.Request, v any) error {
+		p, ok := v.(*surla.ApproveMergePayload)
+		if !ok {
+			return goahttp.ErrInvalidType("surla", "approve_merge", "*surla.ApproveMergePayload", v)
+		}
+		body := NewApproveMergeRequestBody(p)
+		if err := encoder(req).Encode(&body); err != nil {
+			return goahttp.ErrEncodingError("surla", "approve_merge", err)
+		}
+		return nil
+	}
+}
+
+// DecodeApproveMergeResponse returns a decoder for responses returned by the
+// surla approve_merge endpoint. restoreBody controls whether the response body
+// should be restored after having been read.
+func DecodeApproveMergeResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
+	return func(resp *http.Response) (result any, decodeErr error) {
+		responseBody := resp.Body
+		if restoreBody {
+			b, readErr := io.ReadAll(responseBody)
+			closeErr := responseBody.Close()
+			if err := errors.Join(readErr, closeErr); err != nil {
+				return nil, goahttp.ErrDecodingError("surla", "approve_merge", err)
+			}
+			resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			defer func() {
+				resp.Body = io.NopCloser(bytes.NewBuffer(b))
+			}()
+		} else {
+			defer func() {
+				if err := responseBody.Close(); err != nil {
+					decodeErr = errors.Join(decodeErr, goahttp.ErrDecodingError("surla", "approve_merge", err))
+				}
+			}()
+		}
+		switch resp.StatusCode {
+		case http.StatusOK:
+			var (
+				body ApproveMergeResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("surla", "approve_merge", err)
+			}
+			err = ValidateApproveMergeResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("surla", "approve_merge", err)
+			}
+			res := NewApproveMergeChangeCardResultOK(&body)
+			return res, nil
+		default:
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("surla", "approve_merge", err)
+			}
+			return nil, goahttp.ErrInvalidResponse("surla", "approve_merge", resp.StatusCode, string(body))
+		}
+	}
+}
+
 // BuildDiffRequest instantiates a HTTP request object with method and path set
 // to call the "surla" service "diff" endpoint
 func (c *Client) BuildDiffRequest(ctx context.Context, v any) (*http.Request, error) {
@@ -652,6 +732,28 @@ func unmarshalUICompositionItemResponseBodyToSurlaUICompositionItem(v *UIComposi
 	res := &surla.UICompositionItem{
 		Program:             *v.Program,
 		ComposedForRevision: *v.ComposedForRevision,
+	}
+
+	return res
+}
+
+// unmarshalApprovalItemResponseBodyToSurlaApprovalItem builds a value of type
+// *surla.ApprovalItem from a value of type *ApprovalItemResponseBody.
+func unmarshalApprovalItemResponseBodyToSurlaApprovalItem(v *ApprovalItemResponseBody) *surla.ApprovalItem {
+	res := &surla.ApprovalItem{
+		ApprovedBy:      *v.ApprovedBy,
+		ReportDigest:    *v.ReportDigest,
+		CandidateCommit: *v.CandidateCommit,
+		SuiteID:         *v.SuiteID,
+		SuiteCommit:     *v.SuiteCommit,
+		Environment:     *v.Environment,
+		ScenarioCount:   *v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
 	}
 
 	return res

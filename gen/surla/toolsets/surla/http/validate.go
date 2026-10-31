@@ -9,6 +9,84 @@ package http
 
 import goa "goa.design/goa/v3/pkg"
 
+// ValidateApproveMergePayloadTransport runs the validations defined on ApproveMergePayloadTransport.
+func ValidateApproveMergePayloadTransport(body *ApproveMergePayloadTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if body.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if body.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *body.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	}
+	if body.ReportDigest != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.report_digest", *body.ReportDigest, "^[0-9a-f]{64}$"))
+	}
+	return
+}
+
+// ValidateApproveMergeResultTransport runs the validations defined on ApproveMergeResultTransport.
+func ValidateApproveMergeResultTransport(body *ApproveMergeResultTransport) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
+	}
+	if body.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if body.Examples == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("examples", "body"))
+	}
+	if body.PreservedBehaviors == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("preserved_behaviors", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.Status != nil {
+		if !(*body.Status == "needs_confirmation" || *body.Status == "confirmed") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *body.Status, []any{"needs_confirmation", "confirmed"}))
+		}
+	}
+	for _, e := range body.Ambiguities {
+		if e != nil {
+			if err2 := ValidateAmbiguityQuestionTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Examples {
+		if e != nil {
+			if err2 := ValidateExampleItemTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	if body.UIComposition != nil {
+		if err2 := ValidateUICompositionItemTransport(body.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if body.Approval != nil {
+		if err2 := ValidateApprovalItemTransport(body.Approval); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return
+}
+
 // ValidateConfirmIntentPayloadTransport runs the validations defined on ConfirmIntentPayloadTransport.
 func ValidateConfirmIntentPayloadTransport(body *ConfirmIntentPayloadTransport) (err error) {
 	if body.ChangeID == nil {
@@ -77,6 +155,11 @@ func ValidateConfirmIntentResultTransport(body *ConfirmIntentResultTransport) (e
 	}
 	if body.UIComposition != nil {
 		if err2 := ValidateUICompositionItemTransport(body.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if body.Approval != nil {
+		if err2 := ValidateApprovalItemTransport(body.Approval); err2 != nil {
 			err = goa.MergeErrors(err, err2)
 		}
 	}
@@ -209,6 +292,11 @@ func ValidateGetChangeResultTransport(body *GetChangeResultTransport) (err error
 	}
 	if body.UIComposition != nil {
 		if err2 := ValidateUICompositionItemTransport(body.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if body.Approval != nil {
+		if err2 := ValidateApprovalItemTransport(body.Approval); err2 != nil {
 			err = goa.MergeErrors(err, err2)
 		}
 	}
@@ -367,6 +455,11 @@ func ValidateProposeChangeResultTransport(body *ProposeChangeResultTransport) (e
 			err = goa.MergeErrors(err, err2)
 		}
 	}
+	if body.Approval != nil {
+		if err2 := ValidateApprovalItemTransport(body.Approval); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return
 }
 
@@ -409,6 +502,35 @@ func ValidateAmbiguityQuestionTransport(body *AmbiguityQuestionTransport) (err e
 	}
 	if body.Options == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("options", "body"))
+	}
+	return
+}
+
+// ValidateApprovalItemTransport runs the validations defined on ApprovalItemTransport.
+func ValidateApprovalItemTransport(body *ApprovalItemTransport) (err error) {
+	if body.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if body.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if body.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if body.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if body.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if body.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if body.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if body.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
 	}
 	return
 }

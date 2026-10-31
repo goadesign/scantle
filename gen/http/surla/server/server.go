@@ -26,6 +26,7 @@ type Server struct {
 	GetChange           http.Handler
 	PreviewArchitecture http.Handler
 	DraftOverride       http.Handler
+	ApproveMerge        http.Handler
 	Diff                http.Handler
 }
 
@@ -63,6 +64,7 @@ func New(
 			{"GetChange", "GET", "/changes/{change_id}"},
 			{"PreviewArchitecture", "POST", "/changes/preview"},
 			{"DraftOverride", "POST", "/sandbox/draft"},
+			{"ApproveMerge", "POST", "/changes/approve"},
 			{"Diff", "POST", "/diff"},
 		},
 		CheckpointUI:        NewCheckpointUIHandler(e.CheckpointUI, mux, decoder, encoder, errhandler, formatter),
@@ -72,6 +74,7 @@ func New(
 		GetChange:           NewGetChangeHandler(e.GetChange, mux, decoder, encoder, errhandler, formatter),
 		PreviewArchitecture: NewPreviewArchitectureHandler(e.PreviewArchitecture, mux, decoder, encoder, errhandler, formatter),
 		DraftOverride:       NewDraftOverrideHandler(e.DraftOverride, mux, decoder, encoder, errhandler, formatter),
+		ApproveMerge:        NewApproveMergeHandler(e.ApproveMerge, mux, decoder, encoder, errhandler, formatter),
 		Diff:                NewDiffHandler(e.Diff, mux, decoder, encoder, errhandler, formatter),
 	}
 }
@@ -88,6 +91,7 @@ func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.GetChange = m(s.GetChange)
 	s.PreviewArchitecture = m(s.PreviewArchitecture)
 	s.DraftOverride = m(s.DraftOverride)
+	s.ApproveMerge = m(s.ApproveMerge)
 	s.Diff = m(s.Diff)
 }
 
@@ -103,6 +107,7 @@ func Mount(mux goahttp.Muxer, h *Server) {
 	MountGetChangeHandler(mux, h.GetChange)
 	MountPreviewArchitectureHandler(mux, h.PreviewArchitecture)
 	MountDraftOverrideHandler(mux, h.DraftOverride)
+	MountApproveMergeHandler(mux, h.ApproveMerge)
 	MountDiffHandler(mux, h.Diff)
 }
 
@@ -445,6 +450,59 @@ func NewDraftOverrideHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "draft_override")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "surla")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountApproveMergeHandler configures the mux to serve the "surla" service
+// "approve_merge" endpoint.
+func MountApproveMergeHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("POST", "/changes/approve", f)
+}
+
+// NewApproveMergeHandler creates a HTTP handler which loads the HTTP request
+// and calls the "surla" service "approve_merge" endpoint.
+func NewApproveMergeHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodeApproveMergeRequest(mux, decoder)
+		encodeResponse = EncodeApproveMergeResponse(encoder)
+		encodeError    = goahttp.ErrorEncoder(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "approve_merge")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "surla")
 		payload, err := decodeRequest(r)
 		if err != nil {

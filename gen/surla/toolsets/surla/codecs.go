@@ -22,6 +22,22 @@ import (
 	goa "goa.design/goa/v3/pkg"
 )
 
+// ApproveMergePayloadCodec returns a fresh codec for *ApproveMergePayload.
+func ApproveMergePayloadCodec() tools.JSONCodec[*ApproveMergePayload] {
+	return tools.JSONCodec[*ApproveMergePayload]{
+		ToJSON:   MarshalApproveMergePayload,
+		FromJSON: UnmarshalApproveMergePayload,
+	}
+}
+
+// ApproveMergeResultCodec returns a fresh codec for *ApproveMergeResult.
+func ApproveMergeResultCodec() tools.JSONCodec[*ApproveMergeResult] {
+	return tools.JSONCodec[*ApproveMergeResult]{
+		ToJSON:   MarshalApproveMergeResult,
+		FromJSON: UnmarshalApproveMergeResult,
+	}
+}
+
 // ConfirmIntentPayloadCodec returns a fresh codec for *ConfirmIntentPayload.
 func ConfirmIntentPayloadCodec() tools.JSONCodec[*ConfirmIntentPayload] {
 	return tools.JSONCodec[*ConfirmIntentPayload]{
@@ -119,6 +135,32 @@ func ProposeChangeResultCodec() tools.JSONCodec[*ProposeChangeResult] {
 }
 
 var (
+	// approveMergePayloadCodec provides an untyped codec for *ApproveMergePayload.
+	approveMergePayloadCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*ApproveMergePayload); ok {
+				return MarshalApproveMergePayload(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *ApproveMergePayload: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalApproveMergePayload(data)
+		},
+	}
+	// approveMergeResultCodec provides an untyped codec for *ApproveMergeResult.
+	approveMergeResultCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*ApproveMergeResult); ok {
+				return MarshalApproveMergeResult(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *ApproveMergeResult: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalApproveMergeResult(data)
+		},
+	}
 	// confirmIntentPayloadCodec provides an untyped codec for *ConfirmIntentPayload.
 	confirmIntentPayloadCodec = tools.JSONCodec[any]{
 		ToJSON: func(v any) ([]byte, error) {
@@ -276,6 +318,218 @@ var (
 		},
 	}
 )
+var approveMergePayloadFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "Identifies the confirmed Change Card revision, the candidate commit being promoted, and the evaluator-written verification report to check. The report itself and the expected suite, environment and binary digests come from the control plane's promotion target, never from the caller.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Confirmed Change Card identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "Current request_revision of the confirmed Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Full commit ID of the candidate being promoted (40 or 64 lowercase hex characters).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the CP4 verification report written by surla verify (64 lowercase hex characters).",
+	},
+}
+var approveMergeResultFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Change identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("status")},
+		JSONType:    "string",
+		Description: "Checkpoint status (needs_confirmation or confirmed).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("prompt")},
+		JSONType:    "string",
+		Description: "Original operator feature request.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("summary")},
+		JSONType:    "string",
+		Description: "Plain-English summary of requested behavior.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities")},
+		JSONType:    "array",
+		Description: "Domain questions surfaced at CP1, retained for audit after confirmation.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Domain questions surfaced at CP1, retained for audit after confirmation.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Stable question identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("question")},
+		JSONType:    "string",
+		Description: "Plain-English question for the operator.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("options")},
+		JSONType:    "array",
+		Description: "Concrete resolution choices.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ambiguities"), tools.DynamicField{}, tools.FixedField("options"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Concrete resolution choices.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("answers")},
+		JSONType:    "object",
+		Description: "Confirmed resolution per ambiguity question ID.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("answers"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Confirmed resolution per ambiguity question ID.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples")},
+		JSONType:    "array",
+		Description: "Concrete examples mapped to evaluator checks.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Concrete examples mapped to evaluator checks.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Code-assigned stable example identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("scenario")},
+		JSONType:    "string",
+		Description: "Plain-English scenario description.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("input_summary")},
+		JSONType:    "string",
+		Description: "Representative user request and domain fixture state.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("expected_outcome")},
+		JSONType:    "string",
+		Description: "Expected side effect and response behavior.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("examples"), tools.DynamicField{}, tools.FixedField("verification_kind")},
+		JSONType:    "string",
+		Description: "Evaluator check classification (deterministic or model_judged).",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("preserved_behaviors")},
+		JSONType:    "array",
+		Description: "Existing contract invariants preserved by this change.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("preserved_behaviors"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "Existing contract invariants preserved by this change.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("confirmed_by")},
+		JSONType:    "string",
+		Description: "Authenticated principal that confirmed the Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the canonical versioned Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition")},
+		JSONType:    "object",
+		Description: "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
+		JSONType:    "string",
+		Description: "OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
+		JSONType:    "string",
+		Description: "request_revision of the Change Card this program was composed for.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
+		JSONType:    "object",
+		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
+		JSONType:    "string",
+		Description: "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the approved CP4 verification report.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Candidate commit the report was checked against.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_id")},
+		JSONType:    "string",
+		Description: "Evaluator suite the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_commit")},
+		JSONType:    "string",
+		Description: "Evaluator suite commit the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("environment")},
+		JSONType:    "string",
+		Description: "Dependency profile the promotion target requires, such as sim.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts")},
+		JSONType:    "object",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("scenario_count")},
+		JSONType:    "integer",
+		Description: "Number of declared evaluator scenarios, every one of which passed.",
+	},
+}
 var confirmIntentPayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
@@ -471,6 +725,56 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
 		JSONType:    "string",
 		Description: "request_revision of the Change Card this program was composed for.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
+		JSONType:    "object",
+		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
+		JSONType:    "string",
+		Description: "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the approved CP4 verification report.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Candidate commit the report was checked against.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_id")},
+		JSONType:    "string",
+		Description: "Evaluator suite the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_commit")},
+		JSONType:    "string",
+		Description: "Evaluator suite commit the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("environment")},
+		JSONType:    "string",
+		Description: "Dependency profile the promotion target requires, such as sim.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts")},
+		JSONType:    "object",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("scenario_count")},
+		JSONType:    "integer",
+		Description: "Number of declared evaluator scenarios, every one of which passed.",
 	},
 }
 var diffPayloadFields = []tools.FieldMetadata{
@@ -757,6 +1061,56 @@ var getChangeResultFields = []tools.FieldMetadata{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
 		JSONType:    "string",
 		Description: "request_revision of the Change Card this program was composed for.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
+		JSONType:    "object",
+		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
+		JSONType:    "string",
+		Description: "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the approved CP4 verification report.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Candidate commit the report was checked against.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_id")},
+		JSONType:    "string",
+		Description: "Evaluator suite the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_commit")},
+		JSONType:    "string",
+		Description: "Evaluator suite commit the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("environment")},
+		JSONType:    "string",
+		Description: "Dependency profile the promotion target requires, such as sim.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts")},
+		JSONType:    "object",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("scenario_count")},
+		JSONType:    "integer",
+		Description: "Number of declared evaluator scenarios, every one of which passed.",
 	},
 }
 var previewArchitecturePayloadFields = []tools.FieldMetadata{
@@ -1322,6 +1676,56 @@ var proposeChangeResultFields = []tools.FieldMetadata{
 		JSONType:    "string",
 		Description: "request_revision of the Change Card this program was composed for.",
 	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
+		JSONType:    "object",
+		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
+		JSONType:    "string",
+		Description: "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the approved CP4 verification report.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Candidate commit the report was checked against.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_id")},
+		JSONType:    "string",
+		Description: "Evaluator suite the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("suite_commit")},
+		JSONType:    "string",
+		Description: "Evaluator suite commit the promotion target requires.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("environment")},
+		JSONType:    "string",
+		Description: "Dependency profile the promotion target requires, such as sim.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts")},
+		JSONType:    "object",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("artifacts"), tools.DynamicField{}},
+		JSONType:    "string",
+		Description: "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("scenario_count")},
+		JSONType:    "integer",
+		Description: "Number of declared evaluator scenarios, every one of which passed.",
+	},
 }
 
 // newValidationError converts a goa.ServiceError (possibly merged) into a
@@ -1354,6 +1758,40 @@ func newValidationError(err error) error {
 		return err
 	}
 	return tools.NewValidationError(err.Error(), issues, nil)
+}
+func enrichApproveMergePayloadValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(approveMergePayloadFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
+func enrichApproveMergeResultValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(approveMergeResultFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
 }
 func enrichConfirmIntentPayloadValidationError(err error) error {
 	var ve *tools.ValidationError
@@ -1558,6 +1996,68 @@ func enrichProposeChangeResultValidationError(err error) error {
 		}
 	}
 	return tools.NewValidationError(ve.Error(), issues, m)
+}
+func invalidApproveMergePayloadFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "ApproveMergePayloadTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(approveMergePayloadFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
+func invalidApproveMergeResultFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "ApproveMergeResultTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(approveMergeResultFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
 }
 func invalidConfirmIntentPayloadFieldTypeError(err error) error {
 	var typeErr *json.UnmarshalTypeError
@@ -1932,6 +2432,174 @@ func invalidProposeChangeResultFieldTypeError(err error) error {
 	)
 }
 
+// MarshalApproveMergePayload serializes *ApproveMergePayload into JSON.
+func MarshalApproveMergePayload(v *ApproveMergePayload) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("approveMergePayload is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.ApproveMergePayloadTransport
+	out = &toolhttp.ApproveMergePayloadTransport{
+		ChangeID:        &in.ChangeID,
+		RequestRevision: &in.RequestRevision,
+		CandidateCommit: &in.CandidateCommit,
+		ReportDigest:    &in.ReportDigest,
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalApproveMergePayload deserializes JSON into *ApproveMergePayload.
+func UnmarshalApproveMergePayload(data []byte) (*ApproveMergePayload, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("approveMergePayload JSON is empty")
+	}
+	var tv toolhttp.ApproveMergePayloadTransport
+	if err := validateApproveMergePayloadJSON(data); err != nil {
+		return nil, invalidApproveMergePayloadFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidApproveMergePayloadFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateApproveMergePayloadTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichApproveMergePayloadValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *ApproveMergePayload
+	out = &ApproveMergePayload{
+		ChangeID:        *in.ChangeID,
+		RequestRevision: *in.RequestRevision,
+		CandidateCommit: *in.CandidateCommit,
+		ReportDigest:    *in.ReportDigest,
+	}
+	return out, nil
+}
+
+// MarshalApproveMergeResult serializes *ApproveMergeResult into JSON.
+func MarshalApproveMergeResult(v *ApproveMergeResult) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("approveMergeResult is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.ApproveMergeResultTransport
+	out = &toolhttp.ApproveMergeResultTransport{
+		ChangeID:        &in.ChangeID,
+		Status:          &in.Status,
+		Prompt:          &in.Prompt,
+		Summary:         &in.Summary,
+		ConfirmedBy:     in.ConfirmedBy,
+		RequestRevision: &in.RequestRevision,
+	}
+	if in.Ambiguities != nil {
+		out.Ambiguities = make([]*toolhttp.AmbiguityQuestionTransport, len(in.Ambiguities))
+		for i, val := range in.Ambiguities {
+			if val == nil {
+				out.Ambiguities[i] = nil
+				continue
+			}
+			out.Ambiguities[i] = encodeAmbiguityQuestionToAmbiguityQuestionTransport(val)
+		}
+	}
+	if in.Answers != nil {
+		out.Answers = make(map[string]string, len(in.Answers))
+		for key, val := range in.Answers {
+			tk := key
+			tv := val
+			out.Answers[tk] = tv
+		}
+	}
+	out.Examples = make([]*toolhttp.ExampleItemTransport, len(in.Examples))
+	for i, val := range in.Examples {
+		if val == nil {
+			out.Examples[i] = nil
+			continue
+		}
+		out.Examples[i] = encodeExampleItemToExampleItemTransport(val)
+	}
+	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
+	for i, val := range in.PreservedBehaviors {
+		out.PreservedBehaviors[i] = val
+	}
+	if in.UIComposition != nil {
+		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
+	}
+	if in.Approval != nil {
+		out.Approval = encodeApprovalItemToApprovalItemTransport(in.Approval)
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalApproveMergeResult deserializes JSON into *ApproveMergeResult.
+func UnmarshalApproveMergeResult(data []byte) (*ApproveMergeResult, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("approveMergeResult JSON is empty")
+	}
+	var tv toolhttp.ApproveMergeResultTransport
+	if err := validateProposeChangeResultJSON(data); err != nil {
+		return nil, invalidApproveMergeResultFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidApproveMergeResultFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateApproveMergeResultTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichApproveMergeResultValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *ApproveMergeResult
+	out = &ApproveMergeResult{
+		ChangeID:        *in.ChangeID,
+		Status:          *in.Status,
+		Prompt:          *in.Prompt,
+		Summary:         *in.Summary,
+		ConfirmedBy:     in.ConfirmedBy,
+		RequestRevision: *in.RequestRevision,
+	}
+	if in.Ambiguities != nil {
+		out.Ambiguities = make([]*AmbiguityQuestion, len(in.Ambiguities))
+		for i, val := range in.Ambiguities {
+			if val == nil {
+				out.Ambiguities[i] = nil
+				continue
+			}
+			out.Ambiguities[i] = decodeAmbiguityQuestionTransportToAmbiguityQuestion(val)
+		}
+	}
+	if in.Answers != nil {
+		out.Answers = make(map[string]string, len(in.Answers))
+		for key, val := range in.Answers {
+			tk := key
+			tv := val
+			out.Answers[tk] = tv
+		}
+	}
+	out.Examples = make([]*ExampleItem, len(in.Examples))
+	for i, val := range in.Examples {
+		if val == nil {
+			out.Examples[i] = nil
+			continue
+		}
+		out.Examples[i] = decodeExampleItemTransportToExampleItem(val)
+	}
+	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
+	for i, val := range in.PreservedBehaviors {
+		out.PreservedBehaviors[i] = val
+	}
+	if in.UIComposition != nil {
+		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
+	}
+	if in.Approval != nil {
+		out.Approval = decodeApprovalItemTransportToApprovalItem(in.Approval)
+	}
+	return out, nil
+}
+
 // MarshalConfirmIntentPayload serializes *ConfirmIntentPayload into JSON.
 func MarshalConfirmIntentPayload(v *ConfirmIntentPayload) ([]byte, error) {
 	if v == nil {
@@ -2051,6 +2719,9 @@ func MarshalConfirmIntentResult(v *ConfirmIntentResult) ([]byte, error) {
 	if in.UIComposition != nil {
 		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
 	}
+	if in.Approval != nil {
+		out.Approval = encodeApprovalItemToApprovalItemTransport(in.Approval)
+	}
 	return json.Marshal(out)
 }
 
@@ -2114,6 +2785,9 @@ func UnmarshalConfirmIntentResult(data []byte) (*ConfirmIntentResult, error) {
 	}
 	if in.UIComposition != nil {
 		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
+	}
+	if in.Approval != nil {
+		out.Approval = decodeApprovalItemTransportToApprovalItem(in.Approval)
 	}
 	return out, nil
 }
@@ -2411,6 +3085,9 @@ func MarshalGetChangeResult(v *GetChangeResult) ([]byte, error) {
 	if in.UIComposition != nil {
 		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
 	}
+	if in.Approval != nil {
+		out.Approval = encodeApprovalItemToApprovalItemTransport(in.Approval)
+	}
 	return json.Marshal(out)
 }
 
@@ -2474,6 +3151,9 @@ func UnmarshalGetChangeResult(data []byte) (*GetChangeResult, error) {
 	}
 	if in.UIComposition != nil {
 		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
+	}
+	if in.Approval != nil {
+		out.Approval = decodeApprovalItemTransportToApprovalItem(in.Approval)
 	}
 	return out, nil
 }
@@ -2749,6 +3429,9 @@ func MarshalProposeChangeResult(v *ProposeChangeResult) ([]byte, error) {
 	if in.UIComposition != nil {
 		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
 	}
+	if in.Approval != nil {
+		out.Approval = encodeApprovalItemToApprovalItemTransport(in.Approval)
+	}
 	return json.Marshal(out)
 }
 
@@ -2812,6 +3495,9 @@ func UnmarshalProposeChangeResult(data []byte) (*ProposeChangeResult, error) {
 	}
 	if in.UIComposition != nil {
 		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
+	}
+	if in.Approval != nil {
+		out.Approval = decodeApprovalItemTransportToApprovalItem(in.Approval)
 	}
 	return out, nil
 }
@@ -2894,6 +3580,16 @@ func validateDraftOverrideResultJSON(data []byte) error {
 		return err
 	}
 	return validateDraftOverrideResultJSONValue("", root, "")
+}
+
+// validateApproveMergePayloadJSON parses one JSON document and checks the exact value
+// shapes known from this generated Goa type.
+func validateApproveMergePayloadJSON(data []byte) error {
+	root, err := readStrictToolJSON(data)
+	if err != nil {
+		return err
+	}
+	return validateApproveMergePayloadJSONValue("", root, "")
 }
 
 // validateDiffPayloadJSON parses one JSON document and checks the exact value
@@ -3140,6 +3836,13 @@ func validateProposeChangeResultJSONValue(path string, value any, description st
 			); err != nil {
 				return err
 			}
+		case "approval":
+			if err := validateProposeChangeResultApprovalItemTransportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+			); err != nil {
+				return err
+			}
 		case "change_id":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
@@ -3207,6 +3910,7 @@ func validateProposeChangeResultJSONValue(path string, value any, description st
 			return unknownJSONFieldError(path, key, []string{
 				"ambiguities",
 				"answers",
+				"approval",
 				"change_id",
 				"confirmed_by",
 				"examples",
@@ -3347,6 +4051,117 @@ func validateProposeChangeResultRootAnswersJSONValue(path string, value any, des
 		); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// validateProposeChangeResultApprovalItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateProposeChangeResultApprovalItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "approved_by":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.",
+			); err != nil {
+				return err
+			}
+		case "artifacts":
+			if err := validateProposeChangeResultRootAnswersJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+			); err != nil {
+				return err
+			}
+		case "candidate_commit":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Candidate commit the report was checked against.",
+			); err != nil {
+				return err
+			}
+		case "environment":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Dependency profile the promotion target requires, such as sim.",
+			); err != nil {
+				return err
+			}
+		case "report_digest":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the approved CP4 verification report.",
+			); err != nil {
+				return err
+			}
+		case "scenario_count":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Number of declared evaluator scenarios, every one of which passed.",
+			); err != nil {
+				return err
+			}
+		case "suite_commit":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite commit the promotion target requires.",
+			); err != nil {
+				return err
+			}
+		case "suite_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite the promotion target requires.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"approved_by",
+				"artifacts",
+				"candidate_commit",
+				"environment",
+				"report_digest",
+				"scenario_count",
+				"suite_commit",
+				"suite_id",
+			})
+		}
+	}
+	return nil
+}
+
+// validateIntJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateIntJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "integer", "null", description)
+	}
+	typed, ok := value.(json.Number)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "integer", decodedJSONType(value), description)
+	}
+	if _, err := strconv.ParseInt(typed.String(), 10, strconv.IntSize); err != nil {
+		return invalidGeneratedFieldTypeError(field, "integer", "number", description)
 	}
 	return nil
 }
@@ -3991,25 +4806,6 @@ func validateBooleanJSONValue(path string, value any, description string) error 
 	_, ok := value.(bool)
 	if !ok {
 		return invalidGeneratedFieldTypeError(field, "boolean", decodedJSONType(value), description)
-	}
-	return nil
-}
-
-// validateIntJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
-func validateIntJSONValue(path string, value any, description string) error {
-	field := path
-	if field == "" {
-		field = "$payload"
-	}
-	if value == nil {
-		return invalidGeneratedFieldTypeError(field, "integer", "null", description)
-	}
-	typed, ok := value.(json.Number)
-	if !ok {
-		return invalidGeneratedFieldTypeError(field, "integer", decodedJSONType(value), description)
-	}
-	if _, err := strconv.ParseInt(typed.String(), 10, strconv.IntSize); err != nil {
-		return invalidGeneratedFieldTypeError(field, "integer", "number", description)
 	}
 	return nil
 }
@@ -4718,6 +5514,66 @@ func validateDraftOverrideResultJSONValue(path string, value any, description st
 	return nil
 }
 
+// validateApproveMergePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateApproveMergePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "candidate_commit":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Full commit ID of the candidate being promoted (40 or 64 lowercase hex characters).",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Confirmed Change Card identifier.",
+			); err != nil {
+				return err
+			}
+		case "report_digest":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the CP4 verification report written by surla verify (64 lowercase hex characters).",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Current request_revision of the confirmed Change Card.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"candidate_commit",
+				"change_id",
+				"report_digest",
+				"request_revision",
+			})
+		}
+	}
+	return nil
+}
+
 // validateDiffPayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validateDiffPayloadJSONValue(path string, value any, description string) error {
 	field := path
@@ -4941,28 +5797,6 @@ func unknownJSONFieldError(path, field string, allowed []string) error {
 }
 
 // Helper transform functions
-func decodeExampleItemTransportToExampleItem(v *toolhttp.ExampleItemTransport) *ExampleItem {
-	res := &ExampleItem{
-		ID:               *v.ID,
-		Scenario:         *v.Scenario,
-		InputSummary:     *v.InputSummary,
-		ExpectedOutcome:  *v.ExpectedOutcome,
-		VerificationKind: *v.VerificationKind,
-	}
-
-	return res
-}
-func encodeExampleItemToExampleItemTransport(v *ExampleItem) *toolhttp.ExampleItemTransport {
-	res := &toolhttp.ExampleItemTransport{
-		ID:               &v.ID,
-		Scenario:         &v.Scenario,
-		InputSummary:     &v.InputSummary,
-		ExpectedOutcome:  &v.ExpectedOutcome,
-		VerificationKind: &v.VerificationKind,
-	}
-
-	return res
-}
 func decodeAmbiguityQuestionTransportToAmbiguityQuestion(v *toolhttp.AmbiguityQuestionTransport) *AmbiguityQuestion {
 	res := &AmbiguityQuestion{
 		ID:       *v.ID,
@@ -4975,10 +5809,40 @@ func decodeAmbiguityQuestionTransportToAmbiguityQuestion(v *toolhttp.AmbiguityQu
 
 	return res
 }
+func decodeExampleItemTransportToExampleItem(v *toolhttp.ExampleItemTransport) *ExampleItem {
+	res := &ExampleItem{
+		ID:               *v.ID,
+		Scenario:         *v.Scenario,
+		InputSummary:     *v.InputSummary,
+		ExpectedOutcome:  *v.ExpectedOutcome,
+		VerificationKind: *v.VerificationKind,
+	}
+
+	return res
+}
 func decodeUICompositionItemTransportToUICompositionItem(v *toolhttp.UICompositionItemTransport) *UICompositionItem {
 	res := &UICompositionItem{
 		Program:             *v.Program,
 		ComposedForRevision: *v.ComposedForRevision,
+	}
+
+	return res
+}
+func decodeApprovalItemTransportToApprovalItem(v *toolhttp.ApprovalItemTransport) *ApprovalItem {
+	res := &ApprovalItem{
+		ApprovedBy:      *v.ApprovedBy,
+		ReportDigest:    *v.ReportDigest,
+		CandidateCommit: *v.CandidateCommit,
+		SuiteID:         *v.SuiteID,
+		SuiteCommit:     *v.SuiteCommit,
+		Environment:     *v.Environment,
+		ScenarioCount:   *v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
 	}
 
 	return res
@@ -4995,10 +5859,40 @@ func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *
 
 	return res
 }
+func encodeExampleItemToExampleItemTransport(v *ExampleItem) *toolhttp.ExampleItemTransport {
+	res := &toolhttp.ExampleItemTransport{
+		ID:               &v.ID,
+		Scenario:         &v.Scenario,
+		InputSummary:     &v.InputSummary,
+		ExpectedOutcome:  &v.ExpectedOutcome,
+		VerificationKind: &v.VerificationKind,
+	}
+
+	return res
+}
 func encodeUICompositionItemToUICompositionItemTransport(v *UICompositionItem) *toolhttp.UICompositionItemTransport {
 	res := &toolhttp.UICompositionItemTransport{
 		Program:             &v.Program,
 		ComposedForRevision: &v.ComposedForRevision,
+	}
+
+	return res
+}
+func encodeApprovalItemToApprovalItemTransport(v *ApprovalItem) *toolhttp.ApprovalItemTransport {
+	res := &toolhttp.ApprovalItemTransport{
+		ApprovedBy:      &v.ApprovedBy,
+		ReportDigest:    &v.ReportDigest,
+		CandidateCommit: &v.CandidateCommit,
+		SuiteID:         &v.SuiteID,
+		SuiteCommit:     &v.SuiteCommit,
+		Environment:     &v.Environment,
+		ScenarioCount:   &v.ScenarioCount,
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
 	}
 
 	return res

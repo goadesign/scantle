@@ -47,6 +47,13 @@ type Service interface {
 	// Apply a Fast Draft Mode prompt override on the bound target or reject a
 	// compiled-rule prompt hack.
 	DraftOverride(context.Context, *DraftOverridePayload) (res *DraftOverrideResult, err error)
+	// Record Checkpoint 5 approval for the owner's confirmed Change Card revision.
+	// The control plane loads the verification report by digest and the expected
+	// suite, environment and candidate binary digests from its promotion target,
+	// re-derives the report from its evidence with verify.Approve, and records the
+	// approval on the card. A report that did not pass or describes different
+	// inputs is rejected. Nothing is merged or deployed.
+	ApproveMerge(context.Context, *ApproveMergePayload) (res *ChangeCardResult, err error)
 	// Compare evaluated Goa designs and go.mod directives without emitting a
 	// blanket compatibility verdict.
 	Diff(context.Context, *DiffPayload) (res *DiffResult, err error)
@@ -66,7 +73,7 @@ const ServiceName = "surla"
 // MethodNames lists the service method names as defined in the design. These
 // are the same values that are set in the endpoint request contexts under the
 // MethodKey key.
-var MethodNames = [8]string{"checkpoint_ui", "golden_path", "propose_change", "confirm_intent", "get_change", "preview_architecture", "draft_override", "diff"}
+var MethodNames = [9]string{"checkpoint_ui", "golden_path", "propose_change", "confirm_intent", "get_change", "preview_architecture", "draft_override", "approve_merge", "diff"}
 
 // Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.
 type AgentPolicyItem struct {
@@ -96,6 +103,47 @@ type AmbiguityQuestion struct {
 	Question string
 	// Concrete resolution choices.
 	Options []string
+}
+
+// Checkpoint 5 approval recorded by approve_merge after the evaluator-written
+// verification report passed and matched the change being promoted. It is held
+// only in the running control plane's memory, merges and deploys nothing, and
+// is dropped when confirm_intent mints a new request_revision.
+type ApprovalItem struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy string
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest string
+	// Candidate commit the report was checked against.
+	CandidateCommit string
+	// Evaluator suite the promotion target requires.
+	SuiteID string
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit string
+	// Dependency profile the promotion target requires, such as sim.
+	Environment string
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount int
+}
+
+// ApproveMergePayload is the payload type of the surla service approve_merge
+// method.
+type ApproveMergePayload struct {
+	// Confirmed Change Card identifier.
+	ChangeID string
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision string
+	// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit string
+	// SHA-256 digest of the CP4 verification report written by surla verify (64
+	// lowercase hex characters).
+	ReportDigest string
 }
 
 // ArchitecturePreviewResult is the result type of the surla service
@@ -183,6 +231,9 @@ type ChangeCardResult struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItem
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *ApprovalItem
 }
 
 // ConfirmIntentPayload is the payload type of the surla service confirm_intent
@@ -434,6 +485,26 @@ func ValidateagentPolicyItemIntTransport(value agentPolicyItemIntTransport) (err
 	return err
 }
 
+// approvalItemIntTransport stores JSON fields until they have been validated.
+type approvalItemIntTransport int
+
+// UnmarshalJSON reads an exact whole JSON number and stores it within this type's
+// declared range. Decimal and exponent spellings do not change its value.
+func (value *approvalItemIntTransport) UnmarshalJSON(data []byte) error {
+	number, err := rawjson.DecodeInteger[int](data)
+	if err != nil {
+		return fmt.Errorf("decode approvalItemIntTransport integer: %w", err)
+	}
+	*value = approvalItemIntTransport(number)
+	return nil
+}
+
+// ValidateapprovalItemIntTransport checks decoded JSON before it becomes a service value.
+func ValidateapprovalItemIntTransport(value approvalItemIntTransport) (err error) {
+
+	return err
+}
+
 // jsonAgentPolicyItemTransport stores JSON fields until they have been validated.
 type jsonAgentPolicyItemTransport struct {
 	// Scoped agent container identifier.
@@ -509,6 +580,101 @@ func validatejsonAmbiguityQuestionTransport(value *jsonAmbiguityQuestionTranspor
 	}
 	if value.Options == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("options", "body"))
+	}
+	return err
+}
+
+// jsonApprovalItemTransport stores JSON fields until they have been validated.
+type jsonApprovalItemTransport struct {
+	// Authenticated bearer principal that owns the card and called approve_merge.
+	// Bearer authentication does not prove that a human, rather than a coding
+	// agent, made the call.
+	ApprovedBy *string `json:"approved_by"`
+	// SHA-256 digest of the approved CP4 verification report.
+	ReportDigest *string `json:"report_digest"`
+	// Candidate commit the report was checked against.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite the promotion target requires.
+	SuiteID *string `json:"suite_id"`
+	// Evaluator suite commit the promotion target requires.
+	SuiteCommit *string `json:"suite_commit"`
+	// Dependency profile the promotion target requires, such as sim.
+	Environment *string `json:"environment"`
+	// SHA-256 digest of each candidate binary the promotion target measured, keyed
+	// by binary name.
+	Artifacts map[string]string `json:"artifacts"`
+	// Number of declared evaluator scenarios, every one of which passed.
+	ScenarioCount *approvalItemIntTransport `json:"scenario_count"`
+}
+
+// validatejsonApprovalItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonApprovalItemTransport(value *jsonApprovalItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ApprovedBy == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("approved_by", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "body"))
+	}
+	if value.ScenarioCount == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenario_count", "body"))
+	}
+	return err
+}
+
+// jsonApproveMergePayloadTransport stores JSON fields until they have been validated.
+type jsonApproveMergePayloadTransport struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision *string `json:"request_revision"`
+	// Full commit ID of the candidate being promoted (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit *string `json:"candidate_commit"`
+	// SHA-256 digest of the CP4 verification report written by surla verify (64
+	// lowercase hex characters).
+	ReportDigest *string `json:"report_digest"`
+}
+
+// validatejsonApproveMergePayloadTransport checks decoded JSON before it becomes a service value.
+func validatejsonApproveMergePayloadTransport(value *jsonApproveMergePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *value.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	}
+	if value.ReportDigest != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.report_digest", *value.ReportDigest, "^[0-9a-f]{64}$"))
 	}
 	return err
 }
@@ -723,6 +889,9 @@ type jsonChangeCardResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *jsonUICompositionItemTransport `json:"ui_composition,omitempty"`
+	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
+	// never hashed into request_revision.
+	Approval *jsonApprovalItemTransport `json:"approval,omitempty"`
 }
 
 // validatejsonChangeCardResultTransport checks decoded JSON before it becomes a service value.
@@ -772,6 +941,11 @@ func validatejsonChangeCardResultTransport(value *jsonChangeCardResultTransport)
 	}
 	if value.UIComposition != nil {
 		if err2 := validatejsonUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	if value.Approval != nil {
+		if err2 := validatejsonApprovalItemTransport(value.Approval); err2 != nil {
 			err = goa.MergeErrors(err, err2)
 		}
 	}
@@ -1358,6 +1532,21 @@ func validateAmbiguityQuestionOriginal(value *AmbiguityQuestion) (err error) {
 	return err
 }
 
+// validateApprovalItemOriginal checks the original typed value before JSON conversion.
+func validateApprovalItemOriginal(value *ApprovalItem) (err error) {
+	if value.Artifacts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("artifacts", "value"))
+	}
+	return err
+}
+
+// validateApproveMergePayloadOriginal checks the original typed value before JSON conversion.
+func validateApproveMergePayloadOriginal(value *ApproveMergePayload) (err error) {
+	err = goa.MergeErrors(err, goa.ValidatePattern("value.candidate_commit", value.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	err = goa.MergeErrors(err, goa.ValidatePattern("value.report_digest", value.ReportDigest, "^[0-9a-f]{64}$"))
+	return err
+}
+
 // validateArchitecturePreviewResultOriginal checks the original typed value before JSON conversion.
 func validateArchitecturePreviewResultOriginal(value *ArchitecturePreviewResult) (err error) {
 	if value.Containers == nil {
@@ -1489,6 +1678,11 @@ func validateChangeCardResultOriginal(value *ChangeCardResult) (err error) {
 			if err2 := validateExampleItemOriginal(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if value.Approval != nil {
+		if err2 := validateApprovalItemOriginal(value.Approval); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return err
@@ -1795,6 +1989,219 @@ func DecodeAmbiguityQuestion(data []byte) (out *AmbiguityQuestion, err error) {
 		out.Options = make([]string, len(body.Options))
 		for i, val := range body.Options {
 			out.Options[i] = val
+		}
+	}
+	return out, nil
+}
+
+// EncodeApprovalItem turns a service value into JSON using the field names in the Goa design.
+func EncodeApprovalItem(in *ApprovalItem) ([]byte, error) {
+	if err := checkApprovalItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode ApprovalItem JSON: %w", err)
+	}
+	if err := validateApprovalItemOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate ApprovalItem value: %w", err)
+	}
+	var body *jsonApprovalItemTransport
+	{
+		body = &jsonApprovalItemTransport{
+			ApprovedBy:      &in.ApprovedBy,
+			ReportDigest:    &in.ReportDigest,
+			CandidateCommit: &in.CandidateCommit,
+			SuiteID:         &in.SuiteID,
+			SuiteCommit:     &in.SuiteCommit,
+			Environment:     &in.Environment,
+		}
+		scenarioCount := approvalItemIntTransport(in.ScenarioCount)
+		body.ScenarioCount = &scenarioCount
+		body.Artifacts = make(map[string]string, len(in.Artifacts))
+		for key, val := range in.Artifacts {
+			tk := key
+			tv := val
+			body.Artifacts[tk] = tv
+		}
+	}
+	if err := validatejsonApprovalItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate ApprovalItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode ApprovalItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateApprovalItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateApprovalItemValue(in *ApprovalItem) error {
+	if err := checkApprovalItemValue(in); err != nil {
+		return fmt.Errorf("validate ApprovalItem value: %w", err)
+	}
+	if err := validateApprovalItemOriginal(in); err != nil {
+		return fmt.Errorf("validate ApprovalItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "ApprovalItem")
+	}
+
+	var body *jsonApprovalItemTransport
+	{
+		body = &jsonApprovalItemTransport{
+			ApprovedBy:      &in.ApprovedBy,
+			ReportDigest:    &in.ReportDigest,
+			CandidateCommit: &in.CandidateCommit,
+			SuiteID:         &in.SuiteID,
+			SuiteCommit:     &in.SuiteCommit,
+			Environment:     &in.Environment,
+		}
+		scenarioCount := approvalItemIntTransport(in.ScenarioCount)
+		body.ScenarioCount = &scenarioCount
+		body.Artifacts = make(map[string]string, len(in.Artifacts))
+		for key, val := range in.Artifacts {
+			tk := key
+			tv := val
+			body.Artifacts[tk] = tv
+		}
+	}
+	if err := validatejsonApprovalItemTransport(body); err != nil {
+		return fmt.Errorf("validate ApprovalItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeApprovalItem checks JSON field names from the Goa design and returns a service value.
+func DecodeApprovalItem(data []byte) (out *ApprovalItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode ApprovalItem JSON: %w", err)
+	}
+	if err := validateApprovalItemJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode ApprovalItem JSON: %w", err)
+	}
+	var body *jsonApprovalItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode ApprovalItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode ApprovalItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode ApprovalItem JSON after first value: %w", err)
+	}
+	if err := validatejsonApprovalItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate ApprovalItem JSON: %w", err)
+	}
+	{
+		out = &ApprovalItem{
+			ApprovedBy:      *body.ApprovedBy,
+			ReportDigest:    *body.ReportDigest,
+			CandidateCommit: *body.CandidateCommit,
+			SuiteID:         *body.SuiteID,
+			SuiteCommit:     *body.SuiteCommit,
+			Environment:     *body.Environment,
+			ScenarioCount:   int(*body.ScenarioCount),
+		}
+		out.Artifacts = make(map[string]string, len(body.Artifacts))
+		for key, val := range body.Artifacts {
+			tk := key
+			tv := val
+			out.Artifacts[tk] = tv
+		}
+	}
+	return out, nil
+}
+
+// EncodeApproveMergePayload turns a service value into JSON using the field names in the Goa design.
+func EncodeApproveMergePayload(in *ApproveMergePayload) ([]byte, error) {
+	if err := checkApproveMergePayloadValue(in); err != nil {
+		return nil, fmt.Errorf("encode ApproveMergePayload JSON: %w", err)
+	}
+	if err := validateApproveMergePayloadOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate ApproveMergePayload value: %w", err)
+	}
+	var body *jsonApproveMergePayloadTransport
+	{
+		body = &jsonApproveMergePayloadTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+			ReportDigest:    &in.ReportDigest,
+		}
+	}
+	if err := validatejsonApproveMergePayloadTransport(body); err != nil {
+		return nil, fmt.Errorf("validate ApproveMergePayload JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode ApproveMergePayload JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateApproveMergePayloadValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateApproveMergePayloadValue(in *ApproveMergePayload) error {
+	if err := checkApproveMergePayloadValue(in); err != nil {
+		return fmt.Errorf("validate ApproveMergePayload value: %w", err)
+	}
+	if err := validateApproveMergePayloadOriginal(in); err != nil {
+		return fmt.Errorf("validate ApproveMergePayload value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "ApproveMergePayload")
+	}
+
+	var body *jsonApproveMergePayloadTransport
+	{
+		body = &jsonApproveMergePayloadTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+			ReportDigest:    &in.ReportDigest,
+		}
+	}
+	if err := validatejsonApproveMergePayloadTransport(body); err != nil {
+		return fmt.Errorf("validate ApproveMergePayload value: %w", err)
+	}
+	return nil
+}
+
+// DecodeApproveMergePayload checks JSON field names from the Goa design and returns a service value.
+func DecodeApproveMergePayload(data []byte) (out *ApproveMergePayload, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode ApproveMergePayload JSON: %w", err)
+	}
+	if err := validateApproveMergePayloadJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode ApproveMergePayload JSON: %w", err)
+	}
+	var body *jsonApproveMergePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode ApproveMergePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode ApproveMergePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode ApproveMergePayload JSON after first value: %w", err)
+	}
+	if err := validatejsonApproveMergePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate ApproveMergePayload JSON: %w", err)
+	}
+	{
+		out = &ApproveMergePayload{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			CandidateCommit: *body.CandidateCommit,
+			ReportDigest:    *body.ReportDigest,
 		}
 	}
 	return out, nil
@@ -2318,6 +2725,9 @@ func EncodeChangeCardResult(in *ChangeCardResult) ([]byte, error) {
 		if in.UIComposition != nil {
 			body.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
 		}
+		if in.Approval != nil {
+			body.Approval = encodeApprovalItemToApprovalItemTransport(in.Approval)
+		}
 	}
 	if err := validatejsonChangeCardResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate ChangeCardResult JSON: %w", err)
@@ -2386,6 +2796,9 @@ func ValidateChangeCardResultValue(in *ChangeCardResult) error {
 		}
 		if in.UIComposition != nil {
 			body.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
+		}
+		if in.Approval != nil {
+			body.Approval = encodeApprovalItemToApprovalItemTransport(in.Approval)
 		}
 	}
 	if err := validatejsonChangeCardResultTransport(body); err != nil {
@@ -2459,6 +2872,9 @@ func DecodeChangeCardResult(data []byte) (out *ChangeCardResult, err error) {
 		}
 		if body.UIComposition != nil {
 			out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(body.UIComposition)
+		}
+		if body.Approval != nil {
+			out.Approval = decodeApprovalItemTransportToApprovalItem(body.Approval)
 		}
 	}
 	return out, nil
@@ -4052,6 +4468,26 @@ func decodeAmbiguityQuestionTransportToAmbiguityQuestion(v *jsonAmbiguityQuestio
 	return res
 }
 
+func decodeApprovalItemTransportToApprovalItem(v *jsonApprovalItemTransport) *ApprovalItem {
+	res := &ApprovalItem{
+		ApprovedBy:      *v.ApprovedBy,
+		ReportDigest:    *v.ReportDigest,
+		CandidateCommit: *v.CandidateCommit,
+		SuiteID:         *v.SuiteID,
+		SuiteCommit:     *v.SuiteCommit,
+		Environment:     *v.Environment,
+		ScenarioCount:   int(*v.ScenarioCount),
+	}
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
+	}
+
+	return res
+}
+
 func decodeBuilderScopeItemTransportToBuilderScopeItem(v *jsonBuilderScopeItemTransport) *BuilderScopeItem {
 	res := &BuilderScopeItem{
 		Name:               *v.Name,
@@ -4232,6 +4668,27 @@ func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *
 	res.Options = make([]string, len(v.Options))
 	for i, val := range v.Options {
 		res.Options[i] = val
+	}
+
+	return res
+}
+
+func encodeApprovalItemToApprovalItemTransport(v *ApprovalItem) *jsonApprovalItemTransport {
+	res := &jsonApprovalItemTransport{
+		ApprovedBy:      &v.ApprovedBy,
+		ReportDigest:    &v.ReportDigest,
+		CandidateCommit: &v.CandidateCommit,
+		SuiteID:         &v.SuiteID,
+		SuiteCommit:     &v.SuiteCommit,
+		Environment:     &v.Environment,
+	}
+	scenarioCount := approvalItemIntTransport(v.ScenarioCount)
+	res.ScenarioCount = &scenarioCount
+	res.Artifacts = make(map[string]string, len(v.Artifacts))
+	for key, val := range v.Artifacts {
+		tk := key
+		tv := val
+		res.Artifacts[tk] = tv
 	}
 
 	return res
@@ -4624,6 +5081,187 @@ func validateAmbiguityQuestionJSONValue2(path string, value any, description str
 			item, description,
 		); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// validateApprovalItemJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateApprovalItemJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "approved_by":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.",
+			); err != nil {
+				return err
+			}
+		case "artifacts":
+			if err := validateApprovalItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.",
+			); err != nil {
+				return err
+			}
+		case "candidate_commit":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Candidate commit the report was checked against.",
+			); err != nil {
+				return err
+			}
+		case "environment":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Dependency profile the promotion target requires, such as sim.",
+			); err != nil {
+				return err
+			}
+		case "report_digest":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the approved CP4 verification report.",
+			); err != nil {
+				return err
+			}
+		case "scenario_count":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Number of declared evaluator scenarios, every one of which passed.",
+			); err != nil {
+				return err
+			}
+		case "suite_commit":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite commit the promotion target requires.",
+			); err != nil {
+				return err
+			}
+		case "suite_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite the promotion target requires.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"approved_by",
+				"artifacts",
+				"candidate_commit",
+				"environment",
+				"report_digest",
+				"scenario_count",
+				"suite_commit",
+				"suite_id",
+			})
+		}
+	}
+	return nil
+}
+
+// validateApprovalItemJSONValue2 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateApprovalItemJSONValue2(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if err := validateAgentPolicyItemJSONValue2(
+			generatedJSONChildPath(path, key, true),
+			typed[key], description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateApproveMergePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateApproveMergePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "candidate_commit":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Full commit ID of the candidate being promoted (40 or 64 lowercase hex characters).",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Confirmed Change Card identifier.",
+			); err != nil {
+				return err
+			}
+		case "report_digest":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the CP4 verification report written by surla verify (64 lowercase hex characters).",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Current request_revision of the confirmed Change Card.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"candidate_commit",
+				"change_id",
+				"report_digest",
+				"request_revision",
+			})
 		}
 	}
 	return nil
@@ -5574,6 +6212,13 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 			); err != nil {
 				return err
 			}
+		case "approval":
+			if err := validateApprovalItemJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+			); err != nil {
+				return err
+			}
 		case "change_id":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
@@ -5641,6 +6286,7 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 			return unknownJSONFieldError(path, key, []string{
 				"ambiguities",
 				"answers",
+				"approval",
 				"change_id",
 				"confirmed_by",
 				"examples",
@@ -6786,6 +7432,99 @@ func checkAmbiguityQuestionAmbiguityQuestionValue(in *AmbiguityQuestion, field s
 	return nil
 }
 
+// checkApprovalItemValue checks text and cycles before conversion.
+func checkApprovalItemValue(in *ApprovalItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkApprovalItemApprovalItemValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkApprovalItemApprovalItemValue checks one generated value on the active path.
+func checkApprovalItemApprovalItemValue(in *ApprovalItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ApprovedBy)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "approved_by", false))
+		}
+		if !utf8.ValidString(string(in.ReportDigest)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "report_digest", false))
+		}
+		if !utf8.ValidString(string(in.CandidateCommit)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "candidate_commit", false))
+		}
+		if !utf8.ValidString(string(in.SuiteID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "suite_id", false))
+		}
+		if !utf8.ValidString(string(in.SuiteCommit)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "suite_commit", false))
+		}
+		if !utf8.ValidString(string(in.Environment)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "environment", false))
+		}
+		for key1, item1 := range in.Artifacts {
+			_ = item1
+			if !utf8.ValidString(string(key1)) {
+				return fmt.Errorf("%s: invalid UTF-8 map key", generatedJSONChildPath(field, "artifacts", false))
+			}
+			if !utf8.ValidString(string(item1)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(generatedJSONChildPath(field, "artifacts", false), string(key1), true))
+			}
+		}
+	}
+	return nil
+}
+
+// checkApproveMergePayloadValue checks text and cycles before conversion.
+func checkApproveMergePayloadValue(in *ApproveMergePayload) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkApproveMergePayloadApproveMergePayloadValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkApproveMergePayloadApproveMergePayloadValue checks one generated value on the active path.
+func checkApproveMergePayloadApproveMergePayloadValue(in *ApproveMergePayload, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ChangeID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
+		}
+		if !utf8.ValidString(string(in.RequestRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
+		}
+		if !utf8.ValidString(string(in.CandidateCommit)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "candidate_commit", false))
+		}
+		if !utf8.ValidString(string(in.ReportDigest)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "report_digest", false))
+		}
+	}
+	return nil
+}
+
 // checkArchitecturePreviewResultValue checks text and cycles before conversion.
 func checkArchitecturePreviewResultValue(in *ArchitecturePreviewResult) error {
 	if in == nil {
@@ -7224,6 +7963,9 @@ func checkChangeCardResultChangeCardResultValue(in *ChangeCardResult, field stri
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
 		}
 		if err := checkChangeCardResultUICompositionItemValue(in.UIComposition, generatedJSONChildPath(field, "ui_composition", false), active); err != nil {
+			return err
+		}
+		if err := checkApprovalItemApprovalItemValue(in.Approval, generatedJSONChildPath(field, "approval", false), active); err != nil {
 			return err
 		}
 	}

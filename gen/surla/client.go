@@ -22,11 +22,12 @@ type Client struct {
 	GetChangeEndpoint           goa.Endpoint
 	PreviewArchitectureEndpoint goa.Endpoint
 	DraftOverrideEndpoint       goa.Endpoint
+	ApproveMergeEndpoint        goa.Endpoint
 	DiffEndpoint                goa.Endpoint
 }
 
 // NewClient initializes a "surla" service client given the endpoints.
-func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange, previewArchitecture, draftOverride, diff goa.Endpoint) *Client {
+func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange, previewArchitecture, draftOverride, approveMerge, diff goa.Endpoint) *Client {
 	return &Client{
 		CheckpointUIEndpoint:        checkpointUI,
 		GoldenPathEndpoint:          goldenPath,
@@ -35,6 +36,7 @@ func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange
 		GetChangeEndpoint:           getChange,
 		PreviewArchitectureEndpoint: previewArchitecture,
 		DraftOverrideEndpoint:       draftOverride,
+		ApproveMergeEndpoint:        approveMerge,
 		DiffEndpoint:                diff,
 	}
 }
@@ -108,6 +110,16 @@ func (c *Client) DraftOverride(ctx context.Context, p *DraftOverridePayload) (re
 		return
 	}
 	return ires.(*DraftOverrideResult), nil
+}
+
+// ApproveMerge calls the "approve_merge" endpoint of the "surla" service.
+func (c *Client) ApproveMerge(ctx context.Context, p *ApproveMergePayload) (res *ChangeCardResult, err error) {
+	var ires any
+	ires, err = c.ApproveMergeEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*ChangeCardResult), nil
 }
 
 // Diff calls the "diff" endpoint of the "surla" service.
