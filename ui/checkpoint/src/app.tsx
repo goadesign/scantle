@@ -570,8 +570,8 @@ export function bootstrapCheckpointApp() {
               card: payload,
             };
             statusEl.textContent = payload.approval
-              ? "Recorded Checkpoint 5 promotion approval on the saved revision; unsaved draft edits preserved."
-              : "Updated Change Card on the saved revision; unsaved draft edits preserved.";
+              ? "Showing approved Change Card (in-memory approval recorded; nothing merged or deployed)."
+              : "Showing confirmed Change Card. You can refine answers or examples below.";
             syncEditorRegion();
             return;
           }
