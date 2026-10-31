@@ -6,6 +6,7 @@ import (
 	"go/format"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -112,11 +113,14 @@ func TestInitLeavesNothingWhenAStepFails(t *testing.T) {
 func TestInitNeverReplacesADirectoryCreatedMeanwhile(t *testing.T) {
 	parent := t.TempDir()
 	dir := filepath.Join(parent, "shop")
-	run := func(_ context.Context, _, _ string, args ...string) error {
+	run := func(_ context.Context, moduleDir, _ string, args ...string) error {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Join(dir, "late.txt"), []byte("written meanwhile"), 0o600)
+		if err := os.WriteFile(filepath.Join(dir, "late.txt"), []byte("written meanwhile"), 0o600); err != nil {
+			return err
+		}
+		return fakeGoaGen(moduleDir, "shop", args)
 	}
 	_, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/shop", SurlaVersion: published}, run)
 	require.ErrorContains(t, err, "move project into")
@@ -162,9 +166,9 @@ func TestInitWritesTheProjectWithTheServiceName(t *testing.T) {
 	parent := t.TempDir()
 	dir := filepath.Join(parent, "bakery")
 	var ran []string
-	run := func(_ context.Context, _, _ string, args ...string) error {
+	run := func(_ context.Context, dir, _ string, args ...string) error {
 		ran = append(ran, strings.Join(args, " "))
-		return nil
+		return fakeGoaGen(dir, "bakery", args)
 	}
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
@@ -213,6 +217,29 @@ func TestInitWritesTheProjectWithTheServiceName(t *testing.T) {
 	assert.Contains(t, string(main), `genbakery "example.com/bakery/gen/bakery"`)
 	assert.NotContains(t, string(main), "[[")
 	assertOnly(t, parent, "bakery")
+}
+
+func TestInitRejectsANameGoaGeneratesUnderAnotherPackage(t *testing.T) {
+	parent := t.TempDir()
+	run := func(_ context.Context, dir, _ string, args ...string) error {
+		return fakeGoaGen(dir, "errors_", args)
+	}
+	_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "errors"), Module: "example.com/errors", SurlaVersion: published}, run)
+	require.ErrorContains(t, err, `Goa does not generate a service named "errors" as package "errors"`)
+	assert.ErrorContains(t, err, "such as errorsapi")
+	assertOnly(t, parent)
+}
+
+// fakeGoaGen stands in for goa gen: for a gen command it writes the service
+// package Goa would generate, named pkg, into dir.
+func fakeGoaGen(dir, pkg string, args []string) error {
+	if !slices.Contains(args, "gen") {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "gen", pkg), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "gen", pkg, "service.go"), []byte("package "+pkg+"\n"), 0o644)
 }
 
 // failRunner fails the test if Init runs any command.

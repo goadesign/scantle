@@ -294,6 +294,9 @@ func build(ctx context.Context, root, logs string, d data, run Runner) error {
 		if err := runAll(ctx, dir, m.dir, logs, steps, run); err != nil {
 			return err
 		}
+		if err := checkServicePackage(dir, d.Name); err != nil {
+			return err
+		}
 		if err := render(dir, m.templates, d, func(p string) bool { return !isDesignFile(p) }); err != nil {
 			return err
 		}
@@ -341,6 +344,18 @@ func newLogPath(logs, moduleDir string, args []string) (string, error) {
 		return "", fmt.Errorf("create command log: %w", err)
 	}
 	return f.Name(), errors.Join(f.Close(), os.Remove(f.Name()))
+}
+
+// checkServicePackage reports a service name Goa generated under another
+// package name. Goa appends "_" to names reserved in generated Go code, such
+// as errors or string, and the templates import gen/<name>. Checking what Goa
+// actually generated keeps Goa the only owner of that rule.
+func checkServicePackage(dir, name string) error {
+	_, err := os.Stat(filepath.Join(dir, "gen", name, "service.go"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("Goa does not generate a service named %q as package %q, because the name is reserved in generated Go code; end -module in another name, such as %sapi", name, name, name)
+	}
+	return err
 }
 
 // isDesignFile reports whether a template path is written before goa gen:

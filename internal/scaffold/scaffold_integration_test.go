@@ -18,10 +18,14 @@ import (
 // builds the service and its evaluator suite, and runs the suite against the
 // service: both scenarios must pass.
 func TestInitBuildsForServiceNamesThatShadowTemplateNames(t *testing.T) {
-	for _, name := range []string{"helper", "service", "catalog"} {
+	for _, name := range []string{"helper", "service", "catalog", "errors"} {
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(t.TempDir(), name)
 			_, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/" + name, SurlaVersion: published}, RunCommand)
+			if name == "errors" {
+				require.ErrorContains(t, err, "reserved in generated Go code", "Goa generates errors as package errors_")
+				return
+			}
 			require.NoError(t, err, "Init runs go vet on both modules")
 		})
 	}

@@ -262,7 +262,7 @@ func writeServeStatus(w io.Writer, addr *net.TCPAddr, opts controlplane.Options)
 // another exact version. SIGINT and SIGTERM cancel it, leaving -dir unchanged.
 func runInit(args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
-	dir := fs.String("dir", "", "directory to create; it must not exist or must be empty (required)")
+	dir := fs.String("dir", "", "directory to create; it must not exist (required)")
 	modulePath := fs.String("module", "", "Go module path of the new service, such as example.com/shop; its last element names the service (required)")
 	version := fs.String("surla-version", "", "exact github.com/goadesign/surla version the evaluator suite requires (default: the version of this surla binary)")
 	if err := fs.Parse(args); err != nil {
