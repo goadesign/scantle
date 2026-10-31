@@ -27,6 +27,8 @@ import (
 	"syscall"
 	"time"
 
+	"goa.design/goa-ai/eval"
+
 	"github.com/goadesign/surla/internal/procgroup"
 )
 
@@ -164,6 +166,18 @@ func RemoveStore(store string) error {
 // Digest returns the pinned binary's lowercase hex SHA-256.
 func (a Artifact) Digest() string {
 	return a.digest
+}
+
+// Evidence returns the record an evaluator suite attaches to a scenario result
+// to state that the scenario ran this pinned binary. name is the binary's name
+// in the verification plan: the name in `surla verify -binary name=package`,
+// which the suite receives as `--artifact name=path`. surla verify accepts a
+// scenario only when its result carries one such record for every bound
+// binary, with the digest the verifier measured. For example, the binary bound
+// as orders with digest 9f2c… yields
+// eval.Artifact{Name: "candidate:orders", URI: "sha256:9f2c…"}.
+func (a Artifact) Evidence(name string) eval.Artifact {
+	return eval.Artifact{Name: "candidate:" + name, URI: "sha256:" + a.digest}
 }
 
 // Exec verifies the artifact's digest and starts it in the sandbox described by

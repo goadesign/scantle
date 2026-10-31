@@ -292,15 +292,12 @@ func (h *Hooks) OtherCustomersOrderRefused(ctx context.Context) (res eval.Result
 	}, nil
 }
 
-// recordArtifacts adds the digest of every candidate binary this run can
-// execute to the scenario result, as "candidate:<binary>" artifacts with
-// "sha256:<digest>" URIs, so the verifier can check the report used exactly
-// the binaries it bound.
+// recordArtifacts adds to the scenario result the evidence of every pinned
+// candidate binary this run can execute, under the names surla verify bound
+// them with (candidate.Artifact.Evidence), so the verifier can check the
+// report used exactly the binaries it bound.
 func (h *Hooks) recordArtifacts(res *eval.Result) {
-	res.Artifacts = append(res.Artifacts,
-		eval.Artifact{Name: "candidate:orders", URI: "sha256:" + h.env.Orders.Digest()},
-		eval.Artifact{Name: "candidate:orders-worker", URI: "sha256:" + h.env.Worker.Digest()},
-	)
+	res.Artifacts = append(res.Artifacts, h.env.Orders.Evidence("orders"), h.env.Worker.Evidence("orders-worker"))
 }
 
 // finalLedger stops and awaits every candidate process, then stops the

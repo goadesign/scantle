@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -269,4 +270,24 @@ func startModelGateway(t *testing.T, provider model.Provider) string {
 	go func() { assert.NoError(t, grpcSrv.Serve(lis)) }()
 	t.Cleanup(grpcSrv.Stop)
 	return lis.Addr().String()
+}
+
+func TestWriteServeStatusNamesTheBoundAddressAndOffFeatures(t *testing.T) {
+	addr := &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 51234}
+	var off bytes.Buffer
+	writeServeStatus(&off, addr, controlplane.Options{})
+	assert.Equal(t, `surla: serving on http://127.0.0.1:51234
+surla: connect MCP clients to http://127.0.0.1:51234/mcp with the bearer token
+surla: propose_change is off: no model is configured to analyze change requests (set -model-provider and -model-name, or -model-gateway-addr)
+surla: swarm plans are off: no coding-agent profiles are configured (set -swarm-profiles)
+`, off.String())
+
+	var on bytes.Buffer
+	writeServeStatus(&on, addr, controlplane.Options{
+		Analyzer:      controlplane.NewModelCP1Analyzer(nil),
+		SwarmProfiles: []swarm.ProviderProfile{{ID: "p"}},
+	})
+	assert.Equal(t, `surla: serving on http://127.0.0.1:51234
+surla: connect MCP clients to http://127.0.0.1:51234/mcp with the bearer token
+`, on.String())
 }

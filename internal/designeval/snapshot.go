@@ -38,10 +38,11 @@ func validateSnapshot(files map[string]string) (*modfile.File, error) {
 			designFiles++
 		}
 	}
-	for _, required := range []string{"go.mod", "go.sum"} {
-		if _, ok := files[required]; !ok {
-			return nil, fmt.Errorf("design snapshot has no %s", required)
-		}
+	if _, ok := files["go.mod"]; !ok {
+		return nil, errors.New("design snapshot has no go.mod: give the root directory of a Go module (the directory holding go.mod and design/)")
+	}
+	if _, ok := files["go.sum"]; !ok {
+		return nil, errors.New("design snapshot has no go.sum: the evaluator loads dependencies read-only, so go.sum must list every dependency's checksum; run `go mod tidy` in the module and try again")
 	}
 	if designFiles == 0 {
 		return nil, errors.New("design snapshot has no design/*.go file")

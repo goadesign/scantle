@@ -1,6 +1,6 @@
 // Command surla runs the Surla MCP software factory control-plane server
-// and CLI utilities (`surla serve`, `surla diff`, `surla verify` and
-// `surla approve`).
+// and CLI utilities (`surla serve`, `surla preview`, `surla diff`,
+// `surla verify` and `surla approve`). Run `surla help` for usage.
 package main
 
 import (
@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -28,6 +29,7 @@ import (
 
 	gensurla "github.com/goadesign/surla/gen/surla"
 	"github.com/goadesign/surla/internal/controlplane"
+	"github.com/goadesign/surla/internal/designeval"
 	"github.com/goadesign/surla/internal/diff"
 	"github.com/goadesign/surla/internal/swarm"
 	"github.com/goadesign/surla/internal/verify"
@@ -68,6 +70,29 @@ type approveSummary struct {
 	Counts verify.Counts `json:"counts"`
 }
 
+// usage is the text `surla`, `surla help`, `surla -h` and `surla --help`
+// print. Each subcommand prints its own flags with `surla <subcommand> -h`.
+const usage = `Surla checks changes to a Goa/Goa-AI service design before code is
+written, and checks the built service against an evaluator suite before it is
+promoted.
+
+Usage:
+
+  surla <command> [flags]
+
+Commands:
+
+  serve    run the Surla server that MCP clients (coding agents) connect to
+  preview  print the architecture, agent policies and tool contracts a design
+           module declares; needs no server and no model key
+  diff     compare the designs in two module directories
+  verify   build a candidate commit and run an evaluator suite against it,
+           printing a verification report
+  approve  check that a saved verification report passed and matches the
+           change being promoted
+  help     print this text, or "surla help <command>" for a command's flags
+`
+
 // apiKeyEnv maps each supported direct model provider to the environment
 // variable that holds its API key. Keys are read only from the environment so
 // they never appear in process listings or shell history.
@@ -77,31 +102,57 @@ var apiKeyEnv = map[string]string{
 }
 
 func main() {
-	if err := run(os.Args[1:]); err != nil {
+	if err := run(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintf(os.Stderr, "surla: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-// run dispatches the surla subcommands (`serve`, `diff`, `verify` and
-// `approve`).
-func run(args []string) error {
-	sub := "serve"
-	if len(args) > 0 {
-		sub = args[0]
-		args = args[1:]
+// run dispatches the surla subcommands. No arguments, `help`, `-h`, `-help`
+// and `--help` print usage to stdout; `help <command>` and
+// `<command> -h` print that command's flags to stderr (the flag package's
+// output). A help request returns nil so the exit status is 0; an unknown
+// command or a bad flag returns an error.
+func run(args []string, stdout io.Writer) error {
+	if len(args) == 0 {
+		_, err := fmt.Fprint(stdout, usage)
+		return err
 	}
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "help", "-h", "-help", "--help":
+		if sub == "help" && len(rest) == 1 {
+			return run([]string{rest[0], "-h"}, stdout)
+		}
+		if len(rest) > 0 {
+			return fmt.Errorf("unexpected arguments %q after %s", rest, sub)
+		}
+		_, err := fmt.Fprint(stdout, usage)
+		return err
+	}
+	err := dispatch(sub, rest, stdout)
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
+	}
+	return err
+}
+
+// dispatch runs the subcommand sub with its arguments. A `-h` flag makes the
+// subcommand's flag parsing print its flags and return flag.ErrHelp.
+func dispatch(sub string, args []string, stdout io.Writer) error {
 	switch sub {
 	case "serve":
 		return runServe(args)
+	case "preview":
+		return runPreview(args, stdout)
 	case "diff":
 		return runDiff(args)
 	case "verify":
 		return runVerify(args)
 	case "approve":
-		return runApprove(args, os.Stdout)
+		return runApprove(args, stdout)
 	default:
-		return fmt.Errorf("unknown subcommand %q (expected \"serve\", \"diff\", \"verify\" or \"approve\")", sub)
+		return fmt.Errorf("unknown command %q; run \"surla help\" to list the commands", sub)
 	}
 }
 
@@ -133,16 +184,20 @@ func runServe(args []string) (err error) {
 	})
 	cp := controlplane.New(opts)
 	srv := &http.Server{
-		Addr:              *addr,
 		Handler:           controlplane.NewHTTPHandler(cp, auth),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		return err
+	}
+	writeServeStatus(os.Stderr, ln.Addr(), opts)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
 			errCh <- err
 		}
 		close(errCh)
@@ -156,6 +211,51 @@ func runServe(args []string) (err error) {
 		defer cancel()
 		return srv.Shutdown(shutCtx)
 	}
+}
+
+// writeServeStatus tells the operator of `surla serve`, once the listener is
+// bound, where MCP clients connect and which optional features are off. addr is
+// the bound address, so port 0 reports the port actually assigned. The bearer
+// token never appears.
+func writeServeStatus(w io.Writer, addr net.Addr, opts controlplane.Options) {
+	fmt.Fprintf(w, "surla: serving on http://%s\n", addr)
+	fmt.Fprintf(w, "surla: connect MCP clients to http://%s/mcp with the bearer token\n", addr)
+	if opts.Analyzer == nil {
+		fmt.Fprintln(w, "surla: propose_change is off: no model is configured to analyze change requests"+
+			" (set -model-provider and -model-name, or -model-gateway-addr)")
+	}
+	if len(opts.SwarmProfiles) == 0 {
+		fmt.Fprintln(w, "surla: swarm plans are off: no coding-agent profiles are configured (set -swarm-profiles)")
+	}
+}
+
+// runPreview reads the design module in -dir (default: the current directory)
+// with readModuleSnapshot, evaluates it with designeval.Evaluate, and writes
+// the result to w as indented JSON: the system name, declarations, C4
+// containers and edges, agent policies and tool contracts. It records nothing
+// and calls no model. SIGINT and SIGTERM cancel the evaluation.
+func runPreview(args []string, w io.Writer) error {
+	fs := flag.NewFlagSet("preview", flag.ContinueOnError)
+	dir := fs.String("dir", ".", "root directory of the design module (holding go.mod, go.sum and design/)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected arguments %q", fs.Args())
+	}
+	files, err := readModuleSnapshot(*dir)
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	res, err := designeval.Evaluate(ctx, files)
+	if err != nil {
+		return err
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(res)
 }
 
 // runDiff compares two design modules on disk, each read into a snapshot with
@@ -360,20 +460,21 @@ func (b binaryFlags) Set(v string) error {
 }
 
 // parseVerifyFlags turns `surla verify` arguments into a verify.Plan and
-// reports whether the builder view was requested. Every plan field is required
-// and must be given explicitly; commit IDs and repositories are checked by
-// verify.Run.
+// reports whether the builder view was requested. -candidate-module and
+// -suite-module default to ".", the repository root; every other plan field is
+// required and must be given explicitly. Commit IDs and repositories are
+// checked by verify.Run.
 func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	binaries := binaryFlags{}
 	var p verify.Plan
 	fs.StringVar(&p.CandidateRepo, "candidate-repo", "", "git repository holding the candidate")
 	fs.StringVar(&p.CandidateCommit, "candidate-commit", "", "full commit ID of the candidate to build")
-	fs.StringVar(&p.CandidateModule, "candidate-module", "", "candidate Go module directory inside -candidate-repo")
+	fs.StringVar(&p.CandidateModule, "candidate-module", ".", "candidate Go module directory inside -candidate-repo")
 	fs.Var(binaries, "binary", "candidate binary as name=package inside -candidate-module (repeatable)")
 	fs.StringVar(&p.SuiteRepo, "suite-repo", "", "git repository holding the evaluator suite")
 	fs.StringVar(&p.SuiteCommit, "suite-commit", "", "full commit ID of the evaluator suite")
-	fs.StringVar(&p.SuiteModule, "suite-module", "", "suite Go module directory inside -suite-repo")
+	fs.StringVar(&p.SuiteModule, "suite-module", ".", "suite Go module directory inside -suite-repo")
 	fs.StringVar(&p.SuiteCommand, "suite-command", "", "suite command package inside -suite-module")
 	fs.StringVar(&p.RequestRevision, "request-revision", "", "request_revision of the confirmed change being verified")
 	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds and evidence; keep it away from builders")
@@ -391,10 +492,8 @@ func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 	}{
 		{"-candidate-repo", p.CandidateRepo},
 		{"-candidate-commit", p.CandidateCommit},
-		{"-candidate-module", p.CandidateModule},
 		{"-suite-repo", p.SuiteRepo},
 		{"-suite-commit", p.SuiteCommit},
-		{"-suite-module", p.SuiteModule},
 		{"-suite-command", p.SuiteCommand},
 		{"-request-revision", p.RequestRevision},
 		{"-work-dir", p.WorkDir},

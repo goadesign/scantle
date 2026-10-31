@@ -51,7 +51,7 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 		{
 			name:    "no flags names every required flag",
 			args:    nil,
-			wantErr: "verify requires -candidate-repo, -candidate-commit, -candidate-module, -suite-repo, -suite-commit, -suite-module, -suite-command, -request-revision, -work-dir, -report-dir, -binary",
+			wantErr: "verify requires -candidate-repo, -candidate-commit, -suite-repo, -suite-commit, -suite-command, -request-revision, -work-dir, -report-dir, -binary",
 		},
 		{name: "missing request revision", args: without(complete, "-request-revision"), wantErr: "verify requires -request-revision"},
 		{name: "missing binaries", args: without(complete, "-binary"), wantErr: "verify requires -binary"},
@@ -74,6 +74,13 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 			assert.Equal(t, tc.wantBuilderView, builderView)
 		})
 	}
+	t.Run("module directories default to the repository root", func(t *testing.T) {
+		plan, _, err := parseVerifyFlags(without(without(complete, "-candidate-module"), "-suite-module"))
+		require.NoError(t, err)
+		want := wantPlan
+		want.CandidateModule, want.SuiteModule = ".", "."
+		assert.Equal(t, want, plan)
+	})
 }
 
 func TestWriteVerifyReportPrintsBeforeFailing(t *testing.T) {
@@ -125,18 +132,46 @@ func TestWriteVerifyReportPrintsBeforeFailing(t *testing.T) {
 	}
 }
 
-func TestRunDispatchesVerify(t *testing.T) {
-	err := run([]string{"verify"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "verify requires -candidate-repo")
-
-	err = run([]string{"approve"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "approve requires -report")
-
-	err = run([]string{"unknown"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), `expected "serve", "diff", "verify" or "approve"`)
+func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
+	cases := []struct {
+		name      string
+		args      []string
+		wantUsage bool
+		wantErr   string
+	}{
+		{name: "no arguments", args: nil, wantUsage: true},
+		{name: "help", args: []string{"help"}, wantUsage: true},
+		{name: "-h", args: []string{"-h"}, wantUsage: true},
+		{name: "--help", args: []string{"--help"}, wantUsage: true},
+		{name: "help for a command", args: []string{"help", "verify"}},
+		{name: "command -h", args: []string{"preview", "-h"}},
+		{name: "command --help", args: []string{"approve", "--help"}},
+		{name: "help for an unknown command", args: []string{"help", "deploy"}, wantErr: `unknown command "deploy"`},
+		{name: "help with two commands", args: []string{"help", "verify", "approve"}, wantErr: "unexpected arguments"},
+		{name: "unknown command", args: []string{"unknown"}, wantErr: `unknown command "unknown"; run "surla help"`},
+		{name: "verify without flags", args: []string{"verify"}, wantErr: "verify requires -candidate-repo"},
+		{name: "approve without flags", args: []string{"approve"}, wantErr: "approve requires -report"},
+		{name: "serve without credentials", args: []string{"serve"}, wantErr: "serve requires -principal and -auth-token"},
+		{name: "preview with a bad flag", args: []string{"preview", "-nope"}, wantErr: "flag provided but not defined"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("SURLA_AUTH_TOKEN", "")
+			var out bytes.Buffer
+			err := run(tc.args, &out)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.wantUsage {
+				assert.Equal(t, usage, out.String())
+			} else {
+				assert.Empty(t, out.String())
+			}
+		})
+	}
 }
 
 // without returns a copy of args with every occurrence of the flag named name
