@@ -1,53 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
-  <!-- Surla Standalone Icon Mark ("The Interlocking Keystone S", 512x512, transparent background) -->
-  <defs>
-    <!-- Upper Carved Contract Arch (Warm Amber-Gold -> Coral) -->
-    <linearGradient id="upperStone" x1="88" y1="64" x2="424" y2="256" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#F59E0B" />
-      <stop offset="100%" stop-color="#EA580C" />
-    </linearGradient>
+  <!-- Left Compiled-Contract Gate Pillar (Blue) -->
+  <path d="M 184 104 H 136 A 56 56 0 0 0 80 160 V 352 A 56 56 0 0 0 136 408 H 184"
+        stroke="#3B82F6" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
 
-    <!-- Lower Surla River Arch (River Teal -> Ocean Blue) -->
-    <linearGradient id="lowerRiver" x1="88" y1="256" x2="424" y2="448" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#14B8A6" />
-      <stop offset="55%" stop-color="#0EA5E9" />
-      <stop offset="100%" stop-color="#2563EB" />
-    </linearGradient>
-  </defs>
+  <!-- Right Isolated-Sandbox Gate Pillar (Amber) -->
+  <path d="M 328 104 H 376 A 56 56 0 0 1 432 160 V 352 A 56 56 0 0 1 376 408 H 328"
+        stroke="#F59E0B" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
 
-  <!-- Upper Chiseled Stone Arch (The Compiled Contract) -->
-  <path
-    d="M 412 68
-       H 196
-       C 125.308 68 68 125.308 68 196
-       C 68 258.8 113.3 311.0 173.1 321.9
-       L 240 255
-       L 196 255
-       C 163.415 255 137 228.585 137 196
-       C 137 163.415 163.415 137 196 137
-       H 376
-       L 412 68 Z"
-    fill="url(#upperStone)"
-  />
+  <!-- Top & Bottom Keystone Lock Pins (Rose) -->
+  <rect x="234" y="68" width="44" height="72" rx="22" fill="#F43F5E" />
+  <rect x="234" y="372" width="44" height="72" rx="22" fill="#F43F5E" />
 
-  <!-- Lower Flowing River Arch (Verified Multi-Agent Execution) -->
-  <path
-    d="M 100 444
-       H 316
-       C 386.692 444 444 386.692 444 316
-       C 444 253.2 398.7 201.0 338.9 190.1
-       L 272 257
-       L 316 257
-       C 348.585 257 375 283.415 375 316
-       C 375 348.585 348.585 375 316 375
-       H 136
-       L 100 444 Z"
-    fill="url(#lowerRiver)"
-  />
-
-  <!-- Central Carved Verification Keystone Diamond -->
-  <polygon
-    points="256,214 298,256 256,298 214,256"
-    fill="#14B8A6"
-  />
+  <!-- Central Verification Check Lock (Teal) -->
+  <path d="M 190 264 L 238 312 L 330 204"
+        stroke="#14B8A6" stroke-width="46" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
