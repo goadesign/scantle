@@ -12,7 +12,6 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 	io "io"
-	"unicode/utf8"
 
 	scantle "github.com/goadesign/scantle/gen/scantle"
 	goa "goa.design/goa/v3/pkg"
@@ -252,7 +251,10 @@ func ValidateConfirmIntentResultTransport(value *ConfirmIntentResultTransport) (
 // ConfirmIntentResultUICompositionItemTransport stores JSON fields until they have been validated.
 type ConfirmIntentResultUICompositionItemTransport struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program *string `json:"program"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision *string `json:"composed_for_revision"`
@@ -268,11 +270,6 @@ func ValidateConfirmIntentResultUICompositionItemTransport(value *ConfirmIntentR
 	}
 	if value.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
-	}
-	if value.Program != nil {
-		if utf8.RuneCountInString(*value.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
-		}
 	}
 	return err
 }
@@ -598,7 +595,10 @@ func ValidateGetChangeResultTransport(value *GetChangeResultTransport) (err erro
 // GetChangeResultUICompositionItemTransport stores JSON fields until they have been validated.
 type GetChangeResultUICompositionItemTransport struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program *string `json:"program"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision *string `json:"composed_for_revision"`
@@ -614,11 +614,6 @@ func ValidateGetChangeResultUICompositionItemTransport(value *GetChangeResultUIC
 	}
 	if value.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
-	}
-	if value.Program != nil {
-		if utf8.RuneCountInString(*value.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
-		}
 	}
 	return err
 }
@@ -1327,7 +1322,10 @@ func ValidateProposeChangeResultTransport(value *ProposeChangeResultTransport) (
 // ProposeChangeResultUICompositionItemTransport stores JSON fields until they have been validated.
 type ProposeChangeResultUICompositionItemTransport struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program *string `json:"program"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision *string `json:"composed_for_revision"`
@@ -1343,11 +1341,6 @@ func ValidateProposeChangeResultUICompositionItemTransport(value *ProposeChangeR
 	}
 	if value.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
-	}
-	if value.Program != nil {
-		if utf8.RuneCountInString(*value.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
-		}
 	}
 	return err
 }

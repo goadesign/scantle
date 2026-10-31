@@ -465,7 +465,7 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
 		JSONType:    "string",
-		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
@@ -751,7 +751,7 @@ var getChangeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
 		JSONType:    "string",
-		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
@@ -1315,7 +1315,7 @@ var proposeChangeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
 		JSONType:    "string",
-		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
@@ -3473,7 +3473,7 @@ func validateProposeChangeResultUICompositionItemTransportJSONValue(path string,
 		case "program":
 			if err := validateStringJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+				typed[key], "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.",
 			); err != nil {
 				return err
 			}

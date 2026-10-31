@@ -7,11 +7,7 @@
 
 package http
 
-import (
-	"unicode/utf8"
-
-	goa "goa.design/goa/v3/pkg"
-)
+import goa "goa.design/goa/v3/pkg"
 
 // ValidateConfirmIntentPayloadTransport runs the validations defined on ConfirmIntentPayloadTransport.
 func ValidateConfirmIntentPayloadTransport(body *ConfirmIntentPayloadTransport) (err error) {
@@ -632,11 +628,6 @@ func ValidateUICompositionItemTransport(body *UICompositionItemTransport) (err e
 	}
 	if body.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
-	}
-	if body.Program != nil {
-		if utf8.RuneCountInString(*body.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *body.Program, utf8.RuneCountInString(*body.Program), 1, true))
-		}
 	}
 	return
 }

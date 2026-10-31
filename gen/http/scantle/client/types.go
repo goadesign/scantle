@@ -8,8 +8,6 @@
 package client
 
 import (
-	"unicode/utf8"
-
 	scantle "github.com/goadesign/scantle/gen/scantle"
 	goa "goa.design/goa/v3/pkg"
 )
@@ -244,7 +242,10 @@ type ExampleItemResponseBody struct {
 // types.
 type UICompositionItemResponseBody struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program *string `form:"program,omitempty" json:"program,omitempty" xml:"program,omitempty"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision *string `form:"composed_for_revision,omitempty" json:"composed_for_revision,omitempty" xml:"composed_for_revision,omitempty"`
@@ -1085,11 +1086,6 @@ func ValidateUICompositionItemResponseBody(body *UICompositionItemResponseBody) 
 	if body.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
 	}
-	if body.Program != nil {
-		if utf8.RuneCountInString(*body.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *body.Program, utf8.RuneCountInString(*body.Program), 1, true))
-		}
-	}
 	return
 }
 
@@ -1101,11 +1097,6 @@ func validateUICompositionItemResponseBody(body *UICompositionItemResponseBody, 
 	}
 	if body.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", path))
-	}
-	if body.Program != nil {
-		if utf8.RuneCountInString(*body.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError(path+".program", *body.Program, utf8.RuneCountInString(*body.Program), 1, true))
-		}
 	}
 	return
 }

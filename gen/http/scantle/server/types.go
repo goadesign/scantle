@@ -242,7 +242,10 @@ type ExampleItemResponseBody struct {
 // types.
 type UICompositionItemResponseBody struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program string `form:"program" json:"program" xml:"program"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision string `form:"composed_for_revision" json:"composed_for_revision" xml:"composed_for_revision"`

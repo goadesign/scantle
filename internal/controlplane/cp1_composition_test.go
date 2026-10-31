@@ -78,17 +78,34 @@ func TestProposeChangeBindsTheModelCompositionToTheRevisionItAnalyzed(t *testing
 	assert.Equal(t, plainCard.RequestRevision, card.RequestRevision, "the composition must not be part of request_revision")
 }
 
-func TestProposeChangeRejectsABlankComposition(t *testing.T) {
+func TestProposeChangeCarriesAnyModelCompositionVerbatim(t *testing.T) {
 	ctx := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
-	blank := " \n\t"
-	cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, &blank)})
-
-	_, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
-	require.EqualError(t, err, "invalid cp1 analysis: ui_composition must not be blank")
-	cp.mu.RLock()
-	_, stored := cp.cards["chg"]
-	cp.mu.RUnlock()
-	assert.False(t, stored, "a rejected analysis stores no card")
+	cases := []struct {
+		name    string
+		program *string
+	}{
+		{name: "absent", program: nil},
+		{name: "empty", program: &[]string{""}[0]},
+		{name: "whitespace only", program: &[]string{" \n\t"}[0]},
+		{name: "not a valid program", program: &[]string{"root = Nonsense("}[0]},
+		{name: "catalog program", program: &[]string{compositionProgram}[0]},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, tc.program)})
+			card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+			require.NoError(t, err, "a composition the viewer cannot use must not cost the operator the analysis")
+			require.Len(t, card.Ambiguities, 1, "the authoritative questions survive")
+			require.Len(t, card.Examples, 1, "the authoritative examples survive")
+			if tc.program == nil {
+				assert.Nil(t, card.UIComposition)
+				return
+			}
+			require.NotNil(t, card.UIComposition)
+			assert.Equal(t, *tc.program, card.UIComposition.Program, "the server carries the program byte for byte and never judges it")
+			assert.Equal(t, card.RequestRevision, card.UIComposition.ComposedForRevision)
+		})
+	}
 }
 
 func TestCompositionDescribesOnlyTheRevisionItWasComposedFor(t *testing.T) {
