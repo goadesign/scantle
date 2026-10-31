@@ -84,7 +84,7 @@ go run ./cmd/surla help
 
 ### 2. Connect Your Coding Agent to the Surla Control Plane (`surla serve`)
 
-Start the Surla control plane, connect your coding assistant over MCP, and walk a feature change through Surla's five checkpoints (**CP1** Confirm Intent → **CP2** Preview Architecture → **CP3** Fast Draft & Sandbox → **CP4** Isolated Verification → **CP5** Promotion Check):
+Surla organizes development around five checkpoints (**CP1** Confirm Intent → **CP2** Preview Architecture → **CP3** Fast Draft & Sandbox → **CP4** Isolated Verification → **CP5** Promotion Check; see [`docs/HOW_IT_WORKS.md`](docs/HOW_IT_WORKS.md)). Start the standalone Surla control plane and connect your coding assistant over MCP to propose, confirm, and preview a feature change at **CP1** and **CP2** (standalone `surla serve` binds no `TargetUpdater` or `PromotionTarget`; see the [CLI verification walkthrough](examples/orders/README.md#3-run-os-sandboxed-end-to-end-verification-surla-verify) for **CP4** `surla verify` and **CP5** `surla approve`):
 
 ```bash
 # Start the Surla MCP & HTTP control plane with CP1 model analysis and multi-family swarm profiles
