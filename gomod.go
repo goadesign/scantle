@@ -11,8 +11,9 @@ import _ "embed"
 var goMod string
 
 // GoMod returns the go.mod Surla was built from. The design evaluator
-// (internal/designeval) reads the Goa, Goa-AI and Model versions it requires
-// as the generator versions for designs that do not require them. Because the
+// (internal/designeval) reads its go directive and the Goa, Goa-AI and Model
+// versions it requires, as the Go version and generator versions for designs
+// that do not require them. Because the
 // file is compiled in, the result does not depend on the working directory or
 // on a source checkout being present.
 func GoMod() string {
