@@ -17,7 +17,8 @@
 // suite reports with the ones it measured.
 //
 // An evaluator suite's main function only describes itself with a Command and
-// calls Main; the verifier decodes --describe output with Declaration.
+// calls Main; the verifier decodes --describe output with Declaration and
+// compares the exit status with ExitPassed.
 package suite
 
 import (
@@ -29,6 +30,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"slices"
 	"strings"
 	"syscall"
@@ -56,8 +58,9 @@ type (
 		// so it needs no binaries and builds no runtime state.
 		Declare func() (eval.Suite, error)
 		// Suite returns the generated eval.Suite whose scenarios run the given
-		// pinned binaries, keyed by name. pinned holds exactly Binaries. Its
-		// declared scenarios must match Declare's.
+		// pinned binaries, keyed by name. pinned holds exactly Binaries. The
+		// verifier accepts a report only when its scenario IDs are exactly
+		// Declare's; holdout tags are read from Declare alone.
 		Suite func(pinned map[string]candidate.Artifact) (eval.Suite, error)
 	}
 
@@ -88,7 +91,8 @@ type (
 
 const (
 	// ExitPassed is the exit status of a run in which every scenario passed,
-	// and of --describe.
+	// and of a successful --describe. The verifier treats any other status
+	// as a failed run.
 	ExitPassed = 0
 	// ExitFailed is the exit status of a run in which a scenario failed.
 	ExitFailed = 1
@@ -100,21 +104,22 @@ const (
 // and exits with the contract's status. SIGINT and SIGTERM cancel the run.
 func Main(c Command) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := Run(ctx, os.Args[1:], os.Stdout, os.Stderr, c)
+	code := runCommand(ctx, os.Args[1:], os.Stdout, os.Stderr, c)
 	stop()
 	os.Exit(code)
 }
 
-// Run runs the suite command described by c with args and returns its exit
-// status. --describe writes the Declaration to stdout. Otherwise Run pins
+// runCommand runs the suite command described by c with args and returns its
+// exit status. --describe writes the Declaration to stdout. Otherwise Run pins
 // every --artifact into a temporary store, runs the scenarios selected by
 // --scenario or --tag (all by default; the two cannot be combined), with at
 // most --max-concurrency scenarios in flight, writes the eval.Report to stdout, and
 // removes the store. Errors go to stderr. A report is written whenever the
-// runner produced one, even when the run then failed.
-func Run(ctx context.Context, args []string, stdout, stderr io.Writer, c Command) int {
+// runner produced one, even when the run then failed; a store that cannot be
+// removed is an error, so the status is then ExitError.
+func runCommand(ctx context.Context, args []string, stdout, stderr io.Writer, c Command) int {
 	var artifacts, scenarios, tags listFlag
-	fs := flag.NewFlagSet("suite", flag.ContinueOnError)
+	fs := flag.NewFlagSet(filepath.Base(os.Args[0]), flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	describe := fs.Bool("describe", false, "print the suite declaration as JSON and exit")
 	fs.Var(&artifacts, "artifact", "candidate binary as name=path (repeatable)")

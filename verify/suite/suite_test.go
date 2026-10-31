@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,13 +41,17 @@ func TestRunFollowsTheSuiteCommandContract(t *testing.T) {
 		{name: "repeated artifact", args: []string{artifact, artifact}, wantCode: ExitError, wantStderr: "--artifact app given twice"},
 		{name: "malformed artifact", args: []string{"--artifact", "app"}, wantCode: ExitError, wantStderr: `--artifact "app" must be name=path`},
 		{name: "scenario and tag", args: []string{artifact, "--scenario", "smoke", "--tag", "holdout"}, wantCode: ExitError, wantStderr: "--scenario and --tag cannot be combined"},
-		{name: "zero concurrency", args: []string{artifact, "--max-concurrency", "0"}, wantCode: ExitError},
+		{name: "zero concurrency", args: []string{artifact, "--max-concurrency", "0"}, wantCode: ExitError, wantStderr: "concurrency must be greater than zero"},
+		{name: "missing binary file", args: []string{"--artifact", "app=" + filepath.Join(t.TempDir(), "nope")}, wantCode: ExitError, wantStderr: "open "},
 		{name: "positional argument", args: []string{artifact, "extra"}, wantCode: ExitError, wantStderr: `unexpected arguments ["extra"]`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			t.Setenv("TMPDIR", tmp)
+			defer assertEmptyDir(t, tmp)
 			var stdout, stderr bytes.Buffer
-			code := Run(t.Context(), tc.args, &stdout, &stderr, testCommand(tc.failing))
+			code := runCommand(t.Context(), tc.args, &stdout, &stderr, testCommand(tc.failing))
 			assert.Equal(t, tc.wantCode, code, stderr.String())
 			assert.Contains(t, stderr.String(), tc.wantStderr)
 			if tc.wantRan == nil {
@@ -67,9 +72,31 @@ func TestRunFollowsTheSuiteCommandContract(t *testing.T) {
 	}
 }
 
-func TestRunDescribesTheSuiteWithoutBinaries(t *testing.T) {
+func TestRunReportsASuiteThatCannotBeBuilt(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "app")
+	require.NoError(t, os.WriteFile(bin, []byte("app binary"), 0o700))
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	c := testCommand(false)
+	c.Suite = func(map[string]candidate.Artifact) (eval.Suite, error) {
+		return eval.Suite{}, errors.New("no simulator")
+	}
+
 	var stdout, stderr bytes.Buffer
-	code := Run(t.Context(), []string{"--describe"}, &stdout, &stderr, testCommand(false))
+	code := runCommand(t.Context(), []string{"--artifact", "app=" + bin}, &stdout, &stderr, c)
+	assert.Equal(t, ExitError, code)
+	assert.Empty(t, stdout.String())
+	assert.Contains(t, stderr.String(), "no simulator")
+	assertEmptyDir(t, tmp)
+}
+
+func TestRunDescribesTheSuiteWithoutBinaries(t *testing.T) {
+	c := testCommand(false)
+	c.Suite = func(map[string]candidate.Artifact) (eval.Suite, error) {
+		panic("--describe must not build the runtime suite")
+	}
+	var stdout, stderr bytes.Buffer
+	code := runCommand(t.Context(), []string{"--describe"}, &stdout, &stderr, c)
 	require.Equal(t, ExitPassed, code, stderr.String())
 	var d Declaration
 	require.NoError(t, json.Unmarshal(stdout.Bytes(), &d))
@@ -118,6 +145,15 @@ func check(passed bool) eval.Check {
 		return eval.Check{Name: "ok", Passed: true}
 	}
 	return eval.Check{Name: "ok", Diagnostic: "forced failure"}
+}
+
+// assertEmptyDir checks that dir, the TMPDIR of a run, holds nothing: the
+// run removed its artifact store.
+func assertEmptyDir(t *testing.T, dir string) {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Empty(t, entries, "artifact store left in %s", dir)
 }
 
 // digestOf pins path into a scratch store and returns its digest, the value
