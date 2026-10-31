@@ -1029,23 +1029,67 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 		cp, target, card := setup(t)
 		_, err := approve(aliceCtx, cp, card, target.report.Digest)
 		require.NoError(t, err)
-		target.inputsReading = make(chan struct{})
-		target.inputsRelease = make(chan struct{})
+		reading, release := make(chan struct{}), make(chan struct{})
+		target.inputsReading, target.inputsRelease = reading, release
 		got := make(chan *gensurla.ChangeCardResult, 1)
 		go func() {
 			read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
 			assert.NoError(t, err)
 			got <- read
 		}()
-		<-target.inputsReading
+		<-reading
 		// While get_change waits on the target, a confirmation that takes
 		// the lock completes.
 		changed, err := reconfirm(cp, card, "Manager approval")
 		require.NoError(t, err)
 		assert.Nil(t, changed.Approval)
-		close(target.inputsRelease)
+		close(release)
 		read := <-got
 		assert.Equal(t, card.RequestRevision, read.RequestRevision, "get_change answers for the card it read")
+	})
+
+	t.Run("an unchanged confirmation checking the approval does not hold the card lock", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		reading, release := make(chan struct{}), make(chan struct{})
+		target.inputsReading, target.inputsRelease = reading, release
+		got := make(chan *gensurla.ChangeCardResult, 1)
+		go func() {
+			same, err := reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+			assert.NoError(t, err)
+			got <- same
+		}()
+		<-reading
+		changed, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err, "a second confirmation takes the lock while the first waits on the target")
+		assert.NotEqual(t, card.RequestRevision, changed.RequestRevision)
+		close(release)
+		same := <-got
+		assert.Equal(t, card.RequestRevision, same.RequestRevision)
+	})
+
+	t.Run("an approval recorded from inputs measured before the target changed is not presented", func(t *testing.T) {
+		cp, target, card := setup(t)
+		reading, release := make(chan struct{}), make(chan struct{})
+		target.inputsReading, target.inputsRelease = reading, release
+		errc := make(chan error, 1)
+		go func() {
+			_, err := approve(aliceCtx, cp, card, target.report.Digest)
+			errc <- err
+		}()
+		<-reading
+		// approve_merge has measured the old inputs; the target now changes.
+		target.inputs = PromotionInputs{
+			SuiteID: inputs.SuiteID, SuiteCommit: inputs.SuiteCommit, Environment: inputs.Environment,
+			Artifacts: map[string]string{"orders": "d2"},
+		}
+		close(release)
+		require.NoError(t, <-errc, "the approval matched what was measured")
+
+		read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		require.NoError(t, err)
+		assert.Nil(t, read.Approval, "a fresh read checks the changed target")
 	})
 
 	t.Run("a revision minted while the report loads is not approved", func(t *testing.T) {
@@ -1195,16 +1239,23 @@ func (s *promotionTargetStub) LoadReport(context.Context, string) (verify.Report
 	return s.report, nil
 }
 
-// CurrentInputs returns s.inputs, or s.inputsErr when set.
+// CurrentInputs returns s.inputs, or s.inputsErr when set. When
+// inputsReading is set, the first call closes it and waits on inputsRelease.
+// The snapshot is taken when the call starts, so a test that changes
+// s.inputs while the call is held models a target that changed after it was
+// measured.
 func (s *promotionTargetStub) CurrentInputs(context.Context, string) (PromotionInputs, error) {
+	inputs, err := s.inputs, s.inputsErr
 	if s.inputsReading != nil {
-		close(s.inputsReading)
-		<-s.inputsRelease
+		reading, release := s.inputsReading, s.inputsRelease
+		s.inputsReading, s.inputsRelease = nil, nil
+		close(reading)
+		<-release
 	}
-	if s.inputsErr != nil {
-		return PromotionInputs{}, s.inputsErr
+	if err != nil {
+		return PromotionInputs{}, err
 	}
-	return s.inputs, nil
+	return inputs, nil
 }
 
 // passingReport assembles a report in which both declared scenarios passed
