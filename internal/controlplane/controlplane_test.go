@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -962,6 +963,91 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 		assert.Nil(t, changed.Approval, "a new revision drops the approval")
 	})
 
+	t.Run("a saved approval is current only while the target's inputs match", func(t *testing.T) {
+		changes := []struct {
+			name   string
+			change func(*PromotionInputs)
+		}{
+			{"suite", func(in *PromotionInputs) { in.SuiteID = "other_suite" }},
+			{"suite commit", func(in *PromotionInputs) { in.SuiteCommit = "suite-2" }},
+			{"environment", func(in *PromotionInputs) { in.Environment = "staging" }},
+			{"binary digest", func(in *PromotionInputs) { in.Artifacts = map[string]string{"orders": "d2"} }},
+			{"extra binary", func(in *PromotionInputs) { in.Artifacts = map[string]string{"orders": "d1", "worker": "d3"} }},
+		}
+		for _, tc := range changes {
+			t.Run(tc.name, func(t *testing.T) {
+				cp, target, card := setup(t)
+				approved, err := approve(aliceCtx, cp, card, target.report.Digest)
+				require.NoError(t, err)
+				saved := *approved.Approval
+
+				// The target changes on its own, without draft_override.
+				changed := inputs
+				changed.Artifacts = maps.Clone(inputs.Artifacts)
+				tc.change(&changed)
+				target.inputs = changed
+
+				read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+				require.NoError(t, err)
+				assert.Nil(t, read.Approval, "get_change does not present a stale approval")
+				assert.Equal(t, card.RequestRevision, read.RequestRevision)
+				same, err := reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+				require.NoError(t, err)
+				assert.Nil(t, same.Approval, "an unchanged confirm_intent does not either")
+				assert.Equal(t, card.RequestRevision, same.RequestRevision)
+				assert.Equal(t, saved, *approved.Approval, "the returned approval record is not changed")
+
+				// Restoring the approved inputs presents the saved approval again.
+				target.inputs = inputs
+				read, err = cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+				require.NoError(t, err)
+				assert.Equal(t, &saved, read.Approval)
+			})
+		}
+	})
+
+	t.Run("an approval is not presented when current inputs cannot be read", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		target.inputsErr = errors.New("target runs prompt overrides no report covers")
+		_, err = cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		assert.ErrorContains(t, err, "prompt overrides no report covers")
+		_, err = reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+		assert.ErrorContains(t, err, "prompt overrides no report covers")
+	})
+
+	t.Run("a card without an approval never reads the target", func(t *testing.T) {
+		cp, target, _ := setup(t)
+		target.inputsErr = errors.New("must not be called")
+		read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		require.NoError(t, err)
+		assert.Nil(t, read.Approval)
+	})
+
+	t.Run("checking an approval does not hold the card lock", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		target.inputsReading = make(chan struct{})
+		target.inputsRelease = make(chan struct{})
+		got := make(chan *gensurla.ChangeCardResult, 1)
+		go func() {
+			read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+			assert.NoError(t, err)
+			got <- read
+		}()
+		<-target.inputsReading
+		// While get_change waits on the target, a confirmation that takes
+		// the lock completes.
+		changed, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err)
+		assert.Nil(t, changed.Approval)
+		close(target.inputsRelease)
+		read := <-got
+		assert.Equal(t, card.RequestRevision, read.RequestRevision, "get_change answers for the card it read")
+	})
+
 	t.Run("a revision minted while the report loads is not approved", func(t *testing.T) {
 		cp, target, card := setup(t)
 		target.loading = make(chan struct{})
@@ -1090,6 +1176,10 @@ type promotionTargetStub struct {
 	loadErr error
 	// inputsErr, when set, is returned by CurrentInputs.
 	inputsErr error
+	// inputsReading, when set, is closed when CurrentInputs starts.
+	inputsReading chan struct{}
+	// inputsRelease, when set, is waited on before CurrentInputs returns.
+	inputsRelease chan struct{}
 }
 
 // LoadReport returns s.report, or s.loadErr when set, after the optional
@@ -1107,6 +1197,10 @@ func (s *promotionTargetStub) LoadReport(context.Context, string) (verify.Report
 
 // CurrentInputs returns s.inputs, or s.inputsErr when set.
 func (s *promotionTargetStub) CurrentInputs(context.Context, string) (PromotionInputs, error) {
+	if s.inputsReading != nil {
+		close(s.inputsReading)
+		<-s.inputsRelease
+	}
 	if s.inputsErr != nil {
 		return PromotionInputs{}, s.inputsErr
 	}
