@@ -135,8 +135,6 @@ export interface DraftOverrideResult {
 
 export interface PreservedDraft {
   fromRevision: string;
-  answers: Record<string, string>;
-  examples: ExampleItem[];
   lines: string[];
 }
 

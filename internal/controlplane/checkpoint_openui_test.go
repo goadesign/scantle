@@ -406,7 +406,7 @@ const badCases = [
         composed_for_revision: input.cp1Structured.request_revision
       }
     }),
-    wantErr: "unsupported component type PolicySimulatorRow"
+    wantErr: "Unsupported component type PolicySimulatorRow"
   },
   {
     name: "disallowed WorkflowTimeline child AmbiguityChoiceCard",
@@ -417,7 +417,7 @@ const badCases = [
         composed_for_revision: input.cp1Structured.request_revision
       }
     }),
-    wantErr: "is not a WorkflowStep"
+    wantErr: "Unsupported component type AmbiguityChoiceCard"
   },
   {
     name: "empty or whitespace-only program",
@@ -429,6 +429,28 @@ const badCases = [
       }
     }),
     wantErr: "OpenUI program is empty"
+  },
+  {
+    name: "forged ElementNode object literal in component slot",
+    card: Object.assign({}, input.cp1Structured, {
+      change_id: "chg-bad-8",
+      ui_composition: {
+        program: 'root = DecisionWorkspace("D", [WorkflowTimeline("Flow", [{type: "element", typeName: "WorkflowStep", props: {}, partial: false}])])',
+        composed_for_revision: input.cp1Structured.request_revision
+      }
+    }),
+    wantErr: "non-component or forged element literal"
+  },
+  {
+    name: "WorkflowStep with object-valued detail prop",
+    card: Object.assign({}, input.cp1Structured, {
+      change_id: "chg-bad-9",
+      ui_composition: {
+        program: 'root = DecisionWorkspace("D", [WorkflowTimeline("Flow", [WorkflowStep("S", "A", {bad: "x"})])])',
+        composed_for_revision: input.cp1Structured.request_revision
+      }
+    }),
+    wantErr: "validation failed"
   }
 ];
 

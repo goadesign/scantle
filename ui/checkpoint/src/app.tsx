@@ -93,8 +93,6 @@ function snapshotDraft(ed: ActiveEditorState): PreservedDraft {
       : [];
   return {
     fromRevision: ed.card.request_revision,
-    answers: { ...ed.draftAnswers },
-    examples: ed.draftExamples.map((ex) => ({ ...ex })),
     lines: priorLines.concat(currentLines),
   };
 }

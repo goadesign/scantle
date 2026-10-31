@@ -28,6 +28,8 @@ interface ElementNodeLike {
   type?: string;
   typeName?: string;
   props?: Record<string, unknown>;
+  partial?: boolean;
+  hasDynamicProps?: boolean;
 }
 
 // unwrapProps extracts the evaluated props object from a nested OpenUI ElementNode.
@@ -46,9 +48,9 @@ function unwrapProps<T>(item: unknown): T | null {
 export const PolicySimulatorRow = defineComponent({
   name: "PolicySimulatorRow",
   props: z.object({
-    scenario: z.string(),
-    inputSummary: z.string(),
-    outcomes: z.array(z.string()),
+    scenario: z.string().min(1),
+    inputSummary: z.string().min(1),
+    outcomes: z.array(z.string().trim().min(1)).min(1),
     exampleIndex: z.number().int().min(1).optional(),
   }),
   description:
@@ -60,9 +62,9 @@ export const PolicySimulatorRow = defineComponent({
 export const PolicySimulatorTable = defineComponent({
   name: "PolicySimulatorTable",
   props: z.object({
-    title: z.string(),
+    title: z.string().min(1),
     ambiguityIndex: z.number().int().min(1),
-    rows: z.array(PolicySimulatorRow.ref),
+    rows: z.array(PolicySimulatorRow.ref).min(1),
   }),
   description:
     "Interactive policy comparison table bound to a 1-based ambiguityIndex (1..N in ambiguities). Toggling an option updates the canonical CP1 answer draft and highlights the active outcome column.",
@@ -237,9 +239,9 @@ export const AmbiguityChoiceCard = defineComponent({
 export const WorkflowStep = defineComponent({
   name: "WorkflowStep",
   props: z.object({
-    step: z.string(),
-    actor: z.string(),
-    detail: z.string(),
+    step: z.string().min(1),
+    actor: z.string().min(1),
+    detail: z.string().min(1),
     gate: z.string().optional(),
   }),
   description: "A single workflow step showing the step name, actor, detail, and optional policy gate.",
@@ -259,8 +261,8 @@ export const WorkflowStep = defineComponent({
 export const WorkflowTimeline = defineComponent({
   name: "WorkflowTimeline",
   props: z.object({
-    title: z.string(),
-    steps: z.array(WorkflowStep.ref),
+    title: z.string().min(1),
+    steps: z.array(WorkflowStep.ref).min(1),
   }),
   description: "Ordered workflow sequence illustrating how actors and policy gates interact.",
   component: ({ props, renderNode }) => (
@@ -280,8 +282,8 @@ export const ImpactCallout = defineComponent({
   name: "ImpactCallout",
   props: z.object({
     variant: z.enum(["info", "warning"]),
-    title: z.string(),
-    summary: z.string(),
+    title: z.string().min(1),
+    summary: z.string().min(1),
   }),
   description: "Callout banner highlighting a preserved contract invariant or architectural trade-off.",
   component: ({ props }) => (
@@ -299,15 +301,17 @@ export const ImpactCallout = defineComponent({
 export const DecisionWorkspace = defineComponent({
   name: "DecisionWorkspace",
   props: z.object({
-    title: z.string(),
-    children: z.array(
-      z.union([
-        PolicySimulatorTable.ref,
-        AmbiguityChoiceCard.ref,
-        WorkflowTimeline.ref,
-        ImpactCallout.ref,
-      ])
-    ),
+    title: z.string().min(1),
+    children: z
+      .array(
+        z.union([
+          PolicySimulatorTable.ref,
+          AmbiguityChoiceCard.ref,
+          WorkflowTimeline.ref,
+          ImpactCallout.ref,
+        ])
+      )
+      .min(1),
   }),
   description:
     "Root container for a Scantle CP1 Decision Workspace combining policy simulators, decision cards, workflow timelines, and impact callouts.",
@@ -381,9 +385,183 @@ const scantleDecisionParser = createParser(
   scantleDecisionLibrary.root
 );
 
+const schemaToComponentName = new Map<unknown, string>(
+  Object.values(scantleDecisionLibrary.components).map((comp) => [comp.props, comp.name])
+);
+
+// allowedSlotComponentNames inspects a Zod v4 property schema and returns the
+// allowed component names when the property is a component reference slot.
+function allowedSlotComponentNames(propSchema: unknown): string[] | null {
+  const def = (propSchema as { _zod?: { def?: Record<string, unknown> } })?._zod?.def;
+  if (!def) {
+    return null;
+  }
+  if (def.type === "array") {
+    return allowedSlotComponentNames(def.element ?? def.innerType);
+  }
+  if (def.type === "union" && Array.isArray(def.options)) {
+    const names = def.options
+      .map((opt) => schemaToComponentName.get(opt))
+      .filter((n): n is string => typeof n === "string");
+    return names.length > 0 ? names : null;
+  }
+  const single = schemaToComponentName.get(propSchema);
+  return single ? [single] : null;
+}
+
 export interface OpenUIValidationResult {
   ok: boolean;
   error?: string;
+}
+
+// projectAndValidateNode recursively verifies that an AST ElementNode was
+// produced by an OpenUI component call (not a forged object literal), matches
+// its parent slot's allowed component types, satisfies its canonical Zod v4
+// props schema, and obeys the active Change Card's ordinal and option bounds.
+function projectAndValidateNode(
+  node: unknown,
+  allowedTypes: string[],
+  card: ChangeCardResult,
+  parentAmbiguity?: { id: string; options: string[] }
+): { ok: true; projectedProps: Record<string, unknown> } | { ok: false; error: string } {
+  if (!node || typeof node !== "object") {
+    return { ok: false, error: "OpenUI element node must be an object." };
+  }
+  const el = node as ElementNodeLike;
+  if (
+    el.type !== "element" ||
+    el.partial !== false ||
+    typeof el.hasDynamicProps !== "boolean" ||
+    typeof el.typeName !== "string" ||
+    !el.props ||
+    typeof el.props !== "object" ||
+    Array.isArray(el.props)
+  ) {
+    return {
+      ok: false,
+      error: "OpenUI slot contains a non-component or forged element literal.",
+    };
+  }
+  if (!allowedTypes.includes(el.typeName)) {
+    return {
+      ok: false,
+      error:
+        "Unsupported component type " +
+        el.typeName +
+        " (allowed: " +
+        allowedTypes.join(", ") +
+        ").",
+    };
+  }
+  const compDef = scantleDecisionLibrary.components[el.typeName];
+  if (!compDef) {
+    return { ok: false, error: "Unknown OpenUI component " + el.typeName + "." };
+  }
+
+  const ambiguities = Array.isArray(card.ambiguities) ? card.ambiguities : [];
+  const examples = Array.isArray(card.examples) ? card.examples : [];
+  let resolvedAmbiguity = parentAmbiguity;
+
+  if (el.typeName === "AmbiguityChoiceCard" || el.typeName === "PolicySimulatorTable") {
+    const ambIdx = el.props.ambiguityIndex;
+    if (
+      typeof ambIdx !== "number" ||
+      !Number.isInteger(ambIdx) ||
+      ambIdx < 1 ||
+      ambIdx > ambiguities.length
+    ) {
+      return {
+        ok: false,
+        error:
+          el.typeName +
+          " ambiguityIndex " +
+          String(ambIdx) +
+          " is out of bounds (valid range: 1.." +
+          ambiguities.length +
+          ").",
+      };
+    }
+    resolvedAmbiguity = ambiguities[ambIdx - 1];
+  }
+
+  const projectedProps: Record<string, unknown> = { ...el.props };
+  const shape = (compDef.props as { shape?: Record<string, unknown> }).shape || {};
+  for (const [propKey, propSchema] of Object.entries(shape)) {
+    const slotTypes = allowedSlotComponentNames(propSchema);
+    if (!slotTypes) {
+      continue;
+    }
+    const rawChildren = el.props[propKey];
+    if (!Array.isArray(rawChildren)) {
+      return {
+        ok: false,
+        error: el.typeName + "." + propKey + " must be an array of components.",
+      };
+    }
+    const projectedChildren: Record<string, unknown>[] = [];
+    for (let i = 0; i < rawChildren.length; i++) {
+      const childRes = projectAndValidateNode(
+        rawChildren[i],
+        slotTypes,
+        card,
+        resolvedAmbiguity
+      );
+      if (!childRes.ok) {
+        return childRes;
+      }
+      projectedChildren.push(childRes.projectedProps);
+    }
+    projectedProps[propKey] = projectedChildren;
+  }
+
+  const zodRes = compDef.props.safeParse(projectedProps);
+  if (!zodRes.success) {
+    return {
+      ok: false,
+      error:
+        el.typeName +
+        " props failed schema validation: " +
+        zodRes.error.issues.map((iss: { message: string }) => iss.message).join("; "),
+    };
+  }
+
+  if (el.typeName === "PolicySimulatorRow") {
+    const outcomes = projectedProps.outcomes as string[];
+    if (!resolvedAmbiguity || outcomes.length !== resolvedAmbiguity.options.length) {
+      const wantLen = resolvedAmbiguity ? resolvedAmbiguity.options.length : 0;
+      const ambId = resolvedAmbiguity ? resolvedAmbiguity.id : "unknown";
+      return {
+        ok: false,
+        error:
+          "PolicySimulatorRow outcomes must have exactly " +
+          wantLen +
+          " non-empty strings matching ambiguity " +
+          ambId +
+          " options.",
+      };
+    }
+    const exIdx = projectedProps.exampleIndex;
+    if (exIdx !== undefined) {
+      if (
+        typeof exIdx !== "number" ||
+        !Number.isInteger(exIdx) ||
+        exIdx < 1 ||
+        exIdx > examples.length
+      ) {
+        return {
+          ok: false,
+          error:
+            "PolicySimulatorRow exampleIndex " +
+            String(exIdx) +
+            " is out of bounds (valid range: 1.." +
+            examples.length +
+            ").",
+        };
+      }
+    }
+  }
+
+  return { ok: true, projectedProps };
 }
 
 // validateCompletedOpenUI validates a settled openui-lang program against both
@@ -412,7 +590,7 @@ export function validateCompletedOpenUI(
     return { ok: false, error: "OpenUI program is empty." };
   }
   const parsed = scantleDecisionParser.parse(trimmed);
-  if (!parsed.root || parsed.root.typeName !== "DecisionWorkspace") {
+  if (!parsed.root || parsed.root.typeName !== scantleDecisionLibrary.root) {
     return {
       ok: false,
       error: "OpenUI program must define root = DecisionWorkspace(...).",
@@ -455,119 +633,14 @@ export function validateCompletedOpenUI(
     };
   }
 
-  const ambiguities = Array.isArray(card.ambiguities) ? card.ambiguities : [];
-  const examples = Array.isArray(card.examples) ? card.examples : [];
-  const children = Array.isArray(parsed.root.props.children) ? parsed.root.props.children : [];
-  if (children.length === 0) {
-    return { ok: false, error: "DecisionWorkspace must contain at least one child instrument." };
+  const rootCheck = projectAndValidateNode(
+    parsed.root,
+    [scantleDecisionLibrary.root || "DecisionWorkspace"],
+    card
+  );
+  if (!rootCheck.ok) {
+    return { ok: false, error: rootCheck.error };
   }
-
-  for (let i = 0; i < children.length; i++) {
-    const child = children[i] as ElementNodeLike;
-    if (!child || child.type !== "element" || !child.props) {
-      return { ok: false, error: "DecisionWorkspace child " + (i + 1) + " is not a valid element." };
-    }
-    if (child.typeName === "AmbiguityChoiceCard") {
-      const ambIdx = child.props.ambiguityIndex;
-      if (typeof ambIdx !== "number" || !Number.isInteger(ambIdx) || ambIdx < 1 || ambIdx > ambiguities.length) {
-        return {
-          ok: false,
-          error:
-            "AmbiguityChoiceCard ambiguityIndex " +
-            String(ambIdx) +
-            " is out of bounds (valid range: 1.." +
-            ambiguities.length +
-            ").",
-        };
-      }
-    } else if (child.typeName === "PolicySimulatorTable") {
-      const ambIdx = child.props.ambiguityIndex;
-      if (typeof ambIdx !== "number" || !Number.isInteger(ambIdx) || ambIdx < 1 || ambIdx > ambiguities.length) {
-        return {
-          ok: false,
-          error:
-            "PolicySimulatorTable ambiguityIndex " +
-            String(ambIdx) +
-            " is out of bounds (valid range: 1.." +
-            ambiguities.length +
-            ").",
-        };
-      }
-      const amb = ambiguities[ambIdx - 1];
-      const rows = Array.isArray(child.props.rows) ? child.props.rows : [];
-      if (rows.length === 0) {
-        return { ok: false, error: "PolicySimulatorTable must contain at least one PolicySimulatorRow." };
-      }
-      for (let r = 0; r < rows.length; r++) {
-        const rowNode = rows[r] as ElementNodeLike;
-        if (!rowNode || rowNode.type !== "element" || rowNode.typeName !== "PolicySimulatorRow" || !rowNode.props) {
-          return { ok: false, error: "PolicySimulatorTable row " + (r + 1) + " is not a PolicySimulatorRow." };
-        }
-        const outcomes = rowNode.props.outcomes;
-        if (
-          !Array.isArray(outcomes) ||
-          outcomes.length !== amb.options.length ||
-          !outcomes.every((o) => typeof o === "string" && o.trim().length > 0)
-        ) {
-          return {
-            ok: false,
-            error:
-              "PolicySimulatorRow " +
-              (r + 1) +
-              " outcomes must have exactly " +
-              amb.options.length +
-              " non-empty strings matching ambiguity " +
-              amb.id +
-              " options.",
-          };
-        }
-        const exIdx = rowNode.props.exampleIndex;
-        if (exIdx !== undefined) {
-          if (typeof exIdx !== "number" || !Number.isInteger(exIdx) || exIdx < 1 || exIdx > examples.length) {
-            return {
-              ok: false,
-              error:
-                "PolicySimulatorRow exampleIndex " +
-                String(exIdx) +
-                " is out of bounds (valid range: 1.." +
-                examples.length +
-                ").",
-            };
-          }
-        }
-      }
-    } else if (child.typeName === "WorkflowTimeline") {
-      const steps = Array.isArray(child.props.steps) ? child.props.steps : [];
-      if (steps.length === 0) {
-        return { ok: false, error: "WorkflowTimeline must contain at least one WorkflowStep." };
-      }
-      for (let s = 0; s < steps.length; s++) {
-        const stepNode = steps[s] as ElementNodeLike;
-        if (
-          !stepNode ||
-          stepNode.type !== "element" ||
-          stepNode.typeName !== "WorkflowStep" ||
-          !stepNode.props
-        ) {
-          return {
-            ok: false,
-            error: "WorkflowTimeline step " + (s + 1) + " is not a WorkflowStep.",
-          };
-        }
-      }
-    } else if (child.typeName !== "ImpactCallout") {
-      return {
-        ok: false,
-        error:
-          "DecisionWorkspace child " +
-          (i + 1) +
-          " has unsupported component type " +
-          String(child.typeName) +
-          ".",
-      };
-    }
-  }
-
   return { ok: true };
 }
 
