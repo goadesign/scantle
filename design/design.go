@@ -63,7 +63,7 @@ var UICompositionItem = Type("UICompositionItem", func() {
 // ApprovalItem records a passed CP5 promotion check for one Change Card
 // revision.
 var ApprovalItem = Type("ApprovalItem", func() {
-	Description("Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, and is dropped when confirm_intent mints a new request_revision.")
+	Description("Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision.")
 	Attribute("approved_by", String, "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.")
 	Attribute("report_digest", String, "SHA-256 digest of the approved CP4 verification report.")
 	Attribute("candidate_commit", String, "Candidate commit the report was checked against.")
@@ -445,7 +445,7 @@ var _ = Service("surla", func() {
 	})
 
 	Method("approve_merge", func() {
-		Description("Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed.")
+		Description("Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.")
 		Payload(ApproveMergePayload)
 		Result(ChangeCardResult)
 		Tool("approve_merge", "Approve the confirmed Change Card revision after its CP4 verification report passed for the candidate commit.", func() {

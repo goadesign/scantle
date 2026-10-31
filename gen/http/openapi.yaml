@@ -46,7 +46,7 @@ paths:
             tags:
                 - surla
             summary: approve_merge surla
-            description: Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed.
+            description: Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.
             operationId: surla#approve_merge
             parameters:
                 - name: approve_merge_request_body
@@ -396,7 +396,7 @@ definitions:
                 type: string
                 description: Evaluator suite the promotion target requires.
                 example: Accusantium quae ducimus.
-        description: Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, and is dropped when confirm_intent mints a new request_revision.
+        description: Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision.
         example:
             approved_by: Quia fuga rem fugiat quasi.
             artifacts:

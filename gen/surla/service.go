@@ -52,7 +52,9 @@ type Service interface {
 	// suite, environment and candidate binary digests from its promotion target,
 	// re-derives the report from its evidence with verify.Approve, and records the
 	// approval on the card. A report that did not pass or describes different
-	// inputs is rejected. Nothing is merged or deployed.
+	// inputs is rejected. Nothing is merged or deployed. The promotion target is
+	// provided by the program that embeds the control plane; a control plane
+	// without one, such as standalone surla serve, rejects every call.
 	ApproveMerge(context.Context, *ApproveMergePayload) (res *ChangeCardResult, err error)
 	// Compare evaluated Goa designs and go.mod directives without emitting a
 	// blanket compatibility verdict.
@@ -107,8 +109,9 @@ type AmbiguityQuestion struct {
 
 // Checkpoint 5 approval recorded by approve_merge after the evaluator-written
 // verification report passed and matched the change being promoted. It is held
-// only in the running control plane's memory, merges and deploys nothing, and
-// is dropped when confirm_intent mints a new request_revision.
+// only in the running control plane's memory, merges and deploys nothing, is
+// replaced by the next successful approve_merge for the same revision, and is
+// dropped when confirm_intent mints a new request_revision.
 type ApprovalItem struct {
 	// Authenticated bearer principal that owns the card and called approve_merge.
 	// Bearer authentication does not prove that a human, rather than a coding

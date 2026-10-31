@@ -920,10 +920,13 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 		target.report = passingReport(t, card.RequestRevision, commit, inputs)
 		return cp, target, card
 	}
-	approve := func(ctx context.Context, cp *ControlPlane, card *gensurla.ChangeCardResult, digest string) (*gensurla.ChangeCardResult, error) {
+	approveAt := func(ctx context.Context, cp *ControlPlane, revision, candidate, digest string) (*gensurla.ChangeCardResult, error) {
 		return cp.ApproveMerge(ctx, &gensurla.ApproveMergePayload{
-			ChangeID: "chg", RequestRevision: card.RequestRevision, CandidateCommit: commit, ReportDigest: digest,
+			ChangeID: "chg", RequestRevision: revision, CandidateCommit: candidate, ReportDigest: digest,
 		})
+	}
+	approve := func(ctx context.Context, cp *ControlPlane, card *gensurla.ChangeCardResult, digest string) (*gensurla.ChangeCardResult, error) {
+		return approveAt(ctx, cp, card.RequestRevision, commit, digest)
 	}
 	reconfirm := func(cp *ControlPlane, card *gensurla.ChangeCardResult, outcome string) (*gensurla.ChangeCardResult, error) {
 		ex := *card.Examples[0]
@@ -979,6 +982,42 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 		assert.Nil(t, read.Approval)
 	})
 
+	t.Run("candidate commit other than the report's is stale", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approveAt(aliceCtx, cp, card.RequestRevision, strings.Repeat("f", 40), target.report.Digest)
+		require.ErrorIs(t, err, verify.ErrStaleReport)
+		assert.ErrorContains(t, err, "candidate commit")
+	})
+
+	t.Run("revision already superseded at entry", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err)
+		_, err = approve(aliceCtx, cp, card, target.report.Digest)
+		assert.ErrorContains(t, err, "request_revision mismatch")
+	})
+
+	t.Run("card still needs confirmation", func(t *testing.T) {
+		ambiguous, err := json.Marshal(CP1SemanticAnalysis{
+			Summary:     "Refunds up to $50 are instant.",
+			Ambiguities: []CP1ModelAmbiguity{{Question: "Is $50.00 itself instant?", Options: []string{"instant", "manager"}}},
+			Examples: []CP1ModelExample{{
+				Scenario: "Refund at the limit", InputSummary: "Order total $50.00",
+				ExpectedOutcome: "Instant store credit", VerificationKind: "deterministic",
+			}},
+			PreservedBehaviors: []string{},
+		})
+		require.NoError(t, err)
+		cp := New(Options{
+			Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(ambiguous))),
+			PromotionTarget: &promotionTargetStub{inputs: inputs},
+		})
+		card, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+		require.NoError(t, err)
+		_, err = approve(aliceCtx, cp, card, strings.Repeat("0", 64))
+		assert.ErrorContains(t, err, "must be confirmed")
+	})
+
 	rejections := []struct {
 		name    string
 		ctx     context.Context
@@ -1000,6 +1039,18 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 			target.inputs.Artifacts = map[string]string{"orders": "rebuilt"}
 			return target.report.Digest
 		}, "candidate binaries", true},
+		{"report cannot be loaded", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.loadErr = errors.New("no report under that digest")
+			return target.report.Digest
+		}, "no report under that digest", false},
+		{"current inputs cannot be measured", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.inputsErr = errors.New("commit not built")
+			return target.report.Digest
+		}, "commit not built", false},
+		{"required environment differs", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
+			target.inputs.Environment = "staging"
+			return target.report.Digest
+		}, "environment", true},
 		{"required suite commit differs", aliceCtx, func(_ *ControlPlane, target *promotionTargetStub, _ *gensurla.ChangeCardResult) string {
 			target.inputs.SuiteCommit = "suite-2"
 			return target.report.Digest
@@ -1035,19 +1086,30 @@ type promotionTargetStub struct {
 	loading chan struct{}
 	// release, when set, is waited on before LoadReport returns.
 	release chan struct{}
+	// loadErr, when set, is returned by LoadReport.
+	loadErr error
+	// inputsErr, when set, is returned by CurrentInputs.
+	inputsErr error
 }
 
-// LoadReport returns s.report, after the optional loading/release handshake.
+// LoadReport returns s.report, or s.loadErr when set, after the optional
+// loading/release handshake.
 func (s *promotionTargetStub) LoadReport(context.Context, string) (verify.Report, error) {
 	if s.loading != nil {
 		close(s.loading)
 		<-s.release
 	}
+	if s.loadErr != nil {
+		return verify.Report{}, s.loadErr
+	}
 	return s.report, nil
 }
 
-// CurrentInputs returns s.inputs.
+// CurrentInputs returns s.inputs, or s.inputsErr when set.
 func (s *promotionTargetStub) CurrentInputs(context.Context, string) (PromotionInputs, error) {
+	if s.inputsErr != nil {
+		return PromotionInputs{}, s.inputsErr
+	}
 	return s.inputs, nil
 }
 

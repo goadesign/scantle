@@ -815,12 +815,23 @@ func (c *ControlPlane) ApproveMerge(ctx context.Context, p *gensurla.ApproveMerg
 	c.mu.RLock()
 	record, exists := c.cards[p.ChangeID]
 	c.mu.RUnlock()
-	if err := checkApprovable(record, exists, principal, p); err != nil {
-		return nil, err
+	if !exists {
+		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	}
+	if record.owner != principal.ID {
+		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	if record.card.Status != StatusConfirmed {
+		return nil, fmt.Errorf("change_id %q must be confirmed before approval (status %q)", p.ChangeID, record.card.Status)
+	}
+	if record.card.RequestRevision != p.RequestRevision {
+		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
 	}
 
-	// The target calls may be slow, so they run without holding c.mu; the
-	// card is checked again before the approval is written.
+	// The target calls may be slow, so they run without holding c.mu. A card
+	// is never removed and never changes owner or leaves confirmed status, so
+	// only its request_revision can change meanwhile; that is checked again
+	// before the approval is written.
 	report, err := c.promotionTarget.LoadReport(ctx, p.ReportDigest)
 	if err != nil {
 		return nil, fmt.Errorf("load verification report %s: %w", p.ReportDigest, err)
@@ -846,9 +857,9 @@ func (c *ControlPlane) ApproveMerge(ctx context.Context, p *gensurla.ApproveMerg
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	record, exists = c.cards[p.ChangeID]
-	if err := checkApprovable(record, exists, principal, p); err != nil {
-		return nil, err
+	record = c.cards[p.ChangeID]
+	if record.card.RequestRevision != p.RequestRevision {
+		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
 	}
 	approved := *record.card
 	approved.Approval = &gensurla.ApprovalItem{
@@ -884,25 +895,6 @@ func (c *ControlPlane) Diff(ctx context.Context, p *gensurla.DiffPayload) (*gens
 		VersionDeltas:        rep.VersionDeltas,
 		Summary:              rep.Summary,
 	}, nil
-}
-
-// checkApprovable reports why record, looked up for p.ChangeID, cannot be
-// approved by principal: it must exist, belong to principal, be confirmed, and
-// still have p.RequestRevision.
-func checkApprovable(record storedChangeCard, exists bool, principal Principal, p *gensurla.ApproveMergePayload) error {
-	if !exists {
-		return fmt.Errorf("unknown change_id %q", p.ChangeID)
-	}
-	if record.owner != principal.ID {
-		return fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
-	}
-	if record.card.Status != StatusConfirmed {
-		return fmt.Errorf("change_id %q must be confirmed before approval (status %q)", p.ChangeID, record.card.Status)
-	}
-	if record.card.RequestRevision != p.RequestRevision {
-		return fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
-	}
-	return nil
 }
 
 // extractAssistantText concatenates TextPart payloads from a model.Response.
