@@ -8,13 +8,14 @@ import {
   areExamplesModified,
   CP1DraftContext,
   CP1DraftContextValue,
+  PreservedDraft,
 } from "../context/cp1-draft";
 import {
   Renderer,
   scantleDecisionLibrary,
   validateCompletedOpenUI,
 } from "../openui/library";
-import { ChangeCardResult, ExampleItem, PreservedDraft } from "../types";
+import { ChangeCardResult, ExampleItem } from "../types";
 import { Alert, Badge, Button, Card } from "./shadcn";
 
 export interface CP1EditorProps {
@@ -162,9 +163,13 @@ export function CP1EditorView({
     } else {
       openUINode = (
         <Alert id="scantle-openui-error" variant="destructive" role="alert">
-          <strong>OpenUI Composition Rejected: </strong>
-          {check.error} — Use the canonical CP1 inspector below to resolve ambiguities and lock
-          examples.
+          <strong>Interactive decision preview unavailable: </strong>
+          You can still answer every open question and edit or confirm every example directly in the
+          form below.
+          <details className="scantle-details">
+            <summary>Details</summary>
+            <p>{check.error}</p>
+          </details>
         </Alert>
       );
     }
@@ -173,17 +178,18 @@ export function CP1EditorView({
   return (
     <CP1DraftContext.Provider value={ctxValue}>
       <Card className="scantle-meta">
-        <h2>{"CP1 Change Card: " + card.change_id}</h2>
+        <h2>
+          {card.status === "confirmed"
+            ? "Confirmed Change Decision"
+            : "Review & Confirm Change Intent"}
+        </h2>
         <p>
-          <Badge>{card.status}</Badge>
-          request_revision: <code>{card.request_revision}</code>
-        </p>
-        <p>
+          <Badge>{card.status === "confirmed" ? "Confirmed" : "Needs confirmation"}</Badge>
           <strong>Summary: </strong>
           {card.summary}
         </p>
         <p>
-          <strong>Prompt: </strong>
+          <strong>Requested change: </strong>
           {card.prompt}
         </p>
         {card.confirmed_by ? (
@@ -192,6 +198,13 @@ export function CP1EditorView({
             {card.confirmed_by}
           </p>
         ) : null}
+        <details className="scantle-details">
+          <summary>Details</summary>
+          <p>
+            change_id: <code>{card.change_id}</code> · status: <code>{card.status}</code> ·
+            request_revision: <code>{card.request_revision}</code>
+          </p>
+        </details>
       </Card>
 
       {preservedDraft && Array.isArray(preservedDraft.lines) ? (
@@ -201,11 +214,7 @@ export function CP1EditorView({
           role="region"
           aria-label="Preserved Unsaved Draft Edits"
         >
-          <h3>
-            {"Preserved Unsaved Draft Edits (from superseded revision " +
-              preservedDraft.fromRevision +
-              ")"}
-          </h3>
+          <h3>Preserved Unsaved Draft Edits</h3>
           <p>
             Review the latest saved Change Card below before re-applying any of your unsaved edits:
           </p>
@@ -214,13 +223,19 @@ export function CP1EditorView({
               <li key={String(idx)}>{line}</li>
             ))}
           </ul>
+          <details className="scantle-details">
+            <summary>Details</summary>
+            <p>
+              Superseded revision: <code>{preservedDraft.fromRevision}</code>
+            </p>
+          </details>
         </Card>
       ) : null}
 
       {openUINode}
 
       <Card className="scantle-card">
-        <h3>{"Ambiguities (" + ambiguities.length + ")"}</h3>
+        <h3>{"Open Questions (" + ambiguities.length + ")"}</h3>
         {ambiguities.length > 0 ? (
           <ul>
             {ambiguities.map((amb) => {
@@ -233,9 +248,10 @@ export function CP1EditorView({
                 : " [Selected draft answer: " + selected + "]";
               return (
                 <li key={amb.id}>
-                  <code>{amb.id}</code>
-                  {": " + amb.question + " (options: " + amb.options.join(", ") + ")"}
-                  {answerBadge}
+                  <div>
+                    <strong>{amb.question}</strong>
+                    {answerBadge}
+                  </div>
                   <div role="group" aria-label={amb.question}>
                     {amb.options.map((opt) => (
                       <Button
@@ -251,12 +267,19 @@ export function CP1EditorView({
                       </Button>
                     ))}
                   </div>
+                  <details className="scantle-details">
+                    <summary>Details</summary>
+                    <p>
+                      <code>{amb.id}</code>
+                      {" (options: " + amb.options.join(", ") + ")"}
+                    </p>
+                  </details>
                 </li>
               );
             })}
           </ul>
         ) : (
-          <p>No open domain ambiguities.</p>
+          <p>No open domain questions.</p>
         )}
 
         <h3>{"Concrete Examples (" + draftExamples.length + ")"}</h3>
@@ -264,10 +287,13 @@ export function CP1EditorView({
           {draftExamples.map((ex, idx) => (
             <li key={ex.id} data-example-index={String(idx)}>
               <div>
-                <code>{ex.id}</code>
-                {" [" + ex.verification_kind + "] "}
                 <strong>{ex.scenario}</strong>
-                {" — Input: " + ex.input_summary + " -> Expected: " + ex.expected_outcome}
+                {" — Input: " + ex.input_summary + " -> Expected: " + ex.expected_outcome + " "}
+                <Badge>
+                  {ex.verification_kind === "deterministic"
+                    ? "Deterministic check"
+                    : "Model-judged check"}
+                </Badge>
               </div>
               <div className="scantle-field-row">
                 <FieldTextarea
@@ -310,6 +336,13 @@ export function CP1EditorView({
                   {"Kind: " + ex.verification_kind}
                 </Button>
               </div>
+              <details className="scantle-details">
+                <summary>Details</summary>
+                <p>
+                  <code>{ex.id}</code>
+                  {" [" + ex.verification_kind + "]"}
+                </p>
+              </details>
             </li>
           ))}
         </ul>
@@ -348,20 +381,25 @@ export function CP1EditorView({
         <div id="scantle-confirm-feedback">
           {formError ? (
             <Alert variant="destructive" role="alert">
-              <strong>Confirm Intent Error: </strong>
-              {formError}
-              {
-                " — Your edited answers and examples remain in this form. Use Load Latest Card (get_change) to inspect the current saved Change Card alongside your unsaved edits before resubmitting."
-              }
+              <strong>Could not save your changes: </strong>
+              Your edited answers and examples remain in this form. Click{" "}
+              <strong>Load Latest Card</strong> to inspect the current saved Change Card alongside
+              your unsaved edits before resubmitting.
               <div className="scantle-field-row">
                 <Button
                   id="scantle-load-latest-card"
                   disabled={rpcInFlight}
                   onClick={onLoadLatestCard}
                 >
-                  Load Latest Card (get_change)
+                  Load Latest Card
                 </Button>
               </div>
+              <details className="scantle-details">
+                <summary>Details</summary>
+                <p>
+                  Confirm Intent Error: <code>{formError}</code>
+                </p>
+              </details>
             </Alert>
           ) : null}
         </div>

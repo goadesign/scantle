@@ -15,7 +15,7 @@ import {
 } from "./components/c4-graph";
 import { CP1EditorView } from "./components/cp1-editor";
 import { Alert, Card } from "./components/shadcn";
-import { isDraftDirty } from "./context/cp1-draft";
+import { isDraftDirty, PreservedDraft } from "./context/cp1-draft";
 import {
   ArchitecturePreviewResult,
   ChangeCardResult,
@@ -27,7 +27,6 @@ import {
   isDiffResult,
   isDraftOverrideResult,
   isPlainObject,
-  PreservedDraft,
 } from "./types";
 
 const INIT_REQUEST_ID = 1;

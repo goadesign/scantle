@@ -6,6 +6,11 @@
 import React, { createContext, useContext } from "react";
 import { ChangeCardResult, ExampleItem } from "../types";
 
+export interface PreservedDraft {
+  fromRevision: string;
+  lines: string[];
+}
+
 export interface CP1DraftContextValue {
   card: ChangeCardResult;
   draftAnswers: Record<string, string>;

@@ -90,9 +90,15 @@ export const PolicySimulatorTable = defineComponent({
         <CardHeader>
           <div className="scantle-field-row">
             <CardTitle>{props.title}</CardTitle>
-            <Badge>{amb.id}</Badge>
+            <Badge>{"Question " + String(props.ambiguityIndex)}</Badge>
           </div>
           <CardDescription>{amb.question}</CardDescription>
+          <details className="scantle-details">
+            <summary>Details</summary>
+            <p>
+              <code>{amb.id}</code>
+            </p>
+          </details>
         </CardHeader>
         <CardContent>
           <div
@@ -151,7 +157,11 @@ export const PolicySimulatorTable = defineComponent({
                       <strong>{row.scenario || ""}</strong>
                       {exItem ? (
                         <div>
-                          <Badge>{exItem.id}</Badge>
+                          <Badge>{"Example " + String(row.exampleIndex)}</Badge>
+                          <details className="scantle-details">
+                            <summary>Details</summary>
+                            <code>{exItem.id}</code>
+                          </details>
                         </div>
                       ) : null}
                     </td>
@@ -205,9 +215,15 @@ export const AmbiguityChoiceCard = defineComponent({
         <CardHeader>
           <div className="scantle-field-row">
             <CardTitle>{amb.question}</CardTitle>
-            <Badge>{amb.id}</Badge>
+            <Badge>{"Question " + String(props.ambiguityIndex)}</Badge>
           </div>
           {props.rationale ? <CardDescription>{props.rationale}</CardDescription> : null}
+          <details className="scantle-details">
+            <summary>Details</summary>
+            <p>
+              <code>{amb.id}</code>
+            </p>
+          </details>
         </CardHeader>
         <CardContent>
           <div
@@ -325,18 +341,30 @@ export const DecisionWorkspace = defineComponent({
       <div className="scantle-decision-workspace" data-openui-component="DecisionWorkspace">
         <div className="scantle-field-row">
           <h3>{props.title}</h3>
-          <Badge variant="accent">OpenUI Decision Studio</Badge>
+          <Badge variant="accent">Decision Studio</Badge>
           <Badge variant="accent">Model-Proposed Illustration</Badge>
         </div>
         <p className="shadcn-card-desc">
-          composed_for_revision: <code>{composedRev}</code>
+          Compare how each option affects concrete scenarios below. Selecting an option updates your
+          draft answer below.
         </p>
+        <details className="scantle-details">
+          <summary>Details</summary>
+          <p>
+            composed_for_revision: <code>{composedRev}</code>
+          </p>
+        </details>
         {draft?.localExamplesEdited ? (
           <Alert id="scantle-openui-local-edit-notice" variant="warning">
             <strong>Local Examples Modified: </strong>
-            Confirmation examples have been edited locally since{" "}
-            <code>{draft.card.request_revision}</code>. Instruments in this workspace reflect the
-            model-proposed illustration for the saved revision until re-analyzed.
+            You have edited the confirmation examples below. Instruments in this workspace reflect
+            the model-proposed illustration for the saved revision until the change is re-analyzed.
+            <details className="scantle-details">
+              <summary>Details</summary>
+              <p>
+                request_revision: <code>{draft.card.request_revision}</code>
+              </p>
+            </details>
           </Alert>
         ) : null}
         <div className="scantle-decision-grid">{renderNode(props.children)}</div>

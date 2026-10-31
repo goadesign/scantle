@@ -222,17 +222,16 @@ export function ArchitecturePreviewView({ preview }: { preview: ArchitecturePrev
   return (
     <>
       <Card className="scantle-meta">
-        <h2>{"CP2 Architecture Preview: " + preview.system_name}</h2>
+        <h2>{"Architecture Preview: " + preview.system_name}</h2>
         <p>{preview.banner}</p>
-        <p>
-          change_id: <code>{preview.change_id}</code>
-        </p>
-        <p>
-          request_revision: <code>{preview.request_revision}</code>
-        </p>
-        <p>
-          design_digest: <code>{preview.design_digest}</code>
-        </p>
+        <details className="scantle-details">
+          <summary>Details</summary>
+          <p>
+            change_id: <code>{preview.change_id}</code> · request_revision:{" "}
+            <code>{preview.request_revision}</code> · design_digest:{" "}
+            <code>{preview.design_digest}</code>
+          </p>
+        </details>
       </Card>
       <Card className="scantle-card">
         <h3>
@@ -369,13 +368,16 @@ export function DiffResultView({ diff }: { diff: DiffResult }) {
     <>
       <Card className="scantle-meta">
         <h2>Structural Goa &amp; Goa-AI Design Diff</h2>
+        <p>{diff.summary}</p>
         <p>
           Standalone structural comparison (unbound to a CP1 Change Card or request_revision).
         </p>
-        <p>
-          <Badge>{"has_changes=" + diff.has_changes}</Badge>
-          {diff.summary}
-        </p>
+        <details className="scantle-details">
+          <summary>Details</summary>
+          <p>
+            <Badge>{"has_changes=" + diff.has_changes}</Badge>
+          </p>
+        </details>
       </Card>
       <Card className="scantle-card">
         <h3>{"Added Declarations (" + diff.added_declarations.length + ")"}</h3>
@@ -411,17 +413,20 @@ export function DiffResultView({ diff }: { diff: DiffResult }) {
 export function DraftOverrideView({ draft }: { draft: DraftOverrideResult }) {
   return (
     <Card className="scantle-meta">
-      <h2>CP3 Fast Draft Mode</h2>
-      <p>
-        <Badge>{"applied_in_store=" + draft.applied_in_store}</Badge>
-        <Badge>{"requires_rebuild=" + draft.requires_rebuild}</Badge>
-      </p>
+      <h2>Fast Draft Update</h2>
       <p>{draft.message}</p>
-      {draft.prompt_version ? (
+      <details className="scantle-details">
+        <summary>Details</summary>
         <p>
-          prompt_version: <code>{draft.prompt_version}</code>
+          <Badge>{"applied_in_store=" + draft.applied_in_store}</Badge>
+          <Badge>{"requires_rebuild=" + draft.requires_rebuild}</Badge>
+          {draft.prompt_version ? (
+            <span>
+              prompt_version: <code>{draft.prompt_version}</code>
+            </span>
+          ) : null}
         </p>
-      ) : null}
+      </details>
     </Card>
   );
 }
@@ -442,22 +447,20 @@ export function IncomingChangeCardView({
       role="region"
       aria-label="Incoming Change Card"
     >
-      <h3>
-        {"Incoming CP1 Change Card: " +
-          incomingCard.change_id +
-          " (" +
-          incomingCard.status +
-          ")"}
-      </h3>
-      <p>
-        incoming request_revision: <code>{incomingCard.request_revision}</code>
-      </p>
+      <h3>Updated Change Card Available</h3>
       <p>{incomingCard.summary}</p>
       <div className="scantle-field-row">
         <Button id="scantle-replace-incoming-card" onClick={onSwitch}>
           Switch to Incoming Card (Discard Unsaved Edits)
         </Button>
       </div>
+      <details className="scantle-details">
+        <summary>Details</summary>
+        <p>
+          change_id: <code>{incomingCard.change_id}</code> ({incomingCard.status}) · incoming
+          request_revision: <code>{incomingCard.request_revision}</code>
+        </p>
+      </details>
     </Card>
   );
 }

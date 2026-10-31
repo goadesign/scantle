@@ -495,13 +495,34 @@ for (const tc of badCases) {
     }
   });
   const errEl = doc.getElementById("scantle-openui-error");
-  if (!errEl || !errEl.textContent.includes(tc.wantErr) || doc.getElementById("scantle-openui-workspace")) {
-    throw new Error("case " + tc.name + " did not render expected #scantle-openui-error (" + tc.wantErr + "), got: " + (errEl && errEl.textContent));
+  const errDetails = errEl && errEl.querySelector("details.scantle-details");
+  if (!errEl ||
+      !errEl.textContent.includes("Interactive decision preview unavailable:") ||
+      !errDetails ||
+      !errDetails.textContent.includes(tc.wantErr) ||
+      doc.getElementById("scantle-openui-workspace")) {
+    throw new Error("case " + tc.name + " did not render expected #scantle-openui-error with Details disclosure (" + tc.wantErr + "), got: " + (errEl && errEl.textContent));
   }
   const fallbackPill = editorRegion.querySelector('[data-ambiguity-id="chg-openui-ambiguity-01"][data-option="total_with_tax"]');
   if (!fallbackPill) {
     throw new Error("case " + tc.name + " broke canonical CP1 inspector fallback");
   }
+}
+
+// 9b. Verify generated JSON Schema validation rejects undeclared wire properties (additionalProperties: false).
+const extraPropCard = Object.assign({}, input.cp1Structured, {
+  unexpected_wire_field: "must be rejected by generated schema"
+});
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: { structuredContent: extraPropCard }
+  }
+});
+if (root.dataset.state !== "error") {
+  throw new Error("expected generated schema validator to reject undeclared property on ChangeCardResult, got state=" + root.dataset.state);
 }
 
 // 10. Workspace with only WorkflowTimeline + ImpactCallout still displays Model-Proposed Illustration and local-example-edit notice.
