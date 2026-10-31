@@ -190,7 +190,7 @@ export function CP1EditorView({
         </h2>
         <p>
           <Badge>{card.status === "confirmed" ? "Confirmed" : "Needs confirmation"}</Badge>
-          {card.approval ? <Badge variant="accent">Approved for promotion</Badge> : null}
+          {card.approval ? <Badge variant="accent">Approval recorded</Badge> : null}
           <strong>Summary: </strong>
           {card.summary}
         </p>
@@ -228,8 +228,16 @@ export function CP1EditorView({
           <p>
             Approval recorded by bearer principal <code>{card.approval.approved_by}</code> for this
             confirmed <code>request_revision</code> in control-plane memory. Recording approval does
-            not merge branches or deploy binaries.
+            not merge branches or deploy binaries. This record describes the inputs below;
+            check the current approval to see whether they still match the service.
           </p>
+          <Button
+            id="surla-cp5-refresh-approval"
+            disabled={rpcInFlight}
+            onClick={onLoadLatestCard}
+          >
+            Check current approval
+          </Button>
           {draftDirty ? (
             <Alert id="surla-cp5-approval-dirty-warning" variant="warning" role="status">
               <strong>Unsaved draft edits detected: </strong>
@@ -440,10 +448,11 @@ export function CP1EditorView({
         <div id="surla-confirm-feedback">
           {formError ? (
             <Alert variant="destructive" role="alert">
-              <strong>Could not save your changes: </strong>
+              <strong>Change Card request failed: </strong>
+              <p>{formError}</p>
               Your edited answers and examples remain in this form. Click{" "}
               <strong>Load Latest Card</strong> to inspect the current saved Change Card alongside
-              your unsaved edits before resubmitting.
+              your unsaved edits.
               <div className="surla-field-row">
                 <Button
                   id="surla-load-latest-card"
@@ -453,12 +462,6 @@ export function CP1EditorView({
                   Load Latest Card
                 </Button>
               </div>
-              <details className="surla-details">
-                <summary>Details</summary>
-                <p>
-                  Confirm Intent Error: <code>{formError}</code>
-                </p>
-              </details>
             </Alert>
           ) : null}
         </div>

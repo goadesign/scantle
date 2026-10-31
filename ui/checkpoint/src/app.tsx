@@ -29,24 +29,34 @@ import {
   isPlainObject,
 } from "./types";
 
+// Initialization has its own request ID; editor calls start after it.
 const INIT_REQUEST_ID = 1;
+// PROTOCOL_VERSION is the MCP Apps version advertised to the parent host.
 const PROTOCOL_VERSION = "2026-01-26";
 
+// PendingRPC consumes the host response associated with one request ID.
 interface PendingRPC {
-  validate: (payload: unknown) => boolean;
-  onSuccess: (payload: unknown) => void;
+  // onResult validates the tool payload before an editor callback uses it.
+  onResult: (payload: unknown) => void;
+  // onError reports the failed request and completes its local lifetime.
   onError: (message: string) => void;
 }
 
+// ActiveEditorState keeps received saved values separate from editable drafts.
 interface ActiveEditorState {
+  // card is the last saved snapshot received from the server.
   card: ChangeCardResult;
+  // draftAnswers contains the user's current choices, including unsaved ones.
   draftAnswers: Record<string, string>;
+  // draftExamples contains the exact text the user is editing.
   draftExamples: ExampleItem[];
-  rpcInFlight: boolean;
+  // preservedDraft retains earlier revision text for explicit reconciliation.
   preservedDraft: PreservedDraft | null;
+  // formError describes the latest failed editor request or invalid input.
   formError: string | null;
 }
 
+// ActiveResultState is the checkpoint displayed alongside a retained editor.
 type ActiveResultState =
   | { kind: "cp2-architecture-preview"; preview: ArchitecturePreviewResult }
   | { kind: "cp2-diff"; diff: DiffResult }
@@ -56,6 +66,8 @@ type ActiveResultState =
   | { kind: "error"; message: string }
   | { kind: "cancelled"; reason: string };
 
+// formatDraftLines keeps draft values readable when a newer saved revision
+// requires the user to reconcile earlier answers and examples.
 function formatDraftLines(
   rev: string,
   answers: Record<string, string>,
@@ -83,6 +95,8 @@ function formatDraftLines(
     );
 }
 
+// snapshotDraft preserves current edits and any earlier revision text before
+// a different saved revision replaces the editable form.
 function snapshotDraft(ed: ActiveEditorState): PreservedDraft {
   const priorLines = ed.preservedDraft ? ed.preservedDraft.lines : [];
   const dirty = isDraftDirty(ed.card, ed.draftAnswers, ed.draftExamples);
@@ -96,6 +110,8 @@ function snapshotDraft(ed: ActiveEditorState): PreservedDraft {
   };
 }
 
+// extractErrorText uses the host's text error when provided and otherwise
+// explains that the tool failed without inventing a cause.
 function extractErrorText(params: Record<string, unknown>): string {
   if (Array.isArray(params.content)) {
     for (let i = 0; i < params.content.length; i++) {
@@ -113,6 +129,7 @@ function extractErrorText(params: Record<string, unknown>): string {
   return "Tool execution failed.";
 }
 
+// applyHostTheme accepts supported themes from initialization or host updates.
 function applyHostTheme(candidate: unknown) {
   if (!isPlainObject(candidate)) {
     return;
@@ -154,10 +171,15 @@ export function bootstrapCheckpointApp() {
 
   let initPending = false;
   let nextRequestId = 2;
-  let pendingRequests: Record<string, PendingRPC> = {};
+  const pendingRequests: Record<string, PendingRPC> = {};
+  // editorRequest completes after the current card request updates the view.
+  // It also supplies the editor's busy state; no second boolean is retained.
+  let editorRequest: Promise<void> | null = null;
   let activeEditor: ActiveEditorState | null = null;
   let activeResult: ActiveResultState | null = null;
 
+  // hasUnsavedEditorState identifies work that a different checkpoint must
+  // leave available for the user to recover or continue editing.
   function hasUnsavedEditorState(): boolean {
     if (!activeEditor) {
       return false;
@@ -173,19 +195,23 @@ export function bootstrapCheckpointApp() {
     );
   }
 
+  // shouldRetainEditor keeps drafts and the destination of a pending editor
+  // response visible when a separate checkpoint notification arrives.
   function shouldRetainEditor(): boolean {
     return (
       activeEditor !== null &&
-      (Object.keys(pendingRequests).length > 0 || hasUnsavedEditorState())
+      (editorRequest !== null || hasUnsavedEditorState())
     );
   }
 
+  // clearEditorDataset removes DOM metadata when no card is displayed.
   function clearEditorDataset() {
     delete editorRegionEl.dataset.state;
     delete editorRegionEl.dataset.changeId;
     delete editorRegionEl.dataset.requestRevision;
   }
 
+  // clearResultDataset prevents a new result from inheriting old DOM metadata.
   function clearResultDataset() {
     delete resultRegionEl.dataset.state;
     delete resultRegionEl.dataset.changeId;
@@ -194,6 +220,8 @@ export function bootstrapCheckpointApp() {
     delete resultRegionEl.dataset.hasChanges;
   }
 
+  // syncEditorRegion renders saved values and drafts together, with editing
+  // disabled while the host owns an outstanding editor request.
   function syncEditorRegion() {
     if (!activeEditor) {
       clearEditorDataset();
@@ -212,11 +240,11 @@ export function bootstrapCheckpointApp() {
           card={ed.card}
           draftAnswers={ed.draftAnswers}
           draftExamples={ed.draftExamples}
-          rpcInFlight={ed.rpcInFlight}
+          rpcInFlight={editorRequest !== null}
           preservedDraft={ed.preservedDraft}
           formError={ed.formError}
           onSetAnswer={(ambId, opt) => {
-            if (!activeEditor || activeEditor.rpcInFlight) {
+            if (!activeEditor || editorRequest !== null) {
               return;
             }
             activeEditor = {
@@ -226,7 +254,7 @@ export function bootstrapCheckpointApp() {
             syncEditorRegion();
           }}
           onSetExampleField={(exId, field, value) => {
-            if (!activeEditor || activeEditor.rpcInFlight) {
+            if (!activeEditor || editorRequest !== null) {
               return;
             }
             activeEditor = {
@@ -245,6 +273,7 @@ export function bootstrapCheckpointApp() {
     });
   }
 
+  // syncResultRegion replaces only the checkpoint result beside the editor.
   function syncResultRegion() {
     clearResultDataset();
     if (!activeResult) {
@@ -285,7 +314,7 @@ export function bootstrapCheckpointApp() {
           <IncomingChangeCardView
             incomingCard={res.card}
             onSwitch={() => {
-              if (Object.keys(pendingRequests).length > 0) {
+              if (editorRequest !== null) {
                 statusEl.textContent =
                   "Wait for the pending CP1 Change Card request to finish before switching cards.";
                 return;
@@ -334,11 +363,14 @@ export function bootstrapCheckpointApp() {
     }
   }
 
-  function callServerTool(
+  // callEditorTool owns one editor request through its host response and view
+  // update. The completion promise lets a prompt-update notification wait for
+  // that request without retaining a second busy flag or a refresh queue.
+  function callEditorTool<T>(
     toolName: string,
     args: Record<string, unknown>,
-    validateFn: (payload: unknown) => boolean,
-    onSuccess: (payload: unknown) => void,
+    validateFn: (payload: unknown) => payload is T,
+    onSuccess: (payload: T) => void,
     onError: (message: string) => void
   ) {
     if (!window.parent || window.parent === window) {
@@ -346,11 +378,25 @@ export function bootstrapCheckpointApp() {
       return;
     }
     const reqId = nextRequestId++;
-    pendingRequests[String(reqId)] = {
-      validate: validateFn,
-      onSuccess,
-      onError,
-    };
+    editorRequest = new Promise<void>((complete) => {
+      pendingRequests[String(reqId)] = {
+        onResult: (payload) => {
+          editorRequest = null;
+          if (validateFn(payload)) {
+            onSuccess(payload);
+          } else {
+            onError("Tool response is missing a valid structured checkpoint payload.");
+          }
+          complete();
+        },
+        onError: (message) => {
+          editorRequest = null;
+          onError(message);
+          complete();
+        },
+      };
+    });
+    syncEditorRegion();
     window.parent.postMessage(
       {
         jsonrpc: "2.0",
@@ -362,24 +408,48 @@ export function bootstrapCheckpointApp() {
     );
   }
 
+  // refreshAfterPromptUpdate waits for the request active when the prompt
+  // update arrived. If another request has since begun, it already reads
+  // after that update; otherwise this notification starts a fresh card read.
+  // Later checkpoint views do not erase the notification's continuation.
+  async function refreshAfterPromptUpdate() {
+    const pending = editorRequest;
+    if (pending !== null) {
+      await pending;
+    }
+    if (editorRequest === null) {
+      handleLoadLatestCard();
+    }
+  }
+
+  // finishPendingRequests stops local waiting when the host ends the viewer.
+  // It releases prompt-update continuations without canceling server work.
+  function finishPendingRequests(message: string) {
+    for (const key of Object.keys(pendingRequests)) {
+      const request = pendingRequests[key];
+      delete pendingRequests[key];
+      request.onError(message);
+    }
+  }
+
+  // showFormError reports a failed read, save or input check without changing
+  // the saved snapshot or discarding draft text.
   function showFormError(msg: string) {
     if (!activeEditor) {
       return;
     }
-    const stillPending = Object.keys(pendingRequests).length > 0;
-    if (!stillPending) {
-      statusEl.textContent = "CP1 Change Card update failed; unsaved edits preserved.";
-    }
+    statusEl.textContent = "Change Card request failed; unsaved edits preserved.";
     activeEditor = {
       ...activeEditor,
-      rpcInFlight: stillPending,
       formError: String(msg),
     };
     syncEditorRegion();
   }
 
+  // handleConfirmSubmit sends complete answers and examples for the displayed
+  // saved revision after checking that the user filled every required value.
   function handleConfirmSubmit() {
-    if (!activeEditor || activeEditor.rpcInFlight) {
+    if (!activeEditor || editorRequest !== null) {
       return;
     }
     const ambiguities = Array.isArray(activeEditor.card.ambiguities)
@@ -403,11 +473,9 @@ export function bootstrapCheckpointApp() {
     }
     activeEditor = {
       ...activeEditor,
-      rpcInFlight: true,
       formError: null,
     };
     statusEl.textContent = "Saving your confirmed answers and examples...";
-    syncEditorRegion();
 
     const submittedCard = activeEditor.card;
     const submittedAnswers = { ...activeEditor.draftAnswers };
@@ -419,7 +487,7 @@ export function bootstrapCheckpointApp() {
       verification_kind: item.verification_kind,
     }));
 
-    callServerTool(
+    callEditorTool(
       "confirm_intent",
       {
         change_id: submittedCard.change_id,
@@ -429,14 +497,16 @@ export function bootstrapCheckpointApp() {
       },
       isChangeCardResult,
       (updatedCard) => {
-        mountChangeCard(updatedCard as ChangeCardResult, null);
+        mountChangeCard(updatedCard, null);
       },
       showFormError
     );
   }
 
+  // handleDiscardDraft restores saved values or closes the retained editor
+  // while leaving the newer checkpoint result available.
   function handleDiscardDraft() {
-    if (!activeEditor || activeEditor.rpcInFlight) {
+    if (!activeEditor || editorRequest !== null) {
       return;
     }
     if (activeResult && activeResult.kind !== "cp1-incoming-card") {
@@ -448,30 +518,45 @@ export function bootstrapCheckpointApp() {
     mountChangeCard(activeEditor.card, null);
   }
 
+  // handleLoadLatestCard refreshes saved values and approval through get_change.
+  // The same revision keeps editable drafts; a different revision preserves
+  // their text for reconciliation instead of applying it to changed examples.
   function handleLoadLatestCard() {
-    if (!activeEditor || activeEditor.rpcInFlight) {
+    if (!activeEditor || editorRequest !== null) {
       return;
     }
-    const savedDraft = snapshotDraft(activeEditor);
     const changeId = activeEditor.card.change_id;
-    activeEditor = {
-      ...activeEditor,
-      rpcInFlight: true,
-    };
     statusEl.textContent = "Loading the latest saved Change Card...";
-    syncEditorRegion();
 
-    callServerTool(
+    callEditorTool(
       "get_change",
       { change_id: changeId },
       isChangeCardResult,
       (latestCard) => {
-        mountChangeCard(latestCard as ChangeCardResult, savedDraft);
+        if (
+          activeEditor &&
+          latestCard.change_id === activeEditor.card.change_id &&
+          latestCard.request_revision === activeEditor.card.request_revision
+        ) {
+          activeEditor = {
+            ...activeEditor,
+            card: latestCard,
+            formError: null,
+          };
+          statusEl.textContent = latestCard.approval
+            ? "Showing the recorded approval for these inputs."
+            : "Showing the latest card without a current approval.";
+          syncEditorRegion();
+          return;
+        }
+        mountChangeCard(latestCard, activeEditor ? snapshotDraft(activeEditor) : null);
       },
-      showFormError
+      (message) => showFormError("Could not load the current card and approval: " + message)
     );
   }
 
+  // mountChangeCard starts an editor from a received saved card and optionally
+  // shows draft text that belonged to an earlier revision.
   function mountChangeCard(card: ChangeCardResult, preservedDraft: PreservedDraft | null) {
     activeEditor = {
       card,
@@ -483,20 +568,20 @@ export function bootstrapCheckpointApp() {
         expected_outcome: ex.expected_outcome,
         verification_kind: ex.verification_kind,
       })),
-      rpcInFlight: false,
       preservedDraft,
       formError: null,
     };
     statusEl.textContent =
       card.status === "confirmed"
         ? card.approval
-          ? "Showing approved Change Card (in-memory approval recorded; nothing merged or deployed)."
+          ? "Showing the recorded approval for these inputs."
           : "Showing confirmed Change Card. You can refine answers or examples below."
         : "Review the open questions and examples below, then confirm your intent.";
     rootEl.dataset.state = "cp1-change-card";
     syncEditorRegion();
   }
 
+  // renderWaiting clears prior results when the host begins a new checkpoint.
   function renderWaiting(message: string) {
     activeEditor = null;
     activeResult = null;
@@ -506,9 +591,10 @@ export function bootstrapCheckpointApp() {
     statusEl.textContent = message;
   }
 
+  // renderCancelled ends local waiting and shows the host's cancellation.
   function renderCancelled(reason: string) {
-    pendingRequests = {};
     activeEditor = null;
+    finishPendingRequests("The host ended the checkpoint tool call.");
     activeResult = { kind: "cancelled", reason };
     syncEditorRegion();
     syncResultRegion();
@@ -516,6 +602,8 @@ export function bootstrapCheckpointApp() {
     statusEl.textContent = "Checkpoint tool call cancelled";
   }
 
+  // renderError displays an invalid checkpoint or failed tool result while
+  // retaining any draft or editor request that still belongs to the user.
   function renderError(message: string) {
     if (!shouldRetainEditor()) {
       activeEditor = null;
@@ -527,6 +615,9 @@ export function bootstrapCheckpointApp() {
     statusEl.textContent = "Checkpoint payload error";
   }
 
+  // handleToolResult validates untyped host data and updates the region that
+  // owns it. Prompt updates refresh retained cards independently of whichever
+  // checkpoint result is displayed when the current editor request finishes.
   function handleToolResult(params: unknown) {
     if (!isPlainObject(params)) {
       renderError("Malformed ui/notifications/tool-result: params must be an object.");
@@ -570,7 +661,7 @@ export function bootstrapCheckpointApp() {
               card: payload,
             };
             statusEl.textContent = payload.approval
-              ? "Showing approved Change Card (in-memory approval recorded; nothing merged or deployed)."
+              ? "Showing the recorded approval for these inputs."
               : "Showing confirmed Change Card. You can refine answers or examples below.";
             syncEditorRegion();
             return;
@@ -611,11 +702,16 @@ export function bootstrapCheckpointApp() {
       syncResultRegion();
       rootEl.dataset.state = "cp3-draft-override";
       statusEl.textContent = "Showing Fast Draft prompt and rule update.";
+      if (payload.applied_in_store) {
+        void refreshAfterPromptUpdate();
+      }
       return;
     }
     renderError("Unsupported or malformed Surla checkpoint payload.");
   }
 
+  // handleMessage accepts only the parent host, separates protocol requests
+  // from notifications, and correlates responses with their editor request.
   function handleMessage(event: MessageEvent) {
     if (!event || event.source !== window.parent) {
       return;
@@ -627,8 +723,8 @@ export function bootstrapCheckpointApp() {
     if (typeof msg.method === "string") {
       if (msg.id !== undefined && msg.id !== null) {
         if (msg.method === "ui/resource-teardown") {
-          pendingRequests = {};
           activeEditor = null;
+          finishPendingRequests("The host closed the checkpoint viewer.");
           activeResult = null;
           syncEditorRegion();
           syncResultRegion();
@@ -735,15 +831,7 @@ export function bootstrapCheckpointApp() {
         activeReq.onError(extractErrorText(msg.result));
         return;
       }
-      if (
-        !isPlainObject(msg.result.structuredContent) ||
-        (typeof activeReq.validate === "function" &&
-          !activeReq.validate(msg.result.structuredContent))
-      ) {
-        activeReq.onError("Tool response is missing a valid structured checkpoint payload.");
-        return;
-      }
-      activeReq.onSuccess(msg.result.structuredContent);
+      activeReq.onResult(msg.result.structuredContent);
       return;
     }
 

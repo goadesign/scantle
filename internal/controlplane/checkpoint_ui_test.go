@@ -652,14 +652,14 @@ staleSubmitBtns[0].dispatch("click");
 const staleReq = hostMessages[msgCountBeforeStale].msg;
 // Host broadcasts uncorrelated ui/notifications/tool-result {isError:true} BEFORE delivering the matching RPC error response -> renders error in resultRegion while retaining CP1 editor and keeping controls disabled until matching RPC error response arrives.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { isError: true, content: [{ type: "text", text: "preview_architecture failed: invalid design" }] } } });
-if (resultRegion.dataset.state !== "error" || staleOutcomeInputs[0].disabled !== true || renderText(editorRegion).includes("Confirm Intent Error:")) {
+if (resultRegion.dataset.state !== "error" || staleOutcomeInputs[0].disabled !== true || renderText(editorRegion).includes("Change Card request failed:")) {
   throw new Error("uncorrelated error notification replaced CP1 editor, routed into editor feedback, or prematurely re-enabled controls");
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: staleReq.id, result: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
 const staleViewText = renderText(editorRegion);
 if (editorRegion.dataset.state !== "cp1-change-card" ||
     staleOutcomeInputs[0].disabled !== false ||
-    !statusEl.textContent.includes("CP1 Change Card update failed; unsaved edits preserved.") ||
+    !statusEl.textContent.includes("Change Card request failed; unsaved edits preserved.") ||
     !staleViewText.includes(input.staleErrorText) ||
     !staleViewText.includes("Your edited answers and examples remain in this form") ||
     staleOutcomeInputs[0].value !== "Edited outcome preserved across stale error") {
