@@ -91,6 +91,9 @@ func TestRunReportsASuiteThatCannotBeBuilt(t *testing.T) {
 }
 
 func TestRunFailsWhenTheArtifactStoreCannotBeRemoved(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores the read-only directory this test relies on")
+	}
 	bin := filepath.Join(t.TempDir(), "app")
 	require.NoError(t, os.WriteFile(bin, []byte("app binary"), 0o700))
 	tmp := t.TempDir()

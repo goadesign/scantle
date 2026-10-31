@@ -9,8 +9,9 @@
 //   - suite --artifact name=path ... receives every candidate binary the
 //     verification plan binds (`surla verify -binary name=package`). The suite
 //     pins each one, runs its scenarios, and prints the goa-ai eval.Report as
-//     JSON. It exits 0 when every scenario passed, 1 when one did not, and 2
-//     when it could not run.
+//     JSON. It exits 0 when every scenario passed and the pinned binaries
+//     were removed, 1 when a scenario did not pass, and 2 when it could not
+//     run or could not remove the pinned binaries.
 //
 // A scenario result must carry the evidence of every bound binary
 // (candidate.Artifact.Evidence) so the verifier can compare the digests the
@@ -59,8 +60,9 @@ type (
 		Declare func() (eval.Suite, error)
 		// Suite returns the generated eval.Suite whose scenarios run the given
 		// pinned binaries, keyed by name. pinned holds exactly Binaries. The
-		// verifier accepts a report only when its scenario IDs are exactly
-		// Declare's; holdout tags are read from Declare alone.
+		// verifier rejects a report naming a scenario Declare did not
+		// declare, counts a declared scenario the report omits as not run,
+		// and reads holdout tags from Declare alone.
 		Suite func(pinned map[string]candidate.Artifact) (eval.Suite, error)
 	}
 
@@ -113,10 +115,10 @@ func Main(c Command) {
 }
 
 // runCommand runs the suite command described by c with args and returns its
-// exit status. --describe writes the Declaration to stdout. Otherwise Run pins
-// every --artifact into a temporary store, runs the scenarios selected by
-// --scenario or --tag (all by default; the two cannot be combined), with at
-// most --max-concurrency scenarios in flight, writes the eval.Report to stdout, and
+// exit status. --describe writes the Declaration to stdout. Otherwise it
+// pins every --artifact into a temporary store, runs the scenarios selected
+// by --scenario or --tag (all by default; the two cannot be combined) with at
+// most --max-concurrency in flight, writes the eval.Report to stdout, and
 // removes the store. Errors go to stderr. A report is written whenever the
 // runner produced one, even when the run then failed; a store that cannot be
 // removed is an error, so the status is then ExitError.
