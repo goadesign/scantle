@@ -51,6 +51,17 @@ var GetChangePayload = Type("GetChangePayload", func() {
 	Required("change_id")
 })
 
+// UICompositionItem is an optional model-authored decision view for one
+// Change Card revision.
+var UICompositionItem = Type("UICompositionItem", func() {
+	Description("Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.")
+	Attribute("program", String, "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.", func() {
+		MinLength(1)
+	})
+	Attribute("composed_for_revision", String, "request_revision of the Change Card this program was composed for.")
+	Required("program", "composed_for_revision")
+})
+
 // ChangeCardResult is the output of CP1 propose_change, confirm_intent and get_change.
 var ChangeCardResult = Type("ChangeCardResult", func() {
 	Description("Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.")
@@ -66,6 +77,7 @@ var ChangeCardResult = Type("ChangeCardResult", func() {
 	Attribute("preserved_behaviors", ArrayOf(String), "Existing contract invariants preserved by this change.")
 	Attribute("confirmed_by", String, "Authenticated principal that confirmed the Change Card.")
 	Attribute("request_revision", String, "SHA-256 digest of the canonical versioned Change Card.")
+	Attribute("ui_composition", UICompositionItem, "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.")
 	Required("change_id", "status", "prompt", "summary", "examples", "preserved_behaviors", "request_revision")
 })
 

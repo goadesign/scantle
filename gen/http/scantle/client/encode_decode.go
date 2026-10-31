@@ -645,6 +645,18 @@ func unmarshalExampleItemResponseBodyToScantleExampleItem(v *ExampleItemResponse
 	return res
 }
 
+// unmarshalUICompositionItemResponseBodyToScantleUICompositionItem builds a
+// value of type *scantle.UICompositionItem from a value of type
+// *UICompositionItemResponseBody.
+func unmarshalUICompositionItemResponseBodyToScantleUICompositionItem(v *UICompositionItemResponseBody) *scantle.UICompositionItem {
+	res := &scantle.UICompositionItem{
+		Program:             *v.Program,
+		ComposedForRevision: *v.ComposedForRevision,
+	}
+
+	return res
+}
+
 // marshalScantleExampleItemToExampleItemRequestBody builds a value of type
 // *ExampleItemRequestBody from a value of type *scantle.ExampleItem.
 func marshalScantleExampleItemToExampleItemRequestBody(v *scantle.ExampleItem) *ExampleItemRequestBody {

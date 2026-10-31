@@ -41,6 +41,10 @@ type (
 		ConfirmedBy *string
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision string
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItem
 	}
 	// DiffPayload defines the JSON payload for the scantle.diff tool.
 	DiffPayload = struct {
@@ -112,6 +116,10 @@ type (
 		ConfirmedBy *string
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision string
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItem
 	}
 	// PreviewArchitecturePayload defines the JSON payload for the scantle.preview_architecture tool.
 	PreviewArchitecturePayload = struct {
@@ -179,6 +187,10 @@ type (
 		ConfirmedBy *string
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision string
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItem
 	}
 	// AgentPolicyItem is a nested type used by the generated JSON contract.
 	AgentPolicyItem = struct {
@@ -343,5 +355,13 @@ type (
 		LookupTextOnlyArgsSchema *string
 		// Compiler-listed fields supplied outside the ordinary bound model input.
 		InjectedFields []string
+	}
+	// UICompositionItem is a nested type used by the generated JSON contract.
+	UICompositionItem = struct {
+		// OpenUI Lang program composed by the CP1 model from the Scantle decision
+		// component catalog.
+		Program string
+		// request_revision of the Change Card this program was composed for.
+		ComposedForRevision string
 	}
 )

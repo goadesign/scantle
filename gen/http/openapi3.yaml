@@ -82,6 +82,9 @@ paths:
                                 request_revision: Maiores et neque.
                                 status: needs_confirmation
                                 summary: Dolorem blanditiis.
+                                ui_composition:
+                                    composed_for_revision: Aut neque voluptas.
+                                    program: 6j4
     /changes/confirm:
         post:
             tags:
@@ -172,6 +175,9 @@ paths:
                                 request_revision: Alias cupiditate aut quia natus fuga eius.
                                 status: needs_confirmation
                                 summary: Et accusantium expedita.
+                                ui_composition:
+                                    composed_for_revision: Aut neque voluptas.
+                                    program: 6j4
     /changes/preview:
         post:
             tags:
@@ -456,6 +462,9 @@ paths:
                                 request_revision: Necessitatibus quos et ut natus voluptates corporis.
                                 status: needs_confirmation
                                 summary: Maiores voluptate soluta quasi et in.
+                                ui_composition:
+                                    composed_for_revision: Aut neque voluptas.
+                                    program: 6j4
     /diff:
         post:
             tags:
@@ -1168,6 +1177,8 @@ components:
                     type: string
                     description: Plain-English summary of requested behavior.
                     example: Maiores voluptate soluta quasi et in.
+                ui_composition:
+                    $ref: '#/components/schemas/UICompositionItem'
             description: Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.
             example:
                 ambiguities:
@@ -1216,6 +1227,9 @@ components:
                 request_revision: Necessitatibus quos et ut natus voluptates corporis.
                 status: needs_confirmation
                 summary: Maiores voluptate soluta quasi et in.
+                ui_composition:
+                    composed_for_revision: Aut neque voluptas.
+                    program: 6j4
             required:
                 - change_id
                 - status
@@ -1974,6 +1988,25 @@ components:
             required:
                 - args_schema
                 - injected_fields
+        UICompositionItem:
+            type: object
+            properties:
+                composed_for_revision:
+                    type: string
+                    description: request_revision of the Change Card this program was composed for.
+                    example: Aut neque voluptas.
+                program:
+                    type: string
+                    description: OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.
+                    example: 6j4
+                    minLength: 1
+            description: 'Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card''s request_revision.'
+            example:
+                composed_for_revision: Aut neque voluptas.
+                program: 6j4
+            required:
+                - program
+                - composed_for_revision
 tags:
     - name: scantle
       description: Scantle MCP software factory control plane.

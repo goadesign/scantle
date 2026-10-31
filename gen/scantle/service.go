@@ -179,6 +179,10 @@ type ChangeCardResult struct {
 	ConfirmedBy *string
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItem
 }
 
 // ConfirmIntentPayload is the payload type of the scantle service
@@ -394,6 +398,18 @@ type ToolInputBindingItem struct {
 	LookupTextOnlyArgsSchema *string
 	// Compiler-listed fields supplied outside the ordinary bound model input.
 	InjectedFields []string
+}
+
+// Model-authored OpenUI Lang decision view for exactly one Change Card
+// revision. It is presentation only: it is never hashed into request_revision,
+// confirm_intent never reads it, and it describes the card only while
+// composed_for_revision equals the card's request_revision.
+type UICompositionItem struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program string
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision string
 }
 
 // agentPolicyItemIntTransport stores JSON fields until they have been validated.
@@ -701,6 +717,10 @@ type jsonChangeCardResultTransport struct {
 	ConfirmedBy *string `json:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *jsonUICompositionItemTransport `json:"ui_composition,omitempty"`
 }
 
 // validatejsonChangeCardResultTransport checks decoded JSON before it becomes a service value.
@@ -746,6 +766,11 @@ func validatejsonChangeCardResultTransport(value *jsonChangeCardResultTransport)
 			if err2 := validatejsonExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if value.UIComposition != nil {
+		if err2 := validatejsonUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return err
@@ -1297,6 +1322,34 @@ func validatejsonToolInputBindingItemTransport(value *jsonToolInputBindingItemTr
 	return err
 }
 
+// jsonUICompositionItemTransport stores JSON fields until they have been validated.
+type jsonUICompositionItemTransport struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program *string `json:"program"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision *string `json:"composed_for_revision"`
+}
+
+// validatejsonUICompositionItemTransport checks decoded JSON before it becomes a service value.
+func validatejsonUICompositionItemTransport(value *jsonUICompositionItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if value.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	if value.Program != nil {
+		if utf8.RuneCountInString(*value.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
+		}
+	}
+	return err
+}
+
 // validateAmbiguityQuestionOriginal checks the original typed value before JSON conversion.
 func validateAmbiguityQuestionOriginal(value *AmbiguityQuestion) (err error) {
 	if value.Options == nil {
@@ -1438,6 +1491,11 @@ func validateChangeCardResultOriginal(value *ChangeCardResult) (err error) {
 			}
 		}
 	}
+	if value.UIComposition != nil {
+		if err2 := validateUICompositionItemOriginal(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return err
 }
 
@@ -1445,6 +1503,14 @@ func validateChangeCardResultOriginal(value *ChangeCardResult) (err error) {
 func validateExampleItemOriginal(value *ExampleItem) (err error) {
 	if !(value.VerificationKind == "deterministic" || value.VerificationKind == "model_judged") {
 		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.verification_kind", value.VerificationKind, []any{"deterministic", "model_judged"}))
+	}
+	return err
+}
+
+// validateUICompositionItemOriginal checks the original typed value before JSON conversion.
+func validateUICompositionItemOriginal(value *UICompositionItem) (err error) {
+	if utf8.RuneCountInString(value.Program) < 1 {
+		err = goa.MergeErrors(err, goa.InvalidLengthError("value.program", value.Program, utf8.RuneCountInString(value.Program), 1, true))
 	}
 	return err
 }
@@ -2262,6 +2328,9 @@ func EncodeChangeCardResult(in *ChangeCardResult) ([]byte, error) {
 		for i, val := range in.PreservedBehaviors {
 			body.PreservedBehaviors[i] = val
 		}
+		if in.UIComposition != nil {
+			body.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
+		}
 	}
 	if err := validatejsonChangeCardResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate ChangeCardResult JSON: %w", err)
@@ -2327,6 +2396,9 @@ func ValidateChangeCardResultValue(in *ChangeCardResult) error {
 		body.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
 		for i, val := range in.PreservedBehaviors {
 			body.PreservedBehaviors[i] = val
+		}
+		if in.UIComposition != nil {
+			body.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
 		}
 	}
 	if err := validatejsonChangeCardResultTransport(body); err != nil {
@@ -2397,6 +2469,9 @@ func DecodeChangeCardResult(data []byte) (out *ChangeCardResult, err error) {
 		out.PreservedBehaviors = make([]string, len(body.PreservedBehaviors))
 		for i, val := range body.PreservedBehaviors {
 			out.PreservedBehaviors[i] = val
+		}
+		if body.UIComposition != nil {
+			out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(body.UIComposition)
 		}
 	}
 	return out, nil
@@ -3882,6 +3957,92 @@ func DecodeToolInputBindingItem(data []byte) (out *ToolInputBindingItem, err err
 	return out, nil
 }
 
+// EncodeUICompositionItem turns a service value into JSON using the field names in the Goa design.
+func EncodeUICompositionItem(in *UICompositionItem) ([]byte, error) {
+	if err := checkUICompositionItemValue(in); err != nil {
+		return nil, fmt.Errorf("encode UICompositionItem JSON: %w", err)
+	}
+	if err := validateUICompositionItemOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate UICompositionItem value: %w", err)
+	}
+	var body *jsonUICompositionItemTransport
+	{
+		body = &jsonUICompositionItemTransport{
+			Program:             &in.Program,
+			ComposedForRevision: &in.ComposedForRevision,
+		}
+	}
+	if err := validatejsonUICompositionItemTransport(body); err != nil {
+		return nil, fmt.Errorf("validate UICompositionItem JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode UICompositionItem JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateUICompositionItemValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateUICompositionItemValue(in *UICompositionItem) error {
+	if err := checkUICompositionItemValue(in); err != nil {
+		return fmt.Errorf("validate UICompositionItem value: %w", err)
+	}
+	if err := validateUICompositionItemOriginal(in); err != nil {
+		return fmt.Errorf("validate UICompositionItem value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "UICompositionItem")
+	}
+
+	var body *jsonUICompositionItemTransport
+	{
+		body = &jsonUICompositionItemTransport{
+			Program:             &in.Program,
+			ComposedForRevision: &in.ComposedForRevision,
+		}
+	}
+	if err := validatejsonUICompositionItemTransport(body); err != nil {
+		return fmt.Errorf("validate UICompositionItem value: %w", err)
+	}
+	return nil
+}
+
+// DecodeUICompositionItem checks JSON field names from the Goa design and returns a service value.
+func DecodeUICompositionItem(data []byte) (out *UICompositionItem, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode UICompositionItem JSON: %w", err)
+	}
+	if err := validateChangeCardResultJSONValue7("", root, ""); err != nil {
+		return out, fmt.Errorf("decode UICompositionItem JSON: %w", err)
+	}
+	var body *jsonUICompositionItemTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode UICompositionItem JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode UICompositionItem JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode UICompositionItem JSON after first value: %w", err)
+	}
+	if err := validatejsonUICompositionItemTransport(body); err != nil {
+		return out, fmt.Errorf("validate UICompositionItem JSON: %w", err)
+	}
+	{
+		out = &UICompositionItem{
+			Program:             *body.Program,
+			ComposedForRevision: *body.ComposedForRevision,
+		}
+	}
+	return out, nil
+}
+
 func decodeAgentPolicyItemTransportToAgentPolicyItem(v *jsonAgentPolicyItemTransport) *AgentPolicyItem {
 	res := &AgentPolicyItem{
 		AgentID:             *v.AgentID,
@@ -4048,6 +4209,15 @@ func decodeToolInputBindingItemTransportToToolInputBindingItem(v *jsonToolInputB
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
 		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func decodeUICompositionItemTransportToUICompositionItem(v *jsonUICompositionItemTransport) *UICompositionItem {
+	res := &UICompositionItem{
+		Program:             *v.Program,
+		ComposedForRevision: *v.ComposedForRevision,
 	}
 
 	return res
@@ -4248,6 +4418,15 @@ func encodeToolInputBindingItemToToolInputBindingItemTransport(v *ToolInputBindi
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
 		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func encodeUICompositionItemToUICompositionItemTransport(v *UICompositionItem) *jsonUICompositionItemTransport {
+	res := &jsonUICompositionItemTransport{
+		Program:             &v.Program,
+		ComposedForRevision: &v.ComposedForRevision,
 	}
 
 	return res
@@ -5470,6 +5649,13 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 			); err != nil {
 				return err
 			}
+		case "ui_composition":
+			if err := validateChangeCardResultJSONValue7(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.",
+			); err != nil {
+				return err
+			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"ambiguities",
@@ -5482,6 +5668,7 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 				"request_revision",
 				"status",
 				"summary",
+				"ui_composition",
 			})
 		}
 	}
@@ -5658,6 +5845,50 @@ func validateChangeCardResultJSONValue6(path string, value any, description stri
 			item, description,
 		); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// validateChangeCardResultJSONValue7 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateChangeCardResultJSONValue7(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "composed_for_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "request_revision of the Change Card this program was composed for.",
+			); err != nil {
+				return err
+			}
+		case "program":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"composed_for_revision",
+				"program",
+			})
 		}
 	}
 	return nil
@@ -7011,6 +7242,9 @@ func checkChangeCardResultChangeCardResultValue(in *ChangeCardResult, field stri
 		if !utf8.ValidString(string(in.RequestRevision)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
 		}
+		if err := checkChangeCardResultUICompositionItemValue(in.UIComposition, generatedJSONChildPath(field, "ui_composition", false), active); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -7040,6 +7274,27 @@ func checkChangeCardResultExampleItemValue(in *ExampleItem, field string, active
 		}
 		if !utf8.ValidString(string(in.VerificationKind)) {
 			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "verification_kind", false))
+		}
+	}
+	return nil
+}
+
+// checkChangeCardResultUICompositionItemValue checks one generated value on the active path.
+func checkChangeCardResultUICompositionItemValue(in *UICompositionItem, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.Program)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "program", false))
+		}
+		if !utf8.ValidString(string(in.ComposedForRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "composed_for_revision", false))
 		}
 	}
 	return nil
@@ -7460,6 +7715,18 @@ func checkToolInputBindingItemValue(in *ToolInputBindingItem) error {
 	}
 	active := make(map[any]bool)
 	if err := checkArchitecturePreviewResultToolInputBindingItemValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkUICompositionItemValue checks text and cycles before conversion.
+func checkUICompositionItemValue(in *UICompositionItem) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkChangeCardResultUICompositionItemValue(in, "$", active); err != nil {
 		return err
 	}
 	return nil

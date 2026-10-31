@@ -457,6 +457,21 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 		JSONType:    "string",
 		Description: "SHA-256 digest of the canonical versioned Change Card.",
 	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition")},
+		JSONType:    "object",
+		Description: "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
+		JSONType:    "string",
+		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
+		JSONType:    "string",
+		Description: "request_revision of the Change Card this program was composed for.",
+	},
 }
 var diffPayloadFields = []tools.FieldMetadata{
 	{
@@ -727,6 +742,21 @@ var getChangeResultFields = []tools.FieldMetadata{
 		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
 		JSONType:    "string",
 		Description: "SHA-256 digest of the canonical versioned Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition")},
+		JSONType:    "object",
+		Description: "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
+		JSONType:    "string",
+		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
+		JSONType:    "string",
+		Description: "request_revision of the Change Card this program was composed for.",
 	},
 }
 var previewArchitecturePayloadFields = []tools.FieldMetadata{
@@ -1276,6 +1306,21 @@ var proposeChangeResultFields = []tools.FieldMetadata{
 		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
 		JSONType:    "string",
 		Description: "SHA-256 digest of the canonical versioned Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition")},
+		JSONType:    "object",
+		Description: "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("program")},
+		JSONType:    "string",
+		Description: "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("ui_composition"), tools.FixedField("composed_for_revision")},
+		JSONType:    "string",
+		Description: "request_revision of the Change Card this program was composed for.",
 	},
 }
 
@@ -2003,6 +2048,9 @@ func MarshalConfirmIntentResult(v *ConfirmIntentResult) ([]byte, error) {
 	for i, val := range in.PreservedBehaviors {
 		out.PreservedBehaviors[i] = val
 	}
+	if in.UIComposition != nil {
+		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
+	}
 	return json.Marshal(out)
 }
 
@@ -2063,6 +2111,9 @@ func UnmarshalConfirmIntentResult(data []byte) (*ConfirmIntentResult, error) {
 	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
 	for i, val := range in.PreservedBehaviors {
 		out.PreservedBehaviors[i] = val
+	}
+	if in.UIComposition != nil {
+		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
 	}
 	return out, nil
 }
@@ -2357,6 +2408,9 @@ func MarshalGetChangeResult(v *GetChangeResult) ([]byte, error) {
 	for i, val := range in.PreservedBehaviors {
 		out.PreservedBehaviors[i] = val
 	}
+	if in.UIComposition != nil {
+		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
+	}
 	return json.Marshal(out)
 }
 
@@ -2417,6 +2471,9 @@ func UnmarshalGetChangeResult(data []byte) (*GetChangeResult, error) {
 	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
 	for i, val := range in.PreservedBehaviors {
 		out.PreservedBehaviors[i] = val
+	}
+	if in.UIComposition != nil {
+		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
 	}
 	return out, nil
 }
@@ -2689,6 +2746,9 @@ func MarshalProposeChangeResult(v *ProposeChangeResult) ([]byte, error) {
 	for i, val := range in.PreservedBehaviors {
 		out.PreservedBehaviors[i] = val
 	}
+	if in.UIComposition != nil {
+		out.UIComposition = encodeUICompositionItemToUICompositionItemTransport(in.UIComposition)
+	}
 	return json.Marshal(out)
 }
 
@@ -2749,6 +2809,9 @@ func UnmarshalProposeChangeResult(data []byte) (*ProposeChangeResult, error) {
 	out.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
 	for i, val := range in.PreservedBehaviors {
 		out.PreservedBehaviors[i] = val
+	}
+	if in.UIComposition != nil {
+		out.UIComposition = decodeUICompositionItemTransportToUICompositionItem(in.UIComposition)
 	}
 	return out, nil
 }
@@ -3133,6 +3196,13 @@ func validateProposeChangeResultJSONValue(path string, value any, description st
 			); err != nil {
 				return err
 			}
+		case "ui_composition":
+			if err := validateProposeChangeResultUICompositionItemTransportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.",
+			); err != nil {
+				return err
+			}
 		default:
 			return unknownJSONFieldError(path, key, []string{
 				"ambiguities",
@@ -3145,6 +3215,7 @@ func validateProposeChangeResultJSONValue(path string, value any, description st
 				"request_revision",
 				"status",
 				"summary",
+				"ui_composition",
 			})
 		}
 	}
@@ -3366,6 +3437,50 @@ func validateProposeChangeResultExampleItemTransportJSONValue(path string, value
 				"input_summary",
 				"scenario",
 				"verification_kind",
+			})
+		}
+	}
+	return nil
+}
+
+// validateProposeChangeResultUICompositionItemTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateProposeChangeResultUICompositionItemTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "composed_for_revision":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "request_revision of the Change Card this program was composed for.",
+			); err != nil {
+				return err
+			}
+		case "program":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"composed_for_revision",
+				"program",
 			})
 		}
 	}
@@ -4860,6 +4975,14 @@ func decodeAmbiguityQuestionTransportToAmbiguityQuestion(v *toolhttp.AmbiguityQu
 
 	return res
 }
+func decodeUICompositionItemTransportToUICompositionItem(v *toolhttp.UICompositionItemTransport) *UICompositionItem {
+	res := &UICompositionItem{
+		Program:             *v.Program,
+		ComposedForRevision: *v.ComposedForRevision,
+	}
+
+	return res
+}
 func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *toolhttp.AmbiguityQuestionTransport {
 	res := &toolhttp.AmbiguityQuestionTransport{
 		ID:       &v.ID,
@@ -4868,6 +4991,14 @@ func encodeAmbiguityQuestionToAmbiguityQuestionTransport(v *AmbiguityQuestion) *
 	res.Options = make([]string, len(v.Options))
 	for i, val := range v.Options {
 		res.Options[i] = val
+	}
+
+	return res
+}
+func encodeUICompositionItemToUICompositionItemTransport(v *UICompositionItem) *toolhttp.UICompositionItemTransport {
+	res := &toolhttp.UICompositionItemTransport{
+		Program:             &v.Program,
+		ComposedForRevision: &v.ComposedForRevision,
 	}
 
 	return res

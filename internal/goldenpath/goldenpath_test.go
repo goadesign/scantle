@@ -20,5 +20,7 @@ func TestPlaybookMarkdownAndArchitectSystemPromptEmbedSingleSourceOfTruth(t *tes
 
 	prompt := ArchitectSystemPrompt()
 	assert.Contains(t, prompt, "cp1_change_card_analysis")
-	assert.True(t, strings.HasSuffix(prompt, md), "ArchitectSystemPrompt must embed PlaybookMarkdown verbatim")
+	assert.Contains(t, prompt, md, "ArchitectSystemPrompt must embed PlaybookMarkdown verbatim")
+	assert.True(t, strings.HasSuffix(prompt, decisionCatalog), "ArchitectSystemPrompt must end with the embedded decision catalog verbatim")
+	assert.Contains(t, prompt, "1-based position", "the composition instruction must tell the model to reference items by position, not by invented IDs")
 }

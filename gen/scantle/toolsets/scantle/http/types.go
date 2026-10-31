@@ -47,6 +47,10 @@ type (
 		ConfirmedBy *string `json:"confirmed_by,omitempty"`
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision *string `json:"request_revision"`
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
 	}
 	// DiffPayloadTransport is the internal JSON transport type for DiffPayload.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -136,6 +140,10 @@ type (
 		ConfirmedBy *string `json:"confirmed_by,omitempty"`
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision *string `json:"request_revision"`
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
 	}
 	// PreviewArchitecturePayloadTransport is the internal JSON transport type for PreviewArchitecturePayload.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -215,6 +223,10 @@ type (
 		ConfirmedBy *string `json:"confirmed_by,omitempty"`
 		// SHA-256 digest of the canonical versioned Change Card.
 		RequestRevision *string `json:"request_revision"`
+		// Decision view the CP1 model composed for this revision, when it produced
+		// one. A confirm_intent that changes answers or examples returns the new
+		// revision without it.
+		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
 	}
 	// AgentPolicyItemTransport is the internal JSON transport type for AgentPolicyItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -412,5 +424,16 @@ type (
 		LookupTextOnlyArgsSchema *string `json:"lookup_text_only_args_schema,omitempty"`
 		// Compiler-listed fields supplied outside the ordinary bound model input.
 		InjectedFields []string `json:"injected_fields"`
+	}
+	// UICompositionItemTransport is the internal JSON transport type for UICompositionItemTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	UICompositionItemTransport struct {
+		// OpenUI Lang program composed by the CP1 model from the Scantle decision
+		// component catalog.
+		Program *string `json:"program"`
+		// request_revision of the Change Card this program was composed for.
+		ComposedForRevision *string `json:"composed_for_revision"`
 	}
 )

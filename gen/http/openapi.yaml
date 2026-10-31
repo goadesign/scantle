@@ -829,6 +829,8 @@ definitions:
                 type: string
                 description: Plain-English summary of requested behavior.
                 example: Maiores voluptate soluta quasi et in.
+            ui_composition:
+                $ref: '#/definitions/UICompositionItem'
         description: Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.
         example:
             ambiguities:
@@ -877,6 +879,9 @@ definitions:
             request_revision: Necessitatibus quos et ut natus voluptates corporis.
             status: needs_confirmation
             summary: Maiores voluptate soluta quasi et in.
+            ui_composition:
+                composed_for_revision: Aut neque voluptas.
+                program: 6j4
         required:
             - change_id
             - status
@@ -1643,3 +1648,23 @@ definitions:
         required:
             - args_schema
             - injected_fields
+    UICompositionItem:
+        title: UICompositionItem
+        type: object
+        properties:
+            composed_for_revision:
+                type: string
+                description: request_revision of the Change Card this program was composed for.
+                example: Aut neque voluptas.
+            program:
+                type: string
+                description: OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.
+                example: 6j4
+                minLength: 1
+        description: 'Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card''s request_revision.'
+        example:
+            composed_for_revision: Aut neque voluptas.
+            program: 6j4
+        required:
+            - program
+            - composed_for_revision

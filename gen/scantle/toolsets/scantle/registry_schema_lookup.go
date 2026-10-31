@@ -20,15 +20,15 @@ func ToolSchema(name tools.Ident) (*genregistry.ToolSchema, bool) {
 	case "scantle.confirm_intent":
 		return declarations.schema1(), true
 	case "scantle.diff":
-		return declarations.schema53(), true
+		return declarations.schema56(), true
 	case "scantle.draft_override":
-		return declarations.schema82(), true
+		return declarations.schema85(), true
 	case "scantle.get_change":
-		return declarations.schema99(), true
+		return declarations.schema102(), true
 	case "scantle.preview_architecture":
-		return declarations.schema131(), true
+		return declarations.schema137(), true
 	case "scantle.propose_change":
-		return declarations.schema228(), true
+		return declarations.schema234(), true
 	default:
 		return nil, false
 	}

@@ -7,7 +7,11 @@
 
 package http
 
-import goa "goa.design/goa/v3/pkg"
+import (
+	"unicode/utf8"
+
+	goa "goa.design/goa/v3/pkg"
+)
 
 // ValidateConfirmIntentPayloadTransport runs the validations defined on ConfirmIntentPayloadTransport.
 func ValidateConfirmIntentPayloadTransport(body *ConfirmIntentPayloadTransport) (err error) {
@@ -73,6 +77,11 @@ func ValidateConfirmIntentResultTransport(body *ConfirmIntentResultTransport) (e
 			if err2 := ValidateExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if body.UIComposition != nil {
+		if err2 := ValidateUICompositionItemTransport(body.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return
@@ -200,6 +209,11 @@ func ValidateGetChangeResultTransport(body *GetChangeResultTransport) (err error
 			if err2 := ValidateExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if body.UIComposition != nil {
+		if err2 := ValidateUICompositionItemTransport(body.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return
@@ -350,6 +364,11 @@ func ValidateProposeChangeResultTransport(body *ProposeChangeResultTransport) (e
 			if err2 := ValidateExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if body.UIComposition != nil {
+		if err2 := ValidateUICompositionItemTransport(body.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return
@@ -602,6 +621,22 @@ func ValidateToolInputBindingItemTransport(body *ToolInputBindingItemTransport) 
 	}
 	if body.InjectedFields == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("injected_fields", "body"))
+	}
+	return
+}
+
+// ValidateUICompositionItemTransport runs the validations defined on UICompositionItemTransport.
+func ValidateUICompositionItemTransport(body *UICompositionItemTransport) (err error) {
+	if body.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if body.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	if body.Program != nil {
+		if utf8.RuneCountInString(*body.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *body.Program, utf8.RuneCountInString(*body.Program), 1, true))
+		}
 	}
 	return
 }

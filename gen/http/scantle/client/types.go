@@ -8,6 +8,8 @@
 package client
 
 import (
+	"unicode/utf8"
+
 	scantle "github.com/goadesign/scantle/gen/scantle"
 	goa "goa.design/goa/v3/pkg"
 )
@@ -92,6 +94,10 @@ type ProposeChangeResponseBody struct {
 	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
 }
 
 // ConfirmIntentResponseBody is the type of the "scantle" service
@@ -117,6 +123,10 @@ type ConfirmIntentResponseBody struct {
 	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
 }
 
 // GetChangeResponseBody is the type of the "scantle" service "get_change"
@@ -142,6 +152,10 @@ type GetChangeResponseBody struct {
 	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
 }
 
 // PreviewArchitectureResponseBody is the type of the "scantle" service
@@ -224,6 +238,16 @@ type ExampleItemResponseBody struct {
 	ExpectedOutcome *string `form:"expected_outcome,omitempty" json:"expected_outcome,omitempty" xml:"expected_outcome,omitempty"`
 	// Evaluator check classification (deterministic or model_judged).
 	VerificationKind *string `form:"verification_kind,omitempty" json:"verification_kind,omitempty" xml:"verification_kind,omitempty"`
+}
+
+// UICompositionItemResponseBody is used to define fields on response body
+// types.
+type UICompositionItemResponseBody struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program *string `form:"program,omitempty" json:"program,omitempty" xml:"program,omitempty"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision *string `form:"composed_for_revision,omitempty" json:"composed_for_revision,omitempty" xml:"composed_for_revision,omitempty"`
 }
 
 // C4ContainerItemResponseBody is used to define fields on response body types.
@@ -521,6 +545,9 @@ func NewProposeChangeChangeCardResultOK(body *ProposeChangeResponseBody) *scantl
 	for i, val := range body.PreservedBehaviors {
 		v.PreservedBehaviors[i] = val
 	}
+	if body.UIComposition != nil {
+		v.UIComposition = unmarshalUICompositionItemResponseBodyToScantleUICompositionItem(body.UIComposition)
+	}
 
 	return v
 }
@@ -566,6 +593,9 @@ func NewConfirmIntentChangeCardResultOK(body *ConfirmIntentResponseBody) *scantl
 	for i, val := range body.PreservedBehaviors {
 		v.PreservedBehaviors[i] = val
 	}
+	if body.UIComposition != nil {
+		v.UIComposition = unmarshalUICompositionItemResponseBodyToScantleUICompositionItem(body.UIComposition)
+	}
 
 	return v
 }
@@ -610,6 +640,9 @@ func NewGetChangeChangeCardResultOK(body *GetChangeResponseBody) *scantle.Change
 	v.PreservedBehaviors = make([]string, len(body.PreservedBehaviors))
 	for i, val := range body.PreservedBehaviors {
 		v.PreservedBehaviors[i] = val
+	}
+	if body.UIComposition != nil {
+		v.UIComposition = unmarshalUICompositionItemResponseBodyToScantleUICompositionItem(body.UIComposition)
 	}
 
 	return v
@@ -745,6 +778,11 @@ func ValidateProposeChangeResponseBody(body *ProposeChangeResponseBody) (err err
 			}
 		}
 	}
+	if body.UIComposition != nil {
+		if err2 := validateUICompositionItemResponseBody(body.UIComposition, "body.ui_composition"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return
 }
 
@@ -791,6 +829,11 @@ func ValidateConfirmIntentResponseBody(body *ConfirmIntentResponseBody) (err err
 			}
 		}
 	}
+	if body.UIComposition != nil {
+		if err2 := validateUICompositionItemResponseBody(body.UIComposition, "body.ui_composition"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
 	return
 }
 
@@ -835,6 +878,11 @@ func ValidateGetChangeResponseBody(body *GetChangeResponseBody) (err error) {
 			if err2 := validateExampleItemResponseBody(e, "body.examples[*]"); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if body.UIComposition != nil {
+		if err2 := validateUICompositionItemResponseBody(body.UIComposition, "body.ui_composition"); err2 != nil {
+			err = goa.MergeErrors(err, err2)
 		}
 	}
 	return
@@ -1023,6 +1071,40 @@ func validateExampleItemResponseBody(body *ExampleItemResponseBody, path string)
 	if body.VerificationKind != nil {
 		if !(*body.VerificationKind == "deterministic" || *body.VerificationKind == "model_judged") {
 			err = goa.MergeErrors(err, goa.InvalidEnumValueError(path+".verification_kind", *body.VerificationKind, []any{"deterministic", "model_judged"}))
+		}
+	}
+	return
+}
+
+// ValidateUICompositionItemResponseBody runs the validations defined on
+// UICompositionItem
+func ValidateUICompositionItemResponseBody(body *UICompositionItemResponseBody) (err error) {
+	if body.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if body.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	if body.Program != nil {
+		if utf8.RuneCountInString(*body.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *body.Program, utf8.RuneCountInString(*body.Program), 1, true))
+		}
+	}
+	return
+}
+
+// validateUICompositionItemResponseBody checks UICompositionItem and reports
+// errors using the path supplied by its caller
+func validateUICompositionItemResponseBody(body *UICompositionItemResponseBody, path string) (err error) {
+	if body.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", path))
+	}
+	if body.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", path))
+	}
+	if body.Program != nil {
+		if utf8.RuneCountInString(*body.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError(path+".program", *body.Program, utf8.RuneCountInString(*body.Program), 1, true))
 		}
 	}
 	return

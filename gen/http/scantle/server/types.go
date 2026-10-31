@@ -92,6 +92,10 @@ type ProposeChangeResponseBody struct {
 	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
 }
 
 // ConfirmIntentResponseBody is the type of the "scantle" service
@@ -117,6 +121,10 @@ type ConfirmIntentResponseBody struct {
 	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
 }
 
 // GetChangeResponseBody is the type of the "scantle" service "get_change"
@@ -142,6 +150,10 @@ type GetChangeResponseBody struct {
 	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
 }
 
 // PreviewArchitectureResponseBody is the type of the "scantle" service
@@ -224,6 +236,16 @@ type ExampleItemResponseBody struct {
 	ExpectedOutcome string `form:"expected_outcome" json:"expected_outcome" xml:"expected_outcome"`
 	// Evaluator check classification (deterministic or model_judged).
 	VerificationKind string `form:"verification_kind" json:"verification_kind" xml:"verification_kind"`
+}
+
+// UICompositionItemResponseBody is used to define fields on response body
+// types.
+type UICompositionItemResponseBody struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program string `form:"program" json:"program" xml:"program"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision string `form:"composed_for_revision" json:"composed_for_revision" xml:"composed_for_revision"`
 }
 
 // C4ContainerItemResponseBody is used to define fields on response body types.
@@ -441,6 +463,9 @@ func NewProposeChangeResponseBody(res *scantle.ChangeCardResult) *ProposeChangeR
 	} else {
 		body.PreservedBehaviors = []string{}
 	}
+	if res.UIComposition != nil {
+		body.UIComposition = marshalScantleUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
+	}
 	return body
 }
 
@@ -493,6 +518,9 @@ func NewConfirmIntentResponseBody(res *scantle.ChangeCardResult) *ConfirmIntentR
 	} else {
 		body.PreservedBehaviors = []string{}
 	}
+	if res.UIComposition != nil {
+		body.UIComposition = marshalScantleUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
+	}
 	return body
 }
 
@@ -544,6 +572,9 @@ func NewGetChangeResponseBody(res *scantle.ChangeCardResult) *GetChangeResponseB
 		}
 	} else {
 		body.PreservedBehaviors = []string{}
+	}
+	if res.UIComposition != nil {
+		body.UIComposition = marshalScantleUICompositionItemToUICompositionItemResponseBody(res.UIComposition)
 	}
 	return body
 }

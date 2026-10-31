@@ -29,6 +29,7 @@ import (
 	"github.com/goadesign/scantle/internal/goldenpath"
 	"github.com/goadesign/scantle/internal/swarm"
 	"goa.design/goa-ai/runtime/agent/model"
+	"goa.design/goa-ai/runtime/mcp"
 	goahttp "goa.design/goa/v3/http"
 )
 
@@ -88,6 +89,9 @@ type (
 		Examples []CP1ModelExample `json:"examples"`
 		// PreservedBehaviors lists existing contract invariants preserved by the change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
+		// UIComposition is an optional OpenUI Lang decision view composed from
+		// the Scantle decision catalog. Nil means the model composed none.
+		UIComposition *string `json:"ui_composition,omitempty"`
 	}
 
 	// ModelCP1Analyzer implements CP1Analyzer using a Goa-AI model.Client with
@@ -192,7 +196,7 @@ const (
 	// Anthropic require a positive allowance on every request. A response the
 	// provider marks OutputLimited fails Analyze even when its JSON parses, so
 	// no card is stored from an analysis that may be incomplete.
-	cp1AnalysisMaxOutputTokens = 4096
+	cp1AnalysisMaxOutputTokens = 6144
 )
 
 var (
@@ -270,6 +274,10 @@ var (
         "type": "string",
         "minLength": 1
       }
+    },
+    "ui_composition": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }`)
@@ -467,14 +475,23 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 		return nil, fmt.Errorf("change_id %q already exists", p.ChangeID)
 	}
 
+	if err := reportProgress(ctx, 0, 1, "Analyzing the feature request with the CP1 model"); err != nil {
+		return nil, err
+	}
 	analysis, err := c.analyzer.Analyze(ctx, p.Prompt, designSrc)
 	if err != nil {
+		return nil, err
+	}
+	if err := reportProgress(ctx, 1, 1, "Validating the CP1 analysis"); err != nil {
 		return nil, err
 	}
 
 	summary, ambiguities, examples, preserved, err := validateCP1Analysis(p.ChangeID, analysis)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cp1 analysis: %w", err)
+	}
+	if analysis.UIComposition != nil && strings.TrimSpace(*analysis.UIComposition) == "" {
+		return nil, errors.New("invalid cp1 analysis: ui_composition must not be blank")
 	}
 
 	status := StatusConfirmed
@@ -501,6 +518,11 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 		return nil, err
 	}
 	card.RequestRevision = rev
+	// The composition is bound to the revision it was composed with but is
+	// not part of it: request_revision covers only the authoritative card.
+	if analysis.UIComposition != nil {
+		card.UIComposition = &genscantle.UICompositionItem{Program: *analysis.UIComposition, ComposedForRevision: rev}
+	}
 
 	c.mu.Lock()
 	if _, exists := c.cards[p.ChangeID]; exists {
@@ -577,6 +599,10 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	if err != nil {
 		return nil, fmt.Errorf("invalid confirmed examples: %w", err)
 	}
+	// confirmed carries no ui_composition: a composition describes only the
+	// revision it was composed for, and changed answers or examples produce a
+	// new revision. An unchanged submission returns existing, composition
+	// included, below.
 	confirmedBy := principal.ID
 	confirmed := &genscantle.ChangeCardResult{
 		ChangeID:           existing.ChangeID,
@@ -635,8 +661,14 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
 	}
 
+	if err := reportProgress(ctx, 0, 2, "Evaluating the candidate design in the sandbox"); err != nil {
+		return nil, err
+	}
 	evaluated, err := designeval.Evaluate(ctx, p.Design.Files)
 	if err != nil {
+		return nil, err
+	}
+	if err := reportProgress(ctx, 1, 2, "Planning the proposed swarm roster"); err != nil {
 		return nil, err
 	}
 	if evaluated.SystemName == "" || len(evaluated.Containers) == 0 {
@@ -651,6 +683,9 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *genscantle.Pr
 	designDigest := designeval.SnapshotDigest(p.Design.Files)
 	swarmItem, err := planSwarmRoster(p.ChangeID, designDigest, c.swarmProfiles, p.Builders)
 	if err != nil {
+		return nil, err
+	}
+	if err := reportProgress(ctx, 2, 2, "Architecture preview ready"); err != nil {
 		return nil, err
 	}
 	banner := fmt.Sprintf(
@@ -797,6 +832,16 @@ func computeCanonicalRevision(card *genscantle.ChangeCardResult, owner, designSo
 	}
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// reportProgress sends one MCP progress update for the current request:
+// value of total units done, with message. It does nothing when the caller did
+// not ask for progress, and fails when an update cannot be delivered.
+func reportProgress(ctx context.Context, value, total float64, message string) error {
+	if err := mcp.ReportProgress(ctx, value, &total, &message); err != nil {
+		return fmt.Errorf("report progress: %w", err)
+	}
+	return nil
 }
 
 // planSwarmRoster invokes swarm.Plan over server-owned provider profiles and

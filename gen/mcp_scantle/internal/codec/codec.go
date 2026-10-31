@@ -12,6 +12,7 @@ import (
 	json "encoding/json"
 	fmt "fmt"
 	io "io"
+	"unicode/utf8"
 
 	scantle "github.com/goadesign/scantle/gen/scantle"
 	goa "goa.design/goa/v3/pkg"
@@ -189,6 +190,10 @@ type ConfirmIntentResultTransport struct {
 	ConfirmedBy *string `json:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *ConfirmIntentResultUICompositionItemTransport `json:"ui_composition,omitempty"`
 }
 
 // ValidateConfirmIntentResultTransport checks decoded JSON before it becomes a service value.
@@ -234,6 +239,39 @@ func ValidateConfirmIntentResultTransport(value *ConfirmIntentResultTransport) (
 			if err2 := ValidateConfirmIntentResultExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if value.UIComposition != nil {
+		if err2 := ValidateConfirmIntentResultUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// ConfirmIntentResultUICompositionItemTransport stores JSON fields until they have been validated.
+type ConfirmIntentResultUICompositionItemTransport struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program *string `json:"program"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision *string `json:"composed_for_revision"`
+}
+
+// ValidateConfirmIntentResultUICompositionItemTransport checks decoded JSON before it becomes a service value.
+func ValidateConfirmIntentResultUICompositionItemTransport(value *ConfirmIntentResultUICompositionItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if value.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	if value.Program != nil {
+		if utf8.RuneCountInString(*value.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
 		}
 	}
 	return err
@@ -498,6 +536,10 @@ type GetChangeResultTransport struct {
 	ConfirmedBy *string `json:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *GetChangeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
 }
 
 // ValidateGetChangeResultTransport checks decoded JSON before it becomes a service value.
@@ -543,6 +585,39 @@ func ValidateGetChangeResultTransport(value *GetChangeResultTransport) (err erro
 			if err2 := ValidateGetChangeResultExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if value.UIComposition != nil {
+		if err2 := ValidateGetChangeResultUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// GetChangeResultUICompositionItemTransport stores JSON fields until they have been validated.
+type GetChangeResultUICompositionItemTransport struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program *string `json:"program"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision *string `json:"composed_for_revision"`
+}
+
+// ValidateGetChangeResultUICompositionItemTransport checks decoded JSON before it becomes a service value.
+func ValidateGetChangeResultUICompositionItemTransport(value *GetChangeResultUICompositionItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if value.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	if value.Program != nil {
+		if utf8.RuneCountInString(*value.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
 		}
 	}
 	return err
@@ -1190,6 +1265,10 @@ type ProposeChangeResultTransport struct {
 	ConfirmedBy *string `json:"confirmed_by,omitempty"`
 	// SHA-256 digest of the canonical versioned Change Card.
 	RequestRevision *string `json:"request_revision"`
+	// Decision view the CP1 model composed for this revision, when it produced
+	// one. A confirm_intent that changes answers or examples returns the new
+	// revision without it.
+	UIComposition *ProposeChangeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
 }
 
 // ValidateProposeChangeResultTransport checks decoded JSON before it becomes a service value.
@@ -1235,6 +1314,39 @@ func ValidateProposeChangeResultTransport(value *ProposeChangeResultTransport) (
 			if err2 := ValidateProposeChangeResultExampleItemTransport(e); err2 != nil {
 				err = goa.MergeErrors(err, err2)
 			}
+		}
+	}
+	if value.UIComposition != nil {
+		if err2 := ValidateProposeChangeResultUICompositionItemTransport(value.UIComposition); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// ProposeChangeResultUICompositionItemTransport stores JSON fields until they have been validated.
+type ProposeChangeResultUICompositionItemTransport struct {
+	// OpenUI Lang program composed by the CP1 model from the Scantle decision
+	// component catalog.
+	Program *string `json:"program"`
+	// request_revision of the Change Card this program was composed for.
+	ComposedForRevision *string `json:"composed_for_revision"`
+}
+
+// ValidateProposeChangeResultUICompositionItemTransport checks decoded JSON before it becomes a service value.
+func ValidateProposeChangeResultUICompositionItemTransport(value *ProposeChangeResultUICompositionItemTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Program == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("program", "body"))
+	}
+	if value.ComposedForRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
+	}
+	if value.Program != nil {
+		if utf8.RuneCountInString(*value.Program) < 1 {
+			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
 		}
 	}
 	return err
@@ -1321,6 +1433,9 @@ func EncodeConfirmIntentResult(in *scantle.ChangeCardResult) ([]byte, error) {
 		body.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
 		for i, val := range in.PreservedBehaviors {
 			body.PreservedBehaviors[i] = val
+		}
+		if in.UIComposition != nil {
+			body.UIComposition = encodeUICompositionItemToConfirmIntentResultUICompositionItemTransport(in.UIComposition)
 		}
 	}
 	if err := ValidateConfirmIntentResultTransport(body); err != nil {
@@ -1508,6 +1623,9 @@ func EncodeGetChangeResult(in *scantle.ChangeCardResult) ([]byte, error) {
 		for i, val := range in.PreservedBehaviors {
 			body.PreservedBehaviors[i] = val
 		}
+		if in.UIComposition != nil {
+			body.UIComposition = encodeUICompositionItemToGetChangeResultUICompositionItemTransport(in.UIComposition)
+		}
 	}
 	if err := ValidateGetChangeResultTransport(body); err != nil {
 		return nil, fmt.Errorf("validate GetChangeResult JSON: %w", err)
@@ -1679,6 +1797,9 @@ func EncodeProposeChangeResult(in *scantle.ChangeCardResult) ([]byte, error) {
 		body.PreservedBehaviors = make([]string, len(in.PreservedBehaviors))
 		for i, val := range in.PreservedBehaviors {
 			body.PreservedBehaviors[i] = val
+		}
+		if in.UIComposition != nil {
+			body.UIComposition = encodeUICompositionItemToProposeChangeResultUICompositionItemTransport(in.UIComposition)
 		}
 	}
 	if err := ValidateProposeChangeResultTransport(body); err != nil {
@@ -1943,6 +2064,33 @@ func encodeToolInputBindingItemToPreviewArchitectureResultToolInputBindingItemTr
 	res.InjectedFields = make([]string, len(v.InjectedFields))
 	for i, val := range v.InjectedFields {
 		res.InjectedFields[i] = val
+	}
+
+	return res
+}
+
+func encodeUICompositionItemToConfirmIntentResultUICompositionItemTransport(v *scantle.UICompositionItem) *ConfirmIntentResultUICompositionItemTransport {
+	res := &ConfirmIntentResultUICompositionItemTransport{
+		Program:             &v.Program,
+		ComposedForRevision: &v.ComposedForRevision,
+	}
+
+	return res
+}
+
+func encodeUICompositionItemToGetChangeResultUICompositionItemTransport(v *scantle.UICompositionItem) *GetChangeResultUICompositionItemTransport {
+	res := &GetChangeResultUICompositionItemTransport{
+		Program:             &v.Program,
+		ComposedForRevision: &v.ComposedForRevision,
+	}
+
+	return res
+}
+
+func encodeUICompositionItemToProposeChangeResultUICompositionItemTransport(v *scantle.UICompositionItem) *ProposeChangeResultUICompositionItemTransport {
+	res := &ProposeChangeResultUICompositionItemTransport{
+		Program:             &v.Program,
+		ComposedForRevision: &v.ComposedForRevision,
 	}
 
 	return res
