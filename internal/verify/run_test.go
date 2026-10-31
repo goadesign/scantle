@@ -1,6 +1,7 @@
 package verify
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -69,8 +70,11 @@ func TestRunRejectsInvalidPlansBeforeWriting(t *testing.T) {
 			p.WorkDir = t.TempDir()
 			c.edit(&p)
 			_, err := Run(t.Context(), p)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), c.wantErr)
+			var stage *StageError
+			require.ErrorAs(t, err, &stage)
+			assert.Equal(t, StageCheckout, stage.Stage)
+			assert.Equal(t, summaryPlan, stage.Summary, "the builder-safe summary never quotes the plan")
+			assert.Contains(t, stage.Err.Error(), c.wantErr)
 			entries, err := os.ReadDir(p.WorkDir)
 			require.NoError(t, err)
 			assert.Empty(t, entries, "a rejected plan must not write into WorkDir")
@@ -78,13 +82,13 @@ func TestRunRejectsInvalidPlansBeforeWriting(t *testing.T) {
 	}
 
 	_, err := Run(t.Context(), valid())
-	assert.EqualError(t, err, "work directory is required", "an empty WorkDir must not mean the current directory")
+	assert.EqualError(t, errors.Unwrap(err), "work directory is required", "an empty WorkDir must not mean the current directory")
 
 	used := valid()
 	used.WorkDir = t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(used.WorkDir, "build-home-suite"), 0o700))
 	_, err = Run(t.Context(), used)
-	assert.EqualError(t, err, "work directory "+used.WorkDir+" must be missing or empty",
+	assert.EqualError(t, errors.Unwrap(err), "work directory "+used.WorkDir+" must be missing or empty",
 		"files left in WorkDir could be read by a build through a committed link")
 }
 

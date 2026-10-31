@@ -16,9 +16,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/goadesign/surla"
 	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/internal/procgroup"
 	"github.com/goadesign/surla/verify/candidate"
 	"golang.org/x/mod/modfile"
 )
@@ -54,6 +57,10 @@ type (
 		workDir string
 	}
 )
+
+// buildStopGrace bounds how long the evaluator build gets to exit after it
+// is killed, and how long its process group may take to empty.
+const buildStopGrace = 10 * time.Second
 
 var (
 	// resolveToolchainEnv caches the resolved GOROOT, GOMODCACHE, and private
@@ -144,7 +151,7 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 		ModCache:  tc.modCache,
 		WorkDir:   tc.workDir,
 		LogFile:   buildLog,
-	}); err != nil {
+	}, runBuild); err != nil {
 		logBytes, readErr := os.ReadFile(buildLog)
 		if readErr != nil {
 			return Result{}, fmt.Errorf("compile Goa design: %w", err)
@@ -201,4 +208,15 @@ func evaluatorGoMod() (*modfile.File, error) {
 		return nil, fmt.Errorf("parse evaluator go.mod: %w", err)
 	}
 	return mod, nil
+}
+
+// runBuild runs the evaluator build in its own process group, the owning
+// boundary of this build: whatever ends it, the compiler, assembler and
+// linker it started are killed and waited for before Evaluate continues.
+func runBuild(cmd *exec.Cmd) error {
+	runErr, stopErr := procgroup.Run(cmd, syscall.SIGKILL, buildStopGrace, buildStopGrace)
+	if stopErr != nil {
+		return fmt.Errorf("stop build: %w", stopErr)
+	}
+	return runErr
 }

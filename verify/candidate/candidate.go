@@ -25,11 +25,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"goa.design/goa-ai/eval"
-
-	"github.com/goadesign/surla/internal/procgroup"
 )
 
 type (
@@ -260,10 +257,6 @@ type BuildSpec struct {
 	LogFile string
 }
 
-// buildStopGrace bounds how long Build waits for its process group to exit
-// after it is killed.
-const buildStopGrace = 10 * time.Second
-
 // Build compiles source in the build sandbox. The Go toolchain may start its
 // own compiler, assembler and linker, but the build can read only SourceDir,
 // the toolchain, the read-only module cache, its own work and output
@@ -280,7 +273,13 @@ const buildStopGrace = 10 * time.Second
 // version, so such a link grants nothing beyond that trust. Build does not
 // check that WorkDir and the output directory are fresh: a caller that relies
 // on them holding only this build's output must create them empty.
-func Build(ctx context.Context, spec BuildSpec) error {
+//
+// run runs the prepared build command to completion. The caller decides which
+// process group owns the compiler, assembler and linker the build starts: a
+// verification passes (*exec.Cmd).Run so they stay in the verification's
+// group, which its supervisor stops; a caller without such a group passes a
+// runner that gives the build its own group and stops it.
+func Build(ctx context.Context, spec BuildSpec, run func(*exec.Cmd) error) error {
 	if runtime.GOOS != "darwin" {
 		return ErrIsolationUnavailable
 	}
@@ -330,14 +329,8 @@ func Build(ctx context.Context, spec BuildSpec) error {
 		"CGO_ENABLED=0",
 	}
 	cmd.Stdout, cmd.Stderr = logFile, logFile
-	// The compiler, assembler and linker run in the build's process group;
-	// none may outlive Build, whatever ended it.
-	runErr, stopErr := procgroup.Run(cmd, syscall.SIGKILL, buildStopGrace, buildStopGrace)
-	if stopErr != nil {
-		return fmt.Errorf("stop build of %s: %w", spec.Package, stopErr)
-	}
-	if runErr != nil {
-		return fmt.Errorf("sandboxed build of %s: %w", spec.Package, runErr)
+	if err := run(cmd); err != nil {
+		return fmt.Errorf("sandboxed build of %s: %w", spec.Package, err)
 	}
 	return nil
 }
