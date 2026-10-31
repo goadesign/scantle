@@ -191,6 +191,7 @@ func main() {
         Environment:    "sim",
         Binaries:       []string{"orders", "orders-worker"},
         MaxConcurrency: 4,
+        Declare:        declare,
         Suite:          newSuite,
     })
 }
@@ -198,7 +199,7 @@ func main() {
 
 1. **Suite discovery (`--describe`):**
    - `surla verify` runs `<suite-bin> --describe` with no `--artifact` flags.
-   - `suite.Main` calls `Command.Suite(nil)` (which returns the generated `eval.Suite` without starting any candidate binaries), writes [`suite.Declaration`](../verify/suite/suite.go) as JSON to `stdout`, and exits `0`:
+   - `suite.Main` calls `Command.Declare()` (which returns the generated `eval.Suite` without requiring candidate binaries or constructing runtime state), writes [`suite.Declaration`](../verify/suite/suite.go) as JSON to `stdout`, and exits `0`:
      ```json
      {
        "id": "orders_acceptance",
