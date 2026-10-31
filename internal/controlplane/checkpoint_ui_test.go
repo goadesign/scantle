@@ -141,7 +141,7 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 				"id":                "chg-ui-test-check-01",
 				"scenario":          "Refund under $50",
 				"input_summary":     "$40 subtotal",
-				"expected_outcome":  "Auto-approved",
+				"expected_outcome":  "  Instant store credit up to $50.00  ",
 				"verification_kind": "deterministic",
 			},
 		},
@@ -526,7 +526,7 @@ const outcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] ===
 if (outcomeInputs.length !== 1) {
   throw new Error("expected example expected_outcome input, got: " + outcomeInputs.length);
 }
-outcomeInputs[0].value = "Instant store credit up to $50.00";
+outcomeInputs[0].value = "  Instant store credit up to $50.00  ";
 outcomeInputs[0].dispatch("input", { target: outcomeInputs[0] });
 const submitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
 if (submitBtns.length !== 1) {
@@ -534,17 +534,24 @@ if (submitBtns.length !== 1) {
 }
 const msgCountBeforeConfirm = hostMessages.length;
 submitBtns[0].dispatch("click");
-// Duplicate click while in flight must be ignored.
+// Duplicate click or input edits while in flight must be ignored and all edit controls disabled.
 submitBtns[0].dispatch("click");
-if (hostMessages.length !== msgCountBeforeConfirm + 1 || submitBtns[0].disabled !== true) {
-  throw new Error("expected single tools/call request and disabled submit button while in flight");
+const inFlightPills = findAll(viewEl, (n) => n.attributes["data-ambiguity-id"] === "chg-ui-test-ambiguity-01");
+outcomeInputs[0].value = "typed while saving";
+outcomeInputs[0].dispatch("input", { target: outcomeInputs[0] });
+if (hostMessages.length !== msgCountBeforeConfirm + 1 ||
+    submitBtns[0].disabled !== true ||
+    outcomeInputs[0].disabled !== true ||
+    !inFlightPills.every((p) => p.disabled === true) ||
+    outcomeInputs[0].value !== "  Instant store credit up to $50.00  ") {
+  throw new Error("expected single tools/call request and all edit controls disabled while in flight");
 }
 const confirmReq = hostMessages[msgCountBeforeConfirm].msg;
 if (confirmReq.method !== "tools/call" ||
     confirmReq.params.name !== "confirm_intent" ||
     confirmReq.params.arguments.request_revision !== input.wantCP1Revision ||
     confirmReq.params.arguments.answers["chg-ui-test-ambiguity-01"] !== "subtotal_only" ||
-    confirmReq.params.arguments.examples[0].expected_outcome !== "Instant store credit up to $50.00") {
+    confirmReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit up to $50.00  ") {
   throw new Error("unexpected confirm_intent tools/call payload: " + JSON.stringify(confirmReq));
 }
 
@@ -563,8 +570,27 @@ messageListener({
 if (root.dataset.state !== "cp1-change-card" || root.dataset.requestRevision !== input.wantCP2Revision) {
   throw new Error("expected confirmed CP1 revision after tools/call reply, got: " + JSON.stringify(root.dataset));
 }
+// Clicking Refine with no edits on a whitespace-bearing saved card must preserve verbatim whitespace.
+const noEditSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
+const msgCountBeforeNoEdit = hostMessages.length;
+noEditSubmitBtns[0].dispatch("click");
+const noEditRefineReq = hostMessages[msgCountBeforeNoEdit].msg;
+if (noEditRefineReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit up to $50.00  ") {
+  throw new Error("no-edit refine trimmed whitespace: " + JSON.stringify(noEditRefineReq));
+}
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    id: noEditRefineReq.id,
+    result: {
+      content: [],
+      structuredContent: input.cp1ConfirmedStructured
+    }
+  }
+});
 
-// 3b. Exercise stale-revision CP1 form submission: render older rev1 card, edit example, submit, receive server stale-revision error -> edits preserved and recovery guidance displayed.
+// 3b. Exercise stale-revision CP1 form submission with broadcast error notification arriving BEFORE direct RPC error reply.
 messageListener({
   source: parentWindow,
   data: {
@@ -582,6 +608,21 @@ const staleSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c
 const msgCountBeforeStale = hostMessages.length;
 staleSubmitBtns[0].dispatch("click");
 const staleReq = hostMessages[msgCountBeforeStale].msg;
+// Host broadcasts ui/notifications/tool-result {isError:true} BEFORE delivering the matching RPC error response -> must retain CP1 editor and keep controls disabled until RPC response arrives.
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: {
+      isError: true,
+      content: [{ type: "text", text: input.staleErrorText }]
+    }
+  }
+});
+if (root.dataset.state !== "cp1-change-card" || staleOutcomeInputs[0].disabled !== true) {
+  throw new Error("broadcast error notification replaced CP1 editor or prematurely re-enabled controls");
+}
 messageListener({
   source: parentWindow,
   data: {
@@ -595,11 +636,12 @@ messageListener({
 });
 const staleViewText = renderText(viewEl);
 if (root.dataset.state !== "cp1-change-card" ||
+    staleOutcomeInputs[0].disabled !== false ||
     !statusEl.textContent.includes("CP1 Change Card update failed; unsaved edits preserved.") ||
     !staleViewText.includes(input.staleErrorText) ||
     !staleViewText.includes("Your edited answers and examples remain in this form") ||
     staleOutcomeInputs[0].value !== "Edited outcome preserved across stale error") {
-  throw new Error("stale form submission did not update status, preserve edits, or show recovery guidance: " + statusEl.textContent + " / " + staleViewText);
+  throw new Error("stale form submission did not update status, re-enable controls, preserve edits, or show recovery guidance: " + statusEl.textContent + " / " + staleViewText);
 }
 
 // 3c. Click #scantle-load-latest-card after stale error -> guest calls get_change and renders latest card alongside #scantle-preserved-draft.
@@ -618,7 +660,7 @@ if (getChangeReq.method !== "tools/call" ||
     getChangeReq.params.arguments.change_id !== "chg-ui-test") {
   throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
 }
-// Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must still preserve #scantle-preserved-draft and not drop the pending request.
+// Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must retain active editor while get_change is pending, then render latest card + #scantle-preserved-draft on the matching tools/call reply.
 messageListener({
   source: parentWindow,
   data: {
@@ -627,8 +669,8 @@ messageListener({
     params: { structuredContent: input.cp1ConfirmedStructured }
   }
 });
-if (findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1) {
-  throw new Error("interleaved ui/notifications/tool-result lost #scantle-preserved-draft");
+if (root.dataset.requestRevision !== input.wantCP1Revision) {
+  throw new Error("interleaved ui/notifications/tool-result replaced active editor before get_change reply");
 }
 messageListener({
   source: parentWindow,
@@ -855,7 +897,7 @@ if (hostMessages.length !== beforeCount + 2 || hostMessages[beforeCount + 1].msg
 }
 
 process.stdout.write(JSON.stringify({
-  confirmCall: confirmReq.params,
+  confirmCall: noEditRefineReq.params,
   staleCall: staleReq.params,
   getChangeCall: getChangeReq.params
 }));
@@ -870,8 +912,8 @@ process.stdout.write(JSON.stringify({
 	// Execute the exact guest-emitted tools/call payloads through the real MCP adapter.
 	var captured struct {
 		ConfirmCall struct {
-			Name      string         `json:"name"`
-			Arguments map[string]any `json:"arguments"`
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
 		} `json:"confirmCall"`
 		StaleCall struct {
 			Name      string          `json:"name"`
@@ -905,21 +947,25 @@ process.stdout.write(JSON.stringify({
 	if staleComplete, ok := guestStaleRes.Outcome.AsComplete(); !ok || staleComplete.IsError == nil || !*staleComplete.IsError {
 		t.Fatalf("expected guest stale confirm_intent to return tool error, got: %+v", guestStaleRes)
 	}
-	captured.ConfirmCall.Arguments["request_revision"] = confirmedWire.RequestRevision
-	refineArgs, err := json.Marshal(captured.ConfirmCall.Arguments)
-	if err != nil {
-		t.Fatalf("marshal refineArgs: %v", err)
-	}
 	guestRefineRes, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
 		Name:      captured.ConfirmCall.Name,
-		Arguments: refineArgs,
+		Arguments: captured.ConfirmCall.Arguments,
 	})
 	if err != nil {
-		t.Fatalf("adapter.ToolsCall(guest confirm_intent refine): %v", err)
+		t.Fatalf("adapter.ToolsCall(guest confirm_intent no-edit refine): %v", err)
 	}
 	refineComplete, ok := guestRefineRes.Outcome.AsComplete()
-	if !ok || len(refineComplete.StructuredContent) == 0 || !strings.Contains(string(refineComplete.StructuredContent), "Instant store credit up to $50.00") {
+	if !ok || len(refineComplete.StructuredContent) == 0 {
 		t.Fatalf("unexpected guest confirm_intent refine outcome: %+v", guestRefineRes)
+	}
+	var refinedWire struct {
+		RequestRevision string `json:"request_revision"`
+	}
+	if err := json.Unmarshal(refineComplete.StructuredContent, &refinedWire); err != nil {
+		t.Fatalf("unmarshal refinedWire: %v", err)
+	}
+	if refinedWire.RequestRevision != confirmedWire.RequestRevision || !strings.Contains(string(refineComplete.StructuredContent), "  Instant store credit up to $50.00  ") {
+		t.Fatalf("no-edit refine altered request_revision or whitespace: got %q, want %q", refinedWire.RequestRevision, confirmedWire.RequestRevision)
 	}
 }
 

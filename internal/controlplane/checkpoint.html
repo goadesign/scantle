@@ -83,7 +83,7 @@
     var initPending = false;
     var nextRequestId = 2;
     var pendingRequests = {};
-    var activePreservedDraft = null;
+    var activeCP1ErrorHandler = null;
     var root = document.getElementById("scantle-checkpoint-root");
     var statusEl = document.getElementById("scantle-checkpoint-status");
     var viewEl = document.getElementById("scantle-checkpoint-view");
@@ -109,6 +109,8 @@
           node.textContent = String(attrs[k]);
         } else if (k === "value" && "value" in node) {
           node.value = String(attrs[k]);
+        } else if (k === "disabled") {
+          node.disabled = Boolean(attrs[k]);
         } else if (k.indexOf("on") === 0 && typeof attrs[k] === "function") {
           var evtName = k.slice(2).toLowerCase();
           if (typeof node.addEventListener === "function") {
@@ -149,6 +151,7 @@
     }
 
     function clearDatasetKeys() {
+      activeCP1ErrorHandler = null;
       delete root.dataset.changeId;
       delete root.dataset.requestRevision;
       delete root.dataset.designDigest;
@@ -174,7 +177,6 @@
 
     function renderCancelled(reason) {
       pendingRequests = {};
-      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cancelled";
       statusEl.textContent = "Checkpoint tool call cancelled";
@@ -189,7 +191,6 @@
     }
 
     function renderError(message) {
-      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "error";
       statusEl.textContent = "Checkpoint payload error";
@@ -314,15 +315,6 @@
 
     function renderChangeCard(card, preservedDraft) {
       clearDatasetKeys();
-      if (isPlainObject(preservedDraft)) {
-        activePreservedDraft = preservedDraft;
-      } else if (isPlainObject(activePreservedDraft) &&
-                 activePreservedDraft.changeId === card.change_id &&
-                 activePreservedDraft.priorRevision !== card.request_revision) {
-        preservedDraft = activePreservedDraft;
-      } else {
-        activePreservedDraft = null;
-      }
       root.dataset.state = "cp1-change-card";
       root.dataset.changeId = card.change_id;
       root.dataset.requestRevision = card.request_revision;
@@ -340,11 +332,18 @@
         };
       });
       var rpcInFlight = false;
+      var formControls = [];
+      var pillRebuilders = [];
       var feedbackEl = el("div", { id: "scantle-confirm-feedback" }, []);
+
+      function setFormDisabled(disabled) {
+        rpcInFlight = disabled;
+        formControls.forEach(function (ctrl) { ctrl.disabled = disabled; });
+        pillRebuilders.forEach(function (rebuild) { rebuild(); });
+      }
 
       function snapshotDraft() {
         return {
-          changeId: card.change_id,
           priorRevision: card.request_revision,
           answers: Object.assign({}, draftAnswers),
           examples: draftExamples.map(function (item) { return Object.assign({}, item); })
@@ -352,22 +351,21 @@
       }
 
       function showFormError(msg) {
-        rpcInFlight = false;
-        submitBtn.disabled = false;
-        statusEl.textContent = "CP1 Change Card update failed; unsaved edits preserved.";
-        activePreservedDraft = snapshotDraft();
+        if (Object.keys(pendingRequests).length === 0) {
+          setFormDisabled(false);
+          statusEl.textContent = "CP1 Change Card update failed; unsaved edits preserved.";
+        }
         var loadLatestBtn = el("button", {
           type: "button",
           id: "scantle-load-latest-card",
           className: "scantle-btn",
+          disabled: rpcInFlight,
           textContent: "Load Latest Card (get_change)",
           onClick: function () {
             if (rpcInFlight) { return; }
-            rpcInFlight = true;
-            submitBtn.disabled = true;
+            setFormDisabled(true);
             loadLatestBtn.disabled = true;
             var savedDraft = snapshotDraft();
-            activePreservedDraft = savedDraft;
             statusEl.textContent = "Loading latest Change Card via get_change...";
             callServerTool("get_change", { change_id: card.change_id }, isValidChangeCard, function (latestCard) {
               renderChangeCard(latestCard, savedDraft);
@@ -383,6 +381,7 @@
           ])
         ]);
       }
+      activeCP1ErrorHandler = showFormError;
 
       var metaRows = [
         el("h2", { textContent: "CP1 Change Card: " + card.change_id }),
@@ -406,10 +405,12 @@
             return el("button", {
               type: "button",
               className: "scantle-pill",
+              disabled: rpcInFlight,
               "data-ambiguity-id": amb.id,
               "data-option": opt,
               "aria-pressed": selected ? "true" : "false",
               onClick: function () {
+                if (rpcInFlight) { return; }
                 draftAnswers[amb.id] = opt;
                 rebuildPills();
               },
@@ -417,6 +418,7 @@
             });
           }));
         }
+        pillRebuilders.push(rebuildPills);
         rebuildPills();
         var answerText = draftAnswers[amb.id] ? " [Confirmed answer: " + draftAnswers[amb.id] + "]" : "";
         return el("li", {}, [
@@ -427,21 +429,27 @@
 
       var exampleItems = draftExamples.map(function (ex, idx) {
         function makeFieldInput(field, label) {
+          var inputEl = el("input", {
+            type: "text",
+            className: "scantle-input",
+            "aria-label": ex.id + " " + label,
+            "data-example-id": ex.id,
+            "data-field": field,
+            value: ex[field],
+            onInput: function (evt) {
+              if (rpcInFlight) {
+                if (evt && evt.target) { evt.target.value = ex[field]; }
+                return;
+              }
+              if (evt && evt.target && typeof evt.target.value === "string") {
+                ex[field] = evt.target.value;
+              }
+            }
+          });
+          formControls.push(inputEl);
           return el("label", { className: "scantle-field-label" }, [
             el("span", { textContent: label + ": " }),
-            el("input", {
-              type: "text",
-              className: "scantle-input",
-              "aria-label": ex.id + " " + label,
-              "data-example-id": ex.id,
-              "data-field": field,
-              value: ex[field],
-              onInput: function (evt) {
-                if (evt && evt.target && typeof evt.target.value === "string") {
-                  ex[field] = evt.target.value;
-                }
-              }
-            })
+            inputEl
           ]);
         }
         var kindBtn = el("button", {
@@ -451,10 +459,12 @@
           "data-field": "verification_kind",
           textContent: "Kind: " + ex.verification_kind,
           onClick: function () {
+            if (rpcInFlight) { return; }
             ex.verification_kind = ex.verification_kind === "deterministic" ? "model_judged" : "deterministic";
             kindBtn.textContent = "Kind: " + ex.verification_kind;
           }
         });
+        formControls.push(kindBtn);
         return el("li", { "data-example-index": String(idx) }, [
           el("div", {}, [
             el("code", { textContent: ex.id }), " [", ex.verification_kind, "] ",
@@ -494,9 +504,7 @@
               return;
             }
           }
-          rpcInFlight = true;
-          submitBtn.disabled = true;
-          activePreservedDraft = null;
+          setFormDisabled(true);
           replaceChildren(feedbackEl, []);
           statusEl.textContent = "Submitting confirm_intent to MCP Apps host...";
           callServerTool("confirm_intent", {
@@ -506,9 +514,9 @@
             examples: draftExamples.map(function (item) {
               return {
                 id: item.id,
-                scenario: item.scenario.trim(),
-                input_summary: item.input_summary.trim(),
-                expected_outcome: item.expected_outcome.trim(),
+                scenario: item.scenario,
+                input_summary: item.input_summary,
+                expected_outcome: item.expected_outcome,
                 verification_kind: item.verification_kind
               };
             })
@@ -517,6 +525,7 @@
           }, showFormError);
         }
       });
+      formControls.push(submitBtn);
 
       var viewBlocks = [
         el("div", { className: "scantle-meta" }, metaRows)
@@ -650,7 +659,6 @@
     }
 
     function renderArchitecturePreview(preview) {
-      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cp2-architecture-preview";
       root.dataset.changeId = preview.change_id;
@@ -746,7 +754,6 @@
     }
 
     function renderDiffResult(diff) {
-      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cp2-diff";
       root.dataset.hasChanges = String(diff.has_changes);
@@ -772,7 +779,6 @@
     }
 
     function renderDraftOverride(draft) {
-      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cp3-draft-override";
       statusEl.textContent = "Rendered Checkpoint 3 Fast Draft Override";
@@ -808,7 +814,17 @@
         renderError("Malformed ui/notifications/tool-result: params must be an object.");
         return;
       }
+      if (root.dataset.state === "cp1-change-card" && Object.keys(pendingRequests).length > 0) {
+        if (params.isError === true && typeof activeCP1ErrorHandler === "function") {
+          activeCP1ErrorHandler(extractErrorText(params));
+        }
+        return;
+      }
       if (params.isError === true) {
+        if (root.dataset.state === "cp1-change-card" && typeof activeCP1ErrorHandler === "function") {
+          activeCP1ErrorHandler(extractErrorText(params));
+          return;
+        }
         renderError(extractErrorText(params));
         return;
       }
@@ -844,7 +860,6 @@
         if (msg.id !== undefined && msg.id !== null) {
           if (msg.method === "ui/resource-teardown") {
             pendingRequests = {};
-            activePreservedDraft = null;
             clearDatasetKeys();
             root.dataset.state = "terminated";
             statusEl.textContent = "Checkpoint resource torn down.";
@@ -864,6 +879,9 @@
         if (msg.method === "ui/notifications/tool-input") {
           if (msg.params !== undefined && !isPlainObject(msg.params)) {
             renderError("Malformed ui/notifications/tool-input notification.");
+            return;
+          }
+          if (root.dataset.state === "cp1-change-card" && Object.keys(pendingRequests).length > 0) {
             return;
           }
           renderWaiting("Received tool input; awaiting validated checkpoint result...");
