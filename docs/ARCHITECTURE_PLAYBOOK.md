@@ -35,7 +35,7 @@ Never trust an LLM to supply or preserve security principals, tenant IDs, or cre
 - **Generated Agent Guardrails (`AGENTS_QUICKSTART.md`)**: `goa gen` automatically documents every tool's `BindTo` target, server-injected fields, `BoundedResult` pagination, `Confirmation` gates, and `specs/tool_schemas.json` (`input_binding`) in `AGENTS_QUICKSTART.md`.
 
 ### 6. Durable Temporal Workflows & Zero-Wait Human Suspension
-- **Deterministic Replay**: Multi-step agent runs execute on the Goa-AI Temporal engine (`features/runlog/mongo` or SQLite `runstore`), keeping workflow definitions pure and isolating I/O inside registered activities.
+- **Deterministic Replay**: Multi-step agent runs execute on the Goa-AI Temporal engine with a durable run log (`runtime/agent/runlog`; [`examples/orders`](../examples/orders/) stores runs in SQLite through `internal/runstore`), keeping workflow definitions pure and isolating I/O inside registered activities.
 - **Zero-Wait Human Approvals**: High-consequence tools declare design-time `Confirmation(...)` or pause the workflow (`RunStatusPaused`), releasing all worker threads until an authorized principal invokes `PrepareContinuation` and `Continue` on the public API.
 - **Payload & Context Bounds**: Paginate collection tools with `BoundedResult`, configure `RunPolicy` (`MaxToolCalls`, `TimeBudget`, `Cache`, `History` `Compress`), and keep tool/activity payloads well under Temporal's 2 MiB event-history limit (`< 1 MiB` for complete `goa-ai` envelopes).
 
@@ -46,7 +46,7 @@ When a platform needs custom generated files or wants to tailor artifacts produc
 
 ## How the Goa Design Suite Fits Together
 
-- **[Goa](https://github.com/goadesign/goa)** — Compiles `design/*.go` into HTTP, gRPC, OpenAPI, CLI, and validation packages (`goa gen`)—plus in-memory `codegen.SourceArtifacts` for sandboxed design evaluation—at **0 LLM tokens**.
+- **[Goa](https://github.com/goadesign/goa)** — Compiles `design/*.go` into HTTP, gRPC, OpenAPI, CLI, and validation packages (`goa gen`)—plus in-memory `generator.Sources` for sandboxed design evaluation—at **0 LLM tokens**.
 - **[Goa-AI](https://github.com/goadesign/goa-ai)** — Adds `Agent`, `Toolset`, `MCP`, durable Temporal workflows, `eval` suites, gRPC model gateways, and runtime token controls (`Inject`, `BindField`, `BoundedResult`, `ServerData`, `Cache`, `Compress`).
 - **[Pulse](https://github.com/goadesign/pulse)** — Streams live agent events (`pulse/streaming`) and coordinates distributed rate limits and replicated state maps (`pulse/rmap`) over Redis.
 - **[Clue](https://github.com/goadesign/clue)** — Emits OpenTelemetry `gen_ai.*` spans, structured logs, and health checks across services and model gateways.
