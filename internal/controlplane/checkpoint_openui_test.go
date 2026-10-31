@@ -310,8 +310,12 @@ if (!simOptionBtn) {
 simOptionBtn.click();
 const canonicalPill = editorRegion.querySelector('[data-ambiguity-id="chg-openui-ambiguity-01"][data-option="subtotal_only"]');
 const activeCells = openuiWorkspace.querySelectorAll(".shadcn-cell-active");
-if (!canonicalPill || canonicalPill.getAttribute("aria-pressed") !== "true" || activeCells.length !== 3) {
-  throw new Error("OpenUI option click did not synchronize canonical pill or highlight active column cells (activeCells=" + activeCells.length + ")");
+if (!canonicalPill ||
+    canonicalPill.getAttribute("aria-pressed") !== "true" ||
+    activeCells.length !== 3 ||
+    !editorRegion.textContent.includes("[Selected draft answer: subtotal_only]") ||
+    editorRegion.textContent.includes("[Confirmed answer: subtotal_only]")) {
+  throw new Error("OpenUI option click did not synchronize canonical pill, draft label, or active column cells (activeCells=" + activeCells.length + ")");
 }
 
 // 6. Edit a confirmation example locally -> surfaces #scantle-openui-local-edit-notice qualification alert.
@@ -443,8 +447,9 @@ messageListener({
     result: { content: [], structuredContent: confirmedWithoutUI }
   }
 });
-if (doc.getElementById("scantle-openui-workspace")) {
-  throw new Error("expected #scantle-openui-workspace to unmount when confirmed revision has no ui_composition");
+if (doc.getElementById("scantle-openui-workspace") ||
+    !editorRegion.textContent.includes("[Confirmed answer: subtotal_only]")) {
+  throw new Error("expected #scantle-openui-workspace to unmount and confirmed answer label to appear after confirm_intent");
 }
 
 for (const tc of badCases) {

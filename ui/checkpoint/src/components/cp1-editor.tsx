@@ -225,11 +225,17 @@ export function CP1EditorView({
           <ul>
             {ambiguities.map((amb) => {
               const selected = draftAnswers[amb.id] || "";
+              const saved = (card.answers && card.answers[amb.id]) || "";
+              const answerBadge = !selected
+                ? ""
+                : card.status === "confirmed" && selected === saved
+                ? " [Confirmed answer: " + selected + "]"
+                : " [Selected draft answer: " + selected + "]";
               return (
                 <li key={amb.id}>
                   <code>{amb.id}</code>
                   {": " + amb.question + " (options: " + amb.options.join(", ") + ")"}
-                  {selected ? " [Confirmed answer: " + selected + "]" : ""}
+                  {answerBadge}
                   <div role="group" aria-label={amb.question}>
                     {amb.options.map((opt) => (
                       <Button
