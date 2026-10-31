@@ -22,6 +22,7 @@ import (
 
 	"github.com/goadesign/surla/internal/procgroup"
 	"github.com/goadesign/surla/verify/candidate"
+	"github.com/goadesign/surla/verify/suite"
 	"goa.design/goa-ai/eval"
 )
 
@@ -70,21 +71,6 @@ type (
 		WorkDir string
 		// ReportDir receives the report, named by its digest.
 		ReportDir string
-	}
-
-	// declaration is the suite's --describe output.
-	declaration struct {
-		// ID is the suite identifier.
-		ID string `json:"id"`
-		// Environment is the dependency profile the suite runs with.
-		Environment string `json:"environment"`
-		// Scenarios lists every declared scenario.
-		Scenarios []struct {
-			// ID is the scenario identifier.
-			ID string `json:"id"`
-			// Tags are the scenario's declared tags.
-			Tags []string `json:"tags"`
-		} `json:"scenarios"`
 	}
 )
 
@@ -237,16 +223,16 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	}); err != nil {
 		return Report{}, fmt.Errorf("build suite: %w", err)
 	}
-	suite, err := r.describe(ctx, suiteBin)
+	declared, err := r.describe(ctx, suiteBin)
 	if err != nil {
 		return Report{}, err
 	}
-	binding.SuiteID, binding.Environment = suite.ID, suite.Environment
+	binding.SuiteID, binding.Environment = declared.ID, declared.Environment
 	evidence, exit, err := r.runSuite(ctx, suiteBin, artifactFlags)
 	if err != nil {
 		return Report{}, err
 	}
-	report, err := Assemble(binding, suite, evidence, exit)
+	report, err := Assemble(binding, declared, evidence, exit)
 	if err != nil {
 		return Report{}, err
 	}
@@ -336,7 +322,7 @@ func (r *runner) describe(ctx context.Context, suiteBin string) (Suite, error) {
 	if err := r.run(ctx, "describe", "", nil, suiteBin, "--describe"); err != nil {
 		return Suite{}, fmt.Errorf("describe suite: %w", err)
 	}
-	var d declaration
+	var d suite.Declaration
 	if err := decodeFile(filepath.Join(r.evidenceDir, "describe.stdout"), &d); err != nil {
 		return Suite{}, fmt.Errorf("decode suite declaration: %w", err)
 	}
