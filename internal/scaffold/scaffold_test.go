@@ -220,7 +220,10 @@ func TestInitWritesTheProjectWithTheServiceName(t *testing.T) {
 }
 
 func TestInitImportsThePackageGoaGenerated(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "errors")
+	// Brackets in the destination path must not be read as glob syntax.
+	parent := filepath.Join(t.TempDir(), "demo[1]")
+	require.NoError(t, os.Mkdir(parent, 0o755))
+	dir := filepath.Join(parent, "errors")
 	run := func(_ context.Context, moduleDir, _ string, args ...string) error {
 		return fakeGoaGen(moduleDir, "errors_", args)
 	}
@@ -243,16 +246,29 @@ func TestInitImportsThePackageGoaGenerated(t *testing.T) {
 }
 
 func TestInitRequiresExactlyOneGeneratedService(t *testing.T) {
-	parent := t.TempDir()
-	run := func(_ context.Context, moduleDir, _ string, args ...string) error {
-		if err := fakeGoaGen(moduleDir, "shop", args); err != nil {
-			return err
-		}
-		return fakeGoaGen(moduleDir, "other", args)
+	for _, tc := range []struct {
+		name    string
+		pkgs    []string
+		wantErr string
+	}{
+		{name: "none", wantErr: "produced 0 service packages"},
+		{name: "two", pkgs: []string{"shop", "other"}, wantErr: "produced 2 service packages"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := t.TempDir()
+			run := func(_ context.Context, moduleDir, _ string, args ...string) error {
+				for _, pkg := range tc.pkgs {
+					if err := fakeGoaGen(moduleDir, pkg, args); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+			_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "shop"), Module: "example.com/shop", SurlaVersion: published}, run)
+			require.ErrorContains(t, err, tc.wantErr)
+			assertOnly(t, parent)
+		})
 	}
-	_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "shop"), Module: "example.com/shop", SurlaVersion: published}, run)
-	require.ErrorContains(t, err, "produced 2 service packages")
-	assertOnly(t, parent)
 }
 
 // fakeGoaGen stands in for goa gen: for a gen command it writes the service

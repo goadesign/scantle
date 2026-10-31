@@ -357,14 +357,16 @@ func newLogPath(logs, moduleDir string, args []string) (string, error) {
 // project's only service: the one directory under gen/ holding service.go.
 // Goa owns that name, so the templates import it instead of predicting it.
 func generatedServicePackage(dir string) (string, error) {
-	matches, err := filepath.Glob(filepath.Join(dir, "gen", "*", "service.go"))
+	// dir is opened as a file system so characters such as [ in the user's
+	// path are not read as pattern syntax; the only wildcard is Goa's.
+	matches, err := fs.Glob(os.DirFS(dir), "gen/*/service.go")
 	if err != nil {
 		return "", err
 	}
 	if len(matches) != 1 {
 		return "", fmt.Errorf("goa gen produced %d service packages under %s, want exactly 1", len(matches), filepath.Join(dir, "gen"))
 	}
-	return filepath.Base(filepath.Dir(matches[0])), nil
+	return path.Base(path.Dir(matches[0])), nil
 }
 
 // isDesignFile reports whether a template path is written before goa gen:
