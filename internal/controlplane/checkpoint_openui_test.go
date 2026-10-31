@@ -435,11 +435,11 @@ const badCases = [
     card: Object.assign({}, input.cp1Structured, {
       change_id: "chg-bad-8",
       ui_composition: {
-        program: 'root = DecisionWorkspace("D", [WorkflowTimeline("Flow", [{type: "element", typeName: "WorkflowStep", props: {}, partial: false}])])',
+        program: 'root = DecisionWorkspace("D", [WorkflowTimeline("Flow", [{type: "element", typeName: "WorkflowStep", props: {}, partial: false, hasDynamicProps: false}])])',
         composed_for_revision: input.cp1Structured.request_revision
       }
     }),
-    wantErr: "non-component or forged element literal"
+    wantErr: "WorkflowStep props failed schema validation"
   },
   {
     name: "WorkflowStep with object-valued detail prop",

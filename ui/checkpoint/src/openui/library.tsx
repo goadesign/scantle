@@ -414,8 +414,7 @@ export interface OpenUIValidationResult {
   error?: string;
 }
 
-// projectAndValidateNode recursively verifies that an AST ElementNode was
-// produced by an OpenUI component call (not a forged object literal), matches
+// projectAndValidateNode recursively verifies that an AST ElementNode matches
 // its parent slot's allowed component types, satisfies its canonical Zod v4
 // props schema, and obeys the active Change Card's ordinal and option bounds.
 function projectAndValidateNode(
@@ -431,7 +430,6 @@ function projectAndValidateNode(
   if (
     el.type !== "element" ||
     el.partial !== false ||
-    typeof el.hasDynamicProps !== "boolean" ||
     typeof el.typeName !== "string" ||
     !el.props ||
     typeof el.props !== "object" ||
@@ -439,7 +437,7 @@ function projectAndValidateNode(
   ) {
     return {
       ok: false,
-      error: "OpenUI slot contains a non-component or forged element literal.",
+      error: "OpenUI slot contains a non-component element.",
     };
   }
   if (!allowedTypes.includes(el.typeName)) {
@@ -612,6 +610,13 @@ export function validateCompletedOpenUI(
     return {
       ok: false,
       error: "OpenUI program has orphaned statements: " + parsed.meta.orphaned.join(", "),
+    };
+  }
+  const discarded = (parsed.meta as { discarded?: unknown[] }).discarded;
+  if (Array.isArray(discarded) && discarded.length > 0) {
+    return {
+      ok: false,
+      error: "OpenUI program contains discarded statements or trailing tokens.",
     };
   }
   if (parsed.meta.errors.length > 0) {

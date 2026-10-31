@@ -157,6 +157,8 @@ li { margin-bottom: 0.35rem; }
 .shadcn-badge-destructive { border-color: var(--destructive); color: var(--destructive); }
 
 .shadcn-btn, .scantle-pill, .scantle-btn {
+  -webkit-appearance: none;
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -164,12 +166,11 @@ li { margin-bottom: 0.35rem; }
   margin: 0.2rem 0.35rem 0.2rem 0;
   border-radius: calc(var(--radius) - 2px);
   border: 1px solid var(--border);
-  background: var(--card);
+  background-color: var(--muted);
   color: var(--foreground);
   cursor: pointer;
   font-size: 0.84rem;
   font-weight: 500;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .shadcn-btn:focus-visible, .scantle-pill:focus-visible, .scantle-input:focus-visible, .scantle-table-wrap:focus-visible {
   outline: 2px solid var(--accent);
@@ -181,7 +182,8 @@ li { margin-bottom: 0.35rem; }
 }
 .scantle-pill[aria-pressed="true"], .scantle-btn-primary, .shadcn-btn-primary {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  background-color: var(--accent-soft);
+  color: var(--foreground);
   font-weight: 600;
 }
 
