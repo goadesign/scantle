@@ -1,6 +1,6 @@
 # Surla: The MCP-Native Software Factory for Agentic Platforms on the Goa Design Suite
 
-*Architecture and product proposal for Surla (`goa`, `goa-ai`, `pulse`, `clue`, `model`, and `chorus`). Named after **Tambdi Surla** in Goa—whose carved basalt Mahadeva temple beside the Surla River has stood for centuries through precision-dressed, interlocking stone courses without mortar glue—Surla (*SOOR-lah*) uses one `design/*.go` contract for the interfaces and generated plumbing that every builder works to, while independent checks verify the resulting behavior.*
+*Architecture and product proposal for Surla (`goa`, `goa-ai`, `pulse`, `clue`, `model`, and `chorus`). Named after **Tambdi Surla** in Goa—home to the carved basalt Mahadeva temple beside the Surla River—Surla (*SOOR-lah*) uses one `design/*.go` contract for the interfaces and generated plumbing that every builder works to, while independent checks verify the resulting behavior.*
 
 ---
 
