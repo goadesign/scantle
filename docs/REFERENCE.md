@@ -99,7 +99,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 
 - **`propose_change`** (`POST /changes/propose`)
   - **Input:** `change_id`, `prompt`, `design_source?` → **Output:** `ChangeCardResult`
-  - Analyzes a feature request at `CP1` using the embedded Golden Path prompt, returning concrete `examples`, `ambiguities`, `preserved_behaviors`, and a canonical `request_revision` digest.
+  - Analyzes a feature request at `CP1` using the embedded Golden Path prompt, returning concrete `examples`, `ambiguities`, `preserved_behaviors`, and a canonical `request_revision` digest. When the model also composed a decision view, the card carries `ui_composition` (`program`, `composed_for_revision`): it is presentation only, never hashed into `request_revision`, and dropped when `confirm_intent` changes answers or examples. When the request includes a `progressToken`, the tool sends MCP progress updates before and after the model call.
 - **`confirm_intent`** (`POST /changes/confirm`)
   - **Input:** `change_id`, `request_revision`, `answers`, `examples` → **Output:** `ChangeCardResult`
   - Confirms a `needs_confirmation` Change Card or refines an already `confirmed` Change Card at `CP1` when called by the owning principal with the current `request_revision` and complete `answers` and `examples`. No-op submissions return the stored `request_revision`; changed answers or examples mint a new canonical `request_revision` digest.
@@ -108,7 +108,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
   - Reads the stored `ChangeCardResult` for `change_id` without mutating state (restricted to the owning principal) so a stale editor can fetch the latest saved card after a `request_revision` conflict.
 - **`preview_architecture`** (`POST /changes/preview`)
   - **Input:** `change_id`, `request_revision`, `design`, `builders?` → **Output:** `ArchitecturePreviewResult`
-  - Evaluates a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed Chorus `swarm` plan.
+  - Evaluates a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed `swarm` plan. When the request includes a `progressToken`, the tool sends MCP progress updates as design evaluation and roster planning start and finish.
 - **`draft_override`** (`POST /sandbox/draft`)
   - **Input:** `target_kind` (`prompt_template` \| `compiled_rule`), `prompt_id?`, `new_content` → **Output:** `DraftOverrideResult`
   - Applies a `prompt_template` to a target configured through `controlplane.Options.TargetUpdater`, without rebuilding Go code, or reports that a `compiled_rule` requires a rebuild. The `serve` command does not bind a prompt updater, so its `prompt_template` requests return `no target prompt updater is bound to this control plane`.
@@ -121,7 +121,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 - **`scantle://golden-path`** (`text/markdown` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /golden-path`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
 - **`ui://scantle/checkpoint`** (`text/html;profile=mcp-app` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /ui/checkpoint`)
-  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`). Completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders interactive `ChangeCardResult` forms (`CP1`, dispatching `confirm_intent` and `get_change` via host `tools/call` and preserving unsaved draft edits across stale-revision conflicts), `ArchitecturePreviewResult` (`CP2`, with an inline scrollable C4 SVG directed graph above the inspectable lists), unbound structural `DiffResult` views (`CP2` `diff`), and `DraftOverrideResult` (`CP3`) payloads delivered by the host via `ui/notifications/tool-result` without server-retained preview state (interactive role-switching/replay controls and `openui.v1` action dispatch remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough)).
+  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`, built from [`ui/checkpoint/`](../ui/checkpoint/)). It completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders results delivered by the host via `ui/notifications/tool-result`, without server-retained preview state: the `CP1` Change Card form (saving through `confirm_intent` and recovering with `get_change` via host `tools/call`, keeping unsaved edits across stale-revision conflicts), the optional OpenUI decision view from `ui_composition` (labeled as a model-proposed illustration and sharing the form's draft), `CP2` architecture previews (a scrollable C4 graph above inspectable lists), unbound structural diffs, and `CP3` draft results. Interactive role-switching and replay controls, and `openui.v1` action dispatch, remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough).
 
 ---
 
@@ -168,7 +168,9 @@ Scantle includes an order-refund service and an isolated evaluator for checking 
 ### [`examples/orders`](../examples/orders/) — The Candidate Platform
 - **[`design/`](../examples/orders/design/)**: Declares the public `orders` HTTP service, internal `commerce` and `payments` services, the `goa-ai` `refund` agent (`Inject("tenant_id", "customer_id")`, `BoundedResult`, and `Confirmation`), and the C4 architecture model rendered to [`gen/structurizr/model.json`](../examples/orders/gen/structurizr/model.json).
 - **[`AGENTS_QUICKSTART.md`](../examples/orders/AGENTS_QUICKSTART.md)**: Generated contextual map for coding agents, surfacing per-tool `BindTo` method links, server-injected fields, `BoundedResult` cursor guidance, `Confirmation` gates, and `gen/orders/agents/refund/specs/tool_schemas.json`.
-- **[`internal/refundflow`](../examples/orders/internal/refundflow/)**: Durable Temporal workflow implementing instant store credit (`<= \$50.00` including tax and shipping) and manager approval signals (`> \$50.00`) with idempotent payment keys.
+- **[`internal/orders`](../examples/orders/internal/orders/)**: The refund rule (`StoreCreditLimitCents` in `refunds.go`): an order total up to `\$50.00`, including tax and shipping, is refunded as instant store credit; a larger total is refunded to the card after a manager approves.
+- **[`internal/assistant`](../examples/orders/internal/assistant/)**: Runs the `refund` agent and resumes a suspended run after the manager's decision (`PrepareContinuation`, then `StartPrepared`).
+- **[`internal/refundflow`](../examples/orders/internal/refundflow/)**: Durable Temporal workflow that executes each refund exactly once, with workflow IDs and payment idempotency keys derived from the tenant and order.
 - **[`internal/runstore`](../examples/orders/internal/runstore/)**: Transactional SQLite implementation of `goa-ai`'s durable `storage.Store`.
 
 ### [`examples/orders-eval`](../examples/orders-eval/) — The Isolated Evaluator
@@ -204,18 +206,20 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   └── scantle/
 │       └── main.go               # CLI entrypoint (`scantle serve`, `scantle diff`, and `scantle verify`)
 ├── docs/
-│   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & sandbox verification
+│   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & independent verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview
 │   └── REFERENCE.md              # MCP tools/resources, CLI flags & repo layout
 ├── internal/
-│   ├── controlplane/             # CP1–CP3 handlers, bearer auth, MCP Apps host, CP1 schema validator
+│   ├── controlplane/             # CP1–CP3 handlers, bearer auth, embedded checkpoint viewer, CP1 schema validator
 │   ├── designeval/               # Sandboxed Goa/Goa-AI/Model subprocess evaluator & C4 extractor
 │   ├── diff/                     # Structural declaration, tool schema, and go.mod version diff engine
 │   ├── gitcapture/               # Read-only dirty git working-tree snapshot capture
 │   ├── goldenpath/               # Embedded GOLDEN_PATH.md playbook & CP1 architect system prompt
 │   ├── procgroup/                # Process-group lifecycle management for sandboxed child processes
 │   ├── swarm/                    # Deterministic Chorus role assignment & cross-family model router
-│   └── verify/                   # End-to-end worktree verifier, holdout redactor, and CP5 merge gate
+│   └── verify/                   # Worktree verifier (`scantle verify`), holdout redactor, and library merge-gate check
+├── ui/
+│   └── checkpoint/               # React + OpenUI checkpoint viewer source; build.mjs writes checkpoint.html, decision_catalog.md, and generated types
 ├── verify/
 │   └── candidate/                # macOS Seatbelt (`sandbox-exec`) build & runtime isolation jail
 ├── examples/
