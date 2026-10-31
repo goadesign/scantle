@@ -22,8 +22,8 @@ import (
 
 	"github.com/goadesign/surla/verify/candidate"
 
-	genhttp[[.Name]] "[[.Module]]/eval/gen/http/[[.Name]]/client"
-	gen[[.Name]] "[[.Module]]/eval/gen/[[.Name]]"
+	genhttp[[.Pkg]] "[[.Module]]/eval/gen/http/[[.Pkg]]/client"
+	gen[[.Pkg]] "[[.Module]]/eval/gen/[[.Pkg]]"
 	"[[.Module]]/eval/scripted"
 )
 
@@ -69,8 +69,8 @@ func (h *Hooks) ask(ctx context.Context, question, want string, wantKnown bool) 
 	}
 	defer func() { err = errors.Join(err, stop()) }()
 
-	c := genhttp[[.Name]].NewClient("http", addr, http.DefaultClient, goahttp.RequestEncoder, goahttp.ResponseDecoder, false)
-	out, err := gen[[.Name]].NewClient(c.Ask()).Ask(ctx, &gen[[.Name]].AskPayload{Question: question})
+	c := genhttp[[.Pkg]].NewClient("http", addr, http.DefaultClient, goahttp.RequestEncoder, goahttp.ResponseDecoder, false)
+	out, err := gen[[.Pkg]].NewClient(c.Ask()).Ask(ctx, &gen[[.Pkg]].AskPayload{Question: question})
 	if err != nil {
 		return res, fmt.Errorf("ask %q: %w", question, err)
 	}

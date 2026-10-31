@@ -219,14 +219,39 @@ func TestInitWritesTheProjectWithTheServiceName(t *testing.T) {
 	assertOnly(t, parent, "bakery")
 }
 
-func TestInitRejectsANameGoaGeneratesUnderAnotherPackage(t *testing.T) {
-	parent := t.TempDir()
-	run := func(_ context.Context, dir, _ string, args ...string) error {
-		return fakeGoaGen(dir, "errors_", args)
+func TestInitImportsThePackageGoaGenerated(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "errors")
+	run := func(_ context.Context, moduleDir, _ string, args ...string) error {
+		return fakeGoaGen(moduleDir, "errors_", args)
 	}
-	_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "errors"), Module: "example.com/errors", SurlaVersion: published}, run)
-	require.ErrorContains(t, err, `Goa does not generate a service named "errors" as package "errors"`)
-	assert.ErrorContains(t, err, "such as errorsapi")
+	name, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/errors", SurlaVersion: published}, run)
+	require.NoError(t, err)
+	assert.Equal(t, "errors", name)
+	main, err := os.ReadFile(filepath.Join(dir, "cmd", "errors", "main.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(main), `generrors_ "example.com/errors/gen/errors_"`)
+	assert.Contains(t, string(main), `genhttperrors_ "example.com/errors/gen/http/errors_/server"`)
+	svc, err := os.ReadFile(filepath.Join(dir, "internal", "service", "service.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(svc), `"example.com/errors/gen/errors_/agents/helper"`)
+	acc, err := os.ReadFile(filepath.Join(dir, "eval", "acceptance", "acceptance.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(acc), `"example.com/errors/eval/gen/http/errors_/client"`)
+	design, err := os.ReadFile(filepath.Join(dir, "design", "design.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(design), `Service("errors"`, "the DSL keeps the service name")
+}
+
+func TestInitRequiresExactlyOneGeneratedService(t *testing.T) {
+	parent := t.TempDir()
+	run := func(_ context.Context, moduleDir, _ string, args ...string) error {
+		if err := fakeGoaGen(moduleDir, "shop", args); err != nil {
+			return err
+		}
+		return fakeGoaGen(moduleDir, "other", args)
+	}
+	_, err := Init(t.Context(), Options{Dir: filepath.Join(parent, "shop"), Module: "example.com/shop", SurlaVersion: published}, run)
+	require.ErrorContains(t, err, "produced 2 service packages")
 	assertOnly(t, parent)
 }
 

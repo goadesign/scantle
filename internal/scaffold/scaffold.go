@@ -61,6 +61,11 @@ type (
 	data struct {
 		// Name is the service name, the last element of Module.
 		Name string
+		// Pkg is the Go package goa gen generated for the service: Name, or
+		// Name with "_" appended when Name is reserved in generated Go code
+		// (errors becomes errors_). Only templates rendered after goa gen
+		// use it.
+		Pkg string
 		// Module is the candidate's module path.
 		Module string
 		// SurlaVersion is the evaluator's required Surla version.
@@ -294,9 +299,11 @@ func build(ctx context.Context, root, logs string, d data, run Runner) error {
 		if err := runAll(ctx, dir, m.dir, logs, steps, run); err != nil {
 			return err
 		}
-		if err := checkServicePackage(dir, d.Name); err != nil {
+		pkg, err := generatedServicePackage(dir)
+		if err != nil {
 			return err
 		}
+		d.Pkg = pkg
 		if err := render(dir, m.templates, d, func(p string) bool { return !isDesignFile(p) }); err != nil {
 			return err
 		}
@@ -346,16 +353,18 @@ func newLogPath(logs, moduleDir string, args []string) (string, error) {
 	return f.Name(), errors.Join(f.Close(), os.Remove(f.Name()))
 }
 
-// checkServicePackage reports a service name Goa generated under another
-// package name. Goa appends "_" to names reserved in generated Go code, such
-// as errors or string, and the templates import gen/<name>. Checking what Goa
-// actually generated keeps Goa the only owner of that rule.
-func checkServicePackage(dir, name string) error {
-	_, err := os.Stat(filepath.Join(dir, "gen", name, "service.go"))
-	if errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("Goa does not generate a service named %q as package %q, because the name is reserved in generated Go code; end -module in another name, such as %sapi", name, name, name)
+// generatedServicePackage returns the package goa gen generated for the
+// project's only service: the one directory under gen/ holding service.go.
+// Goa owns that name, so the templates import it instead of predicting it.
+func generatedServicePackage(dir string) (string, error) {
+	matches, err := filepath.Glob(filepath.Join(dir, "gen", "*", "service.go"))
+	if err != nil {
+		return "", err
 	}
-	return err
+	if len(matches) != 1 {
+		return "", fmt.Errorf("goa gen produced %d service packages under %s, want exactly 1", len(matches), filepath.Join(dir, "gen"))
+	}
+	return filepath.Base(filepath.Dir(matches[0])), nil
 }
 
 // isDesignFile reports whether a template path is written before goa gen:
