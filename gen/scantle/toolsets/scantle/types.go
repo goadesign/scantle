@@ -85,6 +85,34 @@ type (
 		// Operator-facing status explanation.
 		Message string
 	}
+	// GetChangePayload defines the JSON payload for the scantle.get_change tool.
+	GetChangePayload = struct {
+		// Change identifier.
+		ChangeID string
+	}
+	// GetChangeResult defines the JSON result for the scantle.get_change tool.
+	GetChangeResult = struct {
+		// Change identifier.
+		ChangeID string
+		// Checkpoint status (needs_confirmation or confirmed).
+		Status string
+		// Original operator feature request.
+		Prompt string
+		// Plain-English summary of requested behavior.
+		Summary string
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
+		Ambiguities []*AmbiguityQuestion
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string
+		// Concrete examples mapped to evaluator checks.
+		Examples []*ExampleItem
+		// Existing contract invariants preserved by this change.
+		PreservedBehaviors []string
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string
+		// SHA-256 digest of the canonical versioned Change Card.
+		RequestRevision string
+	}
 	// PreviewArchitecturePayload defines the JSON payload for the scantle.preview_architecture tool.
 	PreviewArchitecturePayload = struct {
 		// Confirmed Change Card identifier.

@@ -119,6 +119,31 @@ type ConfirmIntentResponseBody struct {
 	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
 }
 
+// GetChangeResponseBody is the type of the "scantle" service "get_change"
+// endpoint HTTP response body.
+type GetChangeResponseBody struct {
+	// Change identifier.
+	ChangeID *string `form:"change_id,omitempty" json:"change_id,omitempty" xml:"change_id,omitempty"`
+	// Checkpoint status (needs_confirmation or confirmed).
+	Status *string `form:"status,omitempty" json:"status,omitempty" xml:"status,omitempty"`
+	// Original operator feature request.
+	Prompt *string `form:"prompt,omitempty" json:"prompt,omitempty" xml:"prompt,omitempty"`
+	// Plain-English summary of requested behavior.
+	Summary *string `form:"summary,omitempty" json:"summary,omitempty" xml:"summary,omitempty"`
+	// Domain questions surfaced at CP1, retained for audit after confirmation.
+	Ambiguities []*AmbiguityQuestionResponseBody `form:"ambiguities,omitempty" json:"ambiguities,omitempty" xml:"ambiguities,omitempty"`
+	// Confirmed resolution per ambiguity question ID.
+	Answers map[string]string `form:"answers,omitempty" json:"answers,omitempty" xml:"answers,omitempty"`
+	// Concrete examples mapped to evaluator checks.
+	Examples []*ExampleItemResponseBody `form:"examples,omitempty" json:"examples,omitempty" xml:"examples,omitempty"`
+	// Existing contract invariants preserved by this change.
+	PreservedBehaviors []string `form:"preserved_behaviors,omitempty" json:"preserved_behaviors,omitempty" xml:"preserved_behaviors,omitempty"`
+	// Authenticated principal that confirmed the Change Card.
+	ConfirmedBy *string `form:"confirmed_by,omitempty" json:"confirmed_by,omitempty" xml:"confirmed_by,omitempty"`
+	// SHA-256 digest of the canonical versioned Change Card.
+	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+}
+
 // PreviewArchitectureResponseBody is the type of the "scantle" service
 // "preview_architecture" endpoint HTTP response body.
 type PreviewArchitectureResponseBody struct {
@@ -545,6 +570,51 @@ func NewConfirmIntentChangeCardResultOK(body *ConfirmIntentResponseBody) *scantl
 	return v
 }
 
+// NewGetChangeChangeCardResultOK builds a "scantle" service "get_change"
+// endpoint result from a HTTP "OK" response.
+func NewGetChangeChangeCardResultOK(body *GetChangeResponseBody) *scantle.ChangeCardResult {
+	v := &scantle.ChangeCardResult{
+		ChangeID:        *body.ChangeID,
+		Status:          *body.Status,
+		Prompt:          *body.Prompt,
+		Summary:         *body.Summary,
+		ConfirmedBy:     body.ConfirmedBy,
+		RequestRevision: *body.RequestRevision,
+	}
+	if body.Ambiguities != nil {
+		v.Ambiguities = make([]*scantle.AmbiguityQuestion, len(body.Ambiguities))
+		for i, val := range body.Ambiguities {
+			if val == nil {
+				v.Ambiguities[i] = nil
+				continue
+			}
+			v.Ambiguities[i] = unmarshalAmbiguityQuestionResponseBodyToScantleAmbiguityQuestion(val)
+		}
+	}
+	if body.Answers != nil {
+		v.Answers = make(map[string]string, len(body.Answers))
+		for key, val := range body.Answers {
+			tk := key
+			tv := val
+			v.Answers[tk] = tv
+		}
+	}
+	v.Examples = make([]*scantle.ExampleItem, len(body.Examples))
+	for i, val := range body.Examples {
+		if val == nil {
+			v.Examples[i] = nil
+			continue
+		}
+		v.Examples[i] = unmarshalExampleItemResponseBodyToScantleExampleItem(val)
+	}
+	v.PreservedBehaviors = make([]string, len(body.PreservedBehaviors))
+	for i, val := range body.PreservedBehaviors {
+		v.PreservedBehaviors[i] = val
+	}
+
+	return v
+}
+
 // NewPreviewArchitectureArchitecturePreviewResultOK builds a "scantle" service
 // "preview_architecture" endpoint result from a HTTP "OK" response.
 func NewPreviewArchitectureArchitecturePreviewResultOK(body *PreviewArchitectureResponseBody) *scantle.ArchitecturePreviewResult {
@@ -681,6 +751,52 @@ func ValidateProposeChangeResponseBody(body *ProposeChangeResponseBody) (err err
 // ValidateConfirmIntentResponseBody runs the validations defined on
 // ConfirmIntentResponseBody
 func ValidateConfirmIntentResponseBody(body *ConfirmIntentResponseBody) (err error) {
+	if body.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if body.Status == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("status", "body"))
+	}
+	if body.Prompt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("prompt", "body"))
+	}
+	if body.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if body.Examples == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("examples", "body"))
+	}
+	if body.PreservedBehaviors == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("preserved_behaviors", "body"))
+	}
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.Status != nil {
+		if !(*body.Status == "needs_confirmation" || *body.Status == "confirmed") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.status", *body.Status, []any{"needs_confirmation", "confirmed"}))
+		}
+	}
+	for _, e := range body.Ambiguities {
+		if e != nil {
+			if err2 := validateAmbiguityQuestionResponseBody(e, "body.ambiguities[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	for _, e := range body.Examples {
+		if e != nil {
+			if err2 := validateExampleItemResponseBody(e, "body.examples[*]"); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return
+}
+
+// ValidateGetChangeResponseBody runs the validations defined on
+// GetChangeResponseBody
+func ValidateGetChangeResponseBody(body *GetChangeResponseBody) (err error) {
 	if body.ChangeID == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
 	}

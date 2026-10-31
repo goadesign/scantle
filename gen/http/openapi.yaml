@@ -13,12 +13,40 @@ produces:
     - application/xml
     - application/gob
 paths:
+    /changes/{change_id}:
+        get:
+            tags:
+                - scantle
+            summary: get_change scantle
+            description: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.
+            operationId: scantle#get_change
+            parameters:
+                - name: change_id
+                  in: path
+                  description: Change identifier.
+                  required: true
+                  type: string
+            responses:
+                "200":
+                    description: OK response.
+                    schema:
+                        $ref: '#/definitions/ChangeCardResult'
+                        required:
+                            - change_id
+                            - status
+                            - prompt
+                            - summary
+                            - examples
+                            - preserved_behaviors
+                            - request_revision
+            schemes:
+                - http
     /changes/confirm:
         post:
             tags:
                 - scantle
             summary: confirm_intent scantle
-            description: Confirm Checkpoint 1 answers and examples to freeze the Change Card.
+            description: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.
             operationId: scantle#confirm_intent
             parameters:
                 - name: confirm_intent_request_body

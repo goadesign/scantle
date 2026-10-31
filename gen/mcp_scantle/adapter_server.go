@@ -168,9 +168,27 @@ func (a *MCPAdapter) invokeMCPMethod1(ctx context.Context, payload *scantle.Conf
 	return result, nil
 }
 
-// invokeMCPMethod2 sends validated input to the configured PreviewArchitecture endpoint
+// invokeMCPMethod2 sends validated input to the configured GetChange endpoint
 // and returns its declared result. An unexpected Go type is an internal error.
-func (a *MCPAdapter) invokeMCPMethod2(ctx context.Context, payload *scantle.PreviewArchitecturePayload) (*scantle.ArchitecturePreviewResult, error) {
+func (a *MCPAdapter) invokeMCPMethod2(ctx context.Context, payload *scantle.GetChangePayload) (*scantle.ChangeCardResult, error) {
+	// The original endpoint middleware observes its authored service and method.
+	ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
+	ctx = context.WithValue(ctx, goa.MethodKey, "get_change")
+	raw, err := a.endpoints.GetChange(ctx, payload)
+	var zero *scantle.ChangeCardResult
+	if err != nil {
+		return zero, err
+	}
+	result, ok := raw.(*scantle.ChangeCardResult)
+	if !ok {
+		return zero, &endpointResultError{method: "GetChange"}
+	}
+	return result, nil
+}
+
+// invokeMCPMethod3 sends validated input to the configured PreviewArchitecture endpoint
+// and returns its declared result. An unexpected Go type is an internal error.
+func (a *MCPAdapter) invokeMCPMethod3(ctx context.Context, payload *scantle.PreviewArchitecturePayload) (*scantle.ArchitecturePreviewResult, error) {
 	// The original endpoint middleware observes its authored service and method.
 	ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 	ctx = context.WithValue(ctx, goa.MethodKey, "preview_architecture")
@@ -186,9 +204,9 @@ func (a *MCPAdapter) invokeMCPMethod2(ctx context.Context, payload *scantle.Prev
 	return result, nil
 }
 
-// invokeMCPMethod3 sends validated input to the configured DraftOverride endpoint
+// invokeMCPMethod4 sends validated input to the configured DraftOverride endpoint
 // and returns its declared result. An unexpected Go type is an internal error.
-func (a *MCPAdapter) invokeMCPMethod3(ctx context.Context, payload *scantle.DraftOverridePayload) (*scantle.DraftOverrideResult, error) {
+func (a *MCPAdapter) invokeMCPMethod4(ctx context.Context, payload *scantle.DraftOverridePayload) (*scantle.DraftOverrideResult, error) {
 	// The original endpoint middleware observes its authored service and method.
 	ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 	ctx = context.WithValue(ctx, goa.MethodKey, "draft_override")
@@ -204,9 +222,9 @@ func (a *MCPAdapter) invokeMCPMethod3(ctx context.Context, payload *scantle.Draf
 	return result, nil
 }
 
-// invokeMCPMethod4 sends validated input to the configured Diff endpoint
+// invokeMCPMethod5 sends validated input to the configured Diff endpoint
 // and returns its declared result. An unexpected Go type is an internal error.
-func (a *MCPAdapter) invokeMCPMethod4(ctx context.Context, payload *scantle.DiffPayload) (*scantle.DiffResult, error) {
+func (a *MCPAdapter) invokeMCPMethod5(ctx context.Context, payload *scantle.DiffPayload) (*scantle.DiffResult, error) {
 	// The original endpoint middleware observes its authored service and method.
 	ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 	ctx = context.WithValue(ctx, goa.MethodKey, "diff")
@@ -222,9 +240,9 @@ func (a *MCPAdapter) invokeMCPMethod4(ctx context.Context, payload *scantle.Diff
 	return result, nil
 }
 
-// invokeMCPMethod5 sends validated input to the configured CheckpointUI endpoint
+// invokeMCPMethod6 sends validated input to the configured CheckpointUI endpoint
 // and returns its declared result. An unexpected Go type is an internal error.
-func (a *MCPAdapter) invokeMCPMethod5(ctx context.Context) (string, error) {
+func (a *MCPAdapter) invokeMCPMethod6(ctx context.Context) (string, error) {
 	// The original endpoint middleware observes its authored service and method.
 	ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 	ctx = context.WithValue(ctx, goa.MethodKey, "checkpoint_ui")
@@ -240,9 +258,9 @@ func (a *MCPAdapter) invokeMCPMethod5(ctx context.Context) (string, error) {
 	return result, nil
 }
 
-// invokeMCPMethod6 sends validated input to the configured GoldenPath endpoint
+// invokeMCPMethod7 sends validated input to the configured GoldenPath endpoint
 // and returns its declared result. An unexpected Go type is an internal error.
-func (a *MCPAdapter) invokeMCPMethod6(ctx context.Context) (string, error) {
+func (a *MCPAdapter) invokeMCPMethod7(ctx context.Context) (string, error) {
 	// The original endpoint middleware observes its authored service and method.
 	ctx = context.WithValue(ctx, goa.ServiceKey, "scantle")
 	ctx = context.WithValue(ctx, goa.MethodKey, "golden_path")
@@ -283,7 +301,7 @@ func (a *MCPAdapter) ToolsList(ctx context.Context, p *ToolsListPayload) (*Tools
 	tools := []*ToolInfo{
 		{
 			Name:         "confirm_intent",
-			Description:  stringPtr("Confirm Checkpoint 1 ambiguity answers and example checks."),
+			Description:  stringPtr("Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision."),
 			Meta:         json.RawMessage("{\"ui\":{\"resourceUri\":\"ui://scantle/checkpoint\"}}"),
 			InputSchema:  json.RawMessage("{\"$defs\":{\"ConfirmIntentPayload\":{\"description\":\"Operator confirmation of Checkpoint 1 ambiguity answers and concrete examples.\",\"properties\":{\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Selected resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"examples\":{\"description\":\"Confirmed example table.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Reviewed CP1 request_revision digest being confirmed.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"answers\",\"examples\"],\"title\":\"ConfirmIntentPayload\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator confirmation of Checkpoint 1 ambiguity answers and concrete examples.\",\"properties\":{\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Selected resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"examples\":{\"description\":\"Confirmed example table.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Reviewed CP1 request_revision digest being confirmed.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"answers\",\"examples\"],\"title\":\"ConfirmIntentPayload\",\"type\":\"object\"}"),
 			OutputSchema: json.RawMessage("{\"$defs\":{\"AmbiguityQuestion\":{\"additionalProperties\":false,\"description\":\"Domain ambiguity surfaced with concrete examples at Checkpoint 1.\",\"properties\":{\"id\":{\"description\":\"Stable question identifier.\",\"type\":\"string\"},\"options\":{\"description\":\"Concrete resolution choices.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"question\":{\"description\":\"Plain-English question for the operator.\",\"type\":\"string\"}},\"required\":[\"id\",\"question\",\"options\"],\"title\":\"AmbiguityQuestion\",\"type\":\"object\"},\"ChangeCardResult\":{\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"title\":\"ChangeCardResult\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"title\":\"ChangeCardResult\",\"type\":\"object\"}"),
@@ -291,6 +309,7 @@ func (a *MCPAdapter) ToolsList(ctx context.Context, p *ToolsListPayload) (*Tools
 		{
 			Name:         "diff",
 			Description:  stringPtr("Compute structural Goa design and go.mod dependency diffs."),
+			Meta:         json.RawMessage("{\"ui\":{\"resourceUri\":\"ui://scantle/checkpoint\"}}"),
 			InputSchema:  json.RawMessage("{\"$defs\":{\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"},\"DiffPayload\":{\"description\":\"Previous and candidate design modules to compare structurally, each evaluated with its own go.mod dependencies.\",\"properties\":{\"new\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate design module.\"},\"old\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Previous design module.\"}},\"required\":[\"old\",\"new\"],\"title\":\"DiffPayload\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Previous and candidate design modules to compare structurally, each evaluated with its own go.mod dependencies.\",\"properties\":{\"new\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate design module.\"},\"old\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Previous design module.\"}},\"required\":[\"old\",\"new\"],\"title\":\"DiffPayload\",\"type\":\"object\"}"),
 			OutputSchema: json.RawMessage("{\"$defs\":{\"DiffResult\":{\"description\":\"Structural diff of evaluated Goa/Goa-AI declarations and go.mod directives.\",\"properties\":{\"added_declarations\":{\"description\":\"Added scoped declarations.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"has_changes\":{\"description\":\"True when any declaration, evaluated contract schema, or module directive changed.\",\"type\":\"boolean\"},\"modified_declarations\":{\"description\":\"Declarations whose evaluated schema, route, or policy changed.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"removed_declarations\":{\"description\":\"Removed scoped declarations.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"summary\":{\"description\":\"Human-readable structural diff summary.\",\"type\":\"string\"},\"version_deltas\":{\"description\":\"Changed module require, replace, or exclude directives.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"has_changes\",\"added_declarations\",\"removed_declarations\",\"modified_declarations\",\"version_deltas\",\"summary\"],\"title\":\"DiffResult\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Structural diff of evaluated Goa/Goa-AI declarations and go.mod directives.\",\"properties\":{\"added_declarations\":{\"description\":\"Added scoped declarations.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"has_changes\":{\"description\":\"True when any declaration, evaluated contract schema, or module directive changed.\",\"type\":\"boolean\"},\"modified_declarations\":{\"description\":\"Declarations whose evaluated schema, route, or policy changed.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"removed_declarations\":{\"description\":\"Removed scoped declarations.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"summary\":{\"description\":\"Human-readable structural diff summary.\",\"type\":\"string\"},\"version_deltas\":{\"description\":\"Changed module require, replace, or exclude directives.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"}},\"required\":[\"has_changes\",\"added_declarations\",\"removed_declarations\",\"modified_declarations\",\"version_deltas\",\"summary\"],\"title\":\"DiffResult\",\"type\":\"object\"}"),
 		},
@@ -300,6 +319,13 @@ func (a *MCPAdapter) ToolsList(ctx context.Context, p *ToolsListPayload) (*Tools
 			Meta:         json.RawMessage("{\"ui\":{\"resourceUri\":\"ui://scantle/checkpoint\"}}"),
 			InputSchema:  json.RawMessage("{\"$defs\":{\"DraftOverridePayload\":{\"description\":\"Fast Draft Mode request to hot-reload a prompt template on the bound target platform or reject a compiled business-rule edit.\",\"properties\":{\"new_content\":{\"description\":\"Updated prompt template text or rule expression.\",\"type\":\"string\"},\"prompt_id\":{\"description\":\"Registered prompt identifier when target_kind is prompt_template.\",\"type\":\"string\"},\"target_kind\":{\"description\":\"Override target kind (prompt_template or compiled_rule).\",\"enum\":[\"prompt_template\",\"compiled_rule\"],\"type\":\"string\"}},\"required\":[\"target_kind\",\"new_content\"],\"title\":\"DraftOverridePayload\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Fast Draft Mode request to hot-reload a prompt template on the bound target platform or reject a compiled business-rule edit.\",\"properties\":{\"new_content\":{\"description\":\"Updated prompt template text or rule expression.\",\"type\":\"string\"},\"prompt_id\":{\"description\":\"Registered prompt identifier when target_kind is prompt_template.\",\"type\":\"string\"},\"target_kind\":{\"description\":\"Override target kind (prompt_template or compiled_rule).\",\"enum\":[\"prompt_template\",\"compiled_rule\"],\"type\":\"string\"}},\"required\":[\"target_kind\",\"new_content\"],\"title\":\"DraftOverridePayload\",\"type\":\"object\"}"),
 			OutputSchema: json.RawMessage("{\"$defs\":{\"DraftOverrideResult\":{\"description\":\"Result of a Checkpoint 3 Fast Draft Mode override request.\",\"properties\":{\"applied_in_store\":{\"description\":\"True when updated in the target platform's prompt.Store for 0s reload.\",\"type\":\"boolean\"},\"message\":{\"description\":\"Operator-facing status explanation.\",\"type\":\"string\"},\"prompt_version\":{\"description\":\"New prompt version digest returned by the target platform.\",\"type\":\"string\"},\"requires_rebuild\":{\"description\":\"True when the change modifies a compiled Go business rule.\",\"type\":\"boolean\"}},\"required\":[\"applied_in_store\",\"requires_rebuild\",\"message\"],\"title\":\"DraftOverrideResult\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Result of a Checkpoint 3 Fast Draft Mode override request.\",\"properties\":{\"applied_in_store\":{\"description\":\"True when updated in the target platform's prompt.Store for 0s reload.\",\"type\":\"boolean\"},\"message\":{\"description\":\"Operator-facing status explanation.\",\"type\":\"string\"},\"prompt_version\":{\"description\":\"New prompt version digest returned by the target platform.\",\"type\":\"string\"},\"requires_rebuild\":{\"description\":\"True when the change modifies a compiled Go business rule.\",\"type\":\"boolean\"}},\"required\":[\"applied_in_store\",\"requires_rebuild\",\"message\"],\"title\":\"DraftOverrideResult\",\"type\":\"object\"}"),
+		},
+		{
+			Name:         "get_change",
+			Description:  stringPtr("Read the current Checkpoint 1 Change Card and its request_revision."),
+			Meta:         json.RawMessage("{\"ui\":{\"resourceUri\":\"ui://scantle/checkpoint\"}}"),
+			InputSchema:  json.RawMessage("{\"$defs\":{\"GetChangePayload\":{\"description\":\"Identifies the Change Card the authenticated owner wants to read.\",\"properties\":{\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"}},\"required\":[\"change_id\"],\"title\":\"GetChangePayload\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies the Change Card the authenticated owner wants to read.\",\"properties\":{\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"}},\"required\":[\"change_id\"],\"title\":\"GetChangePayload\",\"type\":\"object\"}"),
+			OutputSchema: json.RawMessage("{\"$defs\":{\"AmbiguityQuestion\":{\"additionalProperties\":false,\"description\":\"Domain ambiguity surfaced with concrete examples at Checkpoint 1.\",\"properties\":{\"id\":{\"description\":\"Stable question identifier.\",\"type\":\"string\"},\"options\":{\"description\":\"Concrete resolution choices.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"question\":{\"description\":\"Plain-English question for the operator.\",\"type\":\"string\"}},\"required\":[\"id\",\"question\",\"options\"],\"title\":\"AmbiguityQuestion\",\"type\":\"object\"},\"ChangeCardResult\":{\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"title\":\"ChangeCardResult\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"title\":\"ChangeCardResult\",\"type\":\"object\"}"),
 		},
 		{
 			Name:         "preview_architecture",
@@ -378,7 +404,7 @@ func (a *MCPAdapter) ToolsCall(ctx context.Context, p *ToolsCallPayload) (*Tools
 		if err != nil {
 			return toolCallError("invalid arguments: " + err.Error()), nil
 		}
-		result, err := a.invokeMCPMethod4(ctx, payload)
+		result, err := a.invokeMCPMethod5(ctx, payload)
 		if err != nil {
 			failure := a.mapError(err, isEndpointFault(err))
 			span.RecordError(failure.err)
@@ -408,7 +434,7 @@ func (a *MCPAdapter) ToolsCall(ctx context.Context, p *ToolsCallPayload) (*Tools
 		if err != nil {
 			return toolCallError("invalid arguments: " + err.Error()), nil
 		}
-		result, err := a.invokeMCPMethod3(ctx, payload)
+		result, err := a.invokeMCPMethod4(ctx, payload)
 		if err != nil {
 			failure := a.mapError(err, isEndpointFault(err))
 			span.RecordError(failure.err)
@@ -429,6 +455,36 @@ func (a *MCPAdapter) ToolsCall(ctx context.Context, p *ToolsCallPayload) (*Tools
 			Content:           []*ContentItem{},
 			StructuredContent: json.RawMessage(encoded),
 		})}, nil
+	case "get_change":
+		arguments := p.Arguments
+		if len(arguments) == 0 {
+			arguments = json.RawMessage("{}")
+		}
+		payload, err := mcpcodec.DecodeGetChangePayload(arguments)
+		if err != nil {
+			return toolCallError("invalid arguments: " + err.Error()), nil
+		}
+		result, err := a.invokeMCPMethod2(ctx, payload)
+		if err != nil {
+			failure := a.mapError(err, isEndpointFault(err))
+			span.RecordError(failure.err)
+			span.SetStatus(codes.Error, failure.err.Error())
+			if failure.internal {
+				return nil, failure.err
+			}
+			return toolCallError(failure.err.Error()), nil
+		}
+		encoded, err := mcpcodec.EncodeGetChangeResult(result)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return nil, goa.PermanentError("internal_error", "%s", err.Error())
+		}
+		return &ToolsCallResult{Outcome: NewToolsCallOutcomeComplete(&ToolsCallCompleteResult{
+			Meta:              resultMeta(),
+			Content:           []*ContentItem{},
+			StructuredContent: json.RawMessage(encoded),
+		})}, nil
 	case "preview_architecture":
 		arguments := p.Arguments
 		if len(arguments) == 0 {
@@ -438,7 +494,7 @@ func (a *MCPAdapter) ToolsCall(ctx context.Context, p *ToolsCallPayload) (*Tools
 		if err != nil {
 			return toolCallError("invalid arguments: " + err.Error()), nil
 		}
-		result, err := a.invokeMCPMethod2(ctx, payload)
+		result, err := a.invokeMCPMethod3(ctx, payload)
 		if err != nil {
 			failure := a.mapError(err, isEndpointFault(err))
 			span.RecordError(failure.err)
@@ -521,7 +577,7 @@ func (a *MCPAdapter) ResourcesRead(ctx context.Context, p *ResourcesReadPayload)
 
 	switch p.URI {
 	case "scantle://golden-path":
-		result, err := a.invokeMCPMethod6(ctx)
+		result, err := a.invokeMCPMethod7(ctx)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
@@ -537,7 +593,7 @@ func (a *MCPAdapter) ResourcesRead(ctx context.Context, p *ResourcesReadPayload)
 
 		return &ResourcesReadResult{Outcome: NewResourcesReadOutcomeComplete(res)}, nil
 	case "ui://scantle/checkpoint":
-		result, err := a.invokeMCPMethod5(ctx)
+		result, err := a.invokeMCPMethod6(ctx)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())

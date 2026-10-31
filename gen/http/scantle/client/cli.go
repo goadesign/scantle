@@ -96,6 +96,22 @@ func BuildConfirmIntentPayload(scantleConfirmIntentBody *string) (*scantle.Confi
 	return v, nil
 }
 
+// BuildGetChangePayload builds the payload for the scantle get_change endpoint
+// from CLI flags.
+func BuildGetChangePayload(scantleGetChangeChangeID *string) (*scantle.GetChangePayload, error) {
+	var changeID string
+	{
+		if scantleGetChangeChangeID == nil {
+			return nil, fmt.Errorf("missing required flag --change-id")
+		}
+		changeID = *scantleGetChangeChangeID
+	}
+	v := &scantle.GetChangePayload{}
+	v.ChangeID = changeID
+
+	return v, nil
+}
+
 // BuildPreviewArchitecturePayload builds the payload for the scantle
 // preview_architecture endpoint from CLI flags.
 func BuildPreviewArchitecturePayload(scantlePreviewArchitectureBody *string) (*scantle.PreviewArchitecturePayload, error) {

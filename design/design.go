@@ -44,7 +44,14 @@ var ProposeChangePayload = Type("ProposeChangePayload", func() {
 	Required("change_id", "prompt")
 })
 
-// ChangeCardResult is the output of CP1 propose_change and confirm_intent.
+// GetChangePayload is the input to the get_change tool.
+var GetChangePayload = Type("GetChangePayload", func() {
+	Description("Identifies the Change Card the authenticated owner wants to read.")
+	Attribute("change_id", String, "Change identifier.")
+	Required("change_id")
+})
+
+// ChangeCardResult is the output of CP1 propose_change, confirm_intent and get_change.
 var ChangeCardResult = Type("ChangeCardResult", func() {
 	Description("Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.")
 	Attribute("change_id", String, "Change identifier.")
@@ -346,14 +353,27 @@ var _ = Service("scantle", func() {
 	})
 
 	Method("confirm_intent", func() {
-		Description("Confirm Checkpoint 1 answers and examples to freeze the Change Card.")
+		Description("Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.")
 		Payload(ConfirmIntentPayload)
 		Result(ChangeCardResult)
-		Tool("confirm_intent", "Confirm Checkpoint 1 ambiguity answers and example checks.", func() {
+		Tool("confirm_intent", "Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision.", func() {
 			ToolUI("ui://scantle/checkpoint")
 		})
 		HTTP(func() {
 			POST("/changes/confirm")
+			Response(StatusOK)
+		})
+	})
+
+	Method("get_change", func() {
+		Description("Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.")
+		Payload(GetChangePayload)
+		Result(ChangeCardResult)
+		Tool("get_change", "Read the current Checkpoint 1 Change Card and its request_revision.", func() {
+			ToolUI("ui://scantle/checkpoint")
+		})
+		HTTP(func() {
+			GET("/changes/{change_id}")
 			Response(StatusOK)
 		})
 	})
@@ -388,7 +408,9 @@ var _ = Service("scantle", func() {
 		Description("Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.")
 		Payload(DiffPayload)
 		Result(DiffResult)
-		Tool("diff", "Compute structural Goa design and go.mod dependency diffs.")
+		Tool("diff", "Compute structural Goa design and go.mod dependency diffs.", func() {
+			ToolUI("ui://scantle/checkpoint")
+		})
 		HTTP(func() {
 			POST("/diff")
 			Response(StatusOK)

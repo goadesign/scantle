@@ -517,9 +517,35 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 	return card, nil
 }
 
-// ConfirmIntent verifies the authenticated owner and reviewed request_revision,
-// resolves all open Checkpoint 1 ambiguity questions, records the confirmed
-// example table and answers, and freezes the Change Card revision.
+// GetChange returns the current Change Card for change_id to its owner. It
+// fails for an unknown change_id or a caller who does not own the card, and
+// never changes the card.
+func (c *ControlPlane) GetChange(ctx context.Context, p *genscantle.GetChangePayload) (*genscantle.ChangeCardResult, error) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		return nil, errors.New("authenticated principal is required")
+	}
+	c.mu.RLock()
+	record, ok := c.cards[p.ChangeID]
+	c.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	}
+	if record.owner != principal.ID {
+		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	return record.card, nil
+}
+
+// ConfirmIntent records the owner's complete answers and example table for a
+// Change Card that needs confirmation or is already confirmed. The caller
+// must be the card's owner and send the card's current request_revision, so
+// an edit based on an older revision fails. Every open ambiguity must have an
+// allowed answer. When a confirmed card's answers and examples are unchanged,
+// the card is returned as it is; otherwise the card is confirmed under a new
+// request_revision, so previews and verification reports bound to the earlier
+// revision no longer match it. The prompt, summary and preserved behaviors
+// never change here: a new requirement needs a new propose_change.
 func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmIntentPayload) (*genscantle.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
@@ -540,9 +566,6 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
 	}
 	existing := record.card
-	if existing.Status != StatusNeedsConfirmation {
-		return nil, fmt.Errorf("change_id %q does not require confirmation (status %q)", p.ChangeID, existing.Status)
-	}
 	if existing.RequestRevision != p.RequestRevision {
 		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, existing.RequestRevision)
 	}
@@ -554,7 +577,6 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	if err != nil {
 		return nil, fmt.Errorf("invalid confirmed examples: %w", err)
 	}
-
 	confirmedBy := principal.ID
 	confirmed := &genscantle.ChangeCardResult{
 		ChangeID:           existing.ChangeID,
@@ -570,6 +592,10 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *genscantle.ConfirmI
 	rev, err := computeCanonicalRevision(confirmed, record.owner, record.designSource)
 	if err != nil {
 		return nil, err
+	}
+	if rev == existing.RequestRevision {
+		// Same answers and examples on an already confirmed card.
+		return existing, nil
 	}
 	confirmed.RequestRevision = rev
 	c.cards[p.ChangeID] = storedChangeCard{
@@ -714,149 +740,6 @@ func (c *ControlPlane) Diff(ctx context.Context, p *genscantle.DiffPayload) (*ge
 		VersionDeltas:        rep.VersionDeltas,
 		Summary:              rep.Summary,
 	}, nil
-}
-
-// validateCP1Analysis validates all model-returned CP1 fields strictly without
-// silent coercion and assigns code-owned mechanical ambiguity and check IDs.
-func validateCP1Analysis(
-	changeID string,
-	in CP1SemanticAnalysis,
-) (string, []*genscantle.AmbiguityQuestion, []*genscantle.ExampleItem, []string, error) {
-	if strings.TrimSpace(in.Summary) == "" {
-		return "", nil, nil, nil, errors.New("summary is required")
-	}
-	ambiguities, err := validateAmbiguities(changeID, in.Ambiguities)
-	if err != nil {
-		return "", nil, nil, nil, err
-	}
-	if len(in.Examples) == 0 {
-		return "", nil, nil, nil, errors.New("at least one example is required")
-	}
-	examples := make([]*genscantle.ExampleItem, 0, len(in.Examples))
-	for i, item := range in.Examples {
-		if strings.TrimSpace(item.Scenario) == "" ||
-			strings.TrimSpace(item.InputSummary) == "" ||
-			strings.TrimSpace(item.ExpectedOutcome) == "" {
-			return "", nil, nil, nil, fmt.Errorf("examples[%d] requires non-empty scenario, input_summary, and expected_outcome", i)
-		}
-		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
-			return "", nil, nil, nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
-		}
-		examples = append(examples, &genscantle.ExampleItem{
-			ID:               fmt.Sprintf("%s-check-%02d", changeID, i+1),
-			Scenario:         item.Scenario,
-			InputSummary:     item.InputSummary,
-			ExpectedOutcome:  item.ExpectedOutcome,
-			VerificationKind: item.VerificationKind,
-		})
-	}
-	preserved := make([]string, 0, len(in.PreservedBehaviors))
-	for i, item := range in.PreservedBehaviors {
-		if strings.TrimSpace(item) == "" {
-			return "", nil, nil, nil, fmt.Errorf("preserved_behaviors[%d] is empty", i)
-		}
-		preserved = append(preserved, item)
-	}
-	return in.Summary, ambiguities, examples, preserved, nil
-}
-
-// validateAmbiguities validates that every ambiguity question has a non-empty
-// question and at least two distinct non-empty options, and assigns a
-// code-owned question ID (`<changeID>-ambiguity-NN`).
-func validateAmbiguities(changeID string, in []CP1ModelAmbiguity) ([]*genscantle.AmbiguityQuestion, error) {
-	if len(in) == 0 {
-		return nil, nil
-	}
-	out := make([]*genscantle.AmbiguityQuestion, 0, len(in))
-	for i, q := range in {
-		id := fmt.Sprintf("%s-ambiguity-%02d", changeID, i+1)
-		if strings.TrimSpace(q.Question) == "" {
-			return nil, fmt.Errorf("ambiguities[%d] requires non-empty question", i)
-		}
-		if len(q.Options) < 2 {
-			return nil, fmt.Errorf("ambiguity %q requires at least 2 options", id)
-		}
-		seenOpts := make(map[string]bool, len(q.Options)*2)
-		opts := make([]string, 0, len(q.Options))
-		for _, opt := range q.Options {
-			trimmed := strings.TrimSpace(opt)
-			if trimmed == "" {
-				return nil, fmt.Errorf("ambiguity %q has an empty option", id)
-			}
-			if seenOpts[opt] || seenOpts[trimmed] {
-				return nil, fmt.Errorf("ambiguity %q has duplicate option %q", id, opt)
-			}
-			seenOpts[opt] = true
-			seenOpts[trimmed] = true
-			opts = append(opts, opt)
-		}
-		out = append(out, &genscantle.AmbiguityQuestion{
-			ID:       id,
-			Question: q.Question,
-			Options:  opts,
-		})
-	}
-	return out, nil
-}
-
-// validateAmbiguityAnswers verifies exact 1-to-1 resolution of open ambiguity
-// questions against their declared options.
-func validateAmbiguityAnswers(questions []*genscantle.AmbiguityQuestion, answers map[string]string) error {
-	allowedByID := make(map[string][]string, len(questions))
-	for _, q := range questions {
-		allowedByID[q.ID] = q.Options
-		ans, has := answers[q.ID]
-		if !has || strings.TrimSpace(ans) == "" {
-			return fmt.Errorf("missing confirmation answer for ambiguity %q", q.ID)
-		}
-		if !slices.Contains(q.Options, ans) {
-			return fmt.Errorf("answer %q for ambiguity %q is not in allowed options %v", ans, q.ID, q.Options)
-		}
-	}
-	for id := range answers {
-		if _, ok := allowedByID[id]; !ok {
-			return fmt.Errorf("unexpected confirmation answer for unknown ambiguity %q", id)
-		}
-	}
-	return nil
-}
-
-// validateConfirmedExamples validates that every confirmed ExampleItem has a
-// unique non-empty ID and valid fields.
-func validateConfirmedExamples(in []*genscantle.ExampleItem) ([]*genscantle.ExampleItem, error) {
-	if len(in) == 0 {
-		return nil, errors.New("at least one example is required")
-	}
-	seenIDs := make(map[string]bool, len(in)*2)
-	out := make([]*genscantle.ExampleItem, 0, len(in))
-	for i, item := range in {
-		if item == nil {
-			return nil, fmt.Errorf("examples[%d] is nil", i)
-		}
-		trimmedID := strings.TrimSpace(item.ID)
-		if trimmedID == "" ||
-			strings.TrimSpace(item.Scenario) == "" ||
-			strings.TrimSpace(item.InputSummary) == "" ||
-			strings.TrimSpace(item.ExpectedOutcome) == "" {
-			return nil, fmt.Errorf("examples[%d] requires non-empty id, scenario, input_summary, and expected_outcome", i)
-		}
-		if item.VerificationKind != "deterministic" && item.VerificationKind != "model_judged" {
-			return nil, fmt.Errorf("examples[%d] has invalid verification_kind %q", i, item.VerificationKind)
-		}
-		if seenIDs[item.ID] || seenIDs[trimmedID] {
-			return nil, fmt.Errorf("duplicate example id %q", item.ID)
-		}
-		seenIDs[item.ID] = true
-		seenIDs[trimmedID] = true
-		out = append(out, &genscantle.ExampleItem{
-			ID:               item.ID,
-			Scenario:         item.Scenario,
-			InputSummary:     item.InputSummary,
-			ExpectedOutcome:  item.ExpectedOutcome,
-			VerificationKind: item.VerificationKind,
-		})
-	}
-	return out, nil
 }
 
 // extractAssistantText concatenates TextPart payloads from a model.Response.

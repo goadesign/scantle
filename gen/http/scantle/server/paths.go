@@ -7,6 +7,8 @@
 
 package server
 
+import "fmt"
+
 // CheckpointUIScantlePath returns the URL path to the scantle service checkpoint_ui HTTP endpoint.
 func CheckpointUIScantlePath() string {
 	return "/ui/checkpoint"
@@ -25,6 +27,11 @@ func ProposeChangeScantlePath() string {
 // ConfirmIntentScantlePath returns the URL path to the scantle service confirm_intent HTTP endpoint.
 func ConfirmIntentScantlePath() string {
 	return "/changes/confirm"
+}
+
+// GetChangeScantlePath returns the URL path to the scantle service get_change HTTP endpoint.
+func GetChangeScantlePath(changeID string) string {
+	return fmt.Sprintf("/changes/%v", changeID)
 }
 
 // PreviewArchitectureScantlePath returns the URL path to the scantle service preview_architecture HTTP endpoint.

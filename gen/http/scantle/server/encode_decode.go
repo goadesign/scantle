@@ -126,6 +126,35 @@ func DecodeConfirmIntentRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 	}
 }
 
+// EncodeGetChangeResponse returns an encoder for responses returned by the
+// scantle get_change endpoint.
+func EncodeGetChangeResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*scantle.ChangeCardResult)
+		enc := encoder(ctx, w)
+		body := NewGetChangeResponseBody(res)
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
+// DecodeGetChangeRequest returns a decoder for requests sent to the scantle
+// get_change endpoint.
+func DecodeGetChangeRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*scantle.GetChangePayload, error) {
+	return func(r *http.Request) (*scantle.GetChangePayload, error) {
+		var payload *scantle.GetChangePayload
+		var (
+			changeID string
+
+			params = mux.Vars(r)
+		)
+		changeID = params["change_id"]
+		payload = NewGetChangePayload(changeID)
+
+		return payload, nil
+	}
+}
+
 // EncodePreviewArchitectureResponse returns an encoder for responses returned
 // by the scantle preview_architecture endpoint.
 func EncodePreviewArchitectureResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {

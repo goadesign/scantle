@@ -103,6 +103,40 @@ type (
 		// Operator-facing status explanation.
 		Message *string `json:"message"`
 	}
+	// GetChangePayloadTransport is the internal JSON transport type for GetChangePayload.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	GetChangePayloadTransport struct {
+		// Change identifier.
+		ChangeID *string `json:"change_id"`
+	}
+	// GetChangeResultTransport is the internal JSON transport type for GetChangeResult.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	GetChangeResultTransport struct {
+		// Change identifier.
+		ChangeID *string `json:"change_id"`
+		// Checkpoint status (needs_confirmation or confirmed).
+		Status *string `json:"status"`
+		// Original operator feature request.
+		Prompt *string `json:"prompt"`
+		// Plain-English summary of requested behavior.
+		Summary *string `json:"summary"`
+		// Domain questions surfaced at CP1, retained for audit after confirmation.
+		Ambiguities []*AmbiguityQuestionTransport `json:"ambiguities,omitempty"`
+		// Confirmed resolution per ambiguity question ID.
+		Answers map[string]string `json:"answers,omitempty"`
+		// Concrete examples mapped to evaluator checks.
+		Examples []*ExampleItemTransport `json:"examples"`
+		// Existing contract invariants preserved by this change.
+		PreservedBehaviors []string `json:"preserved_behaviors"`
+		// Authenticated principal that confirmed the Change Card.
+		ConfirmedBy *string `json:"confirmed_by,omitempty"`
+		// SHA-256 digest of the canonical versioned Change Card.
+		RequestRevision *string `json:"request_revision"`
+	}
 	// PreviewArchitecturePayloadTransport is the internal JSON transport type for PreviewArchitecturePayload.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
