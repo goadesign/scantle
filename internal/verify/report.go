@@ -29,6 +29,8 @@ import (
 	"strings"
 
 	"goa.design/goa-ai/eval"
+
+	suitecmd "github.com/goadesign/surla/verify/suite"
 )
 
 type (
@@ -194,7 +196,7 @@ func Assemble(binding Binding, suite Suite, evidence eval.Report, suiteExit int)
 		r.Counts.add(res.Outcome)
 		r.Scenarios = append(r.Scenarios, res)
 	}
-	r.Passed = r.SuiteError == "" && r.SuiteExit == 0 && r.Counts.Passed == r.Counts.Required
+	r.Passed = r.SuiteError == "" && r.SuiteExit == suitecmd.ExitPassed && r.Counts.Passed == r.Counts.Required
 	digest, err := r.computeDigest()
 	if err != nil {
 		return Report{}, err

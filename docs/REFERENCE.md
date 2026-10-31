@@ -183,11 +183,23 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 
 #### Evaluator Suite Command Contract (`-suite-command`)
 
-`surla verify` compiles the Go package named by `-suite-command` inside the macOS build sandbox and invokes the resulting executable twice:
+`surla verify` compiles the Go package named by `-suite-command` inside the macOS build sandbox and invokes the resulting executable twice. Evaluator suite `main` packages use [`verify/suite`](../verify/suite/suite.go) to implement this contract with [`suite.Main(suite.Command{...})`](../verify/suite/suite.go):
+
+```go
+func main() {
+    suite.Main(suite.Command{
+        Environment:    "sim",
+        Binaries:       []string{"orders", "orders-worker"},
+        MaxConcurrency: 4,
+        Declare:        declare,
+        Suite:          newSuite,
+    })
+}
+```
 
 1. **Suite discovery (`--describe`):**
    - `surla verify` runs `<suite-bin> --describe` with no `--artifact` flags.
-   - The command must write a single JSON declaration object to `stdout` and exit `0`:
+   - `suite.Main` calls `Command.Declare()` (which returns the generated `eval.Suite` without requiring candidate binaries or constructing runtime state), writes [`suite.Declaration`](../verify/suite/suite.go) as JSON to `stdout`, and exits `0`:
      ```json
      {
        "id": "orders_acceptance",
@@ -200,18 +212,20 @@ Clones the committed candidate and evaluator suite into an isolated work directo
      ```
    - Scenarios whose `tags` contain `"holdout"` are marked `Holdout: true` in the assembled `verify.Report` and redacted in `Report.ForBuilders()` (`-builder-view`).
 2. **Suite execution (`--artifact <name>=<path>`):**
-   - `surla verify` runs `<suite-bin> --artifact <name>=<path> ...` passing one `--artifact` flag for every `-binary <name>=<package>` bound in the verification plan.
-   - The suite pins each candidate binary into a private read-only store with [`candidate.Pin(store, path)`](../verify/candidate/candidate.go), starts candidate processes inside the runtime Seatbelt jail with [`candidate.Exec(ctx, pinned, spec)`](../verify/candidate/candidate.go), and attaches [`pinned.Evidence("<name>")`](../verify/candidate/candidate.go) to every scenario's `eval.Result.Artifacts`:
+   - `surla verify` runs `<suite-bin> --artifact <name>=<path> ...` passing one `--artifact` flag for every `-binary <name>=<package>` bound in the verification plan (the suite binary also accepts `--scenario <id>`, mutually exclusive `--tag <tag>`, and `--max-concurrency <n>` for direct runs).
+   - `suite.Main` verifies that the `--artifact` flags match `Command.Binaries` (each required binary once), pins each candidate binary into a temporary read-only store with [`candidate.Pin(store, path)`](../verify/candidate/candidate.go) (cleaning up the store with [`candidate.RemoveStore`](../verify/candidate/candidate.go) when the run finishes), passes the `pinned map[string]candidate.Artifact` to `Command.Suite(pinned)`, and runs the scenarios with `eval.NewRunner`.
+   - Inside each scenario hook, the suite starts candidate processes inside the runtime Seatbelt jail with [`candidate.Exec(ctx, pinned["orders"], spec)`](../verify/candidate/candidate.go) and attaches [`pinned["orders"].Evidence("orders")`](../verify/candidate/candidate.go) to every scenario's `eval.Result.Artifacts`:
      ```go
-     pinned, err := candidate.Pin(store, artifactPaths["orders"])
-     // ...
-     res.Artifacts = append(res.Artifacts, pinned.Evidence("orders"))
+     res.Artifacts = append(res.Artifacts,
+         h.env.Orders.Evidence("orders"),
+         h.env.Worker.Evidence("orders-worker"),
+     )
      ```
-     `pinned.Evidence("orders")` produces `eval.Artifact{Name: "candidate:orders", URI: "sha256:<digest>"}`, which `surla verify` checks against the SHA-256 digest it measured when building `orders`. A scenario that omits a bound binary's evidence record or reports a different digest produces a failing `verify.Report` with scenario outcome `"harness_error"`.
-   - The suite writes `goa.design/goa-ai/eval.Report` JSON to `stdout` and exits with:
-     - **`0`** when all scenarios passed,
-     - **`1`** when the suite ran and wrote a valid `eval.Report` JSON to `stdout` with one or more failed scenarios (`!report.Passed`), or
-     - **`2` (or any other code)** when the suite could not run (invalid flags, harness setup failure, or crash before producing a report).
+     `pinned["orders"].Evidence("orders")` produces `eval.Artifact{Name: "candidate:orders", URI: "sha256:<digest>"}`, which `surla verify` checks against the SHA-256 digest it measured when building `orders`. A scenario that omits a bound binary's evidence record or reports a different digest produces a failing `verify.Report` with scenario outcome `"harness_error"`.
+   - `suite.Main` writes `goa.design/goa-ai/eval.Report` JSON to `stdout` whenever the runner produced one and exits with:
+     - **`0` (`suite.ExitPassed`)** when all scenarios passed and the temporary pinned-artifact store was removed cleanly,
+     - **`1` (`suite.ExitFailed`)** when the suite ran, cleaned up its temporary artifact store, and wrote a valid `eval.Report` JSON to `stdout` with one or more failed scenarios (`!report.Passed`), or
+     - **`2` (`suite.ExitError`)** when the suite could not run or finish cleanly (invalid flags, unknown/missing/duplicate `--artifact`, `--scenario` combined with `--tag`, harness setup failure, crash before producing a report, or failure removing the temporary pinned-artifact store—even if a passing `eval.Report` was already written to `stdout`).
    - See [`examples/orders-eval/cmd/orders_acceptance-evals/main.go`](../examples/orders-eval/cmd/orders_acceptance-evals/main.go) and [`examples/orders-eval/acceptance/hooks.go`](../examples/orders-eval/acceptance/hooks.go) for the complete reference implementation.
 
 ### `surla approve`
@@ -286,7 +300,8 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 ├── ui/
 │   └── checkpoint/               # React + OpenUI checkpoint viewer source; build.mjs writes checkpoint.html, decision_catalog.md, and generated types
 ├── verify/
-│   └── candidate/                # macOS Seatbelt (`sandbox-exec`) build & runtime isolation jail
+│   ├── candidate/                # macOS Seatbelt (`sandbox-exec`) build & runtime isolation jail
+│   └── suite/                    # Evaluator suite command runner (`suite.Main`, `suite.Command`, `suite.Declaration`)
 ├── examples/
 │   ├── orders/                   # Reference Goa + Goa-AI + Temporal + SQLite order-refund platform
 │   └── orders-eval/              # Isolated evaluator harness, simulators, and 5 acceptance scenarios
