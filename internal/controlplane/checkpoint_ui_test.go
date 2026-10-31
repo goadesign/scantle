@@ -504,9 +504,11 @@ messageListener({
     params: { structuredContent: input.cp1Structured }
   }
 });
+const editorRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-cp1-editor")[0];
+const resultRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-result-view")[0];
 const cp1Text = renderText(viewEl);
-if (root.dataset.state !== "cp1-change-card" || root.dataset.requestRevision !== input.wantCP1Revision) {
-  throw new Error("unexpected CP1 dataset: " + JSON.stringify(root.dataset));
+if (root.dataset.state !== "cp1-change-card" || editorRegion.dataset.requestRevision !== input.wantCP1Revision) {
+  throw new Error("unexpected CP1 dataset: " + JSON.stringify(editorRegion.dataset));
 }
 if (!cp1Text.includes(input.wantCP1Revision) ||
     !cp1Text.includes(input.wantAmbiguityText) ||
@@ -562,8 +564,8 @@ if (root.dataset.state !== "cp1-change-card" || outcomeInputs[0].disabled !== tr
 }
 // Host replies with confirmed ChangeCardResult -> guest transitions to confirmed revision.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: confirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
-if (root.dataset.state !== "cp1-change-card" || root.dataset.requestRevision !== input.wantCP2Revision) {
-  throw new Error("expected confirmed CP1 revision after tools/call reply, got: " + JSON.stringify(root.dataset));
+if (root.dataset.state !== "cp1-change-card" || editorRegion.dataset.requestRevision !== input.wantCP2Revision) {
+  throw new Error("expected confirmed CP1 revision after tools/call reply, got: " + JSON.stringify(editorRegion.dataset));
 }
 // Typing into confirmed card and receiving a late tool-result notification must NOT overwrite post-reply edits.
 const postConfirmInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
@@ -596,14 +598,14 @@ const staleSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c
 const msgCountBeforeStale = hostMessages.length;
 staleSubmitBtns[0].dispatch("click");
 const staleReq = hostMessages[msgCountBeforeStale].msg;
-// Host broadcasts ui/notifications/tool-result {isError:true} BEFORE delivering the matching RPC error response -> must retain CP1 editor and keep controls disabled until RPC response arrives.
-messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
-if (root.dataset.state !== "cp1-change-card" || staleOutcomeInputs[0].disabled !== true) {
-  throw new Error("broadcast error notification replaced CP1 editor or prematurely re-enabled controls");
+// Host broadcasts uncorrelated ui/notifications/tool-result {isError:true} BEFORE delivering the matching RPC error response -> renders error in resultRegion while retaining CP1 editor and keeping controls disabled until matching RPC error response arrives.
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { isError: true, content: [{ type: "text", text: "preview_architecture failed: invalid design" }] } } });
+if (resultRegion.dataset.state !== "error" || staleOutcomeInputs[0].disabled !== true || renderText(editorRegion).includes("Confirm Intent Error:")) {
+  throw new Error("uncorrelated error notification replaced CP1 editor, routed into editor feedback, or prematurely re-enabled controls");
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: staleReq.id, result: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
-const staleViewText = renderText(viewEl);
-if (root.dataset.state !== "cp1-change-card" ||
+const staleViewText = renderText(editorRegion);
+if (editorRegion.dataset.state !== "cp1-change-card" ||
     staleOutcomeInputs[0].disabled !== false ||
     !statusEl.textContent.includes("CP1 Change Card update failed; unsaved edits preserved.") ||
     !staleViewText.includes(input.staleErrorText) ||
@@ -628,8 +630,6 @@ if (getChangeReq.method !== "tools/call" ||
     getChangeReq.params.arguments.change_id !== "chg-ui-test") {
   throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
 }
-const editorRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-cp1-editor")[0];
-const resultRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-result-view")[0];
 // Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must retain active editor while get_change is pending, then render latest card + #scantle-preserved-draft on the matching tools/call reply.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1ConfirmedStructured } } });
 if (editorRegion.dataset.requestRevision !== input.wantCP1Revision) {
@@ -710,9 +710,9 @@ messageListener({
 });
 const cp2Text = renderText(viewEl);
 if (root.dataset.state !== "cp2-architecture-preview" ||
-    root.dataset.requestRevision !== input.wantCP2Revision ||
-    root.dataset.designDigest !== input.wantDesignDigest) {
-  throw new Error("unexpected CP2 dataset: " + JSON.stringify(root.dataset));
+    resultRegion.dataset.requestRevision !== input.wantCP2Revision ||
+    resultRegion.dataset.designDigest !== input.wantDesignDigest) {
+  throw new Error("unexpected CP2 dataset: " + JSON.stringify(resultRegion.dataset));
 }
 if (cp2Text.includes(input.wantAmbiguityText)) {
   throw new Error("CP2 view retained stale CP1 ambiguity text: " + cp2Text);
@@ -791,11 +791,11 @@ messageListener({
 });
 const diffText = renderText(viewEl);
 if (root.dataset.state !== "cp2-diff" ||
-    root.dataset.hasChanges !== "true" ||
-    root.dataset.changeId !== undefined ||
-    root.dataset.requestRevision !== undefined ||
-    root.dataset.designDigest !== undefined) {
-  throw new Error("unexpected cp2-diff dataset: " + JSON.stringify(root.dataset));
+    resultRegion.dataset.hasChanges !== "true" ||
+    resultRegion.dataset.changeId !== undefined ||
+    resultRegion.dataset.requestRevision !== undefined ||
+    resultRegion.dataset.designDigest !== undefined) {
+  throw new Error("unexpected cp2-diff dataset: " + JSON.stringify(resultRegion.dataset));
 }
 if (!diffText.includes("Standalone structural comparison") || !diffText.includes("refund_agent")) {
   throw new Error("cp2-diff view missing unbound label or added declaration: " + diffText);
@@ -811,8 +811,8 @@ messageListener({
   }
 });
 const cp3Text = renderText(viewEl);
-if (root.dataset.state !== "cp3-draft-override" || root.dataset.designDigest !== undefined) {
-  throw new Error("unexpected CP3 dataset: " + JSON.stringify(root.dataset));
+if (root.dataset.state !== "cp3-draft-override" || resultRegion.dataset.designDigest !== undefined) {
+  throw new Error("unexpected CP3 dataset: " + JSON.stringify(resultRegion.dataset));
 }
 if (!cp3Text.includes("applied_in_store=true") || !cp3Text.includes("requires_rebuild=false")) {
   throw new Error("CP3 view missing fast-draft badges: " + cp3Text);

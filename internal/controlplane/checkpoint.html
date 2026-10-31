@@ -146,26 +146,6 @@
       replaceChildren(resultRegionEl, []);
     }
 
-    function syncRootDataset(activeState) {
-      root.dataset.state = activeState;
-      delete root.dataset.changeId;
-      delete root.dataset.requestRevision;
-      delete root.dataset.designDigest;
-      delete root.dataset.targetKind;
-      delete root.dataset.hasChanges;
-      var hasEditor = Boolean(editorRegionEl.firstChild);
-      var hasResult = Boolean(resultRegionEl.firstChild);
-      if (hasEditor && !hasResult) {
-        root.dataset.changeId = editorRegionEl.dataset.changeId;
-        root.dataset.requestRevision = editorRegionEl.dataset.requestRevision;
-      } else if (hasResult && !hasEditor) {
-        if (resultRegionEl.dataset.changeId) { root.dataset.changeId = resultRegionEl.dataset.changeId; }
-        if (resultRegionEl.dataset.requestRevision) { root.dataset.requestRevision = resultRegionEl.dataset.requestRevision; }
-        if (resultRegionEl.dataset.designDigest) { root.dataset.designDigest = resultRegionEl.dataset.designDigest; }
-        if (resultRegionEl.dataset.hasChanges) { root.dataset.hasChanges = resultRegionEl.dataset.hasChanges; }
-      }
-    }
-
     function replaceChildren(container, nodes) {
       while (container.firstChild) {
         container.removeChild(container.firstChild);
@@ -178,7 +158,7 @@
     function renderWaiting(message) {
       clearEditorRegion();
       clearResultRegion();
-      syncRootDataset("waiting");
+      root.dataset.state = "waiting";
       statusEl.textContent = message;
     }
 
@@ -187,6 +167,7 @@
       clearEditorRegion();
       clearResultDatasetKeys();
       resultRegionEl.dataset.state = "cancelled";
+      root.dataset.state = "cancelled";
       statusEl.textContent = "Checkpoint tool call cancelled";
       var detail = typeof reason === "string" && reason.length > 0
         ? "Tool call was cancelled (" + reason + "). Re-run the Scantle checkpoint tool to inspect a fresh result."
@@ -196,20 +177,19 @@
           el("strong", { textContent: "Cancelled: " }), detail
         ])
       ]);
-      syncRootDataset("cancelled");
     }
 
     function renderError(message) {
       if (!shouldRetainEditor()) { clearEditorRegion(); }
       clearResultDatasetKeys();
       resultRegionEl.dataset.state = "error";
+      root.dataset.state = "error";
       statusEl.textContent = "Checkpoint payload error";
       replaceChildren(resultRegionEl, [
         el("div", { className: "scantle-error", role: "alert" }, [
           el("strong", { textContent: "Error: " }), String(message)
         ])
       ]);
-      syncRootDataset("error");
     }
 
     function isValidAmbiguity(a) {
@@ -537,7 +517,7 @@
           if (rpcInFlight) { return; }
           if (resultRegionEl.firstChild && resultRegionEl.dataset.state !== "cp1-incoming-card") {
             clearEditorRegion();
-            syncRootDataset(resultRegionEl.dataset.state);
+            root.dataset.state = resultRegionEl.dataset.state;
             return;
           }
           renderChangeCard(card, null);
@@ -564,7 +544,7 @@
         feedbackEl
       ]));
       replaceChildren(editorRegionEl, viewBlocks);
-      syncRootDataset("cp1-change-card");
+      root.dataset.state = "cp1-change-card";
     }
 
     function renderIncomingChangeCard(incomingCard) {
@@ -590,7 +570,7 @@
           el("div", { className: "scantle-field-row" }, [switchBtn])
         ])
       ]);
-      syncRootDataset("cp1-change-card");
+      root.dataset.state = "cp1-change-card";
     }
 
     function columnForKind(kind) {
@@ -767,7 +747,7 @@
         ]),
         el("div", { className: "scantle-card" }, swarmNodes)
       ]);
-      syncRootDataset("cp2-architecture-preview");
+      root.dataset.state = "cp2-architecture-preview";
     }
 
     function renderDiffList(prefix, items, emptyText) {
@@ -796,7 +776,7 @@
           el("h3", { textContent: "Module Version Deltas (" + diff.version_deltas.length + ")" }), renderDiffList("go.mod", diff.version_deltas, "No go.mod directive changes.")
         ])
       ]);
-      syncRootDataset("cp2-diff");
+      root.dataset.state = "cp2-diff";
     }
 
     function renderDraftOverride(draft) {
@@ -811,7 +791,7 @@
       ];
       if (draft.prompt_version) { rows.push(el("p", {}, ["prompt_version: ", el("code", { textContent: draft.prompt_version })])); }
       replaceChildren(resultRegionEl, [el("div", { className: "scantle-meta" }, rows)]);
-      syncRootDataset("cp3-draft-override");
+      root.dataset.state = "cp3-draft-override";
     }
 
     function extractErrorText(params) {
@@ -832,10 +812,6 @@
         return;
       }
       if (params.isError === true) {
-        if (activeCP1Editor && Object.keys(pendingRequests).length > 0) {
-          activeCP1Editor.onError(extractErrorText(params));
-          return;
-        }
         renderError(extractErrorText(params));
         return;
       }
@@ -884,7 +860,7 @@
             pendingRequests = {};
             clearEditorRegion();
             clearResultRegion();
-            syncRootDataset("terminated");
+            root.dataset.state = "terminated";
             statusEl.textContent = "Checkpoint resource torn down.";
             window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
             return;
