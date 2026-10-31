@@ -1,0 +1,296 @@
+{
+  "agent_id": "orders.refund",
+  "tools": [
+    {
+      "id": "orders.issue_store_credit",
+      "name": "issue_store_credit",
+      "service": "orders",
+      "toolset": "orders.orders",
+      "title": "Issue Store Credit",
+      "description": "Refund an order whose total, including tax and shipping, is $50.00 or less as instant store credit.",
+      "payload": {
+        "name": "IssueStoreCreditPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "order_id": {
+              "description": "Order to refund.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "type": "object"
+        }
+      },
+      "hidden_fields": [
+        "tenant_id",
+        "customer_id"
+      ],
+      "result": {
+        "name": "IssueStoreCreditResult",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "description": "Result of a refund attempt.",
+          "properties": {
+            "amount_cents": {
+              "description": "Refunded amount in cents.",
+              "format": "int64",
+              "type": "integer"
+            },
+            "method": {
+              "description": "How the money was returned.",
+              "enum": [
+                "store_credit",
+                "card"
+              ],
+              "type": "string"
+            },
+            "order_id": {
+              "description": "Refunded order.",
+              "type": "string"
+            },
+            "receipt_id": {
+              "description": "Payment provider receipt.",
+              "type": "string"
+            },
+            "status": {
+              "description": "What happened to the refund.",
+              "enum": [
+                "refunded",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "order_id"
+          ],
+          "type": "object"
+        }
+      },
+      "text_only_payload": {
+        "name": "IssueStoreCreditPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "order_id": {
+              "description": "Order to refund.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "id": "orders.list_orders",
+      "name": "list_orders",
+      "service": "orders",
+      "toolset": "orders.orders",
+      "title": "List Orders",
+      "description": "List the customer's orders, newest first.",
+      "payload": {
+        "name": "ListOrdersPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "type": "object"
+        }
+      },
+      "hidden_fields": [
+        "tenant_id",
+        "customer_id"
+      ],
+      "bounded_result": true,
+      "result": {
+        "name": "ListOrdersResult",
+        "schema": {
+          "$defs": {
+            "Order": {
+              "additionalProperties": false,
+              "description": "A customer order with its charged amounts in cents.",
+              "properties": {
+                "id": {
+                  "description": "Order identifier.",
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "items_cents": {
+                  "description": "Item subtotal in cents.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "placed_at": {
+                  "description": "When the order was placed.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "shipping_cents": {
+                  "description": "Shipping charged in cents.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "tax_cents": {
+                  "description": "Tax charged in cents.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "total_cents": {
+                  "description": "Total charged in cents, including tax and shipping.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "placed_at",
+                "items_cents",
+                "tax_cents",
+                "shipping_cents",
+                "total_cents"
+              ],
+              "title": "Order",
+              "type": "object"
+            }
+          },
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "orders": {
+              "description": "Orders on this page.",
+              "items": {
+                "$ref": "#/$defs/Order"
+              },
+              "type": "array"
+            },
+            "refinement_hint": {
+              "description": "Short guidance on how to narrow the request when the result is truncated.",
+              "type": "string"
+            },
+            "returned": {
+              "description": "Number of items returned in this response after applying tool limits.",
+              "type": "integer"
+            },
+            "total": {
+              "description": "Total number of matching items before truncation.",
+              "type": "integer"
+            },
+            "truncated": {
+              "description": "True when this result is partial because tool limits or caps were applied.",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "orders",
+            "returned",
+            "total",
+            "truncated"
+          ],
+          "type": "object"
+        }
+      },
+      "text_only_payload": {
+        "name": "ListOrdersPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "type": "object"
+        }
+      }
+    },
+    {
+      "id": "orders.request_refund",
+      "name": "request_refund",
+      "service": "orders",
+      "toolset": "orders.orders",
+      "title": "Request Refund",
+      "description": "Refund an order whose total, including tax and shipping, is over $50.00. A manager must approve it first.",
+      "confirmation": {
+        "title": "Approve refund",
+        "prompt_template": "Refund order {{ .order_id }} to the customer's card?",
+        "denied_result_template": "{\"status\":\"denied\",\"order_id\":{{ json .order_id }}}"
+      },
+      "payload": {
+        "name": "RequestRefundPayload",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "properties": {
+            "order_id": {
+              "description": "Order to refund.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "order_id"
+          ],
+          "type": "object"
+        }
+      },
+      "hidden_fields": [
+        "tenant_id",
+        "customer_id"
+      ],
+      "result": {
+        "name": "RequestRefundResult",
+        "schema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "additionalProperties": false,
+          "description": "Result of a refund attempt.",
+          "properties": {
+            "amount_cents": {
+              "description": "Refunded amount in cents.",
+              "format": "int64",
+              "type": "integer"
+            },
+            "method": {
+              "description": "How the money was returned.",
+              "enum": [
+                "store_credit",
+                "card"
+              ],
+              "type": "string"
+            },
+            "order_id": {
+              "description": "Refunded order.",
+              "type": "string"
+            },
+            "receipt_id": {
+              "description": "Payment provider receipt.",
+              "type": "string"
+            },
+            "status": {
+              "description": "What happened to the refund.",
+              "enum": [
+                "refunded",
+                "denied"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "order_id"
+          ],
+          "type": "object"
+        }
+      }
+    }
+  ]
+}
