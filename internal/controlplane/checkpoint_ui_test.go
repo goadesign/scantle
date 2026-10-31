@@ -84,15 +84,14 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 		t.Fatalf("MimeType = %q, want %q", got, "text/html;profile=mcp-app")
 	}
 	htmlDoc := *completeRes.Contents[0].Text
-	if strings.Contains(htmlDoc, "innerHTML") {
-		t.Fatal("checkpointUIHTML must not use innerHTML")
-	}
 	for _, want := range []string{
 		`http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';"`,
 		`data-profile="mcp-app"`,
 		`"ui/initialize"`,
 		`"ui/notifications/initialized"`,
 		`"ui/notifications/tool-input"`,
+		`"ui/notifications/tool-input-partial"`,
+		`"ui/notifications/host-context-changed"`,
 		`"ui/notifications/tool-cancelled"`,
 		`"ui/notifications/tool-result"`,
 		`"ui/resource-teardown"`,
@@ -330,9 +329,11 @@ var _ = Service("orders", func() {
 	if err != nil {
 		return
 	}
+	ensureCheckpointUIDeps(t)
 
 	scriptBody := extractCheckpointScript(t, htmlDoc)
 	harnessInput, err := json.Marshal(map[string]any{
+		"htmlDoc":                htmlDoc,
 		"script":                 scriptBody,
 		"cp1Structured":          json.RawMessage(proposeOut.StructuredContent),
 		"cp1ConfirmedStructured": json.RawMessage(confirmOut.StructuredContent),
@@ -352,71 +353,19 @@ var _ = Service("orders", func() {
 
 	nodeHarness := `
 const fs = require("fs");
-const vm = require("vm");
+const { JSDOM } = require("../../ui/checkpoint/node_modules/jsdom");
 const input = JSON.parse(fs.readFileSync(0, "utf8"));
 
-function makeElement(tag, ns) {
-  return {
-    tagName: String(tag).toUpperCase(),
-    namespaceURI: ns || "",
-    get className() {
-      return ns ? { baseVal: this.attributes["class"] || "" } : (this.attributes["class"] || "");
-    },
-    textContent: "",
-    _val: "",
-    get value() { return this._val; },
-    set value(v) { this._val = this.tagName === "INPUT" ? String(v).replace(/[\r\n]/g, "") : String(v); },
-    dataset: {},
-    attributes: {},
-    listeners: {},
-    children: [],
-    get firstChild() {
-      return this.children.length > 0 ? this.children[0] : null;
-    },
-    setAttribute(k, v) {
-      this.attributes[k] = String(v);
-    },
-    addEventListener(type, fn) {
-      if (!this.listeners[type]) this.listeners[type] = [];
-      this.listeners[type].push(fn);
-    },
-    dispatch(type, evt) {
-      const list = this.listeners[type] || [];
-      list.forEach((fn) => fn(evt || { target: this }));
-    },
-    appendChild(child) {
-      this.children.push(child);
-      return child;
-    },
-    removeChild(child) {
-      const idx = this.children.indexOf(child);
-      if (idx >= 0) this.children.splice(idx, 1);
-      return child;
-    }
-  };
-}
-
-function findAll(node, pred, acc) {
-  const out = acc || [];
-  if (!node || node.nodeType === 3) return out;
-  if (pred(node)) out.push(node);
-  (node.children || []).forEach((c) => findAll(c, pred, out));
-  return out;
-}
-
-function renderText(node) {
-  if (!node) return "";
-  if (node.nodeType === 3) return node.textContent;
-  const own = node.textContent || "";
-  const childText = (node.children || []).map(renderText).join(" ");
-  return [own, childText].filter(Boolean).join(" ");
-}
-
-const root = makeElement("main");
-root.dataset.profile = "mcp-app";
-root.dataset.state = "waiting";
-const statusEl = makeElement("p");
-const viewEl = makeElement("section");
+const dom = new JSDOM(input.htmlDoc, {
+  url: "https://sandbox.mcp.local/",
+  runScripts: "outside-only",
+  pretendToBeVisual: true
+});
+const guestWindow = dom.window;
+const documentObj = guestWindow.document;
+const root = documentObj.getElementById("scantle-checkpoint-root");
+const statusEl = documentObj.getElementById("scantle-checkpoint-status");
+const viewEl = documentObj.getElementById("scantle-checkpoint-view");
 
 const hostMessages = [];
 let messageListener = null;
@@ -425,34 +374,74 @@ const parentWindow = {
     hostMessages.push({ msg, targetOrigin });
   }
 };
-const guestWindow = {
-  parent: parentWindow,
-  addEventListener(type, fn) {
-    if (type === "message") messageListener = fn;
-  }
-};
-const documentObj = {
-  getElementById(id) {
-    if (id === "scantle-checkpoint-root") return root;
-    if (id === "scantle-checkpoint-status") return statusEl;
-    if (id === "scantle-checkpoint-view") return viewEl;
-    return null;
-  },
-  createElement(tag) {
-    return makeElement(tag, "");
-  },
-  createElementNS(ns, tag) {
-    return makeElement(tag, ns);
-  },
-  createTextNode(text) {
-    return { nodeType: 3, textContent: String(text) };
-  }
+Object.defineProperty(guestWindow, "parent", { value: parentWindow, configurable: true });
+const origAddEventListener = guestWindow.addEventListener.bind(guestWindow);
+guestWindow.addEventListener = function(type, fn, opts) {
+  if (type === "message") messageListener = fn;
+  return origAddEventListener(type, fn, opts);
 };
 
-vm.runInNewContext(input.script, {
-  window: guestWindow,
-  document: documentObj
-});
+guestWindow.Element.prototype.dispatch = function(type) {
+  if (type === "click") {
+    this.click();
+    return;
+  }
+  this.dispatchEvent(new guestWindow.Event(type, { bubbles: true, cancelable: true }));
+};
+
+function wrapNode(node) {
+  if (!node) return node;
+  const raw = node.__rawNode || node;
+  if (raw.nodeType !== 1) return raw;
+  return new Proxy(raw, {
+    get(target, prop) {
+      if (prop === "__rawNode") return target;
+      if (prop === "attributes") {
+        const m = {};
+        for (let i = 0; i < target.attributes.length; i++) {
+          const a = target.attributes[i];
+          m[a.name] = a.value;
+        }
+        return m;
+      }
+      if (prop === "tagName") {
+        return String(target.tagName || "").toUpperCase();
+      }
+      if (prop === "className" && target.namespaceURI === "http://www.w3.org/2000/svg") {
+        return { baseVal: target.getAttribute("class") || "" };
+      }
+      if (prop === "children") {
+        return Array.from(target.children || []).map(wrapNode);
+      }
+      const val = target[prop];
+      return typeof val === "function" ? val.bind(target) : val;
+    },
+    set(target, prop, value) {
+      target[prop] = value;
+      return true;
+    }
+  });
+}
+
+function findAll(node, pred, acc) {
+  const out = acc || [];
+  const raw = node && (node.__rawNode || node);
+  if (!raw || raw.nodeType !== 1) return out;
+  const wrapped = wrapNode(raw);
+  if (pred(wrapped)) out.push(wrapped);
+  const children = raw.children || [];
+  for (let i = 0; i < children.length; i++) {
+    findAll(children[i], pred, out);
+  }
+  return out;
+}
+
+function renderText(node) {
+  if (!node) return "";
+  return node.textContent || "";
+}
+
+guestWindow.eval(input.script);
 
 if (typeof messageListener !== "function") {
   throw new Error("guest did not register window message listener");

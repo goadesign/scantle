@@ -18,11 +18,11 @@ const (
 
 	// cp1InstructionHeader precedes the embedded Golden Path Markdown in the
 	// CP1 architect system prompt.
+	cp1InstructionHeader = "Analyze the operator feature request against the Goa design source. Return structured JSON matching the cp1_change_card_analysis schema.\n\nApply the following Golden Path architectural playbook when identifying ambiguities, examples, and preserved behaviors:\n\n"
+
 	// cp1CompositionHeader introduces the decision component catalog in the
 	// CP1 architect system prompt.
 	cp1CompositionHeader = "\n\nOptionally, set ui_composition to an OpenUI Lang program built only from the components below that helps the operator decide the open questions. Refer to an ambiguity or example only by its 1-based position in the ambiguities or examples list you return (1 is the first one you list); never invent identifiers. Omit ui_composition when a plain card is clearer.\n\n"
-
-	cp1InstructionHeader = "Analyze the operator feature request against the Goa design source. Return structured JSON matching the cp1_change_card_analysis schema.\n\nApply the following Golden Path architectural playbook when identifying ambiguities, examples, and preserved behaviors:\n\n"
 )
 
 // playbookMarkdown holds the embedded contents of GOLDEN_PATH.md.
