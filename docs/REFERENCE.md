@@ -206,7 +206,7 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   └── scantle/
 │       └── main.go               # CLI entrypoint (`scantle serve`, `scantle diff`, and `scantle verify`)
 ├── docs/
-│   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & sandbox verification
+│   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & independent verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview
 │   └── REFERENCE.md              # MCP tools/resources, CLI flags & repo layout
 ├── internal/

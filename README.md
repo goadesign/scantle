@@ -50,7 +50,7 @@ Most AI-built codebases rot after a few weeks because every prompt invents a new
 - **Production patterns by default:** One HTTP/MCP edge gateway, internal gRPC services, a central LLM gateway with rate limiting and cost tracking, durable Temporal workflows, and server-injected `tenant_id`/`user_id` fields that the LLM can never spoof.
 
 ### 3. Mixed-model teams where the builder never grades its own homework
-When configured with provider profiles (`-swarm-profiles`) and explicit builder path scopes, Scantle proposes a team that routes each role to the right model family and class—frontier reasoning models for architecture and security review, fast coding models for scoped implementation, and a **disjoint model family** for test authoring. Final verification (`scantle verify`, built on `internal/verify`) runs inside an **OS sandbox** (`verify/candidate`) the builder cannot touch:
+When configured with provider profiles (`-swarm-profiles`) and explicit builder path scopes, Scantle proposes a team that routes each role to the right model family and class—frontier reasoning models for architecture and security review, fast coding models for scoped implementation, and a **disjoint model family** for test authoring. Final verification (`scantle verify`, built on `internal/verify`) is independent of the builder: it builds the candidate from its exact commit inside an **OS sandbox** (`verify/candidate`) and runs an evaluator suite the builder does not control, and the reference suite starts each candidate process in its own sandbox:
 - **Unseen holdout tests:** Hidden scenarios verify security and edge cases while [`Report.ForBuilders()`](internal/verify/report.go) strips holdout names, inputs, and logs from the builder's view. For those scenarios to stay unseen, builders must not be able to read the evaluator suite or its report and work directories; share only the redacted builder report with them.
 - **Real `kill -9` crash & budget proof:** The included [`examples/orders-eval`](examples/orders-eval/) reference suite (`scantle verify` or `go test -race -tags e2e`) kills the Temporal worker mid-transaction (`kill -9`), restarts the API during paused approvals, and fails any scenario whose runtime LLM token use exceeds its budget (`TestSeededPayloadBloatFailsTheBudget` proves it with a seeded payload bloat).
 
@@ -86,7 +86,7 @@ Point **Claude Code, Codex, Gemini, or Cursor** at `http://127.0.0.1:8090/mcp` (
 
 Your agent will create the Change Card (`propose_change`, calling `confirm_intent` to answer open ambiguity questions or refine confirmed answers and examples), compile the candidate Goa contract at **0 LLM tokens** (`preview_architecture`), and return the updated C4 topology, tool guardrails, and a proposed cross-family team roster (`@architect`, `@builder-orders`, `@eval-author`, `@reviewer`). The preview proposes the team; it does not launch agents.
 
-To run the full OS-sandboxed verification suite (and compare the full operator report with the builder-redacted `-builder-view` report where `"holdout"` scenarios are redacted to `"id": "holdout-1"`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
+To run the full independent verification suite (and compare the full operator report with the builder-redacted `-builder-view` report where `"holdout"` scenarios are redacted to `"id": "holdout-1"`), see the **[Orders Reference Platform Walkthrough (`examples/orders/README.md`)](examples/orders/README.md)**.
 
 ---
 
