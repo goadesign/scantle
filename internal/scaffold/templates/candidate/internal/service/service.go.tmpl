@@ -1,0 +1,89 @@
+// Package service implements the [[.Name]] service: ask answers a question
+// with the helper agent, and price looks items up in a fixed catalog.
+package service
+
+import (
+	"context"
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"time"
+
+	"goa.design/goa-ai/runtime/agent/model"
+	"goa.design/goa-ai/runtime/agent/runtime"
+	storageinmem "goa.design/goa-ai/runtime/agent/storage/inmem"
+
+	gen[[.Name]] "[[.Module]]/gen/[[.Name]]"
+	genhelper "[[.Module]]/gen/[[.Name]]/agents/helper"
+	genhelpercatalog "[[.Module]]/gen/[[.Name]]/agents/helper/catalog"
+	"[[.Module]]/internal/helper"
+)
+
+// Service implements gen[[.Name]].Service.
+type Service struct {
+	// model is the model client every agent step uses; it outlives
+	// questions.
+	model model.Client
+}
+
+// modelID is the runtime's name for the model client.
+const modelID = "default"
+
+// catalog is the price of every known item, in cents.
+var catalog = map[string]int{
+	"tea":    350,
+	"cookie": 125,
+}
+
+// New returns the [[.Name]] service. mc is the model client the helper agent
+// plans with.
+func New(mc model.Client) *Service {
+	return &Service{model: mc}
+}
+
+// Ask answers the question with the helper agent and returns its final
+// answer. Each question gets its own in-memory runtime, store and session,
+// all released once the answer is returned: nothing asks for an earlier
+// run, so nothing is kept.
+func (s *Service) Ask(ctx context.Context, p *gen[[.Name]].AskPayload) (*gen[[.Name]].AskResult, error) {
+	store := storageinmem.New()
+	rt := runtime.New(store)
+	if err := rt.RegisterModel(modelID, s.model); err != nil {
+		return nil, fmt.Errorf("register model: %w", err)
+	}
+	if err := genhelper.RegisterHelperAgent(ctx, rt, genhelper.HelperAgentConfig{Planner: helper.NewPlanner(modelID)}); err != nil {
+		return nil, fmt.Errorf("register helper agent: %w", err)
+	}
+	endpoints := gen[[.Name]].NewEndpoints(s)
+	tools := gen[[.Name]].NewClient(endpoints.Ask, endpoints.Price)
+	if err := genhelper.RegisterUsedToolsets(ctx, rt,
+		genhelper.WithCatalogExecutor(genhelpercatalog.NewHelperCatalogExec(genhelpercatalog.WithClient(tools))),
+	); err != nil {
+		return nil, fmt.Errorf("register catalog tools: %w", err)
+	}
+	if err := rt.Seal(ctx); err != nil {
+		return nil, fmt.Errorf("seal runtime: %w", err)
+	}
+	sessionID := "session-" + rand.Text()
+	if _, err := store.CreateSession(ctx, sessionID, time.Now().UTC()); err != nil {
+		return nil, fmt.Errorf("create session: %w", err)
+	}
+	out, err := genhelper.NewClient(rt).Run(ctx, sessionID, []*model.Message{{
+		Role:  model.ConversationRoleUser,
+		Parts: []model.Part{model.TextPart{Text: p.Question}},
+	}}, runtime.WithRunID("run-"+rand.Text()))
+	if err != nil {
+		return nil, fmt.Errorf("run helper agent: %w", err)
+	}
+	if out.Final == nil {
+		return nil, errors.New("helper agent finished without an answer")
+	}
+	return &gen[[.Name]].AskResult{Answer: out.Final.Text(), RunID: out.RunID}, nil
+}
+
+// Price returns the catalog price of the item. An item the catalog does not
+// price is reported with Known false, not as an error.
+func (s *Service) Price(_ context.Context, p *gen[[.Name]].PricePayload) (*gen[[.Name]].Price, error) {
+	cents, known := catalog[p.Item]
+	return &gen[[.Name]].Price{Item: p.Item, Known: known, Cents: cents}, nil
+}

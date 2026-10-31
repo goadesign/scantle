@@ -1,0 +1,74 @@
+// Package helper holds the planner of the helper agent: the code that asks the
+// model for the agent's next step.
+package helper
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"goa.design/goa-ai/runtime/agent/model"
+	"goa.design/goa-ai/runtime/agent/planner"
+)
+
+// Planner asks the model registered under modelID for the helper agent's next
+// step: tool calls to run, or the final answer. It has no side effects; tools
+// run through the runtime.
+type Planner struct {
+	// modelID selects the model client registered with the runtime.
+	modelID string
+}
+
+// systemPrompt tells the model how to answer. Prices come only from the
+// lookup_price tool, never from the model.
+const systemPrompt = `You answer questions about item prices.
+Call lookup_price with the item the customer asks about, then answer with the price it returns, formatted in dollars.
+If the tool reports known=false, say that you could not find a price for it.`
+
+// NewPlanner returns a planner that uses the runtime model client registered
+// under modelID.
+func NewPlanner(modelID string) *Planner {
+	return &Planner{modelID: modelID}
+}
+
+// PlanStart decides the first step of a run.
+func (p *Planner) PlanStart(ctx context.Context, in *planner.PlanInput) (*planner.PlanResult, error) {
+	return p.plan(ctx, in.Agent, in.Messages, false)
+}
+
+// PlanResume decides the next step after tool results. When the runtime is
+// finalizing the run, it asks for a final answer without tools.
+func (p *Planner) PlanResume(ctx context.Context, in *planner.PlanResumeInput) (*planner.PlanResult, error) {
+	return p.plan(ctx, in.Agent, in.Messages, in.Finalize != nil)
+}
+
+// plan sends the system prompt, the conversation and the advertised tools to
+// the model and returns the tool calls it requested or its final answer.
+func (p *Planner) plan(ctx context.Context, agent planner.PlannerContext, messages []*model.Message, finalize bool) (*planner.PlanResult, error) {
+	client, ok := agent.PlannerModelClient(p.modelID)
+	if !ok {
+		return nil, fmt.Errorf("model %q is not configured", p.modelID)
+	}
+	req := &model.Request{
+		ModelClass: model.ModelClassDefault,
+		Messages: append([]*model.Message{{
+			Role:  model.ConversationRoleSystem,
+			Parts: []model.Part{model.TextPart{Text: systemPrompt}},
+		}}, messages...),
+		Stream: true,
+	}
+	if !finalize {
+		req.Tools = agent.AdvertisedToolDefinitions()
+	}
+	sum, err := client.Stream(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("model step: %w", err)
+	}
+	if len(sum.ToolCalls) > 0 {
+		if finalize {
+			return nil, errors.New("model requested tools while the run is finalizing")
+		}
+		return &planner.PlanResult{ToolCalls: sum.ToolCalls}, nil
+	}
+	return &planner.PlanResult{FinalResponse: sum.FinalResponse()}, nil
+}

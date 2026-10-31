@@ -1,0 +1,29 @@
+// Command [[.Name]]-evals is the starter evaluator suite for the [[.Name]]. surla verify
+// builds and runs it following Surla's suite command contract
+// (github.com/goadesign/surla/verify/suite): --describe prints the declared
+// scenarios, and --artifact [[.Name]]=<path> runs them against that binary.
+package main
+
+import (
+	"goa.design/goa-ai/eval"
+
+	"github.com/goadesign/surla/verify/candidate"
+	"github.com/goadesign/surla/verify/suite"
+
+	"[[.Module]]/eval/acceptance"
+	genevals "[[.Module]]/eval/gen/evals/[[.Name]]_acceptance"
+)
+
+func main() {
+	suite.Main(suite.Command{
+		Environment:    "scripted-model",
+		Binaries:       []string{acceptance.Name},
+		MaxConcurrency: 2,
+		Declare: func() (eval.Suite, error) {
+			return genevals.New(&acceptance.Hooks{}, genevals.Inputs{})
+		},
+		Suite: func(pinned map[string]candidate.Artifact) (eval.Suite, error) {
+			return genevals.New(acceptance.New(pinned[acceptance.Name]), genevals.Inputs{})
+		},
+	})
+}

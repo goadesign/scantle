@@ -1,0 +1,50 @@
+// Package design is the evaluator's own copy of the [[.Name]]'s public contract and
+// the starter acceptance suite. The evaluator generates its HTTP client from
+// this copy and never imports code from the [[.Name]] module it tests.
+package design
+
+import (
+	. "goa.design/goa-ai/dsl"
+	. "goa.design/goa-ai/eval/dsl"
+	. "goa.design/goa/v3/dsl"
+)
+
+var _ = API("[[.Name]]", func() {
+	Title("[[.Name]] (public contract as the evaluator sees it)")
+})
+
+var _ = Service("[[.Name]]", func() {
+	Method("ask", func() {
+		Payload(func() {
+			Attribute("question", String, "Question to answer.")
+			Required("question")
+		})
+		Result(func() {
+			Attribute("answer", String, "The agent's final answer.")
+			Attribute("run_id", String, "Identifier of the agent run.")
+			Required("answer", "run_id")
+		})
+		HTTP(func() {
+			POST("/ask")
+		})
+	})
+})
+
+// This starter suite lives in the same repository as the [[.Name]], so anyone who
+// can read the [[.Name]]'s code can read these scenarios too. The "holdout" tag
+// only hides a scenario's details in the report view surla verify gives to
+// builders (verify.Report.ForBuilders); it is not a secret test. Keep real
+// holdout scenarios in an evaluator repository builders cannot read.
+var _ = Suite("[[.Name]]_acceptance", func() {
+	Description("Proves through the public API that the helper agent prices items with its lookup_price tool.")
+	Timeout("1m")
+
+	Scenario("prices_tea", func() {
+		Description("Asking \"How much is tea?\" makes the agent call lookup_price for tea and answer with the returned 350 cents as $3.50.")
+		Tags("repair")
+	})
+	Scenario("unknown_item", func() {
+		Description("Asking about coffee, which the catalog does not price, makes the agent call lookup_price and report that it found no price.")
+		Tags("holdout")
+	})
+})

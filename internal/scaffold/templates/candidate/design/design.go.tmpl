@@ -1,0 +1,79 @@
+// Package design declares the [[.Name]] service: a public API, a pricing method,
+// and a helper agent that answers price questions by calling the pricing
+// method as a tool. goa gen generates the HTTP server, the agent's typed
+// client and tool bindings, and the C4 model from this package.
+package design
+
+import (
+	. "goa.design/goa-ai/dsl"
+	. "goa.design/goa/v3/dsl"
+)
+
+var _ = API("[[.Name]]", func() {
+	Title("[[.Name]]")
+	Description("Answers price questions with an agent that looks prices up through a tool.")
+})
+
+// catalog is the toolset the helper agent may call.
+var catalog = Toolset("catalog", func() {
+	Description("Look up the price of an item.")
+
+	Tool("lookup_price", "Look up one item's price in cents; known is false when the catalog has no price for it.", func() {
+		Args(func() {
+			Attribute("item", String, "Item to price, such as tea.", func() { MinLength(1) })
+			Required("item")
+		})
+		Return(Price)
+		BindTo("[[.Name]]", "price")
+	})
+})
+
+var _ = Service("[[.Name]]", func() {
+	Description("Answers price questions.")
+
+	Method("ask", func() {
+		Description("Ask the helper agent a question; it may look prices up before answering.")
+		Payload(func() {
+			Attribute("question", String, "Question to answer, such as \"How much is tea?\".", func() { MinLength(1) })
+			Required("question")
+		})
+		Result(func() {
+			Attribute("answer", String, "The agent's final answer.")
+			Attribute("run_id", String, "Identifier of the agent run that produced the answer.")
+			Required("answer", "run_id")
+		})
+		HTTP(func() {
+			POST("/ask")
+		})
+	})
+
+	Method("price", func() {
+		Description("Look up the price of one item. An item the catalog does not price is an expected answer (known is false), not an error. The helper agent calls this method through the lookup_price tool.")
+		Payload(func() {
+			Attribute("item", String, "Item to price.", func() { MinLength(1) })
+			Required("item")
+		})
+		Result(Price)
+		HTTP(func() {
+			GET("/prices/{item}")
+		})
+	})
+
+	Export(catalog)
+
+	Agent("helper", "Answers price questions using the catalog.", func() {
+		Use(catalog)
+		RunPolicy(func() {
+			DefaultCaps(MaxToolCalls(4), MaxRecoveryTurns(1))
+			TimeBudget("1m")
+		})
+	})
+})
+
+// Price is the catalog's answer for one item.
+var Price = Type("Price", func() {
+	Attribute("item", String, "Item that was looked up.")
+	Attribute("known", Boolean, "Whether the catalog has a price for the item.")
+	Attribute("cents", Int, "Price in cents; 0 when known is false.")
+	Required("item", "known", "cents")
+})

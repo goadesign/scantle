@@ -1,0 +1,28 @@
+package design
+
+import (
+	m "goa.design/model/dsl"
+)
+
+// The C4 model of the [[.Name]]: who uses it, the process it runs, and the model
+// it calls. goa gen renders it, and surla preview shows it as containers and
+// connections.
+var _ = m.Design("[[.Name]]", "Answers price questions with an agent.", func() {
+	m.Person("Customer", "Asks how much an item costs.", func() {
+		m.Uses("[[.Name]]/[[.Name]] API", "Asks price questions", "HTTPS, JSON", m.Synchronous)
+	})
+	m.SoftwareSystem("[[.Name]]", "Price-answering service.", func() {
+		m.Container("[[.Name]] API", "Public HTTP API and helper agent. Runs agent turns in memory and prices items.", "Go, Goa, Goa-AI", func() {
+			m.Uses("Model gateway", "Plans the next tool call or the final answer", "gRPC", m.Synchronous)
+		})
+	})
+	m.SoftwareSystem("Model gateway", "Goa-AI model gateway that holds the provider choice and its keys.", func() {
+		m.External()
+	})
+	m.Views(func() {
+		m.ContainerView("[[.Name]]", "Containers", "The [[.Name]]'s process and what it calls.", func() {
+			m.AddAll()
+			m.AutoLayout(m.RankLeftRight)
+		})
+	})
+})
