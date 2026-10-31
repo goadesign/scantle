@@ -22,12 +22,14 @@ type Client struct {
 	GetChangeEndpoint           goa.Endpoint
 	PreviewArchitectureEndpoint goa.Endpoint
 	DraftOverrideEndpoint       goa.Endpoint
+	VerifyChangeEndpoint        goa.Endpoint
+	GetVerificationEndpoint     goa.Endpoint
 	ApproveMergeEndpoint        goa.Endpoint
 	DiffEndpoint                goa.Endpoint
 }
 
 // NewClient initializes a "surla" service client given the endpoints.
-func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange, previewArchitecture, draftOverride, approveMerge, diff goa.Endpoint) *Client {
+func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange, previewArchitecture, draftOverride, verifyChange, getVerification, approveMerge, diff goa.Endpoint) *Client {
 	return &Client{
 		CheckpointUIEndpoint:        checkpointUI,
 		GoldenPathEndpoint:          goldenPath,
@@ -36,6 +38,8 @@ func NewClient(checkpointUI, goldenPath, proposeChange, confirmIntent, getChange
 		GetChangeEndpoint:           getChange,
 		PreviewArchitectureEndpoint: previewArchitecture,
 		DraftOverrideEndpoint:       draftOverride,
+		VerifyChangeEndpoint:        verifyChange,
+		GetVerificationEndpoint:     getVerification,
 		ApproveMergeEndpoint:        approveMerge,
 		DiffEndpoint:                diff,
 	}
@@ -110,6 +114,26 @@ func (c *Client) DraftOverride(ctx context.Context, p *DraftOverridePayload) (re
 		return
 	}
 	return ires.(*DraftOverrideResult), nil
+}
+
+// VerifyChange calls the "verify_change" endpoint of the "surla" service.
+func (c *Client) VerifyChange(ctx context.Context, p *VerifyChangePayload) (res *VerificationStatusResult, err error) {
+	var ires any
+	ires, err = c.VerifyChangeEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*VerificationStatusResult), nil
+}
+
+// GetVerification calls the "get_verification" endpoint of the "surla" service.
+func (c *Client) GetVerification(ctx context.Context, p *GetVerificationPayload) (res *VerificationStatusResult, err error) {
+	var ires any
+	ires, err = c.GetVerificationEndpoint(ctx, p)
+	if err != nil {
+		return
+	}
+	return ires.(*VerificationStatusResult), nil
 }
 
 // ApproveMerge calls the "approve_merge" endpoint of the "surla" service.

@@ -1032,6 +1032,336 @@ func ValidateGetChangeResultUICompositionItemTransport(value *GetChangeResultUIC
 	return err
 }
 
+// GetVerificationPayloadTransport stores JSON fields until they have been validated.
+type GetVerificationPayloadTransport struct {
+	// Verification run identifier returned by verify_change.
+	RunID *string `json:"run_id"`
+}
+
+// ValidateGetVerificationPayloadTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationPayloadTransport(value *GetVerificationPayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.RunID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("run_id", "body"))
+	}
+	return err
+}
+
+// GetVerificationResultBuilderVerificationReportTransport stores JSON fields until they have been validated.
+type GetVerificationResultBuilderVerificationReportTransport struct {
+	// SHA-256 digest of the full report the evaluator saved; approve_merge and
+	// surla approve take this digest.
+	ReportDigest *string `json:"report_digest"`
+	// Every declared scenario, counted by outcome.
+	Counts *GetVerificationResultVerificationCountsTransport `json:"counts"`
+	// The verdict: true only when every declared scenario passed and the suite ran
+	// cleanly.
+	Passed *bool `json:"passed"`
+	// Whether the evaluator suite itself failed or ended abnormally.
+	SuiteFailed *bool `json:"suite_failed"`
+	// Every declared scenario in declaration order.
+	Scenarios []*GetVerificationResultVerificationScenarioTransport `json:"scenarios"`
+}
+
+// ValidateGetVerificationResultBuilderVerificationReportTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultBuilderVerificationReportTransport(value *GetVerificationResultBuilderVerificationReportTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.Counts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("counts", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	if value.SuiteFailed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_failed", "body"))
+	}
+	if value.Scenarios == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenarios", "body"))
+	}
+	if value.Counts != nil {
+		if err2 := ValidateGetVerificationResultVerificationCountsTransport(value.Counts); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	for _, e := range value.Scenarios {
+		if e != nil {
+			if err2 := ValidateGetVerificationResultVerificationScenarioTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// GetVerificationResultTransport stores JSON fields until they have been validated.
+type GetVerificationResultTransport struct {
+	// Verification run identifier; get_verification takes it.
+	RunID *string `json:"run_id"`
+	// Change Card the run verifies.
+	ChangeID *string `json:"change_id"`
+	// Change Card revision the run verifies.
+	RequestRevision *string `json:"request_revision"`
+	// Candidate commit the run builds and verifies.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite commit the operator configured for the run.
+	SuiteCommit *string `json:"suite_commit"`
+	// Exactly one of running, completed or not_completed.
+	State *GetVerificationResultstateTransport `json:"state"`
+}
+
+// ValidateGetVerificationResultTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultTransport(value *GetVerificationResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.RunID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("run_id", "body"))
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.State == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("state", "body"))
+	}
+	if value.State != nil {
+
+		if err2 := value.State.Validate(); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		} else {
+			switch string(value.State.Kind()) {
+			case "running":
+				actual, _ := value.State.AsRunning()
+				if actual != nil {
+					if err2 := ValidateGetVerificationResultVerificationRunningTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			case "completed":
+				actual, _ := value.State.AsCompleted()
+				if actual != nil {
+					if err2 := ValidateGetVerificationResultVerificationCompletedTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			case "not_completed":
+				actual, _ := value.State.AsNotCompleted()
+				if actual != nil {
+					if err2 := ValidateGetVerificationResultVerificationNotCompletedTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			}
+		}
+
+	}
+	return err
+}
+
+// GetVerificationResultVerificationCheckTransport stores JSON fields until they have been validated.
+type GetVerificationResultVerificationCheckTransport struct {
+	// Check name.
+	Name *string `json:"name"`
+	// Whether the check passed.
+	Passed *bool `json:"passed"`
+	// Why the check failed; empty when it passed.
+	Diagnostic *string `json:"diagnostic,omitempty"`
+}
+
+// ValidateGetVerificationResultVerificationCheckTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultVerificationCheckTransport(value *GetVerificationResultVerificationCheckTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	return err
+}
+
+// GetVerificationResultVerificationCompletedTransport stores JSON fields until they have been validated.
+type GetVerificationResultVerificationCompletedTransport struct {
+	// Evaluator suite the report was produced by.
+	SuiteID *string `json:"suite_id"`
+	// Dependency profile the suite ran the candidate with, such as sim.
+	Environment *string `json:"environment"`
+	// The builder view of the report.
+	Report *GetVerificationResultBuilderVerificationReportTransport `json:"report"`
+}
+
+// ValidateGetVerificationResultVerificationCompletedTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultVerificationCompletedTransport(value *GetVerificationResultVerificationCompletedTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Report == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report", "body"))
+	}
+	if value.Report != nil {
+		if err2 := ValidateGetVerificationResultBuilderVerificationReportTransport(value.Report); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// GetVerificationResultVerificationCountsTransport stores JSON fields until they have been validated.
+type GetVerificationResultVerificationCountsTransport struct {
+	// Scenarios the suite declares.
+	Required *int `json:"required"`
+	// Scenarios that passed.
+	Passed *int `json:"passed"`
+	// Scenarios whose checks failed.
+	Failed *int `json:"failed"`
+	// Declared scenarios the suite did not report.
+	NotRun *int `json:"not_run"`
+	// Scenarios that could not be evaluated.
+	HarnessError *int `json:"harness_error"`
+}
+
+// ValidateGetVerificationResultVerificationCountsTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultVerificationCountsTransport(value *GetVerificationResultVerificationCountsTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Required == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("required", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	if value.Failed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("failed", "body"))
+	}
+	if value.NotRun == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("not_run", "body"))
+	}
+	if value.HarnessError == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("harness_error", "body"))
+	}
+	return err
+}
+
+// GetVerificationResultVerificationNotCompletedTransport stores JSON fields until they have been validated.
+type GetVerificationResultVerificationNotCompletedTransport struct {
+	// execution_failed when a step failed; interrupted when the run's process
+	// ended before it finished.
+	Kind *string `json:"kind"`
+	// Where the run stopped.
+	Stage *string `json:"stage"`
+	// Builder-safe description of what stopped the run; never command output.
+	Summary *string `json:"summary"`
+}
+
+// ValidateGetVerificationResultVerificationNotCompletedTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultVerificationNotCompletedTransport(value *GetVerificationResultVerificationNotCompletedTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if value.Stage == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("stage", "body"))
+	}
+	if value.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if value.Kind != nil {
+		if !(*value.Kind == "execution_failed" || *value.Kind == "interrupted") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"execution_failed", "interrupted"}))
+		}
+	}
+	if value.Stage != nil {
+		if !(*value.Stage == "checkout" || *value.Stage == "build" || *value.Stage == "describe" || *value.Stage == "suite" || *value.Stage == "report" || *value.Stage == "supervise") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.stage", *value.Stage, []any{"checkout", "build", "describe", "suite", "report", "supervise"}))
+		}
+	}
+	return err
+}
+
+// GetVerificationResultVerificationRunningTransport stores JSON fields until they have been validated.
+type GetVerificationResultVerificationRunningTransport struct {
+	// When the run was accepted.
+	StartedAt *string `json:"started_at"`
+}
+
+// ValidateGetVerificationResultVerificationRunningTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultVerificationRunningTransport(value *GetVerificationResultVerificationRunningTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.StartedAt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("started_at", "body"))
+	}
+	if value.StartedAt != nil {
+		err = goa.MergeErrors(err, goa.ValidateFormat("body.started_at", *value.StartedAt, goa.FormatDateTime))
+	}
+	return err
+}
+
+// GetVerificationResultVerificationScenarioTransport stores JSON fields until they have been validated.
+type GetVerificationResultVerificationScenarioTransport struct {
+	// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+	ID *string `json:"id"`
+	// How the scenario ended.
+	Outcome *string `json:"outcome"`
+	// The repair scenario's checks; empty for holdouts.
+	Checks []*GetVerificationResultVerificationCheckTransport `json:"checks,omitempty"`
+	// The repair scenario's environment error; empty for holdouts.
+	Error *string `json:"error,omitempty"`
+}
+
+// ValidateGetVerificationResultVerificationScenarioTransport checks decoded JSON before it becomes a service value.
+func ValidateGetVerificationResultVerificationScenarioTransport(value *GetVerificationResultVerificationScenarioTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Outcome == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("outcome", "body"))
+	}
+	if value.Outcome != nil {
+		if !(*value.Outcome == "passed" || *value.Outcome == "failed" || *value.Outcome == "not_run" || *value.Outcome == "harness_error") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.outcome", *value.Outcome, []any{"passed", "failed", "not_run", "harness_error"}))
+		}
+	}
+	for _, e := range value.Checks {
+		if e != nil {
+			if err2 := ValidateGetVerificationResultVerificationCheckTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
 // PreviewArchitecturePayloadBuilderScopeItemTransport stores JSON fields until they have been validated.
 type PreviewArchitecturePayloadBuilderScopeItemTransport struct {
 	// Human-readable builder scope name (for example, orders or api).
@@ -1825,6 +2155,602 @@ func ValidateProposeChangeResultUICompositionItemTransport(value *ProposeChangeR
 	return err
 }
 
+// VerifyChangePayloadTransport stores JSON fields until they have been validated.
+type VerifyChangePayloadTransport struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision *string `json:"request_revision"`
+	// Full commit ID of the candidate to build and verify (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit *string `json:"candidate_commit"`
+}
+
+// ValidateVerifyChangePayloadTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangePayloadTransport(value *VerifyChangePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *value.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	}
+	return err
+}
+
+// VerifyChangeResultBuilderVerificationReportTransport stores JSON fields until they have been validated.
+type VerifyChangeResultBuilderVerificationReportTransport struct {
+	// SHA-256 digest of the full report the evaluator saved; approve_merge and
+	// surla approve take this digest.
+	ReportDigest *string `json:"report_digest"`
+	// Every declared scenario, counted by outcome.
+	Counts *VerifyChangeResultVerificationCountsTransport `json:"counts"`
+	// The verdict: true only when every declared scenario passed and the suite ran
+	// cleanly.
+	Passed *bool `json:"passed"`
+	// Whether the evaluator suite itself failed or ended abnormally.
+	SuiteFailed *bool `json:"suite_failed"`
+	// Every declared scenario in declaration order.
+	Scenarios []*VerifyChangeResultVerificationScenarioTransport `json:"scenarios"`
+}
+
+// ValidateVerifyChangeResultBuilderVerificationReportTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultBuilderVerificationReportTransport(value *VerifyChangeResultBuilderVerificationReportTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.Counts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("counts", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	if value.SuiteFailed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_failed", "body"))
+	}
+	if value.Scenarios == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenarios", "body"))
+	}
+	if value.Counts != nil {
+		if err2 := ValidateVerifyChangeResultVerificationCountsTransport(value.Counts); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	for _, e := range value.Scenarios {
+		if e != nil {
+			if err2 := ValidateVerifyChangeResultVerificationScenarioTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// VerifyChangeResultTransport stores JSON fields until they have been validated.
+type VerifyChangeResultTransport struct {
+	// Verification run identifier; get_verification takes it.
+	RunID *string `json:"run_id"`
+	// Change Card the run verifies.
+	ChangeID *string `json:"change_id"`
+	// Change Card revision the run verifies.
+	RequestRevision *string `json:"request_revision"`
+	// Candidate commit the run builds and verifies.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite commit the operator configured for the run.
+	SuiteCommit *string `json:"suite_commit"`
+	// Exactly one of running, completed or not_completed.
+	State *VerifyChangeResultstateTransport `json:"state"`
+}
+
+// ValidateVerifyChangeResultTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultTransport(value *VerifyChangeResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.RunID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("run_id", "body"))
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.State == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("state", "body"))
+	}
+	if value.State != nil {
+
+		if err2 := value.State.Validate(); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		} else {
+			switch string(value.State.Kind()) {
+			case "running":
+				actual, _ := value.State.AsRunning()
+				if actual != nil {
+					if err2 := ValidateVerifyChangeResultVerificationRunningTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			case "completed":
+				actual, _ := value.State.AsCompleted()
+				if actual != nil {
+					if err2 := ValidateVerifyChangeResultVerificationCompletedTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			case "not_completed":
+				actual, _ := value.State.AsNotCompleted()
+				if actual != nil {
+					if err2 := ValidateVerifyChangeResultVerificationNotCompletedTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			}
+		}
+
+	}
+	return err
+}
+
+// VerifyChangeResultVerificationCheckTransport stores JSON fields until they have been validated.
+type VerifyChangeResultVerificationCheckTransport struct {
+	// Check name.
+	Name *string `json:"name"`
+	// Whether the check passed.
+	Passed *bool `json:"passed"`
+	// Why the check failed; empty when it passed.
+	Diagnostic *string `json:"diagnostic,omitempty"`
+}
+
+// ValidateVerifyChangeResultVerificationCheckTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultVerificationCheckTransport(value *VerifyChangeResultVerificationCheckTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	return err
+}
+
+// VerifyChangeResultVerificationCompletedTransport stores JSON fields until they have been validated.
+type VerifyChangeResultVerificationCompletedTransport struct {
+	// Evaluator suite the report was produced by.
+	SuiteID *string `json:"suite_id"`
+	// Dependency profile the suite ran the candidate with, such as sim.
+	Environment *string `json:"environment"`
+	// The builder view of the report.
+	Report *VerifyChangeResultBuilderVerificationReportTransport `json:"report"`
+}
+
+// ValidateVerifyChangeResultVerificationCompletedTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultVerificationCompletedTransport(value *VerifyChangeResultVerificationCompletedTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Report == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report", "body"))
+	}
+	if value.Report != nil {
+		if err2 := ValidateVerifyChangeResultBuilderVerificationReportTransport(value.Report); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// VerifyChangeResultVerificationCountsTransport stores JSON fields until they have been validated.
+type VerifyChangeResultVerificationCountsTransport struct {
+	// Scenarios the suite declares.
+	Required *int `json:"required"`
+	// Scenarios that passed.
+	Passed *int `json:"passed"`
+	// Scenarios whose checks failed.
+	Failed *int `json:"failed"`
+	// Declared scenarios the suite did not report.
+	NotRun *int `json:"not_run"`
+	// Scenarios that could not be evaluated.
+	HarnessError *int `json:"harness_error"`
+}
+
+// ValidateVerifyChangeResultVerificationCountsTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultVerificationCountsTransport(value *VerifyChangeResultVerificationCountsTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Required == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("required", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	if value.Failed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("failed", "body"))
+	}
+	if value.NotRun == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("not_run", "body"))
+	}
+	if value.HarnessError == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("harness_error", "body"))
+	}
+	return err
+}
+
+// VerifyChangeResultVerificationNotCompletedTransport stores JSON fields until they have been validated.
+type VerifyChangeResultVerificationNotCompletedTransport struct {
+	// execution_failed when a step failed; interrupted when the run's process
+	// ended before it finished.
+	Kind *string `json:"kind"`
+	// Where the run stopped.
+	Stage *string `json:"stage"`
+	// Builder-safe description of what stopped the run; never command output.
+	Summary *string `json:"summary"`
+}
+
+// ValidateVerifyChangeResultVerificationNotCompletedTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultVerificationNotCompletedTransport(value *VerifyChangeResultVerificationNotCompletedTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if value.Stage == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("stage", "body"))
+	}
+	if value.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if value.Kind != nil {
+		if !(*value.Kind == "execution_failed" || *value.Kind == "interrupted") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"execution_failed", "interrupted"}))
+		}
+	}
+	if value.Stage != nil {
+		if !(*value.Stage == "checkout" || *value.Stage == "build" || *value.Stage == "describe" || *value.Stage == "suite" || *value.Stage == "report" || *value.Stage == "supervise") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.stage", *value.Stage, []any{"checkout", "build", "describe", "suite", "report", "supervise"}))
+		}
+	}
+	return err
+}
+
+// VerifyChangeResultVerificationRunningTransport stores JSON fields until they have been validated.
+type VerifyChangeResultVerificationRunningTransport struct {
+	// When the run was accepted.
+	StartedAt *string `json:"started_at"`
+}
+
+// ValidateVerifyChangeResultVerificationRunningTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultVerificationRunningTransport(value *VerifyChangeResultVerificationRunningTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.StartedAt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("started_at", "body"))
+	}
+	if value.StartedAt != nil {
+		err = goa.MergeErrors(err, goa.ValidateFormat("body.started_at", *value.StartedAt, goa.FormatDateTime))
+	}
+	return err
+}
+
+// VerifyChangeResultVerificationScenarioTransport stores JSON fields until they have been validated.
+type VerifyChangeResultVerificationScenarioTransport struct {
+	// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+	ID *string `json:"id"`
+	// How the scenario ended.
+	Outcome *string `json:"outcome"`
+	// The repair scenario's checks; empty for holdouts.
+	Checks []*VerifyChangeResultVerificationCheckTransport `json:"checks,omitempty"`
+	// The repair scenario's environment error; empty for holdouts.
+	Error *string `json:"error,omitempty"`
+}
+
+// ValidateVerifyChangeResultVerificationScenarioTransport checks decoded JSON before it becomes a service value.
+func ValidateVerifyChangeResultVerificationScenarioTransport(value *VerifyChangeResultVerificationScenarioTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Outcome == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("outcome", "body"))
+	}
+	if value.Outcome != nil {
+		if !(*value.Outcome == "passed" || *value.Outcome == "failed" || *value.Outcome == "not_run" || *value.Outcome == "harness_error") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.outcome", *value.Outcome, []any{"passed", "failed", "not_run", "harness_error"}))
+		}
+	}
+	for _, e := range value.Checks {
+		if e != nil {
+			if err2 := ValidateVerifyChangeResultVerificationCheckTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// GetVerificationResultstateTransport stores exactly one selected Goa OneOf branch.
+type GetVerificationResultstateTransport struct {
+	kind         GetVerificationResultstateTransportKind
+	Running      *GetVerificationResultVerificationRunningTransport
+	Completed    *GetVerificationResultVerificationCompletedTransport
+	NotCompleted *GetVerificationResultVerificationNotCompletedTransport
+}
+
+// GetVerificationResultstateTransportKind identifies the selected branch of GetVerificationResultstateTransport.
+type GetVerificationResultstateTransportKind string
+
+const (
+	GetVerificationResultstateTransportKindRunning      GetVerificationResultstateTransportKind = "running"
+	GetVerificationResultstateTransportKindCompleted    GetVerificationResultstateTransportKind = "completed"
+	GetVerificationResultstateTransportKindNotCompleted GetVerificationResultstateTransportKind = "not_completed"
+)
+
+// Kind returns the selected branch.
+func (u GetVerificationResultstateTransport) Kind() GetVerificationResultstateTransportKind {
+	return u.kind
+}
+
+// NewGetVerificationResultstateTransportRunning creates GetVerificationResultstateTransport with its running branch selected.
+func NewGetVerificationResultstateTransportRunning(value *GetVerificationResultVerificationRunningTransport) GetVerificationResultstateTransport {
+	return GetVerificationResultstateTransport{kind: GetVerificationResultstateTransportKindRunning, Running: value}
+}
+
+// AsRunning returns the running branch when it is selected.
+func (u GetVerificationResultstateTransport) AsRunning() (_ *GetVerificationResultVerificationRunningTransport, ok bool) {
+	if u.kind != GetVerificationResultstateTransportKindRunning {
+		return
+	}
+	return u.Running, true
+}
+
+// SetRunning selects the running branch.
+func (u *GetVerificationResultstateTransport) SetRunning(value *GetVerificationResultVerificationRunningTransport) {
+	u.kind = GetVerificationResultstateTransportKindRunning
+	u.Running = value
+}
+
+// NewGetVerificationResultstateTransportCompleted creates GetVerificationResultstateTransport with its completed branch selected.
+func NewGetVerificationResultstateTransportCompleted(value *GetVerificationResultVerificationCompletedTransport) GetVerificationResultstateTransport {
+	return GetVerificationResultstateTransport{kind: GetVerificationResultstateTransportKindCompleted, Completed: value}
+}
+
+// AsCompleted returns the completed branch when it is selected.
+func (u GetVerificationResultstateTransport) AsCompleted() (_ *GetVerificationResultVerificationCompletedTransport, ok bool) {
+	if u.kind != GetVerificationResultstateTransportKindCompleted {
+		return
+	}
+	return u.Completed, true
+}
+
+// SetCompleted selects the completed branch.
+func (u *GetVerificationResultstateTransport) SetCompleted(value *GetVerificationResultVerificationCompletedTransport) {
+	u.kind = GetVerificationResultstateTransportKindCompleted
+	u.Completed = value
+}
+
+// NewGetVerificationResultstateTransportNotCompleted creates GetVerificationResultstateTransport with its not_completed branch selected.
+func NewGetVerificationResultstateTransportNotCompleted(value *GetVerificationResultVerificationNotCompletedTransport) GetVerificationResultstateTransport {
+	return GetVerificationResultstateTransport{kind: GetVerificationResultstateTransportKindNotCompleted, NotCompleted: value}
+}
+
+// AsNotCompleted returns the not_completed branch when it is selected.
+func (u GetVerificationResultstateTransport) AsNotCompleted() (_ *GetVerificationResultVerificationNotCompletedTransport, ok bool) {
+	if u.kind != GetVerificationResultstateTransportKindNotCompleted {
+		return
+	}
+	return u.NotCompleted, true
+}
+
+// SetNotCompleted selects the not_completed branch.
+func (u *GetVerificationResultstateTransport) SetNotCompleted(value *GetVerificationResultVerificationNotCompletedTransport) {
+	u.kind = GetVerificationResultstateTransportKindNotCompleted
+	u.NotCompleted = value
+}
+
+// Validate checks that one complete branch is selected.
+func (u GetVerificationResultstateTransport) Validate() error {
+	switch u.kind {
+	case GetVerificationResultstateTransportKindRunning:
+		if u.Running == nil {
+			return goa.MissingFieldError("value", "GetVerificationResultstateTransport")
+		}
+		return nil
+	case GetVerificationResultstateTransportKindCompleted:
+		if u.Completed == nil {
+			return goa.MissingFieldError("value", "GetVerificationResultstateTransport")
+		}
+		return nil
+	case GetVerificationResultstateTransportKindNotCompleted:
+		if u.NotCompleted == nil {
+			return goa.MissingFieldError("value", "GetVerificationResultstateTransport")
+		}
+		return nil
+	case "":
+		return goa.MissingFieldError("type", "GetVerificationResultstateTransport")
+	default:
+		return goa.InvalidEnumValueError("type", u.kind, []any{string(GetVerificationResultstateTransportKindRunning), string(GetVerificationResultstateTransportKindCompleted), string(GetVerificationResultstateTransportKindNotCompleted)})
+	}
+}
+
+// MarshalJSON writes the selected branch name and value.
+func (u GetVerificationResultstateTransport) MarshalJSON() ([]byte, error) {
+	if err := u.Validate(); err != nil {
+		return nil, err
+	}
+	var value any
+	switch u.kind {
+	case GetVerificationResultstateTransportKindRunning:
+		value = u.Running
+	case GetVerificationResultstateTransportKindCompleted:
+		value = u.Completed
+	case GetVerificationResultstateTransportKindNotCompleted:
+		value = u.NotCompleted
+	default:
+		return nil, fmt.Errorf("unexpected GetVerificationResultstateTransport branch %q", u.kind)
+	}
+	return json.Marshal(struct {
+		Type  string `json:"type"`
+		Value any    `json:"value"`
+	}{Type: string(u.kind), Value: value})
+}
+
+// VerifyChangeResultstateTransport stores exactly one selected Goa OneOf branch.
+type VerifyChangeResultstateTransport struct {
+	kind         VerifyChangeResultstateTransportKind
+	Running      *VerifyChangeResultVerificationRunningTransport
+	Completed    *VerifyChangeResultVerificationCompletedTransport
+	NotCompleted *VerifyChangeResultVerificationNotCompletedTransport
+}
+
+// VerifyChangeResultstateTransportKind identifies the selected branch of VerifyChangeResultstateTransport.
+type VerifyChangeResultstateTransportKind string
+
+const (
+	VerifyChangeResultstateTransportKindRunning      VerifyChangeResultstateTransportKind = "running"
+	VerifyChangeResultstateTransportKindCompleted    VerifyChangeResultstateTransportKind = "completed"
+	VerifyChangeResultstateTransportKindNotCompleted VerifyChangeResultstateTransportKind = "not_completed"
+)
+
+// Kind returns the selected branch.
+func (u VerifyChangeResultstateTransport) Kind() VerifyChangeResultstateTransportKind {
+	return u.kind
+}
+
+// NewVerifyChangeResultstateTransportRunning creates VerifyChangeResultstateTransport with its running branch selected.
+func NewVerifyChangeResultstateTransportRunning(value *VerifyChangeResultVerificationRunningTransport) VerifyChangeResultstateTransport {
+	return VerifyChangeResultstateTransport{kind: VerifyChangeResultstateTransportKindRunning, Running: value}
+}
+
+// AsRunning returns the running branch when it is selected.
+func (u VerifyChangeResultstateTransport) AsRunning() (_ *VerifyChangeResultVerificationRunningTransport, ok bool) {
+	if u.kind != VerifyChangeResultstateTransportKindRunning {
+		return
+	}
+	return u.Running, true
+}
+
+// SetRunning selects the running branch.
+func (u *VerifyChangeResultstateTransport) SetRunning(value *VerifyChangeResultVerificationRunningTransport) {
+	u.kind = VerifyChangeResultstateTransportKindRunning
+	u.Running = value
+}
+
+// NewVerifyChangeResultstateTransportCompleted creates VerifyChangeResultstateTransport with its completed branch selected.
+func NewVerifyChangeResultstateTransportCompleted(value *VerifyChangeResultVerificationCompletedTransport) VerifyChangeResultstateTransport {
+	return VerifyChangeResultstateTransport{kind: VerifyChangeResultstateTransportKindCompleted, Completed: value}
+}
+
+// AsCompleted returns the completed branch when it is selected.
+func (u VerifyChangeResultstateTransport) AsCompleted() (_ *VerifyChangeResultVerificationCompletedTransport, ok bool) {
+	if u.kind != VerifyChangeResultstateTransportKindCompleted {
+		return
+	}
+	return u.Completed, true
+}
+
+// SetCompleted selects the completed branch.
+func (u *VerifyChangeResultstateTransport) SetCompleted(value *VerifyChangeResultVerificationCompletedTransport) {
+	u.kind = VerifyChangeResultstateTransportKindCompleted
+	u.Completed = value
+}
+
+// NewVerifyChangeResultstateTransportNotCompleted creates VerifyChangeResultstateTransport with its not_completed branch selected.
+func NewVerifyChangeResultstateTransportNotCompleted(value *VerifyChangeResultVerificationNotCompletedTransport) VerifyChangeResultstateTransport {
+	return VerifyChangeResultstateTransport{kind: VerifyChangeResultstateTransportKindNotCompleted, NotCompleted: value}
+}
+
+// AsNotCompleted returns the not_completed branch when it is selected.
+func (u VerifyChangeResultstateTransport) AsNotCompleted() (_ *VerifyChangeResultVerificationNotCompletedTransport, ok bool) {
+	if u.kind != VerifyChangeResultstateTransportKindNotCompleted {
+		return
+	}
+	return u.NotCompleted, true
+}
+
+// SetNotCompleted selects the not_completed branch.
+func (u *VerifyChangeResultstateTransport) SetNotCompleted(value *VerifyChangeResultVerificationNotCompletedTransport) {
+	u.kind = VerifyChangeResultstateTransportKindNotCompleted
+	u.NotCompleted = value
+}
+
+// Validate checks that one complete branch is selected.
+func (u VerifyChangeResultstateTransport) Validate() error {
+	switch u.kind {
+	case VerifyChangeResultstateTransportKindRunning:
+		if u.Running == nil {
+			return goa.MissingFieldError("value", "VerifyChangeResultstateTransport")
+		}
+		return nil
+	case VerifyChangeResultstateTransportKindCompleted:
+		if u.Completed == nil {
+			return goa.MissingFieldError("value", "VerifyChangeResultstateTransport")
+		}
+		return nil
+	case VerifyChangeResultstateTransportKindNotCompleted:
+		if u.NotCompleted == nil {
+			return goa.MissingFieldError("value", "VerifyChangeResultstateTransport")
+		}
+		return nil
+	case "":
+		return goa.MissingFieldError("type", "VerifyChangeResultstateTransport")
+	default:
+		return goa.InvalidEnumValueError("type", u.kind, []any{string(VerifyChangeResultstateTransportKindRunning), string(VerifyChangeResultstateTransportKindCompleted), string(VerifyChangeResultstateTransportKindNotCompleted)})
+	}
+}
+
+// MarshalJSON writes the selected branch name and value.
+func (u VerifyChangeResultstateTransport) MarshalJSON() ([]byte, error) {
+	if err := u.Validate(); err != nil {
+		return nil, err
+	}
+	var value any
+	switch u.kind {
+	case VerifyChangeResultstateTransportKindRunning:
+		value = u.Running
+	case VerifyChangeResultstateTransportKindCompleted:
+		value = u.Completed
+	case VerifyChangeResultstateTransportKindNotCompleted:
+		value = u.NotCompleted
+	default:
+		return nil, fmt.Errorf("unexpected VerifyChangeResultstateTransport branch %q", u.kind)
+	}
+	return json.Marshal(struct {
+		Type  string `json:"type"`
+		Value any    `json:"value"`
+	}{Type: string(u.kind), Value: value})
+}
+
 // DecodeApproveMergePayload checks JSON field names from the Goa design and returns a service value.
 func DecodeApproveMergePayload(data []byte) (out *surla.ApproveMergePayload, err error) {
 	var body *ApproveMergePayloadTransport
@@ -2203,6 +3129,84 @@ func EncodeGetChangeResult(in *surla.ChangeCardResult) ([]byte, error) {
 	return data, nil
 }
 
+// DecodeGetVerificationPayload checks JSON field names from the Goa design and returns a service value.
+func DecodeGetVerificationPayload(data []byte) (out *surla.GetVerificationPayload, err error) {
+	var body *GetVerificationPayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode GetVerificationPayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode GetVerificationPayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode GetVerificationPayload JSON after first value: %w", err)
+	}
+	if err := ValidateGetVerificationPayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate GetVerificationPayload JSON: %w", err)
+	}
+	{
+		out = &surla.GetVerificationPayload{
+			RunID: *body.RunID,
+		}
+	}
+	return out, nil
+}
+
+// EncodeGetVerificationResult turns a service value into JSON using the field names in the Goa design.
+func EncodeGetVerificationResult(in *surla.VerificationStatusResult) ([]byte, error) {
+	var body *GetVerificationResultTransport
+	{
+		body = &GetVerificationResultTransport{
+			RunID:           &in.RunID,
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+			SuiteCommit:     &in.SuiteCommit,
+		}
+		var stateValue GetVerificationResultstateTransport
+		switch string(in.State.Kind()) {
+		case "running":
+			actual, _ := in.State.AsRunning()
+			var obj *GetVerificationResultVerificationRunningTransport
+			if actual != nil {
+				obj = encodeVerificationRunningToGetVerificationResultVerificationRunningTransport(actual)
+			}
+			u := stateValue
+			u.SetRunning((*GetVerificationResultVerificationRunningTransport)(obj))
+			stateValue = u
+		case "completed":
+			actual, _ := in.State.AsCompleted()
+			var obj *GetVerificationResultVerificationCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationCompletedToGetVerificationResultVerificationCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetCompleted((*GetVerificationResultVerificationCompletedTransport)(obj))
+			stateValue = u
+		case "not_completed":
+			actual, _ := in.State.AsNotCompleted()
+			var obj *GetVerificationResultVerificationNotCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationNotCompletedToGetVerificationResultVerificationNotCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetNotCompleted((*GetVerificationResultVerificationNotCompletedTransport)(obj))
+			stateValue = u
+		}
+		body.State = &stateValue
+	}
+	if err := ValidateGetVerificationResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate GetVerificationResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode GetVerificationResult JSON: %w", err)
+	}
+	return data, nil
+}
+
 // DecodePreviewArchitecturePayload checks JSON field names from the Goa design and returns a service value.
 func DecodePreviewArchitecturePayload(data []byte) (out *surla.PreviewArchitecturePayload, err error) {
 	var body *PreviewArchitecturePayloadTransport
@@ -2377,6 +3381,86 @@ func EncodeProposeChangeResult(in *surla.ChangeCardResult) ([]byte, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("encode ProposeChangeResult JSON: %w", err)
+	}
+	return data, nil
+}
+
+// DecodeVerifyChangePayload checks JSON field names from the Goa design and returns a service value.
+func DecodeVerifyChangePayload(data []byte) (out *surla.VerifyChangePayload, err error) {
+	var body *VerifyChangePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerifyChangePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerifyChangePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerifyChangePayload JSON after first value: %w", err)
+	}
+	if err := ValidateVerifyChangePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerifyChangePayload JSON: %w", err)
+	}
+	{
+		out = &surla.VerifyChangePayload{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			CandidateCommit: *body.CandidateCommit,
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerifyChangeResult turns a service value into JSON using the field names in the Goa design.
+func EncodeVerifyChangeResult(in *surla.VerificationStatusResult) ([]byte, error) {
+	var body *VerifyChangeResultTransport
+	{
+		body = &VerifyChangeResultTransport{
+			RunID:           &in.RunID,
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+			SuiteCommit:     &in.SuiteCommit,
+		}
+		var stateValue VerifyChangeResultstateTransport
+		switch string(in.State.Kind()) {
+		case "running":
+			actual, _ := in.State.AsRunning()
+			var obj *VerifyChangeResultVerificationRunningTransport
+			if actual != nil {
+				obj = encodeVerificationRunningToVerifyChangeResultVerificationRunningTransport(actual)
+			}
+			u := stateValue
+			u.SetRunning((*VerifyChangeResultVerificationRunningTransport)(obj))
+			stateValue = u
+		case "completed":
+			actual, _ := in.State.AsCompleted()
+			var obj *VerifyChangeResultVerificationCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationCompletedToVerifyChangeResultVerificationCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetCompleted((*VerifyChangeResultVerificationCompletedTransport)(obj))
+			stateValue = u
+		case "not_completed":
+			actual, _ := in.State.AsNotCompleted()
+			var obj *VerifyChangeResultVerificationNotCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationNotCompletedToVerifyChangeResultVerificationNotCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetNotCompleted((*VerifyChangeResultVerificationNotCompletedTransport)(obj))
+			stateValue = u
+		}
+		body.State = &stateValue
+	}
+	if err := ValidateVerifyChangeResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerifyChangeResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerifyChangeResult JSON: %w", err)
 	}
 	return data, nil
 }
@@ -2589,6 +3673,44 @@ func encodeApprovalItemToProposeChangeResultApprovalItemTransport(v *surla.Appro
 	return res
 }
 
+func encodeBuilderVerificationReportToGetVerificationResultBuilderVerificationReportTransport(v *surla.BuilderVerificationReport) *GetVerificationResultBuilderVerificationReportTransport {
+	res := &GetVerificationResultBuilderVerificationReportTransport{
+		ReportDigest: &v.ReportDigest,
+		Passed:       &v.Passed,
+		SuiteFailed:  &v.SuiteFailed,
+	}
+	res.Counts = encodeVerificationCountsToGetVerificationResultVerificationCountsTransport(v.Counts)
+	res.Scenarios = make([]*GetVerificationResultVerificationScenarioTransport, len(v.Scenarios))
+	for i, val := range v.Scenarios {
+		if val == nil {
+			res.Scenarios[i] = nil
+			continue
+		}
+		res.Scenarios[i] = encodeVerificationScenarioToGetVerificationResultVerificationScenarioTransport(val)
+	}
+
+	return res
+}
+
+func encodeBuilderVerificationReportToVerifyChangeResultBuilderVerificationReportTransport(v *surla.BuilderVerificationReport) *VerifyChangeResultBuilderVerificationReportTransport {
+	res := &VerifyChangeResultBuilderVerificationReportTransport{
+		ReportDigest: &v.ReportDigest,
+		Passed:       &v.Passed,
+		SuiteFailed:  &v.SuiteFailed,
+	}
+	res.Counts = encodeVerificationCountsToVerifyChangeResultVerificationCountsTransport(v.Counts)
+	res.Scenarios = make([]*VerifyChangeResultVerificationScenarioTransport, len(v.Scenarios))
+	for i, val := range v.Scenarios {
+		if val == nil {
+			res.Scenarios[i] = nil
+			continue
+		}
+		res.Scenarios[i] = encodeVerificationScenarioToVerifyChangeResultVerificationScenarioTransport(val)
+	}
+
+	return res
+}
+
 func encodeC4ContainerItemToPreviewArchitectureResultC4ContainerItemTransport(v *surla.C4ContainerItem) *PreviewArchitectureResultC4ContainerItemTransport {
 	res := &PreviewArchitectureResultC4ContainerItemTransport{
 		ID:          &v.ID,
@@ -2774,6 +3896,146 @@ func encodeUICompositionItemToProposeChangeResultUICompositionItemTransport(v *s
 	res := &ProposeChangeResultUICompositionItemTransport{
 		Program:             &v.Program,
 		ComposedForRevision: &v.ComposedForRevision,
+	}
+
+	return res
+}
+
+func encodeVerificationCheckToGetVerificationResultVerificationCheckTransport(v *surla.VerificationCheck) *GetVerificationResultVerificationCheckTransport {
+	res := &GetVerificationResultVerificationCheckTransport{
+		Name:       &v.Name,
+		Passed:     &v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+
+func encodeVerificationCheckToVerifyChangeResultVerificationCheckTransport(v *surla.VerificationCheck) *VerifyChangeResultVerificationCheckTransport {
+	res := &VerifyChangeResultVerificationCheckTransport{
+		Name:       &v.Name,
+		Passed:     &v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+
+func encodeVerificationCompletedToGetVerificationResultVerificationCompletedTransport(v *surla.VerificationCompleted) *GetVerificationResultVerificationCompletedTransport {
+	res := &GetVerificationResultVerificationCompletedTransport{
+		SuiteID:     &v.SuiteID,
+		Environment: &v.Environment,
+	}
+	res.Report = encodeBuilderVerificationReportToGetVerificationResultBuilderVerificationReportTransport(v.Report)
+
+	return res
+}
+
+func encodeVerificationCompletedToVerifyChangeResultVerificationCompletedTransport(v *surla.VerificationCompleted) *VerifyChangeResultVerificationCompletedTransport {
+	res := &VerifyChangeResultVerificationCompletedTransport{
+		SuiteID:     &v.SuiteID,
+		Environment: &v.Environment,
+	}
+	res.Report = encodeBuilderVerificationReportToVerifyChangeResultBuilderVerificationReportTransport(v.Report)
+
+	return res
+}
+
+func encodeVerificationCountsToGetVerificationResultVerificationCountsTransport(v *surla.VerificationCounts) *GetVerificationResultVerificationCountsTransport {
+	res := &GetVerificationResultVerificationCountsTransport{
+		Required:     &v.Required,
+		Passed:       &v.Passed,
+		Failed:       &v.Failed,
+		NotRun:       &v.NotRun,
+		HarnessError: &v.HarnessError,
+	}
+
+	return res
+}
+
+func encodeVerificationCountsToVerifyChangeResultVerificationCountsTransport(v *surla.VerificationCounts) *VerifyChangeResultVerificationCountsTransport {
+	res := &VerifyChangeResultVerificationCountsTransport{
+		Required:     &v.Required,
+		Passed:       &v.Passed,
+		Failed:       &v.Failed,
+		NotRun:       &v.NotRun,
+		HarnessError: &v.HarnessError,
+	}
+
+	return res
+}
+
+func encodeVerificationNotCompletedToGetVerificationResultVerificationNotCompletedTransport(v *surla.VerificationNotCompleted) *GetVerificationResultVerificationNotCompletedTransport {
+	res := &GetVerificationResultVerificationNotCompletedTransport{
+		Kind:    &v.Kind,
+		Stage:   &v.Stage,
+		Summary: &v.Summary,
+	}
+
+	return res
+}
+
+func encodeVerificationNotCompletedToVerifyChangeResultVerificationNotCompletedTransport(v *surla.VerificationNotCompleted) *VerifyChangeResultVerificationNotCompletedTransport {
+	res := &VerifyChangeResultVerificationNotCompletedTransport{
+		Kind:    &v.Kind,
+		Stage:   &v.Stage,
+		Summary: &v.Summary,
+	}
+
+	return res
+}
+
+func encodeVerificationRunningToGetVerificationResultVerificationRunningTransport(v *surla.VerificationRunning) *GetVerificationResultVerificationRunningTransport {
+	res := &GetVerificationResultVerificationRunningTransport{
+		StartedAt: &v.StartedAt,
+	}
+
+	return res
+}
+
+func encodeVerificationRunningToVerifyChangeResultVerificationRunningTransport(v *surla.VerificationRunning) *VerifyChangeResultVerificationRunningTransport {
+	res := &VerifyChangeResultVerificationRunningTransport{
+		StartedAt: &v.StartedAt,
+	}
+
+	return res
+}
+
+func encodeVerificationScenarioToGetVerificationResultVerificationScenarioTransport(v *surla.VerificationScenario) *GetVerificationResultVerificationScenarioTransport {
+	res := &GetVerificationResultVerificationScenarioTransport{
+		ID:      &v.ID,
+		Outcome: &v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*GetVerificationResultVerificationCheckTransport, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = encodeVerificationCheckToGetVerificationResultVerificationCheckTransport(val)
+		}
+	}
+
+	return res
+}
+
+func encodeVerificationScenarioToVerifyChangeResultVerificationScenarioTransport(v *surla.VerificationScenario) *VerifyChangeResultVerificationScenarioTransport {
+	res := &VerifyChangeResultVerificationScenarioTransport{
+		ID:      &v.ID,
+		Outcome: &v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*VerifyChangeResultVerificationCheckTransport, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = encodeVerificationCheckToVerifyChangeResultVerificationCheckTransport(val)
+		}
 	}
 
 	return res

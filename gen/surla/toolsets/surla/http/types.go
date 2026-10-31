@@ -209,6 +209,32 @@ type (
 		// request_revision.
 		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
+	// GetVerificationPayloadTransport is the internal JSON transport type for GetVerificationPayload.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	GetVerificationPayloadTransport struct {
+		// Verification run identifier returned by verify_change.
+		RunID *string `json:"run_id"`
+	}
+	// GetVerificationResultTransport is the internal JSON transport type for GetVerificationResult.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	GetVerificationResultTransport struct {
+		// Verification run identifier; get_verification takes it.
+		RunID *string `json:"run_id"`
+		// Change Card the run verifies.
+		ChangeID *string `json:"change_id"`
+		// Change Card revision the run verifies.
+		RequestRevision *string `json:"request_revision"`
+		// Candidate commit the run builds and verifies.
+		CandidateCommit *string `json:"candidate_commit"`
+		// Evaluator suite commit the operator configured for the run.
+		SuiteCommit *string `json:"suite_commit"`
+		// Exactly one of running, completed or not_completed.
+		State *State `json:"state"`
+	}
 	// PreviewArchitecturePayloadTransport is the internal JSON transport type for PreviewArchitecturePayload.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
@@ -298,6 +324,37 @@ type (
 		// request_revision.
 		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
+	// VerifyChangePayloadTransport is the internal JSON transport type for VerifyChangePayload.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerifyChangePayloadTransport struct {
+		// Confirmed Change Card identifier.
+		ChangeID *string `json:"change_id"`
+		// Current request_revision of the confirmed Change Card.
+		RequestRevision *string `json:"request_revision"`
+		// Full commit ID of the candidate to build and verify (40 or 64 lowercase hex
+		// characters).
+		CandidateCommit *string `json:"candidate_commit"`
+	}
+	// VerifyChangeResultTransport is the internal JSON transport type for VerifyChangeResult.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerifyChangeResultTransport struct {
+		// Verification run identifier; get_verification takes it.
+		RunID *string `json:"run_id"`
+		// Change Card the run verifies.
+		ChangeID *string `json:"change_id"`
+		// Change Card revision the run verifies.
+		RequestRevision *string `json:"request_revision"`
+		// Candidate commit the run builds and verifies.
+		CandidateCommit *string `json:"candidate_commit"`
+		// Evaluator suite commit the operator configured for the run.
+		SuiteCommit *string `json:"suite_commit"`
+		// Exactly one of running, completed or not_completed.
+		State *State `json:"state"`
+	}
 	// AgentPolicyItemTransport is the internal JSON transport type for AgentPolicyItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
 	// decode + validation (missing-field detection) before transforming into
@@ -368,6 +425,24 @@ type (
 		Paths []string `json:"paths"`
 		// Optional preference selecting a server-configured authenticated profile ID.
 		PreferredProfileID *string `json:"preferred_profile_id,omitempty"`
+	}
+	// BuilderVerificationReportTransport is the internal JSON transport type for BuilderVerificationReportTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	BuilderVerificationReportTransport struct {
+		// SHA-256 digest of the full report the evaluator saved; approve_merge and
+		// surla approve take this digest.
+		ReportDigest *string `json:"report_digest"`
+		// Every declared scenario, counted by outcome.
+		Counts *VerificationCountsTransport `json:"counts"`
+		// The verdict: true only when every declared scenario passed and the suite ran
+		// cleanly.
+		Passed *bool `json:"passed"`
+		// Whether the evaluator suite itself failed or ended abnormally.
+		SuiteFailed *bool `json:"suite_failed"`
+		// Every declared scenario in declaration order.
+		Scenarios []*VerificationScenarioTransport `json:"scenarios"`
 	}
 	// C4ContainerItemTransport is the internal JSON transport type for C4ContainerItemTransport.
 	// It lives in the toolset-local http package and is used only for JSON
@@ -533,5 +608,80 @@ type (
 		Program *string `json:"program"`
 		// request_revision of the Change Card this program was composed for.
 		ComposedForRevision *string `json:"composed_for_revision"`
+	}
+	// VerificationCheckTransport is the internal JSON transport type for VerificationCheckTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerificationCheckTransport struct {
+		// Check name.
+		Name *string `json:"name"`
+		// Whether the check passed.
+		Passed *bool `json:"passed"`
+		// Why the check failed; empty when it passed.
+		Diagnostic *string `json:"diagnostic,omitempty"`
+	}
+	// VerificationCompletedTransport is the internal JSON transport type for VerificationCompletedTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerificationCompletedTransport struct {
+		// Evaluator suite the report was produced by.
+		SuiteID *string `json:"suite_id"`
+		// Dependency profile the suite ran the candidate with, such as sim.
+		Environment *string `json:"environment"`
+		// The builder view of the report.
+		Report *BuilderVerificationReportTransport `json:"report"`
+	}
+	// VerificationCountsTransport is the internal JSON transport type for VerificationCountsTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerificationCountsTransport struct {
+		// Scenarios the suite declares.
+		Required *int `json:"required"`
+		// Scenarios that passed.
+		Passed *int `json:"passed"`
+		// Scenarios whose checks failed.
+		Failed *int `json:"failed"`
+		// Declared scenarios the suite did not report.
+		NotRun *int `json:"not_run"`
+		// Scenarios that could not be evaluated.
+		HarnessError *int `json:"harness_error"`
+	}
+	// VerificationNotCompletedTransport is the internal JSON transport type for VerificationNotCompletedTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerificationNotCompletedTransport struct {
+		// execution_failed when a step failed; interrupted when the run's process
+		// ended before it finished.
+		Kind *string `json:"kind"`
+		// Where the run stopped.
+		Stage *string `json:"stage"`
+		// Builder-safe description of what stopped the run; never command output.
+		Summary *string `json:"summary"`
+	}
+	// VerificationRunningTransport is the internal JSON transport type for VerificationRunningTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerificationRunningTransport struct {
+		// When the run was accepted.
+		StartedAt *string `json:"started_at"`
+	}
+	// VerificationScenarioTransport is the internal JSON transport type for VerificationScenarioTransport.
+	// It lives in the toolset-local http package and is used only for JSON
+	// decode + validation (missing-field detection) before transforming into
+	// the public tool type.
+	VerificationScenarioTransport struct {
+		// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+		ID *string `json:"id"`
+		// How the scenario ended.
+		Outcome *string `json:"outcome"`
+		// The repair scenario's checks; empty for holdouts.
+		Checks []*VerificationCheckTransport `json:"checks,omitempty"`
+		// The repair scenario's environment error; empty for holdouts.
+		Error *string `json:"error,omitempty"`
 	}
 )

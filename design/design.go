@@ -351,6 +351,112 @@ var DiffResult = Type("DiffResult", func() {
 	Required("has_changes", "added_declarations", "removed_declarations", "modified_declarations", "version_deltas", "summary")
 })
 
+// VerifyChangePayload starts Checkpoint 4 verification of one candidate commit.
+var VerifyChangePayload = Type("VerifyChangePayload", func() {
+	Description("Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.")
+	Attribute("change_id", String, "Confirmed Change Card identifier.")
+	Attribute("request_revision", String, "Current request_revision of the confirmed Change Card.")
+	Attribute("candidate_commit", String, "Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).", func() {
+		Pattern("^([0-9a-f]{40}|[0-9a-f]{64})$")
+	})
+	Required("change_id", "request_revision", "candidate_commit")
+})
+
+// GetVerificationPayload names one verification run.
+var GetVerificationPayload = Type("GetVerificationPayload", func() {
+	Description("Identifies a verification run returned by verify_change.")
+	Attribute("run_id", String, "Verification run identifier returned by verify_change.")
+	Required("run_id")
+})
+
+// VerificationCheck is one check of a repair scenario.
+var VerificationCheck = Type("VerificationCheck", func() {
+	Description("One deterministic check of a repair scenario.")
+	Attribute("name", String, "Check name.")
+	Attribute("passed", Boolean, "Whether the check passed.")
+	Attribute("diagnostic", String, "Why the check failed; empty when it passed.")
+	Required("name", "passed")
+})
+
+// VerificationScenario is one declared scenario in the builder view.
+var VerificationScenario = Type("VerificationScenario", func() {
+	Description("One declared scenario as builders see it. Repair scenarios carry their name, checks and environment error; holdout scenarios appear only as holdout-<n> with their outcome.")
+	Attribute("id", String, "Scenario name for a repair scenario, or holdout-<n> for a holdout.")
+	Attribute("outcome", String, "How the scenario ended.", func() {
+		Enum("passed", "failed", "not_run", "harness_error")
+	})
+	Attribute("checks", ArrayOf(VerificationCheck), "The repair scenario's checks; empty for holdouts.")
+	Attribute("error", String, "The repair scenario's environment error; empty for holdouts.")
+	Required("id", "outcome")
+})
+
+// VerificationCounts counts declared scenarios by outcome.
+var VerificationCounts = Type("VerificationCounts", func() {
+	Description("Every declared scenario, counted by outcome.")
+	Attribute("required", Int, "Scenarios the suite declares.")
+	Attribute("passed", Int, "Scenarios that passed.")
+	Attribute("failed", Int, "Scenarios whose checks failed.")
+	Attribute("not_run", Int, "Declared scenarios the suite did not report.")
+	Attribute("harness_error", Int, "Scenarios that could not be evaluated.")
+	Required("required", "passed", "failed", "not_run", "harness_error")
+})
+
+// BuilderVerificationReport is the builder view of a CP4 report.
+var BuilderVerificationReport = Type("BuilderVerificationReport", func() {
+	Description("The builder view of a Checkpoint 4 verification report: counts, verdict and repair scenario checks. Holdout details, evidence and logs stay with the evaluator.")
+	Attribute("report_digest", String, "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.")
+	Attribute("counts", VerificationCounts, "Every declared scenario, counted by outcome.")
+	Attribute("passed", Boolean, "The verdict: true only when every declared scenario passed and the suite ran cleanly.")
+	Attribute("suite_failed", Boolean, "Whether the evaluator suite itself failed or ended abnormally.")
+	Attribute("scenarios", ArrayOf(VerificationScenario), "Every declared scenario in declaration order.")
+	Required("report_digest", "counts", "passed", "suite_failed", "scenarios")
+})
+
+// VerificationRunning is the state of a run still in progress.
+var VerificationRunning = Type("VerificationRunning", func() {
+	Description("The run is still building or evaluating the candidate.")
+	Attribute("started_at", String, "When the run was accepted.", func() { Format(FormatDateTime) })
+	Required("started_at")
+})
+
+// VerificationCompleted is the state of a run that produced a report.
+var VerificationCompleted = Type("VerificationCompleted", func() {
+	Description("The run produced a verification report. Its verdict is report.passed.")
+	Attribute("suite_id", String, "Evaluator suite the report was produced by.")
+	Attribute("environment", String, "Dependency profile the suite ran the candidate with, such as sim.")
+	Attribute("report", BuilderVerificationReport, "The builder view of the report.")
+	Required("suite_id", "environment", "report")
+})
+
+// VerificationNotCompleted is the state of a run that produced no report.
+var VerificationNotCompleted = Type("VerificationNotCompleted", func() {
+	Description("The run ended without a report. Full evidence stays with the evaluator; this states only where it stopped.")
+	Attribute("kind", String, "execution_failed when a step failed; interrupted when the run's process ended before it finished.", func() {
+		Enum("execution_failed", "interrupted")
+	})
+	Attribute("stage", String, "Where the run stopped.", func() {
+		Enum("checkout", "build", "describe", "suite", "report", "supervise")
+	})
+	Attribute("summary", String, "Builder-safe description of what stopped the run; never command output.")
+	Required("kind", "stage", "summary")
+})
+
+// VerificationStatusResult reports one CP4 verification run.
+var VerificationStatusResult = Type("VerificationStatusResult", func() {
+	Description("One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.")
+	Attribute("run_id", String, "Verification run identifier; get_verification takes it.")
+	Attribute("change_id", String, "Change Card the run verifies.")
+	Attribute("request_revision", String, "Change Card revision the run verifies.")
+	Attribute("candidate_commit", String, "Candidate commit the run builds and verifies.")
+	Attribute("suite_commit", String, "Evaluator suite commit the operator configured for the run.")
+	OneOf("state", "Exactly one of running, completed or not_completed.", func() {
+		Attribute("running", VerificationRunning)
+		Attribute("completed", VerificationCompleted)
+		Attribute("not_completed", VerificationNotCompleted)
+	})
+	Required("run_id", "change_id", "request_revision", "candidate_commit", "suite_commit", "state")
+})
+
 var _ = Service("surla", func() {
 	Description("Surla MCP software factory control plane.")
 
@@ -440,6 +546,32 @@ var _ = Service("surla", func() {
 		})
 		HTTP(func() {
 			POST("/sandbox/draft")
+			Response(StatusOK)
+		})
+	})
+
+	Method("verify_change", func() {
+		Description("Start Checkpoint 4 verification of a candidate commit for the owner's confirmed Change Card revision and return its run_id at once. The server builds the commit in Surla's sandbox and runs the evaluator suite the operator configured, in a separate process that keeps running when the caller disconnects or the server restarts; get_verification reads its state. Only the builder view of the report is ever returned. A server started without verification configured rejects every call.")
+		Payload(VerifyChangePayload)
+		Result(VerificationStatusResult)
+		Tool("verify_change", "Start CP4 verification of a candidate commit for the confirmed Change Card revision; returns a run_id to read with get_verification.", func() {
+			ToolUI("ui://surla/checkpoint")
+		})
+		HTTP(func() {
+			POST("/changes/{change_id}/verifications")
+			Response(StatusOK)
+		})
+	})
+
+	Method("get_verification", func() {
+		Description("Return the current state of a verification run to the owner who started it: running, completed with the builder view of its report, or not completed with where it stopped. A run keeps the Change Card revision it was started for.")
+		Payload(GetVerificationPayload)
+		Result(VerificationStatusResult)
+		Tool("get_verification", "Read the state of a CP4 verification run started by verify_change.", func() {
+			ToolUI("ui://surla/checkpoint")
+		})
+		HTTP(func() {
+			GET("/verifications/{run_id}")
 			Response(StatusOK)
 		})
 	})

@@ -26,6 +26,8 @@ type Server struct {
 	GetChange           http.Handler
 	PreviewArchitecture http.Handler
 	DraftOverride       http.Handler
+	VerifyChange        http.Handler
+	GetVerification     http.Handler
 	ApproveMerge        http.Handler
 	Diff                http.Handler
 }
@@ -64,6 +66,8 @@ func New(
 			{"GetChange", "GET", "/changes/{change_id}"},
 			{"PreviewArchitecture", "POST", "/changes/preview"},
 			{"DraftOverride", "POST", "/sandbox/draft"},
+			{"VerifyChange", "POST", "/changes/{change_id}/verifications"},
+			{"GetVerification", "GET", "/verifications/{run_id}"},
 			{"ApproveMerge", "POST", "/changes/approve"},
 			{"Diff", "POST", "/diff"},
 		},
@@ -74,6 +78,8 @@ func New(
 		GetChange:           NewGetChangeHandler(e.GetChange, mux, decoder, encoder, errhandler, formatter),
 		PreviewArchitecture: NewPreviewArchitectureHandler(e.PreviewArchitecture, mux, decoder, encoder, errhandler, formatter),
 		DraftOverride:       NewDraftOverrideHandler(e.DraftOverride, mux, decoder, encoder, errhandler, formatter),
+		VerifyChange:        NewVerifyChangeHandler(e.VerifyChange, mux, decoder, encoder, errhandler, formatter),
+		GetVerification:     NewGetVerificationHandler(e.GetVerification, mux, decoder, encoder, errhandler, formatter),
 		ApproveMerge:        NewApproveMergeHandler(e.ApproveMerge, mux, decoder, encoder, errhandler, formatter),
 		Diff:                NewDiffHandler(e.Diff, mux, decoder, encoder, errhandler, formatter),
 	}
@@ -91,6 +97,8 @@ func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.GetChange = m(s.GetChange)
 	s.PreviewArchitecture = m(s.PreviewArchitecture)
 	s.DraftOverride = m(s.DraftOverride)
+	s.VerifyChange = m(s.VerifyChange)
+	s.GetVerification = m(s.GetVerification)
 	s.ApproveMerge = m(s.ApproveMerge)
 	s.Diff = m(s.Diff)
 }
@@ -107,6 +115,8 @@ func Mount(mux goahttp.Muxer, h *Server) {
 	MountGetChangeHandler(mux, h.GetChange)
 	MountPreviewArchitectureHandler(mux, h.PreviewArchitecture)
 	MountDraftOverrideHandler(mux, h.DraftOverride)
+	MountVerifyChangeHandler(mux, h.VerifyChange)
+	MountGetVerificationHandler(mux, h.GetVerification)
 	MountApproveMergeHandler(mux, h.ApproveMerge)
 	MountDiffHandler(mux, h.Diff)
 }
@@ -450,6 +460,112 @@ func NewDraftOverrideHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "draft_override")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "surla")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountVerifyChangeHandler configures the mux to serve the "surla" service
+// "verify_change" endpoint.
+func MountVerifyChangeHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("POST", "/changes/{change_id}/verifications", f)
+}
+
+// NewVerifyChangeHandler creates a HTTP handler which loads the HTTP request
+// and calls the "surla" service "verify_change" endpoint.
+func NewVerifyChangeHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodeVerifyChangeRequest(mux, decoder)
+		encodeResponse = EncodeVerifyChangeResponse(encoder)
+		encodeError    = goahttp.ErrorEncoder(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "verify_change")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "surla")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountGetVerificationHandler configures the mux to serve the "surla" service
+// "get_verification" endpoint.
+func MountGetVerificationHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("GET", "/verifications/{run_id}", f)
+}
+
+// NewGetVerificationHandler creates a HTTP handler which loads the HTTP
+// request and calls the "surla" service "get_verification" endpoint.
+func NewGetVerificationHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodeGetVerificationRequest(mux, decoder)
+		encodeResponse = EncodeGetVerificationResponse(encoder)
+		encodeError    = goahttp.ErrorEncoder(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "get_verification")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "surla")
 		payload, err := decodeRequest(r)
 		if err != nil {

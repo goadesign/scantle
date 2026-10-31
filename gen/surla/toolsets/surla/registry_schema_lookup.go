@@ -27,10 +27,14 @@ func ToolSchema(name tools.Ident) (*genregistry.ToolSchema, bool) {
 		return declarations.schema146(), true
 	case "surla.get_change":
 		return declarations.schema163(), true
-	case "surla.preview_architecture":
+	case "surla.get_verification":
 		return declarations.schema208(), true
+	case "surla.preview_architecture":
+		return declarations.schema253(), true
 	case "surla.propose_change":
-		return declarations.schema305(), true
+		return declarations.schema350(), true
+	case "surla.verify_change":
+		return declarations.schema399(), true
 	default:
 		return nil, false
 	}

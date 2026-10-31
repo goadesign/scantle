@@ -179,6 +179,26 @@ type (
 		// request_revision.
 		Approval *ApprovalItem
 	}
+	// GetVerificationPayload defines the JSON payload for the surla.get_verification tool.
+	GetVerificationPayload = struct {
+		// Verification run identifier returned by verify_change.
+		RunID string
+	}
+	// GetVerificationResult defines the JSON result for the surla.get_verification tool.
+	GetVerificationResult = struct {
+		// Verification run identifier; get_verification takes it.
+		RunID string
+		// Change Card the run verifies.
+		ChangeID string
+		// Change Card revision the run verifies.
+		RequestRevision string
+		// Candidate commit the run builds and verifies.
+		CandidateCommit string
+		// Evaluator suite commit the operator configured for the run.
+		SuiteCommit string
+		// Exactly one of running, completed or not_completed.
+		State State
+	}
 	// PreviewArchitecturePayload defines the JSON payload for the surla.preview_architecture tool.
 	PreviewArchitecturePayload = struct {
 		// Confirmed Change Card identifier.
@@ -256,6 +276,31 @@ type (
 		// request_revision.
 		Approval *ApprovalItem
 	}
+	// VerifyChangePayload defines the JSON payload for the surla.verify_change tool.
+	VerifyChangePayload = struct {
+		// Confirmed Change Card identifier.
+		ChangeID string
+		// Current request_revision of the confirmed Change Card.
+		RequestRevision string
+		// Full commit ID of the candidate to build and verify (40 or 64 lowercase hex
+		// characters).
+		CandidateCommit string
+	}
+	// VerifyChangeResult defines the JSON result for the surla.verify_change tool.
+	VerifyChangeResult = struct {
+		// Verification run identifier; get_verification takes it.
+		RunID string
+		// Change Card the run verifies.
+		ChangeID string
+		// Change Card revision the run verifies.
+		RequestRevision string
+		// Candidate commit the run builds and verifies.
+		CandidateCommit string
+		// Evaluator suite commit the operator configured for the run.
+		SuiteCommit string
+		// Exactly one of running, completed or not_completed.
+		State State
+	}
 	// AgentPolicyItem is a nested type used by the generated JSON contract.
 	AgentPolicyItem = struct {
 		// Scoped agent container identifier.
@@ -314,6 +359,21 @@ type (
 		Paths []string
 		// Optional preference selecting a server-configured authenticated profile ID.
 		PreferredProfileID *string
+	}
+	// BuilderVerificationReport is a nested type used by the generated JSON contract.
+	BuilderVerificationReport = struct {
+		// SHA-256 digest of the full report the evaluator saved; approve_merge and
+		// surla approve take this digest.
+		ReportDigest string
+		// Every declared scenario, counted by outcome.
+		Counts *VerificationCounts
+		// The verdict: true only when every declared scenario passed and the suite ran
+		// cleanly.
+		Passed bool
+		// Whether the evaluator suite itself failed or ended abnormally.
+		SuiteFailed bool
+		// Every declared scenario in declaration order.
+		Scenarios []*VerificationScenario
 	}
 	// C4ContainerItem is a nested type used by the generated JSON contract.
 	C4ContainerItem = struct {
@@ -452,5 +512,62 @@ type (
 		Program string
 		// request_revision of the Change Card this program was composed for.
 		ComposedForRevision string
+	}
+	// VerificationCheck is a nested type used by the generated JSON contract.
+	VerificationCheck = struct {
+		// Check name.
+		Name string
+		// Whether the check passed.
+		Passed bool
+		// Why the check failed; empty when it passed.
+		Diagnostic *string
+	}
+	// VerificationCompleted is a nested type used by the generated JSON contract.
+	VerificationCompleted = struct {
+		// Evaluator suite the report was produced by.
+		SuiteID string
+		// Dependency profile the suite ran the candidate with, such as sim.
+		Environment string
+		// The builder view of the report.
+		Report *BuilderVerificationReport
+	}
+	// VerificationCounts is a nested type used by the generated JSON contract.
+	VerificationCounts = struct {
+		// Scenarios the suite declares.
+		Required int
+		// Scenarios that passed.
+		Passed int
+		// Scenarios whose checks failed.
+		Failed int
+		// Declared scenarios the suite did not report.
+		NotRun int
+		// Scenarios that could not be evaluated.
+		HarnessError int
+	}
+	// VerificationNotCompleted is a nested type used by the generated JSON contract.
+	VerificationNotCompleted = struct {
+		// execution_failed when a step failed; interrupted when the run's process
+		// ended before it finished.
+		Kind string
+		// Where the run stopped.
+		Stage string
+		// Builder-safe description of what stopped the run; never command output.
+		Summary string
+	}
+	// VerificationRunning is a nested type used by the generated JSON contract.
+	VerificationRunning = struct {
+		// When the run was accepted.
+		StartedAt string
+	}
+	// VerificationScenario is a nested type used by the generated JSON contract.
+	VerificationScenario = struct {
+		// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+		ID string
+		// How the scenario ended.
+		Outcome string
+		// The repair scenario's checks; empty for holdouts.
+		Checks []*VerificationCheck
+		// The repair scenario's environment error; empty for holdouts.
+		Error *string
 	}
 )

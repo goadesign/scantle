@@ -22,6 +22,8 @@ type Endpoints struct {
 	GetChange           goa.Endpoint
 	PreviewArchitecture goa.Endpoint
 	DraftOverride       goa.Endpoint
+	VerifyChange        goa.Endpoint
+	GetVerification     goa.Endpoint
 	ApproveMerge        goa.Endpoint
 	Diff                goa.Endpoint
 }
@@ -36,6 +38,8 @@ func NewEndpoints(s Service) *Endpoints {
 		GetChange:           NewGetChangeEndpoint(s),
 		PreviewArchitecture: NewPreviewArchitectureEndpoint(s),
 		DraftOverride:       NewDraftOverrideEndpoint(s),
+		VerifyChange:        NewVerifyChangeEndpoint(s),
+		GetVerification:     NewGetVerificationEndpoint(s),
 		ApproveMerge:        NewApproveMergeEndpoint(s),
 		Diff:                NewDiffEndpoint(s),
 	}
@@ -50,6 +54,8 @@ func (e *Endpoints) Use(m func(goa.Endpoint) goa.Endpoint) {
 	e.GetChange = m(e.GetChange)
 	e.PreviewArchitecture = m(e.PreviewArchitecture)
 	e.DraftOverride = m(e.DraftOverride)
+	e.VerifyChange = m(e.VerifyChange)
+	e.GetVerification = m(e.GetVerification)
 	e.ApproveMerge = m(e.ApproveMerge)
 	e.Diff = m(e.Diff)
 }
@@ -112,6 +118,24 @@ func NewDraftOverrideEndpoint(s Service) goa.Endpoint {
 	return func(ctx context.Context, req any) (any, error) {
 		p := req.(*DraftOverridePayload)
 		return s.DraftOverride(ctx, p)
+	}
+}
+
+// NewVerifyChangeEndpoint returns an endpoint function that calls the method
+// "verify_change" of service "surla".
+func NewVerifyChangeEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		p := req.(*VerifyChangePayload)
+		return s.VerifyChange(ctx, p)
+	}
+}
+
+// NewGetVerificationEndpoint returns an endpoint function that calls the
+// method "get_verification" of service "surla".
+func NewGetVerificationEndpoint(s Service) goa.Endpoint {
+	return func(ctx context.Context, req any) (any, error) {
+		p := req.(*GetVerificationPayload)
+		return s.GetVerification(ctx, p)
 	}
 }
 
