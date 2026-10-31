@@ -163,18 +163,23 @@ func Init(ctx context.Context, o Options, run Runner) (string, error) {
 		}
 		return "", errors.Join(err, os.RemoveAll(staging))
 	}
+	// Every step succeeded, so the logs are no longer needed. They are removed
+	// before publishing so that the rename is the last thing that can fail.
+	if err := os.RemoveAll(logs); err != nil {
+		return "", errors.Join(fmt.Errorf("remove command logs: %w", err), os.RemoveAll(staging))
+	}
 	// MkdirTemp creates the staging directory private (0700); the project
 	// gets the usual directory permissions before it is published.
 	if err := os.Chmod(staging, 0o755); err != nil {
-		return "", errors.Join(fmt.Errorf("set project permissions: %w", err), os.RemoveAll(staging), os.RemoveAll(logs))
+		return "", errors.Join(fmt.Errorf("set project permissions: %w", err), os.RemoveAll(staging))
 	}
 	// os.Rename refuses a target that exists when it checks. A directory
 	// created between that check and the rename is replaced only if it is
 	// empty (rename(2) fails on a non-empty one), so no data is lost.
 	if err := os.Rename(staging, target); err != nil {
-		return "", errors.Join(fmt.Errorf("move project into %s: %w", target, err), os.RemoveAll(staging), os.RemoveAll(logs))
+		return "", errors.Join(fmt.Errorf("move project into %s: %w", target, err), os.RemoveAll(staging))
 	}
-	return d.Name, os.RemoveAll(logs)
+	return d.Name, nil
 }
 
 // RunCommand runs args in dir as its own process group with GOWORK=off, so a
@@ -309,12 +314,15 @@ func runAll(ctx context.Context, dir, moduleDir, logs string, steps [][]string, 
 			return err
 		}
 		if err := run(ctx, dir, log, args...); err != nil {
+			step := &StepError{Args: args, Module: moduleDir, Log: log, Err: err}
 			var stuck *stuckError
 			if errors.As(err, &stuck) {
-				return err
+				// Processes may still be writing the log, so it is not read.
+				return step
 			}
 			tail, tailErr := readTail(log)
-			return errors.Join(&StepError{Args: args, Module: moduleDir, Log: log, Tail: tail, Err: err}, tailErr)
+			step.Tail = tail
+			return errors.Join(step, tailErr)
 		}
 	}
 	return nil

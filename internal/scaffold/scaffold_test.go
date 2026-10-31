@@ -124,6 +124,25 @@ func TestInitNeverReplacesADirectoryCreatedMeanwhile(t *testing.T) {
 	assertOnly(t, dir, "late.txt")
 }
 
+func TestInitKeepsStagingWhenProcessesMayStillRun(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "shop")
+	run := func(_ context.Context, _, _ string, _ ...string) error {
+		return &stuckError{err: errors.New("process group did not exit")}
+	}
+	_, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/shop", SurlaVersion: published}, run)
+	var step *StepError
+	require.ErrorAs(t, err, &step)
+	assert.Equal(t, []string{"go", "mod", "tidy"}, step.Args)
+	assert.Equal(t, ".", step.Module)
+	assert.Empty(t, step.Tail, "a log that may still be written is not read")
+	assert.Contains(t, err.Error(), "is kept because processes may still use it")
+	entries, err := os.ReadDir(parent)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	assert.True(t, strings.HasPrefix(entries[0].Name(), "shop.surla-init-"), entries[0].Name())
+}
+
 func TestInitStopsAndCleansUpWhenCanceled(t *testing.T) {
 	parent := t.TempDir()
 	dir := filepath.Join(parent, "shop")
@@ -147,8 +166,11 @@ func TestInitWritesTheProjectWithTheServiceName(t *testing.T) {
 		ran = append(ran, strings.Join(args, " "))
 		return nil
 	}
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
 	name, err := Init(t.Context(), Options{Dir: dir, Module: "example.com/bakery", SurlaVersion: published}, run)
 	require.NoError(t, err)
+	assertOnly(t, tmp)
 	assert.Equal(t, "bakery", name)
 	assert.Equal(t, []string{
 		"go mod tidy", "go run goa.design/goa/v3/cmd/goa gen example.com/bakery/design", "go mod tidy", "go vet ./...",
