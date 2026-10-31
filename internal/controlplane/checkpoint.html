@@ -6,11 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Scantle Checkpoint Host</title>
   <style>
-    :root {
-      color-scheme: light dark;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      line-height: 1.45;
-    }
+    :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.45; }
     body { margin: 0; padding: 1rem 1.25rem; }
     header { border-bottom: 1px solid rgba(127, 127, 127, 0.35); padding-bottom: 0.75rem; margin-bottom: 1rem; }
     h1 { font-size: 1.25rem; margin: 0 0 0.35rem 0; }
@@ -19,46 +15,17 @@
     p { margin: 0.25rem 0; }
     code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85rem; }
     code { overflow-wrap: anywhere; word-break: break-word; }
-    pre {
-      padding: 0.65rem; border-radius: 6px; border: 1px solid rgba(127, 127, 127, 0.35);
-      overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere;
-    }
-    .scantle-meta, .scantle-card {
-      border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 6px;
-      padding: 0.75rem; margin-bottom: 0.75rem; overflow-wrap: anywhere;
-    }
-    .scantle-badge {
-      display: inline-block; padding: 0.1rem 0.45rem; border-radius: 4px;
-      border: 1px solid rgba(127, 127, 127, 0.5); font-size: 0.8rem;
-      font-weight: 600; margin-right: 0.4rem;
-    }
-    .scantle-pill, .scantle-btn {
-      display: inline-block; padding: 0.25rem 0.65rem; margin: 0.2rem 0.35rem 0.2rem 0;
-      border-radius: 999px; border: 1px solid rgba(127, 127, 127, 0.55);
-      background: transparent; color: inherit; cursor: pointer; font-size: 0.85rem;
-    }
-    .scantle-pill[aria-pressed="true"], .scantle-btn-primary {
-      border-color: #2563eb; background: rgba(37, 99, 235, 0.16); font-weight: 600;
-    }
-    .scantle-field-row {
-      display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0;
-    }
-    .scantle-field-label {
-      display: inline-flex; align-items: center; gap: 0.25rem; flex: 1 1 12rem; font-size: 0.85rem;
-    }
-    .scantle-input {
-      padding: 0.25rem 0.45rem; border-radius: 4px;
-      border: 1px solid rgba(127, 127, 127, 0.5); background: transparent;
-      color: inherit; font-size: 0.85rem; flex: 1 1 10rem;
-    }
-    .scantle-graph-wrap {
-      overflow: auto; border: 1px solid rgba(127, 127, 127, 0.35);
-      border-radius: 6px; padding: 0.5rem; margin: 0.5rem 0 0.75rem 0;
-    }
+    pre { padding: 0.65rem; border-radius: 6px; border: 1px solid rgba(127, 127, 127, 0.35); overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .scantle-meta, .scantle-card { border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; overflow-wrap: anywhere; }
+    .scantle-badge { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 4px; border: 1px solid rgba(127, 127, 127, 0.5); font-size: 0.8rem; font-weight: 600; margin-right: 0.4rem; }
+    .scantle-pill, .scantle-btn { display: inline-block; padding: 0.25rem 0.65rem; margin: 0.2rem 0.35rem 0.2rem 0; border-radius: 999px; border: 1px solid rgba(127, 127, 127, 0.55); background: transparent; color: inherit; cursor: pointer; font-size: 0.85rem; }
+    .scantle-pill[aria-pressed="true"], .scantle-btn-primary { border-color: #2563eb; background: rgba(37, 99, 235, 0.16); font-weight: 600; }
+    .scantle-field-row { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0; }
+    .scantle-field-label { display: inline-flex; align-items: center; gap: 0.25rem; flex: 1 1 12rem; font-size: 0.85rem; }
+    .scantle-input { padding: 0.25rem 0.45rem; border-radius: 4px; border: 1px solid rgba(127, 127, 127, 0.5); background: transparent; color: inherit; font-size: 0.85rem; flex: 1 1 10rem; }
+    .scantle-graph-wrap { overflow: auto; border: 1px solid rgba(127, 127, 127, 0.35); border-radius: 6px; padding: 0.5rem; margin: 0.5rem 0 0.75rem 0; }
     #scantle-c4-svg text { fill: currentColor; }
-    .scantle-error {
-      border: 2px solid #c62828; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;
-    }
+    .scantle-error { border: 2px solid #c62828; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem; }
     ul { margin: 0.35rem 0; padding-left: 1.25rem; }
     li { margin-bottom: 0.35rem; }
   </style>
@@ -83,7 +50,7 @@
     var initPending = false;
     var nextRequestId = 2;
     var pendingRequests = {};
-    var activeCP1ErrorHandler = null;
+    var activeCP1Editor = null;
     var root = document.getElementById("scantle-checkpoint-root");
     var statusEl = document.getElementById("scantle-checkpoint-status");
     var viewEl = document.getElementById("scantle-checkpoint-view");
@@ -151,7 +118,7 @@
     }
 
     function clearDatasetKeys() {
-      activeCP1ErrorHandler = null;
+      activeCP1Editor = null;
       delete root.dataset.changeId;
       delete root.dataset.requestRevision;
       delete root.dataset.designDigest;
@@ -381,7 +348,42 @@
           ])
         ]);
       }
-      activeCP1ErrorHandler = showFormError;
+      function isDirty() {
+        for (var i = 0; i < ambiguities.length; i++) {
+          var qid = ambiguities[i].id;
+          if ((draftAnswers[qid] || "") !== ((card.answers && card.answers[qid]) || "")) {
+            return true;
+          }
+        }
+        for (var j = 0; j < draftExamples.length; j++) {
+          var dEx = draftExamples[j];
+          var cEx = card.examples[j];
+          if (!cEx ||
+              dEx.scenario !== cEx.scenario ||
+              dEx.input_summary !== cEx.input_summary ||
+              dEx.expected_outcome !== cEx.expected_outcome ||
+              dEx.verification_kind !== cEx.verification_kind) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      activeCP1Editor = {
+        changeId: card.change_id,
+        requestRevision: card.request_revision,
+        isDirty: isDirty,
+        preservedDraft: isPlainObject(preservedDraft) ? preservedDraft : null,
+        hasUnsavedState: function () {
+          return isDirty() || isPlainObject(preservedDraft) || Boolean(feedbackEl.firstChild);
+        },
+        onError: showFormError,
+        onCancel: function (reason) {
+          statusEl.textContent = reason
+            ? "Host reported tool cancellation (" + reason + "); CP1 draft preserved."
+            : "Host reported tool cancellation; CP1 draft preserved.";
+        }
+      };
 
       var metaRows = [
         el("h2", { textContent: "CP1 Change Card: " + card.change_id }),
@@ -815,14 +817,14 @@
         return;
       }
       if (root.dataset.state === "cp1-change-card" && Object.keys(pendingRequests).length > 0) {
-        if (params.isError === true && typeof activeCP1ErrorHandler === "function") {
-          activeCP1ErrorHandler(extractErrorText(params));
+        if (params.isError === true && activeCP1Editor) {
+          activeCP1Editor.onError(extractErrorText(params));
         }
         return;
       }
       if (params.isError === true) {
-        if (root.dataset.state === "cp1-change-card" && typeof activeCP1ErrorHandler === "function") {
-          activeCP1ErrorHandler(extractErrorText(params));
+        if (root.dataset.state === "cp1-change-card" && activeCP1Editor) {
+          activeCP1Editor.onError(extractErrorText(params));
           return;
         }
         renderError(extractErrorText(params));
@@ -838,6 +840,14 @@
         return;
       }
       if (isValidChangeCard(payload)) {
+        if (activeCP1Editor) {
+          if (activeCP1Editor.isDirty() ||
+              (payload.change_id === activeCP1Editor.changeId && payload.request_revision === activeCP1Editor.requestRevision)) {
+            return;
+          }
+          renderChangeCard(payload, activeCP1Editor.preservedDraft);
+          return;
+        }
         renderChangeCard(payload, null);
         return;
       }
@@ -881,7 +891,7 @@
             renderError("Malformed ui/notifications/tool-input notification.");
             return;
           }
-          if (root.dataset.state === "cp1-change-card" && Object.keys(pendingRequests).length > 0) {
+          if (activeCP1Editor && (Object.keys(pendingRequests).length > 0 || activeCP1Editor.hasUnsavedState())) {
             return;
           }
           renderWaiting("Received tool input; awaiting validated checkpoint result...");
@@ -893,6 +903,10 @@
             return;
           }
           var cancelReason = isPlainObject(msg.params) && typeof msg.params.reason === "string" ? msg.params.reason : "";
+          if (activeCP1Editor) {
+            activeCP1Editor.onCancel(cancelReason);
+            return;
+          }
           renderCancelled(cancelReason);
           return;
         }

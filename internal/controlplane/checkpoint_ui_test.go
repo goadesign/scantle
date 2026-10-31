@@ -555,21 +555,26 @@ if (confirmReq.method !== "tools/call" ||
   throw new Error("unexpected confirm_intent tools/call payload: " + JSON.stringify(confirmReq));
 }
 
+// Uncorrelated tool-cancelled while confirm is pending must NOT clear pendingRequests or replace the active CP1 editor.
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-cancelled", params: { reason: "uncorrelated cancel" } } });
+if (root.dataset.state !== "cp1-change-card" || outcomeInputs[0].disabled !== true) {
+  throw new Error("tool-cancelled while confirm pending deleted CP1 editor or re-enabled controls");
+}
 // Host replies with confirmed ChangeCardResult -> guest transitions to confirmed revision.
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    id: confirmReq.id,
-    result: {
-      content: [],
-      structuredContent: input.cp1ConfirmedStructured
-    }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: confirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
 if (root.dataset.state !== "cp1-change-card" || root.dataset.requestRevision !== input.wantCP2Revision) {
   throw new Error("expected confirmed CP1 revision after tools/call reply, got: " + JSON.stringify(root.dataset));
 }
+// Typing into confirmed card and receiving a late tool-result notification must NOT overwrite post-reply edits.
+const postConfirmInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
+postConfirmInputs[0].value = "post-confirm draft edit";
+postConfirmInputs[0].dispatch("input", { target: postConfirmInputs[0] });
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1ConfirmedStructured } } });
+if (postConfirmInputs[0].value !== "post-confirm draft edit") {
+  throw new Error("late tool-result notification overwrote post-confirm edit");
+}
+postConfirmInputs[0].value = "  Instant store credit up to $50.00  ";
+postConfirmInputs[0].dispatch("input", { target: postConfirmInputs[0] });
 // Clicking Refine with no edits on a whitespace-bearing saved card must preserve verbatim whitespace.
 const noEditSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
 const msgCountBeforeNoEdit = hostMessages.length;
@@ -578,17 +583,7 @@ const noEditRefineReq = hostMessages[msgCountBeforeNoEdit].msg;
 if (noEditRefineReq.params.arguments.examples[0].expected_outcome !== "  Instant store credit up to $50.00  ") {
   throw new Error("no-edit refine trimmed whitespace: " + JSON.stringify(noEditRefineReq));
 }
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    id: noEditRefineReq.id,
-    result: {
-      content: [],
-      structuredContent: input.cp1ConfirmedStructured
-    }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: noEditRefineReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
 
 // 3b. Exercise stale-revision CP1 form submission with broadcast error notification arriving BEFORE direct RPC error reply.
 messageListener({
@@ -672,17 +667,9 @@ messageListener({
 if (root.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("interleaved ui/notifications/tool-result replaced active editor before get_change reply");
 }
-messageListener({
-  source: parentWindow,
-  data: {
-    jsonrpc: "2.0",
-    id: getChangeReq.id,
-    result: {
-      content: [],
-      structuredContent: input.getChangeStructured
-    }
-  }
-});
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: getChangeReq.id, result: { content: [], structuredContent: input.getChangeStructured } } });
+// Same successful host tool-result notification arriving AFTER get_change reply must NOT drop #scantle-preserved-draft.
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.getChangeStructured } } });
 const recoveredViewText = renderText(viewEl);
 const preservedPanels = findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft");
 if (root.dataset.state !== "cp1-change-card" ||
@@ -691,7 +678,7 @@ if (root.dataset.state !== "cp1-change-card" ||
     !recoveredViewText.includes("Preserved Unsaved Draft Edits") ||
     !recoveredViewText.includes("total_with_tax") ||
     !recoveredViewText.includes("Edited outcome preserved across stale error")) {
-  throw new Error("get_change recovery did not render latest card + preserved draft panel: " + recoveredViewText);
+  throw new Error("get_change recovery did not retain latest card + preserved draft panel after late tool-result: " + recoveredViewText);
 }
 
 // 4. Deliver CP2 ArchitecturePreviewResult -> must replace CP1 view completely and render both SVG graph and inspectable list.
