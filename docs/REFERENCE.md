@@ -12,7 +12,7 @@
 | **`Change Card`** | The versioned change plan (`ChangeCardResult`) created at `CP1`, holding concrete input/outcome examples, open domain ambiguity questions, confirmed answers, preserved contract behaviors, and optional `CP5` approval metadata. |
 | **`request_revision`** | The SHA-256 hex digest of a Change Card's canonical content. `preview_architecture`, `surla verify`, `surla approve`, and `approve_merge` bind to `request_revision` so changing the agreed examples or answers automatically invalidates stale previews, reports, and approvals. When running standalone `surla verify` and `surla approve` on the CLI without a control-plane Change Card, pass any explicit revision string (such as a commit or label) consistently to both commands. |
 | **`holdout`** | An unseen acceptance scenario (tagged `"holdout"` in the evaluator suite) whose name, inputs, checks, and logs are redacted to `"id": "holdout-N"` in `surla verify -builder-view` (`Report.ForBuilders()`) so coding agents cannot hardcode around the test cases. |
-| **`input_binding`** | Per-field classification on a tool contract (`server_injected` vs. `model_supplied`). Fields declared with `Inject(...)` in Goa-AI are supplied by trusted server code and omitted from the LLM-visible JSON Schema. |
+| **`input_binding`** | The compiled tool input contract (`ToolInputBindingItem`) returned in architecture previews, containing `args_schema`, `text_only_args_schema`, `lookup_args_schema`, `lookup_text_only_args_schema`, and `injected_fields` (the field names declared with `Inject(...)` in Goa-AI, which are omitted from the model-facing `args_schema`). |
 | **`TargetUpdater` / `PromotionTarget`** | Optional Go interfaces in `controlplane.Options` bound when embedding the Surla control plane inside a custom host (`TargetUpdater` applies in-memory `CP3` prompt overrides; `PromotionTarget` loads `CP4` verification reports and measured promotion inputs for `approve_merge`). Standalone `surla serve` binds neither interface; use CLI `surla approve` for standalone report verification. |
 
 ---
@@ -187,7 +187,7 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 
 1. **Suite discovery (`--describe`):**
    - `surla verify` runs `<suite-bin> --describe` with no `--artifact` flags.
-   - The command must write a single JSON object (`verify.Suite`) to `stdout` and exit `0`:
+   - The command must write a single JSON declaration object to `stdout` and exit `0`:
      ```json
      {
        "id": "orders_acceptance",
@@ -207,7 +207,7 @@ Clones the committed candidate and evaluator suite into an isolated work directo
      // ...
      res.Artifacts = append(res.Artifacts, pinned.Evidence("orders"))
      ```
-     `pinned.Evidence("orders")` produces `eval.Artifact{Name: "candidate:orders", URI: "sha256:<digest>"}`, which `surla verify` checks against the SHA-256 digest it measured when building `orders`. A scenario that omits a bound binary's evidence record or reports a different digest fails report assembly.
+     `pinned.Evidence("orders")` produces `eval.Artifact{Name: "candidate:orders", URI: "sha256:<digest>"}`, which `surla verify` checks against the SHA-256 digest it measured when building `orders`. A scenario that omits a bound binary's evidence record or reports a different digest produces a failing `verify.Report` with scenario outcome `"harness_error"`.
    - The suite writes `goa.design/goa-ai/eval.Report` JSON to `stdout` and exits with:
      - **`0`** when all scenarios passed,
      - **`1`** when the suite ran and wrote a valid `eval.Report` JSON to `stdout` with one or more failed scenarios (`!report.Passed`), or
