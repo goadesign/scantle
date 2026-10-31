@@ -47,7 +47,7 @@ function unwrapProps<T>(item: unknown): T | null {
 // PolicySimulatorRow represents a single scenario row inside a PolicySimulatorTable.
 export const PolicySimulatorRow = defineComponent({
   name: "PolicySimulatorRow",
-  props: z.object({
+  props: z.strictObject({
     scenario: z.string().min(1),
     inputSummary: z.string().min(1),
     outcomes: z.array(z.string().trim().min(1)).min(1),
@@ -61,7 +61,7 @@ export const PolicySimulatorRow = defineComponent({
 // PolicySimulatorTable renders an interactive option toggle and responsive comparison matrix.
 export const PolicySimulatorTable = defineComponent({
   name: "PolicySimulatorTable",
-  props: z.object({
+  props: z.strictObject({
     title: z.string().min(1),
     ambiguityIndex: z.number().int().min(1),
     rows: z.array(PolicySimulatorRow.ref).min(1),
@@ -179,7 +179,7 @@ export const PolicySimulatorTable = defineComponent({
 // AmbiguityChoiceCard renders a focused decision card for a single 1-based ambiguity.
 export const AmbiguityChoiceCard = defineComponent({
   name: "AmbiguityChoiceCard",
-  props: z.object({
+  props: z.strictObject({
     ambiguityIndex: z.number().int().min(1),
     rationale: z.string().optional(),
   }),
@@ -238,7 +238,7 @@ export const AmbiguityChoiceCard = defineComponent({
 // WorkflowStep renders a single step in a WorkflowTimeline.
 export const WorkflowStep = defineComponent({
   name: "WorkflowStep",
-  props: z.object({
+  props: z.strictObject({
     step: z.string().min(1),
     actor: z.string().min(1),
     detail: z.string().min(1),
@@ -260,7 +260,7 @@ export const WorkflowStep = defineComponent({
 // WorkflowTimeline renders an ordered sequence of WorkflowStep items.
 export const WorkflowTimeline = defineComponent({
   name: "WorkflowTimeline",
-  props: z.object({
+  props: z.strictObject({
     title: z.string().min(1),
     steps: z.array(WorkflowStep.ref).min(1),
   }),
@@ -280,7 +280,7 @@ export const WorkflowTimeline = defineComponent({
 // ImpactCallout renders a domain invariant or risk highlight banner.
 export const ImpactCallout = defineComponent({
   name: "ImpactCallout",
-  props: z.object({
+  props: z.strictObject({
     variant: z.enum(["info", "warning"]),
     title: z.string().min(1),
     summary: z.string().min(1),
@@ -300,7 +300,7 @@ export const ImpactCallout = defineComponent({
 // DecisionWorkspace is the root OpenUI container for CP1 decision instruments.
 export const DecisionWorkspace = defineComponent({
   name: "DecisionWorkspace",
-  props: z.object({
+  props: z.strictObject({
     title: z.string().min(1),
     children: z
       .array(

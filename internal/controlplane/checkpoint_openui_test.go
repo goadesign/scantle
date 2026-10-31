@@ -451,6 +451,17 @@ const badCases = [
       }
     }),
     wantErr: "validation failed"
+  },
+  {
+    name: "forged ImpactCallout with unexpected extra property",
+    card: Object.assign({}, input.cp1Structured, {
+      change_id: "chg-bad-10",
+      ui_composition: {
+        program: 'root = DecisionWorkspace("D", [{type: "element", typeName: "ImpactCallout", props: {variant: "info", title: "Shown", summary: "Shown", unexpected: "Dropped model field"}, partial: false}])',
+        composed_for_revision: input.cp1Structured.request_revision
+      }
+    }),
+    wantErr: "ImpactCallout props failed schema validation"
   }
 ];
 
