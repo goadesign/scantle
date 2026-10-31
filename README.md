@@ -66,9 +66,9 @@ Instead of reading a 2,000-line diff blindly, Surla separates fast prompt tuning
 
 ## Try It in 60 Seconds
 
-### 1. Inspect & Diff Any Goa-AI Design Locally (`0` API Keys Needed)
+### 1. Inspect, Diff, or Scaffold a Goa-AI Project Locally (`0` API Keys Needed)
 
-Before configuring an LLM key or starting a server, run Surla's sandboxed Goa/Goa-AI compiler directly on the included [`examples/orders`](examples/orders/README.md) reference platform:
+Before configuring an LLM key or starting a server, run Surla's sandboxed Goa/Goa-AI compiler directly on the included [`examples/orders`](examples/orders/README.md) reference platform—or scaffold a new starter service and evaluator suite with `surla init`:
 
 ```bash
 # Compile examples/orders/design/*.go in an OS sandbox at 0 LLM tokens and print
@@ -77,6 +77,10 @@ go run ./cmd/surla preview -dir examples/orders
 
 # Compare two Goa design modules structurally at 0 LLM tokens:
 go run ./cmd/surla diff --old-dir examples/orders --new-dir examples/orders
+
+# Scaffold a new Goa + Goa-AI + Model starter service and visible eval/ suite:
+go run ./cmd/surla init -dir /tmp/shop -module example.com/shop \
+  -surla-version v0.0.0-20261031211028-8ec6e0997e6b
 
 # List all commands and flags:
 go run ./cmd/surla help
