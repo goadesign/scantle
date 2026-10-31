@@ -1,10 +1,10 @@
 # Golden Path Architecture & the Goa Design Suite
 
-**[← Back to README](../README.md)** · **[← How Scantle Works](HOW_IT_WORKS.md)** · **[CLI & MCP Reference →](REFERENCE.md)**
+**[← Back to README](../README.md)** · **[← How Surla Works](HOW_IT_WORKS.md)** · **[CLI & MCP Reference →](REFERENCE.md)**
 
 When coding agents build a platform from scratch without architectural guardrails, they default to fragile shortcuts: every service exposes ad-hoc HTTP JSON routes, every package calls LLM provider SDKs directly with no central rate limiting or cost tracking, `tenant_id` is passed inside LLM prompt arguments, and multi-step workflows run in fragile in-memory goroutines that lose state on deploy.
 
-Scantle embeds a single-source-of-truth **Golden Path Playbook** ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) and serves it both as an MCP resource (`scantle://golden-path`) and as the foundational system prompt for Checkpoint 1 architectural analysis.
+Surla embeds a single-source-of-truth **Golden Path Playbook** ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) and serves it both as an MCP resource (`surla://golden-path`) and as the foundational system prompt for Checkpoint 1 architectural analysis.
 
 ---
 

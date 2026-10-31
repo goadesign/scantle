@@ -1,6 +1,6 @@
 # CLI, MCP & Repository Reference
 
-**[← Back to README](../README.md)** · **[← How Scantle Works](HOW_IT_WORKS.md)** · **[← Golden Path Architecture](ARCHITECTURE_PLAYBOOK.md)**
+**[← Back to README](../README.md)** · **[← How Surla Works](HOW_IT_WORKS.md)** · **[← Golden Path Architecture](ARCHITECTURE_PLAYBOOK.md)**
 
 ---
 
@@ -11,29 +11,29 @@
 - **macOS** (`sandbox-exec` is used by `verify/candidate` to isolate candidate builds and processes; non-macOS hosts fail closed with `ErrIsolationUnavailable`)
 - **Temporal CLI** (`brew install temporal`) for running the end-to-end durable workflow crash and replay verification suites
 
-### Start the Scantle Server
+### Start the Surla Server
 
-To enable feature-request analysis, set `ANTHROPIC_API_KEY` and set `SCANTLE_MODEL_NAME` to a model ID available to that key, then run:
+To enable feature-request analysis, set `ANTHROPIC_API_KEY` and set `SURLA_MODEL_NAME` to a model ID available to that key, then run:
 
 ```bash
-export SCANTLE_AUTH_TOKEN="dev-secret-token"
-go run ./cmd/scantle serve -addr 127.0.0.1:8090 \
+export SURLA_AUTH_TOKEN="dev-secret-token"
+go run ./cmd/surla serve -addr 127.0.0.1:8090 \
   -principal operator@example.com \
-  -model-provider anthropic -model-name "$SCANTLE_MODEL_NAME"
+  -model-provider anthropic -model-name "$SURLA_MODEL_NAME"
 ```
 
 For OpenAI, use `-model-provider openai`, set `OPENAI_API_KEY`, and choose a model ID available to that key. Alternatively, use `-model-gateway-addr <host:port>` alone to call an existing model gateway; the gateway chooses the model. That connection uses plaintext gRPC and is intended for loopback or a trusted network.
 
 Omitting all model flags starts the server without feature-request analysis. The `diff` tool, Golden Path resource, and `compiled_rule` rebuild response still work; `propose_change` returns `cp1 semantic analyzer is required`.
 
-### Register Scantle in `.mcp.json`
+### Register Surla in `.mcp.json`
 
-Add Scantle to your project's `.mcp.json` (or global agent configuration in Claude Code, Codex, Gemini, or Cursor):
+Add Surla to your project's `.mcp.json` (or global agent configuration in Claude Code, Codex, Gemini, or Cursor):
 
 ```json
 {
   "mcpServers": {
-    "scantle": {
+    "surla": {
       "type": "http",
       "url": "http://127.0.0.1:8090/mcp",
       "headers": {
@@ -114,24 +114,24 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
   - Applies a `prompt_template` to a target configured through `controlplane.Options.TargetUpdater`, without rebuilding Go code, or reports that a `compiled_rule` requires a rebuild. The `serve` command does not bind a prompt updater, so its `prompt_template` requests return `no target prompt updater is bound to this control plane`.
 - **`diff`** (`POST /diff`)
   - **Input:** `old` (`DesignSnapshot`), `new` (`DesignSnapshot`) → **Output:** `DiffResult`
-  - Compares two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives, paired with `ToolUI("ui://scantle/checkpoint")` for structural diff visualization.
+  - Compares two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives, paired with `ToolUI("ui://surla/checkpoint")` for structural diff visualization.
 
 ### MCP Resources
 
-- **`scantle://golden-path`** (`text/markdown` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /golden-path`)
+- **`surla://golden-path`** (`text/markdown` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /golden-path`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
-- **`ui://scantle/checkpoint`** (`text/html;profile=mcp-app` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /ui/checkpoint`)
+- **`ui://surla/checkpoint`** (`text/html;profile=mcp-app` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /ui/checkpoint`)
   - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`, built from [`ui/checkpoint/`](../ui/checkpoint/)). It completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders results delivered by the host via `ui/notifications/tool-result`, without server-retained preview state: the `CP1` Change Card form (saving through `confirm_intent` and recovering with `get_change` via host `tools/call`, keeping unsaved edits across stale-revision conflicts), the optional OpenUI decision view from `ui_composition` (labeled as a model-proposed illustration and sharing the form's draft), `CP2` architecture previews (a scrollable C4 graph above inspectable lists), unbound structural diffs, and `CP3` draft results. Interactive role-switching and replay controls, and `openui.v1` action dispatch, remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough).
 
 ---
 
 ## CLI Reference
 
-### `scantle serve` *(default)*
-Starts the Scantle HTTP and MCP JSON-RPC control-plane server protected by bearer-token authentication.
+### `surla serve` *(default)*
+Starts the Surla HTTP and MCP JSON-RPC control-plane server protected by bearer-token authentication.
 - `-addr <host:port>` — Listen address (default `127.0.0.1:8090`).
 - `-principal <id>` — Authenticated operator principal ID *(required)*.
-- `-auth-token <token>` — Bearer token required on HTTP and MCP requests (or `$SCANTLE_AUTH_TOKEN`, *required*).
+- `-auth-token <token>` — Bearer token required on HTTP and MCP requests (or `$SURLA_AUTH_TOKEN`, *required*).
 - `-model-gateway-addr <host:port>` — Optional model gateway for CP1 analysis over plaintext gRPC. The gateway chooses the model; cannot be combined with `-model-provider` or `-model-name`.
 - `-model-provider <anthropic|openai>` — Optional direct provider for CP1 analysis. Requires `-model-name` and the matching `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` environment variable. Provider names must match exactly.
 - `-model-name <model>` — Model ID for direct provider mode; required with `-model-provider` and rejected in gateway mode.
@@ -139,12 +139,12 @@ Starts the Scantle HTTP and MCP JSON-RPC control-plane server protected by beare
 
 Model and swarm-profile flags are independent. Incomplete or mixed model options stop startup with an error. A supplied profiles file must contain one JSON array: unknown fields, trailing JSON values, duplicate profile IDs, empty required metadata, and unknown capabilities stop startup. Omitted profiles leave the proposed roster unconfigured.
 
-### `scantle diff`
+### `surla diff`
 Reads two Go design modules into symlink-safe snapshots, evaluates both inside the sandboxed Goa/Goa-AI compiler at their own `go.mod` dependency versions, and prints the JSON `DiffResult` to `stdout`.
 - `--old-dir <path>` — Root directory of the previous design module *(required)*.
 - `--new-dir <path>` — Root directory of the candidate design module *(required)*.
 
-### `scantle verify`
+### `surla verify`
 Clones the committed candidate and evaluator suite into an isolated work directory, builds the candidate binaries (`WorkDir/candidate-bin/<name>`) and suite runner (`WorkDir/suite-bin/suite`) inside `verify/candidate`'s macOS `sandbox-exec` jail, runs the suite, writes the canonical `verify.Report` JSON to `<report-dir>/<digest>.json`, and prints the JSON report to `stdout` (setup or build errors exit non-zero without printing report JSON, while an assembled report with a failing scenario is written and printed before exiting non-zero).
 - `-candidate-repo <path|url>` — Git repository holding the candidate *(required)*.
 - `-candidate-commit <sha>` — Full commit ID of the candidate to build *(required)*.
@@ -163,7 +163,7 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 
 ## Reference Platform: `examples/orders` & `examples/orders-eval`
 
-Scantle includes an order-refund service and an isolated evaluator for checking payment effects, manager approval, worker recovery, and token budgets:
+Surla includes an order-refund service and an isolated evaluator for checking payment effects, manager approval, worker recovery, and token budgets:
 
 ### [`examples/orders`](../examples/orders/) — The Candidate Platform
 - **[`design/`](../examples/orders/design/)**: Declares the public `orders` HTTP service, internal `commerce` and `payments` services, the `goa-ai` `refund` agent (`Inject("tenant_id", "customer_id")`, `BoundedResult`, and `Confirmation`), and the C4 architecture model rendered to [`gen/structurizr/model.json`](../examples/orders/gen/structurizr/model.json).
@@ -192,7 +192,7 @@ The end-to-end tests require the `e2e` build tag, macOS, and the Temporal CLI. R
 go test -race -tags e2e ./internal/verify
 ```
 
-See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-step walkthrough including `scantle verify` (full operator report vs. `-builder-view`).
+See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-step walkthrough including `surla verify` (full operator report vs. `-builder-view`).
 
 ---
 
@@ -201,10 +201,10 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 ```text
 .
 ├── design/
-│   └── design.go                 # Scantle Goa & Goa-AI MCP 1.0.0 DSL contract
+│   └── design.go                 # Surla Goa & Goa-AI MCP 1.0.0 DSL contract
 ├── cmd/
-│   └── scantle/
-│       └── main.go               # CLI entrypoint (`scantle serve`, `scantle diff`, and `scantle verify`)
+│   └── surla/
+│       └── main.go               # CLI entrypoint (`surla serve`, `surla diff`, and `surla verify`)
 ├── docs/
 │   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & independent verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview
@@ -217,7 +217,7 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   ├── goldenpath/               # Embedded GOLDEN_PATH.md playbook & CP1 architect system prompt
 │   ├── procgroup/                # Process-group lifecycle management for sandboxed child processes
 │   ├── swarm/                    # Deterministic Chorus role assignment & cross-family model router
-│   └── verify/                   # Worktree verifier (`scantle verify`), holdout redactor, and library merge-gate check
+│   └── verify/                   # Worktree verifier (`surla verify`), holdout redactor, and library merge-gate check
 ├── ui/
 │   └── checkpoint/               # React + OpenUI checkpoint viewer source; build.mjs writes checkpoint.html, decision_catalog.md, and generated types
 ├── verify/
