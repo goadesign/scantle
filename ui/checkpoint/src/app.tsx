@@ -406,7 +406,7 @@ export function bootstrapCheckpointApp() {
       rpcInFlight: true,
       formError: null,
     };
-    statusEl.textContent = "Submitting confirm_intent to MCP Apps host...";
+    statusEl.textContent = "Saving your confirmed answers and examples...";
     syncEditorRegion();
 
     const submittedCard = activeEditor.card;
@@ -458,7 +458,7 @@ export function bootstrapCheckpointApp() {
       ...activeEditor,
       rpcInFlight: true,
     };
-    statusEl.textContent = "Loading latest Change Card via get_change...";
+    statusEl.textContent = "Loading the latest saved Change Card...";
     syncEditorRegion();
 
     callServerTool(
@@ -487,7 +487,10 @@ export function bootstrapCheckpointApp() {
       preservedDraft,
       formError: null,
     };
-    statusEl.textContent = "Rendered Checkpoint 1 Change Card (" + card.status + ")";
+    statusEl.textContent =
+      card.status === "confirmed"
+        ? "Showing confirmed Change Card. You can refine answers or examples below."
+        : "Review the open questions and examples below, then confirm your intent.";
     rootEl.dataset.state = "cp1-change-card";
     syncEditorRegion();
   }
@@ -544,8 +547,7 @@ export function bootstrapCheckpointApp() {
       activeResult = { kind: "cp2-architecture-preview", preview: payload };
       syncResultRegion();
       rootEl.dataset.state = "cp2-architecture-preview";
-      statusEl.textContent =
-        "Rendered Checkpoint 2 Architecture Preview (" + payload.system_name + ")";
+      statusEl.textContent = "Showing architecture preview for " + payload.system_name + ".";
       return;
     }
     if (isChangeCardResult(payload)) {
@@ -561,9 +563,7 @@ export function bootstrapCheckpointApp() {
           syncResultRegion();
           rootEl.dataset.state = "cp1-change-card";
           statusEl.textContent =
-            "Received Checkpoint 1 Change Card (" +
-            payload.request_revision +
-            "); unsaved editor draft preserved.";
+            "A newer Change Card arrived while you were editing; your unsaved draft is preserved.";
           return;
         }
       }
@@ -580,8 +580,9 @@ export function bootstrapCheckpointApp() {
       activeResult = { kind: "cp2-diff", diff: payload };
       syncResultRegion();
       rootEl.dataset.state = "cp2-diff";
-      statusEl.textContent =
-        "Rendered Structural Design Diff (has_changes=" + payload.has_changes + ")";
+      statusEl.textContent = payload.has_changes
+        ? "Showing structural design diff with detected contract changes."
+        : "Showing structural design diff (no contract changes detected).";
       return;
     }
     if (isDraftOverrideResult(payload)) {
@@ -592,7 +593,7 @@ export function bootstrapCheckpointApp() {
       activeResult = { kind: "cp3-draft-override", draft: payload };
       syncResultRegion();
       rootEl.dataset.state = "cp3-draft-override";
-      statusEl.textContent = "Rendered Checkpoint 3 Fast Draft Override";
+      statusEl.textContent = "Showing Fast Draft prompt and rule update.";
       return;
     }
     renderError("Unsupported or malformed Scantle checkpoint payload.");
@@ -659,7 +660,7 @@ export function bootstrapCheckpointApp() {
         syncEditorRegion();
         syncResultRegion();
         rootEl.dataset.state = "waiting";
-        statusEl.textContent = "Streaming partial tool input; awaiting validated checkpoint result...";
+        statusEl.textContent = "Receiving checkpoint input...";
         return;
       }
       if (msg.method === "ui/notifications/tool-input") {
@@ -670,7 +671,7 @@ export function bootstrapCheckpointApp() {
         if (shouldRetainEditor()) {
           return;
         }
-        renderWaiting("Received tool input; awaiting validated checkpoint result...");
+        renderWaiting("Preparing checkpoint view...");
         return;
       }
       if (msg.method === "ui/notifications/tool-cancelled") {
@@ -745,7 +746,7 @@ export function bootstrapCheckpointApp() {
       }
       applyHostTheme(msg.result);
       rootEl.dataset.initialized = "true";
-      statusEl.textContent = "MCP Apps handshake complete; awaiting checkpoint tool result...";
+      statusEl.textContent = "Ready. Waiting for the next checkpoint...";
       window.parent.postMessage(
         { jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} },
         "*"

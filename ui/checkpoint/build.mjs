@@ -1,9 +1,10 @@
 // build.mjs derives ui/checkpoint/src/types.ts from the Goa-generated tool
-// result schemas in gen/scantle/toolsets/scantle, compiles the Scantle
-// Checkpoint Studio React + OpenUI + shadcn/ui application into the single-file
-// internal/controlplane/checkpoint.html bundle, and exports the OpenUI catalog
+// result schemas exported by internal/controlplane/export_schemas_gen.go,
+// compiles the Scantle Checkpoint Studio React + OpenUI + shadcn/ui application
+// into internal/controlplane/checkpoint.html, and exports the OpenUI catalog
 // prompt to internal/goldenpath/decision_catalog.md.
 
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
@@ -12,76 +13,142 @@ import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../..");
 const checkOnly = process.argv.includes("--check");
 
 const typesTsPath = path.join(__dirname, "src/types.ts");
-const checkpointHtmlPath = path.resolve(
-  __dirname,
-  "../../internal/controlplane/checkpoint.html"
-);
-const decisionCatalogPath = path.resolve(
-  __dirname,
-  "../../internal/goldenpath/decision_catalog.md"
-);
-const registryLookupPath = path.resolve(
-  __dirname,
-  "../../gen/scantle/toolsets/scantle/registry_schema_lookup.go"
-);
-const registrySchemasPath = path.resolve(
-  __dirname,
-  "../../gen/scantle/toolsets/scantle/registry_schemas.go"
-);
-const mcpAdapterPath = path.resolve(
-  __dirname,
-  "../../gen/mcp_scantle/adapter_server.go"
-);
-const openApiPath = path.resolve(
-  __dirname,
-  "../../gen/http/openapi3.json"
-);
+const checkpointHtmlPath = path.join(repoRoot, "internal/controlplane/checkpoint.html");
+const decisionCatalogPath = path.join(repoRoot, "internal/goldenpath/decision_catalog.md");
+const openApiPath = path.join(repoRoot, "gen/http/openapi3.json");
 
-// compactSchema strips prose descriptions and root $schema URLs while keeping
-// every structural JSON Schema constraint (type, properties, required,
-// additionalProperties, items, enum, $ref, $defs).
-function compactSchema(node) {
-  if (!node || typeof node !== "object") {
-    return node;
+const SUPPORTED_SCHEMA_KEYS = new Set([
+  "type",
+  "$ref",
+  "enum",
+  "required",
+  "additionalProperties",
+  "items",
+  "properties",
+  "$defs",
+]);
+
+const IGNORED_ANNOTATION_KEYS = new Set([
+  "$schema",
+  "title",
+  "description",
+  "example",
+  "examples",
+  "default",
+]);
+
+const SUPPORTED_TYPES = new Set([
+  "string",
+  "boolean",
+  "integer",
+  "number",
+  "array",
+  "object",
+]);
+
+// compactSchema strips non-constraining annotation keys while keeping every
+// supported structural JSON Schema constraint and failing the build if any
+// unsupported keyword, type, or format constraint appears in a generated schema.
+function compactSchema(node, schemaPath = "$") {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    throw new Error(`Invalid JSON Schema node at ${schemaPath}`);
+  }
+  for (const key of Object.keys(node)) {
+    if (key === "format") {
+      if (node.type !== "integer" || node.format !== "int64") {
+        throw new Error(
+          `Unsupported JSON Schema format ${JSON.stringify(node.format)} on type ${JSON.stringify(
+            node.type
+          )} at ${schemaPath}`
+        );
+      }
+      continue;
+    }
+    if (!SUPPORTED_SCHEMA_KEYS.has(key) && !IGNORED_ANNOTATION_KEYS.has(key)) {
+      throw new Error(`Unsupported JSON Schema keyword ${JSON.stringify(key)} at ${schemaPath}`);
+    }
   }
   const out = {};
-  if (typeof node.type === "string") {
+  if (node.type !== undefined) {
+    if (typeof node.type !== "string" || !SUPPORTED_TYPES.has(node.type)) {
+      throw new Error(
+        `Unsupported JSON Schema type ${JSON.stringify(node.type)} at ${schemaPath}`
+      );
+    }
     out.type = node.type;
   }
-  if (typeof node.$ref === "string") {
+  if (node.$ref !== undefined) {
+    if (typeof node.$ref !== "string" || !node.$ref.startsWith("#/$defs/")) {
+      throw new Error(
+        `Unsupported JSON Schema $ref ${JSON.stringify(node.$ref)} at ${schemaPath}`
+      );
+    }
     out.$ref = node.$ref;
   }
-  if (Array.isArray(node.enum)) {
+  if (node.enum !== undefined) {
+    if (!Array.isArray(node.enum) || !node.enum.every((v) => typeof v === "string")) {
+      throw new Error(`Unsupported non-string enum at ${schemaPath}`);
+    }
     out.enum = node.enum;
   }
-  if (Array.isArray(node.required)) {
+  if (node.required !== undefined) {
+    if (!Array.isArray(node.required) || !node.required.every((v) => typeof v === "string")) {
+      throw new Error(`Invalid required array at ${schemaPath}`);
+    }
     out.required = node.required;
   }
   if (node.additionalProperties !== undefined) {
-    out.additionalProperties =
-      typeof node.additionalProperties === "object" && node.additionalProperties !== null
-        ? compactSchema(node.additionalProperties)
-        : node.additionalProperties;
-  }
-  if (node.items && typeof node.items === "object") {
-    out.items = compactSchema(node.items);
-  }
-  if (node.properties && typeof node.properties === "object") {
-    out.properties = {};
-    for (const [k, v] of Object.entries(node.properties)) {
-      out.properties[k] = compactSchema(v);
+    if (typeof node.additionalProperties === "boolean") {
+      out.additionalProperties = node.additionalProperties;
+    } else if (
+      node.additionalProperties &&
+      typeof node.additionalProperties === "object" &&
+      !Array.isArray(node.additionalProperties)
+    ) {
+      out.additionalProperties = compactSchema(
+        node.additionalProperties,
+        `${schemaPath}.additionalProperties`
+      );
+    } else {
+      throw new Error(`Unsupported additionalProperties at ${schemaPath}`);
     }
   }
-  if (node.$defs && typeof node.$defs === "object") {
+  if (node.items !== undefined) {
+    out.items = compactSchema(node.items, `${schemaPath}.items`);
+  }
+  if (node.properties !== undefined) {
+    if (typeof node.properties !== "object" || Array.isArray(node.properties)) {
+      throw new Error(`Invalid properties map at ${schemaPath}`);
+    }
+    out.properties = {};
+    for (const [k, v] of Object.entries(node.properties)) {
+      out.properties[k] = compactSchema(v, `${schemaPath}.properties.${k}`);
+    }
+  }
+  if (node.$defs !== undefined) {
+    if (typeof node.$defs !== "object" || Array.isArray(node.$defs)) {
+      throw new Error(`Invalid $defs map at ${schemaPath}`);
+    }
     out.$defs = {};
     for (const [k, v] of Object.entries(node.$defs)) {
-      out.$defs[k] = compactSchema(v);
+      out.$defs[k] = compactSchema(v, `${schemaPath}.$defs.${k}`);
     }
   }
   return out;
+}
+
+// Verify at build startup that compactSchema rejects unsupported assertions.
+try {
+  compactSchema({ type: "string", minLength: 1 }, "$.selfCheck");
+  throw new Error("compactSchema failed to reject unsupported keyword minLength");
+} catch (err) {
+  if (!String(err.message || err).includes('Unsupported JSON Schema keyword "minLength"')) {
+    throw err;
+  }
 }
 
 // tsTypeForProperty converts a JSON Schema property node into its TypeScript
@@ -127,47 +194,27 @@ function emitInterface(name, schema) {
   return lines.join("\n");
 }
 
-// generateTypesModule reads the Goa-generated tool schemas via
-// gen/scantle/toolsets/scantle/registry_schema_lookup.go, verifies parity with
-// gen/mcp_scantle/adapter_server.go and gen/http/openapi3.json, and generates
-// ui/checkpoint/src/types.ts.
+// generateTypesModule invokes internal/controlplane/export_schemas_gen.go to
+// obtain the generated ResultSchemas (via ToolSchemas() and ToolSchema(name))
+// and MCP OutputSchemas (via NewMCPAdapter(nil, nil).ToolsList), verifies
+// parity against gen/http/openapi3.json, and generates ui/checkpoint/src/types.ts.
 function generateTypesModule() {
-  const lookupSrc = fs.readFileSync(registryLookupPath, "utf8");
-  const regSrc = fs.readFileSync(registrySchemasPath, "utf8");
-  const adapterSrc = fs.readFileSync(mcpAdapterPath, "utf8");
+  const exportedRaw = execFileSync(
+    "go",
+    ["run", "./internal/controlplane/export_schemas_gen.go"],
+    { cwd: repoRoot, encoding: "utf8" }
+  );
+  const exported = JSON.parse(exportedRaw);
   const openApi = JSON.parse(fs.readFileSync(openApiPath, "utf8"));
 
-  const toolToFunc = {};
-  for (const m of lookupSrc.matchAll(
-    /case\s+"([^"]+)":\s*return\s+declarations\.(schema\d+)\(\)/g
-  )) {
-    toolToFunc[m[1]] = m[2];
-  }
-
-  const rawByTool = {};
-  for (const [tool, fn] of Object.entries(toolToFunc)) {
-    const re = new RegExp(
-      "func \\(declarations registryDeclarations\\) " +
-        fn +
-        "\\(\\) \\*genregistry\\.ToolSchema \\{[\\s\\S]*?ResultSchema:\\s*\\[\\]byte\\(\"((?:\\\\.|[^\"\\\\])*)\"\\)"
-    );
-    const m = regSrc.match(re);
-    if (!m) {
-      throw new Error(`Missing ResultSchema for ${tool} (${fn}) in registry_schemas.go`);
-    }
-    const regSchema = JSON.parse(JSON.parse(`"${m[1]}"`));
-
+  const rawByTool = exported.registry || {};
+  const mcpByTool = exported.mcp || {};
+  for (const [tool, regSchema] of Object.entries(rawByTool)) {
     const mcpName = tool.replace(/^scantle\./, "");
-    const outRe = new RegExp(
-      'Name:\\s*"' +
-        mcpName +
-        '"[\\s\\S]*?OutputSchema:\\s*json\\.RawMessage\\("((?:\\\\.|[^"\\\\])*)"\\)'
-    );
-    const outMatch = adapterSrc.match(outRe);
-    if (!outMatch) {
-      throw new Error(`Missing OutputSchema for ${mcpName} in gen/mcp_scantle/adapter_server.go`);
+    const mcpSchema = mcpByTool[mcpName];
+    if (!mcpSchema) {
+      throw new Error(`Missing MCP OutputSchema for ${mcpName} from ToolsList`);
     }
-    const mcpSchema = JSON.parse(JSON.parse(`"${outMatch[1]}"`));
     const oaType = mcpSchema.title;
     const oaSchema = openApi.components?.schemas?.[oaType];
     if (
@@ -178,7 +225,6 @@ function generateTypesModule() {
     ) {
       throw new Error(`Schema parity mismatch for ${tool} (${oaType})`);
     }
-    rawByTool[tool] = regSchema;
   }
 
   if (
@@ -191,10 +237,19 @@ function generateTypesModule() {
   }
 
   const rootSchemas = {
-    ChangeCardResult: compactSchema(rawByTool["scantle.propose_change"]),
-    ArchitecturePreviewResult: compactSchema(rawByTool["scantle.preview_architecture"]),
-    DiffResult: compactSchema(rawByTool["scantle.diff"]),
-    DraftOverrideResult: compactSchema(rawByTool["scantle.draft_override"]),
+    ChangeCardResult: compactSchema(
+      rawByTool["scantle.propose_change"],
+      "ChangeCardResult"
+    ),
+    ArchitecturePreviewResult: compactSchema(
+      rawByTool["scantle.preview_architecture"],
+      "ArchitecturePreviewResult"
+    ),
+    DiffResult: compactSchema(rawByTool["scantle.diff"], "DiffResult"),
+    DraftOverrideResult: compactSchema(
+      rawByTool["scantle.draft_override"],
+      "DraftOverrideResult"
+    ),
   };
 
   const emittedDefs = new Set();
@@ -398,7 +453,7 @@ ${stylesCss}
         <p><small>Submitting Checkpoint 1 edits dispatches <code>confirm_intent</code> through the MCP Apps host; server authentication and <code>request_revision</code> checks remain authoritative.</small></p>
       </details>
     </header>
-    <p id="scantle-checkpoint-status" role="status" aria-live="polite">Awaiting MCP Apps host initialization and checkpoint tool result...</p>
+    <p id="scantle-checkpoint-status" role="status" aria-live="polite">Connecting to checkpoint studio...</p>
     <section id="scantle-checkpoint-view" aria-label="Checkpoint Payload"></section>
   </main>
   <script>
