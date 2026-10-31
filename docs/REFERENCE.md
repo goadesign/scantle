@@ -168,7 +168,9 @@ Scantle includes an order-refund service and an isolated evaluator for checking 
 ### [`examples/orders`](../examples/orders/) — The Candidate Platform
 - **[`design/`](../examples/orders/design/)**: Declares the public `orders` HTTP service, internal `commerce` and `payments` services, the `goa-ai` `refund` agent (`Inject("tenant_id", "customer_id")`, `BoundedResult`, and `Confirmation`), and the C4 architecture model rendered to [`gen/structurizr/model.json`](../examples/orders/gen/structurizr/model.json).
 - **[`AGENTS_QUICKSTART.md`](../examples/orders/AGENTS_QUICKSTART.md)**: Generated contextual map for coding agents, surfacing per-tool `BindTo` method links, server-injected fields, `BoundedResult` cursor guidance, `Confirmation` gates, and `gen/orders/agents/refund/specs/tool_schemas.json`.
-- **[`internal/refundflow`](../examples/orders/internal/refundflow/)**: Durable Temporal workflow implementing instant store credit (`<= \$50.00` including tax and shipping) and manager approval signals (`> \$50.00`) with idempotent payment keys.
+- **[`internal/orders`](../examples/orders/internal/orders/)**: The refund rule (`StoreCreditLimitCents` in `refunds.go`): an order total up to `\$50.00`, including tax and shipping, is refunded as instant store credit; a larger total is refunded to the card after a manager approves.
+- **[`internal/assistant`](../examples/orders/internal/assistant/)**: Runs the `refund` agent and resumes a suspended run after the manager's decision (`PrepareContinuation`, then `StartPrepared`).
+- **[`internal/refundflow`](../examples/orders/internal/refundflow/)**: Durable Temporal workflow that executes each refund exactly once, with workflow IDs and payment idempotency keys derived from the tenant and order.
 - **[`internal/runstore`](../examples/orders/internal/runstore/)**: Transactional SQLite implementation of `goa-ai`'s durable `storage.Store`.
 
 ### [`examples/orders-eval`](../examples/orders-eval/) — The Isolated Evaluator

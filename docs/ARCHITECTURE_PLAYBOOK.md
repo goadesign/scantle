@@ -21,7 +21,7 @@ Every service, method, payload, error contract, agent, toolset, MCP resource, an
 No domain service or agent worker holds raw LLM provider API keys or calls external provider endpoints directly:
 - **Gateway Service**: Front all model calls with [`goa.design/goa-ai/features/model/gateway`](https://github.com/goadesign/goa-ai) (`RegisterGRPCServer` and `NewGRPCClient`) over `Complete`, `Stream`, and `CountTokens`.
 - **Distributed Token Rate Limiting**: Wrap the gateway with `middleware.NewAdaptiveRateLimiter` backed by a [Pulse](https://github.com/goadesign/pulse) replicated map (`pulse/rmap`) so token-per-minute budgets and AIMD backpressure are coordinated across replicas.
-- **Fail-Closed Usage Attribution**: Emit OpenTelemetry `gen_ai.*` spans via [Clue](https://github.com/goadesign/clue) and record `TokenUsage` on every call. If a provider omits usage metadata, mark `RetainedUsageIncomplete = true` so budget gates fail closed rather than counting missing usage as zero.
+- **Fail-Closed Usage Attribution**: Emit OpenTelemetry `gen_ai.*` spans via [Clue](https://github.com/goadesign/clue) and record `TokenUsage` on every call. Treat a call whose usage is missing or only partly reported as unknown, never as zero, so budget gates fail closed (the `examples/orders-eval` gateway counts such calls in `Usage.Unreported` and fails the budget check).
 
 ### 4. Security & Identity by Construction (`Inject`, `BindField`, `ServerData`)
 Never trust an LLM to supply or preserve security principals, tenant IDs, or credentials:
@@ -36,7 +36,7 @@ Never trust an LLM to supply or preserve security principals, tenant IDs, or cre
 
 ### 6. Durable Temporal Workflows & Zero-Wait Human Suspension
 - **Deterministic Replay**: Multi-step agent runs execute on the Goa-AI Temporal engine with a durable run log (`runtime/agent/runlog`; [`examples/orders`](../examples/orders/) stores runs in SQLite through `internal/runstore`), keeping workflow definitions pure and isolating I/O inside registered activities.
-- **Zero-Wait Human Approvals**: High-consequence tools declare design-time `Confirmation(...)` or pause the workflow (`RunStatusPaused`), releasing all worker threads until an authorized principal invokes `PrepareContinuation` and `Continue` on the public API.
+- **Zero-Wait Human Approvals**: High-consequence tools declare design-time `Confirmation(...)`. The run then suspends and saves its suspension, holding no worker thread, until an authorized principal decides through the public API, which resumes it by calling `PrepareContinuation` and then `StartPrepared` (as `examples/orders/internal/assistant` does).
 - **Payload & Context Bounds**: Paginate collection tools with `BoundedResult`, configure `RunPolicy` (`MaxToolCalls`, `TimeBudget`, `Cache`, `History` `Compress`), and keep tool/activity payloads well under Temporal's 2 MiB event-history limit (`< 1 MiB` for complete `goa-ai` envelopes).
 
 ### 7. Customizing Generated Artifacts via Goa Plugins (`codegen.RegisterPluginLast`)
