@@ -26,6 +26,20 @@ choice = AmbiguityChoiceCard(1, "Tax and shipping change who waits for a manager
 table = PolicySimulatorTable("Who waits?", 1, [row])
 row = PolicySimulatorRow("$48 item + $6 shipping", "$54.00 total", ["Instant credit", "Waits for a manager"], 1)`
 
+// mcpResultFrame is the final JSON-RPC tools/call response frame of an MCP
+// event stream.
+type mcpResultFrame struct {
+	// ID is the JSON-RPC request ID the frame answers.
+	ID json.RawMessage `json:"id"`
+	// Result is the tool call outcome.
+	Result struct {
+		// IsError reports a tool error.
+		IsError bool `json:"isError"`
+		// StructuredContent is the encoded tool result.
+		StructuredContent json.RawMessage `json:"structuredContent"`
+	} `json:"result"`
+}
+
 // recordingCP1Provider is a model.Provider that records the CP1 request it
 // receives and answers with a fixed analysis.
 type recordingCP1Provider struct {
@@ -135,7 +149,7 @@ func TestCompositionSurvivesAnUnchangedResubmission(t *testing.T) {
 }
 
 func TestProposeChangeReportsProgressOverMCP(t *testing.T) {
-	cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, nil)})
+	cp := newCompositionControlPlane(t, &recordingCP1Provider{analysis: compositionAnalysis(t, &[]string{compositionProgram}[0])})
 	srv := httptest.NewServer(NewHTTPHandler(cp, NewTokenAuthenticator(map[string]Principal{"alice-token": {ID: "alice@example.com"}})))
 	defer srv.Close()
 
@@ -158,6 +172,7 @@ func TestProposeChangeReportsProgressOverMCP(t *testing.T) {
 
 	var messages []string
 	var progress []map[string]any
+	var final *mcpResultFrame
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 1<<20), 1<<20)
 	for scanner.Scan() {
@@ -168,13 +183,17 @@ func TestProposeChangeReportsProgressOverMCP(t *testing.T) {
 		var msg struct {
 			Method string         `json:"method"`
 			Params map[string]any `json:"params"`
-			Result map[string]any `json:"result"`
 		}
 		require.NoError(t, json.Unmarshal([]byte(data), &msg))
 		if msg.Method == "notifications/progress" {
+			require.Nil(t, final, "progress must arrive before the final result")
 			progress = append(progress, msg.Params)
 			messages = append(messages, msg.Params["message"].(string))
+			continue
 		}
+		require.Nil(t, final, "the stream must carry exactly one final result")
+		final = new(mcpResultFrame)
+		require.NoError(t, json.Unmarshal([]byte(data), final))
 	}
 	require.NoError(t, scanner.Err())
 	assert.Equal(t, []string{"Analyzing the feature request with the CP1 model", "Validating the CP1 analysis"}, messages)
@@ -182,6 +201,26 @@ func TestProposeChangeReportsProgressOverMCP(t *testing.T) {
 		assert.Equal(t, "p1", p["progressToken"])
 		assert.EqualValues(t, 1, p["total"])
 	}
+
+	require.NotNil(t, final, "the stream must end with the tools/call result")
+	assert.JSONEq(t, `1`, string(final.ID), "the final result must answer request 1")
+	require.False(t, final.Result.IsError, "propose_change failed: %s", final.Result.StructuredContent)
+	var card struct {
+		RequestRevision string `json:"request_revision"`
+		Ambiguities     []struct {
+			ID string `json:"id"`
+		} `json:"ambiguities"`
+		UIComposition struct {
+			Program             string `json:"program"`
+			ComposedForRevision string `json:"composed_for_revision"`
+		} `json:"ui_composition"`
+	}
+	require.NoError(t, json.Unmarshal(final.Result.StructuredContent, &card))
+	assert.Equal(t, compositionProgram, card.UIComposition.Program, "the program must cross the MCP wire byte for byte")
+	assert.Equal(t, card.RequestRevision, card.UIComposition.ComposedForRevision)
+	assert.NotEmpty(t, card.RequestRevision)
+	require.Len(t, card.Ambiguities, 1)
+	assert.Equal(t, "chg-ambiguity-01", card.Ambiguities[0].ID)
 }
 
 func TestReportProgressWithoutARequestedTokenIsANoOp(t *testing.T) {
