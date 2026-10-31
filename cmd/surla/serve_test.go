@@ -288,6 +288,14 @@ surla: propose_change is off: no model is configured to analyze change requests 
 `,
 		},
 		{
+			name: "all IPv4 interfaces without a model",
+			addr: &net.TCPAddr{IP: net.IPv4zero, Port: 8090},
+			want: `surla: serving on http://localhost:8090
+surla: connect MCP clients to http://localhost:8090/mcp with the bearer token
+surla: propose_change is off: no model is configured to analyze change requests (set -model-provider and -model-name, or -model-gateway-addr)
+`,
+		},
+		{
 			name: "all interfaces with a model",
 			addr: &net.TCPAddr{IP: net.IPv6unspecified, Port: 8090},
 			opts: controlplane.Options{Analyzer: controlplane.NewModelCP1Analyzer(nil)},

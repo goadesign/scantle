@@ -146,6 +146,7 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 		{name: "-h", args: []string{"-h"}, wantUsage: true},
 		{name: "--help", args: []string{"--help"}, wantUsage: true},
 		{name: "help help", args: []string{"help", "help"}, wantUsage: true},
+		{name: "help -h", args: []string{"help", "-h"}, wantUsage: true},
 		{name: "help for a command", args: []string{"help", "verify"}},
 		{name: "command -h", args: []string{"preview", "-h"}},
 		{name: "command --help", args: []string{"approve", "--help"}},
@@ -177,6 +178,27 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 	}
 }
 
+func TestResolveAuthTokenPrefersTheFlag(t *testing.T) {
+	cases := []struct {
+		name, flag, env, want string
+	}{
+		{name: "flag only", flag: "from-flag", want: "from-flag"},
+		{name: "environment only", env: "from-env", want: "from-env"},
+		{name: "flag beats environment", flag: "from-flag", env: "from-env", want: "from-flag"},
+		{name: "whitespace trimmed", env: "  from-env\n", want: "from-env"},
+		{name: "neither", want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			getenv := func(name string) string {
+				require.Equal(t, "SURLA_AUTH_TOKEN", name)
+				return tc.env
+			}
+			assert.Equal(t, tc.want, resolveAuthToken(tc.flag, getenv))
+		})
+	}
+}
+
 func TestServeHelpNeverPrintsTheEnvironmentToken(t *testing.T) {
 	const token = "synthetic-token-7f3a"
 	t.Setenv("SURLA_AUTH_TOKEN", token)
@@ -196,15 +218,24 @@ func TestServeHelpNeverPrintsTheEnvironmentToken(t *testing.T) {
 	assert.NotContains(t, err.Error(), "requires -principal and -auth-token")
 }
 
-// captureStderr runs fn with os.Stderr redirected and returns what fn wrote.
+// captureStderr runs fn with os.Stderr redirected to a pipe and returns what
+// fn wrote. The pipe is read only after fn returns, so fn must write less than
+// the pipe buffer (about 16 KiB); help text is about 1 KiB. Tests using it
+// must not run in parallel because os.Stderr is process-wide.
 func captureStderr(t *testing.T, fn func()) string {
 	t.Helper()
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = r.Close()
+		_ = w.Close()
+	})
 	saved := os.Stderr
 	os.Stderr = w
-	defer func() { os.Stderr = saved }()
-	fn()
+	func() {
+		defer func() { os.Stderr = saved }()
+		fn()
+	}()
 	require.NoError(t, w.Close())
 	out, err := io.ReadAll(r)
 	require.NoError(t, err)

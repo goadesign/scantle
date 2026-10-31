@@ -94,6 +94,10 @@ Commands:
   help     print this text, or "surla help <command>" for a command's flags
 `
 
+// helpWords are the arguments that ask for top-level usage: `surla help`,
+// `surla -h`, `surla -help` and `surla --help`, also after `help`.
+var helpWords = []string{"help", "-h", "-help", "--help"}
+
 // apiKeyEnv maps each supported direct model provider to the environment
 // variable that holds its API key. Keys are read only from the environment so
 // they never appear in process listings or shell history.
@@ -120,10 +124,9 @@ func run(args []string, stdout io.Writer) error {
 		return err
 	}
 	sub, rest := args[0], args[1:]
-	switch sub {
-	case "help", "-h", "-help", "--help":
+	if slices.Contains(helpWords, sub) {
 		switch {
-		case len(rest) == 0, sub == "help" && slices.Equal(rest, []string{"help"}):
+		case len(rest) == 0, sub == "help" && len(rest) == 1 && slices.Contains(helpWords, rest[0]):
 			_, err := fmt.Fprint(stdout, usage)
 			return err
 		case sub == "help" && len(rest) == 1:
@@ -173,12 +176,8 @@ func runServe(args []string) (err error) {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	// The environment is read only after parsing so the token never becomes
-	// the flag's printed default in `surla serve -h`.
-	if *authToken == "" {
-		*authToken = os.Getenv("SURLA_AUTH_TOKEN")
-	}
-	if strings.TrimSpace(*principalID) == "" || strings.TrimSpace(*authToken) == "" {
+	token := resolveAuthToken(*authToken, os.Getenv)
+	if strings.TrimSpace(*principalID) == "" || token == "" {
 		return errors.New("serve requires -principal and -auth-token (or SURLA_AUTH_TOKEN)")
 	}
 	opts, closeModel, err := serveOptions(cfg, os.Getenv)
@@ -187,7 +186,7 @@ func runServe(args []string) (err error) {
 	}
 	defer func() { err = errors.Join(err, closeModel()) }()
 	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{
-		strings.TrimSpace(*authToken): {ID: strings.TrimSpace(*principalID)},
+		token: {ID: strings.TrimSpace(*principalID)},
 	})
 	cp := controlplane.New(opts)
 	srv := &http.Server{
@@ -218,6 +217,18 @@ func runServe(args []string) (err error) {
 		defer cancel()
 		return srv.Shutdown(shutCtx)
 	}
+}
+
+// resolveAuthToken returns the bearer token `surla serve` requires: the
+// -auth-token flag when it is set, otherwise SURLA_AUTH_TOKEN from getenv,
+// with surrounding whitespace removed. The environment is read here, after
+// flag parsing, rather than as the flag's default, so `surla serve -h` never
+// prints the token. An empty result means no token was given.
+func resolveAuthToken(flagValue string, getenv func(string) string) string {
+	if flagValue == "" {
+		flagValue = getenv("SURLA_AUTH_TOKEN")
+	}
+	return strings.TrimSpace(flagValue)
 }
 
 // writeServeStatus tells the operator of `surla serve`, once the listener is
