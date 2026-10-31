@@ -1,5 +1,5 @@
 // Package shadcn provides accessible, composable shadcn/ui React components
-// tailored for the sandboxed Scantle Checkpoint Studio.
+// tailored for the sandboxed Surla Checkpoint Studio.
 
 import React from "react";
 
@@ -69,7 +69,7 @@ export function Badge({ variant = "default", className = "", children, ...rest }
       : variant === "destructive"
       ? "shadcn-badge-destructive"
       : "";
-  const cls = ["shadcn-badge", "scantle-badge", variantCls, className].filter(Boolean).join(" ");
+  const cls = ["shadcn-badge", "surla-badge", variantCls, className].filter(Boolean).join(" ");
   return (
     <span className={cls} {...rest}>
       {children}
@@ -86,10 +86,10 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 export function Button({ variant = "default", className = "", type = "button", children, ...rest }: ButtonProps) {
   const variantCls =
     variant === "primary"
-      ? "shadcn-btn-primary scantle-btn-primary scantle-btn"
+      ? "shadcn-btn-primary surla-btn-primary surla-btn"
       : variant === "pill"
-      ? "scantle-pill"
-      : "scantle-btn";
+      ? "surla-pill"
+      : "surla-btn";
   const cls = ["shadcn-btn", variantCls, className].filter(Boolean).join(" ");
   return (
     <button type={type} className={cls} {...rest}>
@@ -107,7 +107,7 @@ export interface AlertProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Alert({ variant = "default", className = "", children, ...rest }: AlertProps) {
   const variantCls =
     variant === "destructive"
-      ? "shadcn-alert-destructive scantle-error"
+      ? "shadcn-alert-destructive surla-error"
       : variant === "warning"
       ? "shadcn-alert-warning"
       : "";
@@ -127,7 +127,7 @@ export interface ResponsiveTableProps extends React.TableHTMLAttributes<HTMLTabl
 // ResponsiveTable wraps a semantic HTML table in a keyboard-scrollable container-query region.
 export function ResponsiveTable({ ariaLabel, children, ...rest }: ResponsiveTableProps) {
   return (
-    <div className="scantle-table-wrap" role="region" aria-label={ariaLabel} tabIndex={0}>
+    <div className="surla-table-wrap" role="region" aria-label={ariaLabel} tabIndex={0}>
       <table className="shadcn-table" {...rest}>
         {children}
       </table>

@@ -3,12 +3,12 @@
 // orders HTTP client types
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package client
 
 import (
-	orders "github.com/goadesign/scantle/examples/orders-eval/gen/orders"
+	orders "github.com/goadesign/surla/examples/orders-eval/gen/orders"
 	goa "goa.design/goa/v3/pkg"
 )
 

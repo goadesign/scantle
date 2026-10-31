@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/goadesign/scantle/examples/orders/internal/orders"
+	"github.com/goadesign/surla/examples/orders/internal/orders"
 	"github.com/google/uuid"
 	"goa.design/goa-ai/runtime/agent/api"
 	"goa.design/goa-ai/runtime/agent/model"

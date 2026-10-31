@@ -1,19 +1,19 @@
 openapi: 3.0.3
 info:
-    title: Scantle MCP Software Factory Control Plane
+    title: Surla MCP Software Factory Control Plane
     description: MCP-native control plane for creating, verifying, and evolving production Goa-AI agentic platforms.
     version: 1.0.0
 servers:
     - url: http://localhost:80
-      description: Default server for scantle
+      description: Default server for surla
 paths:
     /changes/{change_id}:
         get:
             tags:
-                - scantle
-            summary: get_change scantle
+                - surla
+            summary: get_change surla
             description: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.
-            operationId: scantle#get_change
+            operationId: surla#get_change
             parameters:
                 - name: change_id
                   in: path
@@ -22,8 +22,8 @@ paths:
                   schema:
                     type: string
                     description: Change identifier.
-                    example: Aliquid eaque veniam quia voluptas.
-                  example: Aliquid eaque veniam quia voluptas.
+                    example: Deleniti nobis.
+                  example: Deleniti nobis.
             responses:
                 "200":
                     description: OK response.
@@ -33,65 +33,79 @@ paths:
                                 $ref: '#/components/schemas/ChangeCardResult'
                             example:
                                 ambiguities:
-                                    - id: Aut fuga velit.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
-                                    - id: Aut fuga velit.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
-                                    - id: Aut fuga velit.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
+                                      options:
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
                                 answers:
-                                    Et modi molestiae.: Id aut.
-                                change_id: Non consequuntur quis.
-                                confirmed_by: Fugit quam magnam beatae sint.
+                                    Et porro exercitationem quia vel ab officia.: Earum et laudantium rerum hic.
+                                    Laboriosam rerum.: Corporis veniam animi temporibus.
+                                    Similique placeat nisi.: Quia atque ea.
+                                change_id: Architecto minima et tempora.
+                                confirmed_by: Necessitatibus laborum culpa accusantium quidem ut.
                                 examples:
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
                                 preserved_behaviors:
-                                    - Ea beatae totam numquam soluta.
-                                    - Autem laboriosam adipisci sed.
-                                    - Expedita iste dolor.
-                                prompt: Repudiandae aut qui aliquam cumque ab non.
-                                request_revision: Maiores et neque.
+                                    - Quis quae dolor numquam dolor aut vitae.
+                                    - Possimus illo voluptate sed enim ad.
+                                    - Veniam voluptatibus.
+                                prompt: Nam sed.
+                                request_revision: Eum minus sequi repudiandae velit enim.
                                 status: needs_confirmation
-                                summary: Dolorem blanditiis.
+                                summary: Provident ullam voluptatum.
                                 ui_composition:
-                                    composed_for_revision: Aut neque voluptas.
-                                    program: Repellat ex.
+                                    composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
+                                    program: Numquam provident excepturi et deleniti vel sed.
     /changes/confirm:
         post:
             tags:
-                - scantle
-            summary: confirm_intent scantle
+                - surla
+            summary: confirm_intent surla
             description: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.
-            operationId: scantle#confirm_intent
+            operationId: surla#confirm_intent
             requestBody:
                 description: Request body for confirm_intent.
                 required: true
@@ -101,27 +115,21 @@ paths:
                             $ref: '#/components/schemas/ConfirmIntentPayload'
                         example:
                             answers:
-                                Cupiditate vel.: Omnis debitis sit.
-                                Modi voluptates.: Occaecati corporis laborum libero odit repellat sit.
-                                Optio id ut quae.: Aperiam labore autem est possimus ipsam sunt.
-                            change_id: Aspernatur quia doloribus assumenda unde tenetur.
+                                Qui aut iure rem.: Deserunt vitae fuga nisi quia atque quia.
+                                Soluta cumque quas minus autem neque.: Quis exercitationem.
+                            change_id: Consectetur asperiores rem iusto.
                             examples:
-                                - expected_outcome: Voluptatem necessitatibus numquam.
-                                  id: Nemo libero.
-                                  input_summary: Deserunt tempore deleniti.
-                                  scenario: Vitae velit dicta excepturi distinctio.
-                                  verification_kind: deterministic
-                                - expected_outcome: Voluptatem necessitatibus numquam.
-                                  id: Nemo libero.
-                                  input_summary: Deserunt tempore deleniti.
-                                  scenario: Vitae velit dicta excepturi distinctio.
-                                  verification_kind: deterministic
-                                - expected_outcome: Voluptatem necessitatibus numquam.
-                                  id: Nemo libero.
-                                  input_summary: Deserunt tempore deleniti.
-                                  scenario: Vitae velit dicta excepturi distinctio.
-                                  verification_kind: deterministic
-                            request_revision: Rerum consequatur iste necessitatibus ab dolor enim.
+                                - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                  id: Consequatur voluptatibus soluta sequi reiciendis.
+                                  input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                  scenario: Facilis sed tempore.
+                                  verification_kind: model_judged
+                                - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                  id: Consequatur voluptatibus soluta sequi reiciendis.
+                                  input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                  scenario: Facilis sed tempore.
+                                  verification_kind: model_judged
+                            request_revision: Deserunt adipisci et corporis qui corporis architecto.
             responses:
                 "200":
                     description: OK response.
@@ -131,60 +139,59 @@ paths:
                                 $ref: '#/components/schemas/ChangeCardResult'
                             example:
                                 ambiguities:
-                                    - id: Aut fuga velit.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
-                                    - id: Aut fuga velit.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
-                                    - id: Aut fuga velit.
-                                      options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
                                 answers:
-                                    Corrupti vero ut voluptate similique animi.: Cumque nisi nihil dolores nemo qui.
-                                    Enim quod quis fugit.: Deleniti voluptas aperiam et similique exercitationem.
-                                change_id: Sunt deleniti.
-                                confirmed_by: Non qui provident consectetur.
+                                    Magni sed sint nihil id quia soluta.: Laudantium repellat sit.
+                                    Praesentium sit quos adipisci.: Quibusdam velit ut voluptatibus.
+                                change_id: Id consequatur sunt odio.
+                                confirmed_by: Aliquid explicabo deserunt rerum.
                                 examples:
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
                                 preserved_behaviors:
-                                    - Voluptatem aut sapiente ut.
-                                    - Dolorum quasi magnam nostrum dolorum magnam.
-                                prompt: Blanditiis qui.
-                                request_revision: Alias cupiditate aut quia natus fuga eius.
+                                    - Numquam minima ad.
+                                    - Placeat illum.
+                                    - Voluptatem deserunt in harum blanditiis animi eum.
+                                prompt: Iure recusandae voluptates.
+                                request_revision: Amet voluptatem quibusdam.
                                 status: needs_confirmation
-                                summary: Et accusantium expedita.
+                                summary: Sit minus quidem.
                                 ui_composition:
-                                    composed_for_revision: Aut neque voluptas.
-                                    program: Repellat ex.
+                                    composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
+                                    program: Numquam provident excepturi et deleniti vel sed.
     /changes/preview:
         post:
             tags:
-                - scantle
-            summary: preview_architecture scantle
+                - surla
+            summary: preview_architecture surla
             description: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.
-            operationId: scantle#preview_architecture
+            operationId: surla#preview_architecture
             requestBody:
                 description: Request body for preview_architecture.
                 required: true
@@ -194,33 +201,40 @@ paths:
                             $ref: '#/components/schemas/PreviewArchitecturePayload'
                         example:
                             builders:
-                                - name: Ut nulla.
+                                - name: Libero cupiditate occaecati natus sed.
                                   paths:
-                                    - Tempora aut qui voluptatem iste exercitationem.
-                                    - Sed quia et ullam libero et et.
-                                  preferred_profile_id: Accusamus et et qui ut deserunt.
-                                - name: Ut nulla.
+                                    - At recusandae.
+                                    - Ea ipsa sed ullam et quas.
+                                    - Quia perferendis rerum.
+                                    - Praesentium quia beatae dolorem vel.
+                                  preferred_profile_id: Unde ut in.
+                                - name: Libero cupiditate occaecati natus sed.
                                   paths:
-                                    - Tempora aut qui voluptatem iste exercitationem.
-                                    - Sed quia et ullam libero et et.
-                                  preferred_profile_id: Accusamus et et qui ut deserunt.
-                                - name: Ut nulla.
+                                    - At recusandae.
+                                    - Ea ipsa sed ullam et quas.
+                                    - Quia perferendis rerum.
+                                    - Praesentium quia beatae dolorem vel.
+                                  preferred_profile_id: Unde ut in.
+                                - name: Libero cupiditate occaecati natus sed.
                                   paths:
-                                    - Tempora aut qui voluptatem iste exercitationem.
-                                    - Sed quia et ullam libero et et.
-                                  preferred_profile_id: Accusamus et et qui ut deserunt.
-                                - name: Ut nulla.
+                                    - At recusandae.
+                                    - Ea ipsa sed ullam et quas.
+                                    - Quia perferendis rerum.
+                                    - Praesentium quia beatae dolorem vel.
+                                  preferred_profile_id: Unde ut in.
+                                - name: Libero cupiditate occaecati natus sed.
                                   paths:
-                                    - Tempora aut qui voluptatem iste exercitationem.
-                                    - Sed quia et ullam libero et et.
-                                  preferred_profile_id: Accusamus et et qui ut deserunt.
-                            change_id: Nam ut commodi.
+                                    - At recusandae.
+                                    - Ea ipsa sed ullam et quas.
+                                    - Quia perferendis rerum.
+                                    - Praesentium quia beatae dolorem vel.
+                                  preferred_profile_id: Unde ut in.
+                            change_id: Vel libero.
                             design:
                                 files:
-                                    Amet qui.: Et ut dolore est.
-                                    Beatae quia.: Impedit laboriosam repellendus nisi.
-                                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
-                            request_revision: Et esse in incidunt repellendus in voluptate.
+                                    Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                                    Quaerat vitae quas rerum.: Vel in molestias et quaerat.
+                            request_revision: Quisquam mollitia.
             responses:
                 "200":
                     description: OK response.
@@ -230,173 +244,171 @@ paths:
                                 $ref: '#/components/schemas/ArchitecturePreviewResult'
                             example:
                                 agent_policies:
-                                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                                      cache_after_system: false
+                                    - agent_id: Hic dolores temporibus at tempora recusandae.
+                                      cache_after_system: true
                                       cache_after_tools: false
-                                      compress_at_turns: 1985631241836553606
-                                      keep_recent_turns: 8669062505451687645
-                                      max_execution_seconds: 4973048293267150158
-                                      max_recovery_turns: 1926956061700657504
-                                      max_tool_calls: 6650034279102484511
-                                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                                      cache_after_system: false
+                                      compress_at_turns: 2961075941365311475
+                                      keep_recent_turns: 8141624799624588935
+                                      max_execution_seconds: 9164198126331039093
+                                      max_recovery_turns: 1479075455329254996
+                                      max_tool_calls: 7430104826542814714
+                                    - agent_id: Hic dolores temporibus at tempora recusandae.
+                                      cache_after_system: true
                                       cache_after_tools: false
-                                      compress_at_turns: 1985631241836553606
-                                      keep_recent_turns: 8669062505451687645
-                                      max_execution_seconds: 4973048293267150158
-                                      max_recovery_turns: 1926956061700657504
-                                      max_tool_calls: 6650034279102484511
-                                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                                      cache_after_system: false
-                                      cache_after_tools: false
-                                      compress_at_turns: 1985631241836553606
-                                      keep_recent_turns: 8669062505451687645
-                                      max_execution_seconds: 4973048293267150158
-                                      max_recovery_turns: 1926956061700657504
-                                      max_tool_calls: 6650034279102484511
-                                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                                      cache_after_system: false
-                                      cache_after_tools: false
-                                      compress_at_turns: 1985631241836553606
-                                      keep_recent_turns: 8669062505451687645
-                                      max_execution_seconds: 4973048293267150158
-                                      max_recovery_turns: 1926956061700657504
-                                      max_tool_calls: 6650034279102484511
-                                banner: Praesentium temporibus in repudiandae.
-                                change_id: Quisquam sapiente.
+                                      compress_at_turns: 2961075941365311475
+                                      keep_recent_turns: 8141624799624588935
+                                      max_execution_seconds: 9164198126331039093
+                                      max_recovery_turns: 1479075455329254996
+                                      max_tool_calls: 7430104826542814714
+                                banner: Cumque est ut quia aspernatur dolor libero.
+                                change_id: Temporibus dolorem exercitationem nulla quisquam nesciunt.
                                 containers:
-                                    - description: Tempora ab omnis minima veritatis.
-                                      id: Deserunt non quia earum.
-                                      kind: toolset
-                                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
-                                    - description: Tempora ab omnis minima veritatis.
-                                      id: Deserunt non quia earum.
-                                      kind: toolset
-                                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
-                                design_digest: Perferendis molestias nisi cupiditate in.
+                                    - description: Architecto ipsa qui praesentium.
+                                      id: Nihil consequatur et fugit atque.
+                                      kind: agent
+                                      name: Reprehenderit assumenda officia assumenda et quo.
+                                    - description: Architecto ipsa qui praesentium.
+                                      id: Nihil consequatur et fugit atque.
+                                      kind: agent
+                                      name: Reprehenderit assumenda officia assumenda et quo.
+                                design_digest: Doloremque numquam porro debitis beatae.
                                 edges:
-                                    - from_id: Ut esse ipsa.
-                                      protocol: Et dolor neque non molestias voluptas.
-                                      to_id: Non et dolor dolorum ipsa ullam.
-                                    - from_id: Ut esse ipsa.
-                                      protocol: Et dolor neque non molestias voluptas.
-                                      to_id: Non et dolor dolorum ipsa ullam.
-                                    - from_id: Ut esse ipsa.
-                                      protocol: Et dolor neque non molestias voluptas.
-                                      to_id: Non et dolor dolorum ipsa ullam.
-                                request_revision: Quos aperiam quia.
+                                    - from_id: Corporis non sapiente.
+                                      protocol: Cumque laboriosam fugit commodi voluptates.
+                                      to_id: Totam labore pariatur magnam voluptates eum.
+                                    - from_id: Corporis non sapiente.
+                                      protocol: Cumque laboriosam fugit commodi voluptates.
+                                      to_id: Totam labore pariatur magnam voluptates eum.
+                                request_revision: Voluptatem assumenda.
                                 swarm:
                                     assignments:
-                                        - access_mode: read_write_worktree
-                                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                                          handle: Labore alias in ex enim explicabo.
-                                          model: Qui ut quo nam aspernatur incidunt.
+                                        - access_mode: read_only_after_cp2
+                                          family: Et aut accusantium alias.
+                                          handle: Quos et quo autem odio ratione.
+                                          model: Velit impedit dolores quod saepe.
                                           owned_paths:
-                                            - Dolore nulla.
-                                            - Officia reprehenderit dolor labore earum perferendis.
-                                          profile_id: Sint quis exercitationem.
-                                          provider: Alias et ab consequatur cupiditate.
-                                          role: eval_author
-                                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                                        - access_mode: read_write_worktree
-                                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                                          handle: Labore alias in ex enim explicabo.
-                                          model: Qui ut quo nam aspernatur incidunt.
+                                            - Et harum fugiat.
+                                            - Fuga sit ut.
+                                            - Voluptatem temporibus provident.
+                                            - Delectus minus.
+                                          profile_id: Vitae sed autem sit.
+                                          provider: Laboriosam veniam aut.
+                                          role: builder
+                                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                                        - access_mode: read_only_after_cp2
+                                          family: Et aut accusantium alias.
+                                          handle: Quos et quo autem odio ratione.
+                                          model: Velit impedit dolores quod saepe.
                                           owned_paths:
-                                            - Dolore nulla.
-                                            - Officia reprehenderit dolor labore earum perferendis.
-                                          profile_id: Sint quis exercitationem.
-                                          provider: Alias et ab consequatur cupiditate.
-                                          role: eval_author
-                                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                                        - access_mode: read_write_worktree
-                                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                                          handle: Labore alias in ex enim explicabo.
-                                          model: Qui ut quo nam aspernatur incidunt.
+                                            - Et harum fugiat.
+                                            - Fuga sit ut.
+                                            - Voluptatem temporibus provident.
+                                            - Delectus minus.
+                                          profile_id: Vitae sed autem sit.
+                                          provider: Laboriosam veniam aut.
+                                          role: builder
+                                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                                        - access_mode: read_only_after_cp2
+                                          family: Et aut accusantium alias.
+                                          handle: Quos et quo autem odio ratione.
+                                          model: Velit impedit dolores quod saepe.
                                           owned_paths:
-                                            - Dolore nulla.
-                                            - Officia reprehenderit dolor labore earum perferendis.
-                                          profile_id: Sint quis exercitationem.
-                                          provider: Alias et ab consequatur cupiditate.
-                                          role: eval_author
-                                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                                        - access_mode: read_write_worktree
-                                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                                          handle: Labore alias in ex enim explicabo.
-                                          model: Qui ut quo nam aspernatur incidunt.
-                                          owned_paths:
-                                            - Dolore nulla.
-                                            - Officia reprehenderit dolor labore earum perferendis.
-                                          profile_id: Sint quis exercitationem.
-                                          provider: Alias et ab consequatur cupiditate.
-                                          role: eval_author
-                                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                                    cross_family_eval: false
-                                    cross_family_review: true
-                                    manifest: Adipisci suscipit corporis doloremque et.
+                                            - Et harum fugiat.
+                                            - Fuga sit ut.
+                                            - Voluptatem temporibus provident.
+                                            - Delectus minus.
+                                          profile_id: Vitae sed autem sit.
+                                          provider: Laboriosam veniam aut.
+                                          role: builder
+                                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                                    cross_family_eval: true
+                                    cross_family_review: false
+                                    manifest: Voluptatum rerum.
                                     missing_roles:
-                                        - Totam ab ex quod ea nesciunt nobis.
-                                        - Qui vero quos blanditiis autem et.
-                                        - Et blanditiis tenetur occaecati est maxime.
-                                        - Quam dignissimos animi sed possimus.
-                                    single_family: false
-                                    status: missing_capability
-                                    summary: Blanditiis eligendi illo quia exercitationem voluptatem ut.
-                                system_name: Expedita vero et minima.
+                                        - Quas a quia non accusantium ipsam facere.
+                                        - Est rerum beatae quasi occaecati earum.
+                                        - Qui dolores nam quis non ex.
+                                    single_family: true
+                                    status: configured
+                                    summary: Repellat neque ut facilis.
+                                system_name: Itaque et rerum ut ea consequatur.
                                 tools:
-                                    - args_schema: Nisi vel iusto.
-                                      bounded_result: true
-                                      description: Voluptatem pariatur similique omnis dolore.
-                                      id: Omnis aut quos rem qui sunt.
+                                    - args_schema: Repudiandae illo autem.
+                                      bounded_result: false
+                                      description: Et laborum quis.
+                                      id: Dolores et accusantium et.
                                       injected_fields:
-                                        - Soluta tenetur sint ullam aut illum.
-                                        - Odit culpa distinctio nobis.
-                                        - Voluptatum similique.
-                                        - Nisi minima reprehenderit.
+                                        - Molestiae velit quos tempora maxime corporis.
+                                        - Voluptatem libero quae amet reiciendis voluptatem.
+                                        - Quae ipsam.
+                                        - Veniam rem consequatur libero tempora.
                                       input_binding:
-                                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                                        args_schema: Nam libero temporibus veritatis enim dolorum.
                                         injected_fields:
-                                            - Quam laborum aut dolorum enim perferendis omnis.
-                                            - Aut doloribus.
-                                        lookup_args_schema: Qui itaque.
-                                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                                      name: Voluptatum voluptatem.
-                                      requires_confirmation: true
-                                      requires_ui: true
-                                      return_schema: Omnis aut ab aliquam qui.
-                                      text_only_args_schema: Suscipit dignissimos ut.
-                                      toolset: Veniam aspernatur ad recusandae unde.
-                                    - args_schema: Nisi vel iusto.
-                                      bounded_result: true
-                                      description: Voluptatem pariatur similique omnis dolore.
-                                      id: Omnis aut quos rem qui sunt.
+                                            - Beatae ut in.
+                                            - Sunt distinctio nisi et adipisci cumque minus.
+                                        lookup_args_schema: Nisi sunt pariatur at.
+                                        lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                                        text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                                      name: Et quis sapiente tempora nihil est ut.
+                                      requires_confirmation: false
+                                      requires_ui: false
+                                      return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                                      text_only_args_schema: Facere voluptas rerum consectetur.
+                                      toolset: Beatae repudiandae.
+                                    - args_schema: Repudiandae illo autem.
+                                      bounded_result: false
+                                      description: Et laborum quis.
+                                      id: Dolores et accusantium et.
                                       injected_fields:
-                                        - Soluta tenetur sint ullam aut illum.
-                                        - Odit culpa distinctio nobis.
-                                        - Voluptatum similique.
-                                        - Nisi minima reprehenderit.
+                                        - Molestiae velit quos tempora maxime corporis.
+                                        - Voluptatem libero quae amet reiciendis voluptatem.
+                                        - Quae ipsam.
+                                        - Veniam rem consequatur libero tempora.
                                       input_binding:
-                                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                                        args_schema: Nam libero temporibus veritatis enim dolorum.
                                         injected_fields:
-                                            - Quam laborum aut dolorum enim perferendis omnis.
-                                            - Aut doloribus.
-                                        lookup_args_schema: Qui itaque.
-                                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                                      name: Voluptatum voluptatem.
-                                      requires_confirmation: true
-                                      requires_ui: true
-                                      return_schema: Omnis aut ab aliquam qui.
-                                      text_only_args_schema: Suscipit dignissimos ut.
-                                      toolset: Veniam aspernatur ad recusandae unde.
+                                            - Beatae ut in.
+                                            - Sunt distinctio nisi et adipisci cumque minus.
+                                        lookup_args_schema: Nisi sunt pariatur at.
+                                        lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                                        text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                                      name: Et quis sapiente tempora nihil est ut.
+                                      requires_confirmation: false
+                                      requires_ui: false
+                                      return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                                      text_only_args_schema: Facere voluptas rerum consectetur.
+                                      toolset: Beatae repudiandae.
+                                    - args_schema: Repudiandae illo autem.
+                                      bounded_result: false
+                                      description: Et laborum quis.
+                                      id: Dolores et accusantium et.
+                                      injected_fields:
+                                        - Molestiae velit quos tempora maxime corporis.
+                                        - Voluptatem libero quae amet reiciendis voluptatem.
+                                        - Quae ipsam.
+                                        - Veniam rem consequatur libero tempora.
+                                      input_binding:
+                                        args_schema: Nam libero temporibus veritatis enim dolorum.
+                                        injected_fields:
+                                            - Beatae ut in.
+                                            - Sunt distinctio nisi et adipisci cumque minus.
+                                        lookup_args_schema: Nisi sunt pariatur at.
+                                        lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                                        text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                                      name: Et quis sapiente tempora nihil est ut.
+                                      requires_confirmation: false
+                                      requires_ui: false
+                                      return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                                      text_only_args_schema: Facere voluptas rerum consectetur.
+                                      toolset: Beatae repudiandae.
     /changes/propose:
         post:
             tags:
-                - scantle
-            summary: propose_change scantle
+                - surla
+            summary: propose_change surla
             description: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.
-            operationId: scantle#propose_change
+            operationId: surla#propose_change
             requestBody:
                 description: Request body for propose_change.
                 required: true
@@ -405,9 +417,9 @@ paths:
                         schema:
                             $ref: '#/components/schemas/ProposeChangePayload'
                         example:
-                            change_id: Molestiae debitis minima.
-                            design_source: Dolorem aut quidem molestiae nihil.
-                            prompt: Nobis alias dolores tenetur.
+                            change_id: Ipsum soluta officiis facilis dolorem quae.
+                            design_source: Quia placeat maiores voluptatem voluptatem.
+                            prompt: Enim distinctio et sunt sunt et.
             responses:
                 "200":
                     description: OK response.
@@ -417,61 +429,61 @@ paths:
                                 $ref: '#/components/schemas/ChangeCardResult'
                             example:
                                 ambiguities:
-                                    - id: Aut fuga velit.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
-                                    - id: Aut fuga velit.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
-                                    - id: Aut fuga velit.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
+                                    - id: Incidunt quasi molestias itaque tempore animi.
                                       options:
-                                        - Ex aliquid est velit necessitatibus hic incidunt.
-                                        - Quia aut qui maxime autem.
-                                        - Facere voluptatum dolorem.
-                                        - Sit qui nam odio itaque aut.
-                                      question: Inventore maxime esse.
+                                        - Et laudantium quibusdam aut voluptas atque magnam.
+                                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                                        - Et temporibus suscipit et tempore praesentium fuga.
+                                        - Est ipsa et nihil aut omnis fugit.
+                                      question: Labore harum illo eos ipsum deleniti possimus.
                                 answers:
-                                    Ducimus quo illo expedita.: Culpa vero voluptatum itaque facilis.
-                                change_id: Dolor adipisci ut nam quia ad.
-                                confirmed_by: Tenetur voluptas aspernatur officia ipsam ut.
+                                    Consequatur ex.: Veritatis alias non blanditiis.
+                                change_id: Molestiae autem quas reprehenderit fugit.
+                                confirmed_by: Accusamus harum velit earum libero ad.
                                 examples:
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
-                                    - expected_outcome: Voluptatem necessitatibus numquam.
-                                      id: Nemo libero.
-                                      input_summary: Deserunt tempore deleniti.
-                                      scenario: Vitae velit dicta excepturi distinctio.
-                                      verification_kind: deterministic
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
+                                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                                      scenario: Facilis sed tempore.
+                                      verification_kind: model_judged
                                 preserved_behaviors:
-                                    - Qui quia assumenda vero fugit rerum sed.
-                                    - Exercitationem ea dolores quo ab rerum adipisci.
-                                    - Aut et nostrum.
-                                    - Mollitia commodi qui error.
-                                prompt: Culpa aut.
-                                request_revision: Necessitatibus quos et ut natus voluptates corporis.
-                                status: needs_confirmation
-                                summary: Maiores voluptate soluta quasi et in.
+                                    - Aperiam quae cumque et quasi omnis aut.
+                                    - Asperiores laboriosam aspernatur consequuntur voluptas rerum dolores.
+                                    - At qui aut.
+                                    - Animi unde.
+                                prompt: Ea perferendis neque.
+                                request_revision: Et maxime fugiat.
+                                status: confirmed
+                                summary: Et repellendus nemo.
                                 ui_composition:
-                                    composed_for_revision: Aut neque voluptas.
-                                    program: Repellat ex.
+                                    composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
+                                    program: Numquam provident excepturi et deleniti vel sed.
     /diff:
         post:
             tags:
-                - scantle
-            summary: diff scantle
+                - surla
+            summary: diff surla
             description: Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.
-            operationId: scantle#diff
+            operationId: surla#diff
             requestBody:
                 description: Request body for diff.
                 required: true
@@ -482,14 +494,12 @@ paths:
                         example:
                             new:
                                 files:
-                                    Amet qui.: Et ut dolore est.
-                                    Beatae quia.: Impedit laboriosam repellendus nisi.
-                                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                                    Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                                    Quaerat vitae quas rerum.: Vel in molestias et quaerat.
                             old:
                                 files:
-                                    Amet qui.: Et ut dolore est.
-                                    Beatae quia.: Impedit laboriosam repellendus nisi.
-                                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                                    Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                                    Quaerat vitae quas rerum.: Vel in molestias et quaerat.
             responses:
                 "200":
                     description: OK response.
@@ -499,31 +509,31 @@ paths:
                                 $ref: '#/components/schemas/DiffResult'
                             example:
                                 added_declarations:
-                                    - Nostrum at rerum voluptatem eligendi quia.
-                                    - Voluptates possimus.
-                                    - Aut esse qui.
-                                    - Debitis ut corrupti.
+                                    - Sint facilis dolorum officiis similique.
+                                    - Consequuntur voluptatem voluptatem hic voluptate.
+                                    - Sed ratione doloremque.
+                                    - Assumenda quod excepturi.
                                 has_changes: true
                                 modified_declarations:
-                                    - Temporibus sunt dolorem quo.
-                                    - Numquam provident.
-                                    - Beatae laborum qui ut.
+                                    - Et et molestias est est rerum doloribus.
+                                    - Quisquam labore qui id a quia necessitatibus.
+                                    - Similique qui voluptas.
                                 removed_declarations:
-                                    - Quidem ea quidem sunt non.
-                                    - Perferendis et eum.
-                                summary: Provident dolores nostrum.
+                                    - Ipsa ut ut est sapiente autem beatae.
+                                    - Doloribus esse necessitatibus explicabo consectetur.
+                                    - Similique expedita est.
+                                summary: Aut dicta quia.
                                 version_deltas:
-                                    - Sint magnam.
-                                    - Aut dignissimos autem voluptas fuga dolorem inventore.
-                                    - Velit nihil velit veritatis.
-                                    - Non dicta corrupti natus rerum quidem.
+                                    - Explicabo cupiditate occaecati consequatur optio molestiae iure.
+                                    - Quibusdam soluta quisquam impedit pariatur laboriosam.
+                                    - Minus eum corrupti culpa.
     /golden-path:
         get:
             tags:
-                - scantle
-            summary: golden_path scantle
-            description: Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.
-            operationId: scantle#golden_path
+                - surla
+            summary: golden_path surla
+            description: Serve the Surla Golden Path architecture playbook for Goa-AI agentic platforms.
+            operationId: surla#golden_path
             responses:
                 "200":
                     description: OK response.
@@ -531,15 +541,15 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Est voluptatum et explicabo tempora voluptatem architecto.
-                            example: Est voluptatum et explicabo tempora voluptatem architecto.
+                                example: Maxime nihil veritatis perferendis culpa et.
+                            example: Maxime nihil veritatis perferendis culpa et.
     /sandbox/draft:
         post:
             tags:
-                - scantle
-            summary: draft_override scantle
+                - surla
+            summary: draft_override surla
             description: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.
-            operationId: scantle#draft_override
+            operationId: surla#draft_override
             requestBody:
                 description: Request body for draft_override.
                 required: true
@@ -548,9 +558,9 @@ paths:
                         schema:
                             $ref: '#/components/schemas/DraftOverridePayload'
                         example:
-                            new_content: Et autem necessitatibus.
-                            prompt_id: Nesciunt et qui aut eaque.
-                            target_kind: compiled_rule
+                            new_content: Dolores explicabo.
+                            prompt_id: Quia ea soluta.
+                            target_kind: prompt_template
             responses:
                 "200":
                     description: OK response.
@@ -559,17 +569,17 @@ paths:
                             schema:
                                 $ref: '#/components/schemas/DraftOverrideResult'
                             example:
-                                applied_in_store: false
-                                message: Ad assumenda iusto.
-                                prompt_version: Provident iste temporibus magni molestiae facilis dolores.
-                                requires_rebuild: false
+                                applied_in_store: true
+                                message: Mollitia voluptatem error voluptatem molestiae quia.
+                                prompt_version: Pariatur numquam quisquam sunt sequi recusandae adipisci.
+                                requires_rebuild: true
     /ui/checkpoint:
         get:
             tags:
-                - scantle
-            summary: checkpoint_ui scantle
-            description: Serve the interactive MCP Apps HTML host for Scantle checkpoints.
-            operationId: scantle#checkpoint_ui
+                - surla
+            summary: checkpoint_ui surla
+            description: Serve the interactive MCP Apps HTML host for Surla checkpoints.
+            operationId: surla#checkpoint_ui
             responses:
                 "200":
                     description: OK response.
@@ -577,8 +587,8 @@ paths:
                         application/json:
                             schema:
                                 type: string
-                                example: Velit et.
-                            example: Velit et.
+                                example: Commodi et adipisci ipsa sit.
+                            example: Commodi et adipisci ipsa sit.
 components:
     schemas:
         AgentPolicyItem:
@@ -587,11 +597,11 @@ components:
                 agent_id:
                     type: string
                     description: Scoped agent container identifier.
-                    example: Consectetur laudantium rem architecto aut molestias velit.
+                    example: Hic dolores temporibus at tempora recusandae.
                 cache_after_system:
                     type: boolean
                     description: True when prompt caching places a checkpoint after system prompts.
-                    example: false
+                    example: true
                 cache_after_tools:
                     type: boolean
                     description: True when prompt caching places a checkpoint after tool definitions.
@@ -599,38 +609,38 @@ components:
                 compress_at_turns:
                     type: integer
                     description: Turn threshold for history compression.
-                    example: 1985631241836553606
+                    example: 2961075941365311475
                     format: int64
                 keep_recent_turns:
                     type: integer
                     description: Recent turns retained uncompressed.
-                    example: 8669062505451687645
+                    example: 8141624799624588935
                     format: int64
                 max_execution_seconds:
                     type: integer
                     description: Per-run execution time budget in seconds.
-                    example: 4973048293267150158
+                    example: 9164198126331039093
                     format: int64
                 max_recovery_turns:
                     type: integer
                     description: Maximum consecutive recovery turns after validation failure.
-                    example: 1926956061700657504
+                    example: 1479075455329254996
                     format: int64
                 max_tool_calls:
                     type: integer
                     description: Per-run retrieval tool-call budget.
-                    example: 6650034279102484511
+                    example: 7430104826542814714
                     format: int64
             description: Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.
             example:
-                agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                cache_after_system: false
+                agent_id: Hic dolores temporibus at tempora recusandae.
+                cache_after_system: true
                 cache_after_tools: false
-                compress_at_turns: 1985631241836553606
-                keep_recent_turns: 8669062505451687645
-                max_execution_seconds: 4973048293267150158
-                max_recovery_turns: 1926956061700657504
-                max_tool_calls: 6650034279102484511
+                compress_at_turns: 2961075941365311475
+                keep_recent_turns: 8141624799624588935
+                max_execution_seconds: 9164198126331039093
+                max_recovery_turns: 1479075455329254996
+                max_tool_calls: 7430104826542814714
             required:
                 - agent_id
                 - max_execution_seconds
@@ -646,31 +656,31 @@ components:
                 id:
                     type: string
                     description: Stable question identifier.
-                    example: Aut fuga velit.
+                    example: Incidunt quasi molestias itaque tempore animi.
                 options:
                     type: array
                     items:
                         type: string
-                        example: Ex aliquid est velit necessitatibus hic incidunt.
+                        example: Et laudantium quibusdam aut voluptas atque magnam.
                     description: Concrete resolution choices.
                     example:
-                        - Ex aliquid est velit necessitatibus hic incidunt.
-                        - Quia aut qui maxime autem.
-                        - Facere voluptatum dolorem.
-                        - Sit qui nam odio itaque aut.
+                        - Et laudantium quibusdam aut voluptas atque magnam.
+                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                        - Et temporibus suscipit et tempore praesentium fuga.
+                        - Est ipsa et nihil aut omnis fugit.
                 question:
                     type: string
                     description: Plain-English question for the operator.
-                    example: Inventore maxime esse.
+                    example: Labore harum illo eos ipsum deleniti possimus.
             description: Domain ambiguity surfaced with concrete examples at Checkpoint 1.
             example:
-                id: Aut fuga velit.
+                id: Incidunt quasi molestias itaque tempore animi.
                 options:
-                    - Ex aliquid est velit necessitatibus hic incidunt.
-                    - Quia aut qui maxime autem.
-                    - Facere voluptatum dolorem.
-                    - Sit qui nam odio itaque aut.
-                question: Inventore maxime esse.
+                    - Et laudantium quibusdam aut voluptas atque magnam.
+                    - Vel voluptas deleniti nemo molestiae quia ipsa.
+                    - Et temporibus suscipit et tempore praesentium fuga.
+                    - Est ipsa et nihil aut omnis fugit.
+                question: Labore harum illo eos ipsum deleniti possimus.
             required:
                 - id
                 - question
@@ -684,304 +694,306 @@ components:
                         $ref: '#/components/schemas/AgentPolicyItem'
                     description: Evaluated Goa-AI runtime policies per declared agent.
                     example:
-                        - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                          cache_after_system: false
+                        - agent_id: Hic dolores temporibus at tempora recusandae.
+                          cache_after_system: true
                           cache_after_tools: false
-                          compress_at_turns: 1985631241836553606
-                          keep_recent_turns: 8669062505451687645
-                          max_execution_seconds: 4973048293267150158
-                          max_recovery_turns: 1926956061700657504
-                          max_tool_calls: 6650034279102484511
-                        - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                          cache_after_system: false
+                          compress_at_turns: 2961075941365311475
+                          keep_recent_turns: 8141624799624588935
+                          max_execution_seconds: 9164198126331039093
+                          max_recovery_turns: 1479075455329254996
+                          max_tool_calls: 7430104826542814714
+                        - agent_id: Hic dolores temporibus at tempora recusandae.
+                          cache_after_system: true
                           cache_after_tools: false
-                          compress_at_turns: 1985631241836553606
-                          keep_recent_turns: 8669062505451687645
-                          max_execution_seconds: 4973048293267150158
-                          max_recovery_turns: 1926956061700657504
-                          max_tool_calls: 6650034279102484511
-                        - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                          cache_after_system: false
-                          cache_after_tools: false
-                          compress_at_turns: 1985631241836553606
-                          keep_recent_turns: 8669062505451687645
-                          max_execution_seconds: 4973048293267150158
-                          max_recovery_turns: 1926956061700657504
-                          max_tool_calls: 6650034279102484511
-                        - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                          cache_after_system: false
-                          cache_after_tools: false
-                          compress_at_turns: 1985631241836553606
-                          keep_recent_turns: 8669062505451687645
-                          max_execution_seconds: 4973048293267150158
-                          max_recovery_turns: 1926956061700657504
-                          max_tool_calls: 6650034279102484511
+                          compress_at_turns: 2961075941365311475
+                          keep_recent_turns: 8141624799624588935
+                          max_execution_seconds: 9164198126331039093
+                          max_recovery_turns: 1479075455329254996
+                          max_tool_calls: 7430104826542814714
                 banner:
                     type: string
                     description: Plain-English summary of topology and guardrails.
-                    example: Praesentium temporibus in repudiandae.
+                    example: Cumque est ut quia aspernatur dolor libero.
                 change_id:
                     type: string
                     description: Bound Change Card identifier.
-                    example: Quisquam sapiente.
+                    example: Temporibus dolorem exercitationem nulla quisquam nesciunt.
                 containers:
                     type: array
                     items:
                         $ref: '#/components/schemas/C4ContainerItem'
                     description: Derived C4 containers.
                     example:
-                        - description: Tempora ab omnis minima veritatis.
-                          id: Deserunt non quia earum.
-                          kind: toolset
-                          name: Quaerat facilis eum quisquam magnam voluptatem corporis.
-                        - description: Tempora ab omnis minima veritatis.
-                          id: Deserunt non quia earum.
-                          kind: toolset
-                          name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                        - description: Architecto ipsa qui praesentium.
+                          id: Nihil consequatur et fugit atque.
+                          kind: agent
+                          name: Reprehenderit assumenda officia assumenda et quo.
+                        - description: Architecto ipsa qui praesentium.
+                          id: Nihil consequatur et fugit atque.
+                          kind: agent
+                          name: Reprehenderit assumenda officia assumenda et quo.
                 design_digest:
                     type: string
                     description: SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).
-                    example: Perferendis molestias nisi cupiditate in.
+                    example: Doloremque numquam porro debitis beatae.
                 edges:
                     type: array
                     items:
                         $ref: '#/components/schemas/C4EdgeItem'
                     description: Validated directed edges between declared containers.
                     example:
-                        - from_id: Ut esse ipsa.
-                          protocol: Et dolor neque non molestias voluptas.
-                          to_id: Non et dolor dolorum ipsa ullam.
-                        - from_id: Ut esse ipsa.
-                          protocol: Et dolor neque non molestias voluptas.
-                          to_id: Non et dolor dolorum ipsa ullam.
-                        - from_id: Ut esse ipsa.
-                          protocol: Et dolor neque non molestias voluptas.
-                          to_id: Non et dolor dolorum ipsa ullam.
+                        - from_id: Corporis non sapiente.
+                          protocol: Cumque laboriosam fugit commodi voluptates.
+                          to_id: Totam labore pariatur magnam voluptates eum.
+                        - from_id: Corporis non sapiente.
+                          protocol: Cumque laboriosam fugit commodi voluptates.
+                          to_id: Totam labore pariatur magnam voluptates eum.
                 request_revision:
                     type: string
                     description: Bound CP1 request_revision digest.
-                    example: Quos aperiam quia.
+                    example: Voluptatem assumenda.
                 swarm:
                     $ref: '#/components/schemas/SwarmPlanItem'
                 system_name:
                     type: string
                     description: API or primary service name declared in the design.
-                    example: Expedita vero et minima.
+                    example: Itaque et rerum ut ea consequatur.
                 tools:
                     type: array
                     items:
                         $ref: '#/components/schemas/ToolContractItem'
                     description: Evaluated Goa-AI tool contracts.
                     example:
-                        - args_schema: Nisi vel iusto.
-                          bounded_result: true
-                          description: Voluptatem pariatur similique omnis dolore.
-                          id: Omnis aut quos rem qui sunt.
+                        - args_schema: Repudiandae illo autem.
+                          bounded_result: false
+                          description: Et laborum quis.
+                          id: Dolores et accusantium et.
                           injected_fields:
-                            - Soluta tenetur sint ullam aut illum.
-                            - Odit culpa distinctio nobis.
-                            - Voluptatum similique.
-                            - Nisi minima reprehenderit.
+                            - Molestiae velit quos tempora maxime corporis.
+                            - Voluptatem libero quae amet reiciendis voluptatem.
+                            - Quae ipsam.
+                            - Veniam rem consequatur libero tempora.
                           input_binding:
-                            args_schema: Qui qui illo assumenda dolores nemo harum.
+                            args_schema: Nam libero temporibus veritatis enim dolorum.
                             injected_fields:
-                                - Quam laborum aut dolorum enim perferendis omnis.
-                                - Aut doloribus.
-                            lookup_args_schema: Qui itaque.
-                            lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                            text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                          name: Voluptatum voluptatem.
-                          requires_confirmation: true
-                          requires_ui: true
-                          return_schema: Omnis aut ab aliquam qui.
-                          text_only_args_schema: Suscipit dignissimos ut.
-                          toolset: Veniam aspernatur ad recusandae unde.
-                        - args_schema: Nisi vel iusto.
-                          bounded_result: true
-                          description: Voluptatem pariatur similique omnis dolore.
-                          id: Omnis aut quos rem qui sunt.
+                                - Beatae ut in.
+                                - Sunt distinctio nisi et adipisci cumque minus.
+                            lookup_args_schema: Nisi sunt pariatur at.
+                            lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                            text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                          name: Et quis sapiente tempora nihil est ut.
+                          requires_confirmation: false
+                          requires_ui: false
+                          return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                          text_only_args_schema: Facere voluptas rerum consectetur.
+                          toolset: Beatae repudiandae.
+                        - args_schema: Repudiandae illo autem.
+                          bounded_result: false
+                          description: Et laborum quis.
+                          id: Dolores et accusantium et.
                           injected_fields:
-                            - Soluta tenetur sint ullam aut illum.
-                            - Odit culpa distinctio nobis.
-                            - Voluptatum similique.
-                            - Nisi minima reprehenderit.
+                            - Molestiae velit quos tempora maxime corporis.
+                            - Voluptatem libero quae amet reiciendis voluptatem.
+                            - Quae ipsam.
+                            - Veniam rem consequatur libero tempora.
                           input_binding:
-                            args_schema: Qui qui illo assumenda dolores nemo harum.
+                            args_schema: Nam libero temporibus veritatis enim dolorum.
                             injected_fields:
-                                - Quam laborum aut dolorum enim perferendis omnis.
-                                - Aut doloribus.
-                            lookup_args_schema: Qui itaque.
-                            lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                            text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                          name: Voluptatum voluptatem.
-                          requires_confirmation: true
-                          requires_ui: true
-                          return_schema: Omnis aut ab aliquam qui.
-                          text_only_args_schema: Suscipit dignissimos ut.
-                          toolset: Veniam aspernatur ad recusandae unde.
+                                - Beatae ut in.
+                                - Sunt distinctio nisi et adipisci cumque minus.
+                            lookup_args_schema: Nisi sunt pariatur at.
+                            lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                            text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                          name: Et quis sapiente tempora nihil est ut.
+                          requires_confirmation: false
+                          requires_ui: false
+                          return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                          text_only_args_schema: Facere voluptas rerum consectetur.
+                          toolset: Beatae repudiandae.
+                        - args_schema: Repudiandae illo autem.
+                          bounded_result: false
+                          description: Et laborum quis.
+                          id: Dolores et accusantium et.
+                          injected_fields:
+                            - Molestiae velit quos tempora maxime corporis.
+                            - Voluptatem libero quae amet reiciendis voluptatem.
+                            - Quae ipsam.
+                            - Veniam rem consequatur libero tempora.
+                          input_binding:
+                            args_schema: Nam libero temporibus veritatis enim dolorum.
+                            injected_fields:
+                                - Beatae ut in.
+                                - Sunt distinctio nisi et adipisci cumque minus.
+                            lookup_args_schema: Nisi sunt pariatur at.
+                            lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                            text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                          name: Et quis sapiente tempora nihil est ut.
+                          requires_confirmation: false
+                          requires_ui: false
+                          return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                          text_only_args_schema: Facere voluptas rerum consectetur.
+                          toolset: Beatae repudiandae.
             description: Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.
             example:
                 agent_policies:
-                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                      cache_after_system: false
+                    - agent_id: Hic dolores temporibus at tempora recusandae.
+                      cache_after_system: true
                       cache_after_tools: false
-                      compress_at_turns: 1985631241836553606
-                      keep_recent_turns: 8669062505451687645
-                      max_execution_seconds: 4973048293267150158
-                      max_recovery_turns: 1926956061700657504
-                      max_tool_calls: 6650034279102484511
-                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                      cache_after_system: false
+                      compress_at_turns: 2961075941365311475
+                      keep_recent_turns: 8141624799624588935
+                      max_execution_seconds: 9164198126331039093
+                      max_recovery_turns: 1479075455329254996
+                      max_tool_calls: 7430104826542814714
+                    - agent_id: Hic dolores temporibus at tempora recusandae.
+                      cache_after_system: true
                       cache_after_tools: false
-                      compress_at_turns: 1985631241836553606
-                      keep_recent_turns: 8669062505451687645
-                      max_execution_seconds: 4973048293267150158
-                      max_recovery_turns: 1926956061700657504
-                      max_tool_calls: 6650034279102484511
-                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                      cache_after_system: false
-                      cache_after_tools: false
-                      compress_at_turns: 1985631241836553606
-                      keep_recent_turns: 8669062505451687645
-                      max_execution_seconds: 4973048293267150158
-                      max_recovery_turns: 1926956061700657504
-                      max_tool_calls: 6650034279102484511
-                    - agent_id: Consectetur laudantium rem architecto aut molestias velit.
-                      cache_after_system: false
-                      cache_after_tools: false
-                      compress_at_turns: 1985631241836553606
-                      keep_recent_turns: 8669062505451687645
-                      max_execution_seconds: 4973048293267150158
-                      max_recovery_turns: 1926956061700657504
-                      max_tool_calls: 6650034279102484511
-                banner: Praesentium temporibus in repudiandae.
-                change_id: Quisquam sapiente.
+                      compress_at_turns: 2961075941365311475
+                      keep_recent_turns: 8141624799624588935
+                      max_execution_seconds: 9164198126331039093
+                      max_recovery_turns: 1479075455329254996
+                      max_tool_calls: 7430104826542814714
+                banner: Cumque est ut quia aspernatur dolor libero.
+                change_id: Temporibus dolorem exercitationem nulla quisquam nesciunt.
                 containers:
-                    - description: Tempora ab omnis minima veritatis.
-                      id: Deserunt non quia earum.
-                      kind: toolset
-                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
-                    - description: Tempora ab omnis minima veritatis.
-                      id: Deserunt non quia earum.
-                      kind: toolset
-                      name: Quaerat facilis eum quisquam magnam voluptatem corporis.
-                design_digest: Perferendis molestias nisi cupiditate in.
+                    - description: Architecto ipsa qui praesentium.
+                      id: Nihil consequatur et fugit atque.
+                      kind: agent
+                      name: Reprehenderit assumenda officia assumenda et quo.
+                    - description: Architecto ipsa qui praesentium.
+                      id: Nihil consequatur et fugit atque.
+                      kind: agent
+                      name: Reprehenderit assumenda officia assumenda et quo.
+                design_digest: Doloremque numquam porro debitis beatae.
                 edges:
-                    - from_id: Ut esse ipsa.
-                      protocol: Et dolor neque non molestias voluptas.
-                      to_id: Non et dolor dolorum ipsa ullam.
-                    - from_id: Ut esse ipsa.
-                      protocol: Et dolor neque non molestias voluptas.
-                      to_id: Non et dolor dolorum ipsa ullam.
-                    - from_id: Ut esse ipsa.
-                      protocol: Et dolor neque non molestias voluptas.
-                      to_id: Non et dolor dolorum ipsa ullam.
-                request_revision: Quos aperiam quia.
+                    - from_id: Corporis non sapiente.
+                      protocol: Cumque laboriosam fugit commodi voluptates.
+                      to_id: Totam labore pariatur magnam voluptates eum.
+                    - from_id: Corporis non sapiente.
+                      protocol: Cumque laboriosam fugit commodi voluptates.
+                      to_id: Totam labore pariatur magnam voluptates eum.
+                request_revision: Voluptatem assumenda.
                 swarm:
                     assignments:
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
+                        - access_mode: read_only_after_cp2
+                          family: Et aut accusantium alias.
+                          handle: Quos et quo autem odio ratione.
+                          model: Velit impedit dolores quod saepe.
                           owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
+                            - Et harum fugiat.
+                            - Fuga sit ut.
+                            - Voluptatem temporibus provident.
+                            - Delectus minus.
+                          profile_id: Vitae sed autem sit.
+                          provider: Laboriosam veniam aut.
+                          role: builder
+                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                        - access_mode: read_only_after_cp2
+                          family: Et aut accusantium alias.
+                          handle: Quos et quo autem odio ratione.
+                          model: Velit impedit dolores quod saepe.
                           owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
+                            - Et harum fugiat.
+                            - Fuga sit ut.
+                            - Voluptatem temporibus provident.
+                            - Delectus minus.
+                          profile_id: Vitae sed autem sit.
+                          provider: Laboriosam veniam aut.
+                          role: builder
+                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                        - access_mode: read_only_after_cp2
+                          family: Et aut accusantium alias.
+                          handle: Quos et quo autem odio ratione.
+                          model: Velit impedit dolores quod saepe.
                           owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
-                          owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                    cross_family_eval: false
-                    cross_family_review: true
-                    manifest: Adipisci suscipit corporis doloremque et.
+                            - Et harum fugiat.
+                            - Fuga sit ut.
+                            - Voluptatem temporibus provident.
+                            - Delectus minus.
+                          profile_id: Vitae sed autem sit.
+                          provider: Laboriosam veniam aut.
+                          role: builder
+                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                    cross_family_eval: true
+                    cross_family_review: false
+                    manifest: Voluptatum rerum.
                     missing_roles:
-                        - Totam ab ex quod ea nesciunt nobis.
-                        - Qui vero quos blanditiis autem et.
-                        - Et blanditiis tenetur occaecati est maxime.
-                        - Quam dignissimos animi sed possimus.
-                    single_family: false
-                    status: missing_capability
-                    summary: Blanditiis eligendi illo quia exercitationem voluptatem ut.
-                system_name: Expedita vero et minima.
+                        - Quas a quia non accusantium ipsam facere.
+                        - Est rerum beatae quasi occaecati earum.
+                        - Qui dolores nam quis non ex.
+                    single_family: true
+                    status: configured
+                    summary: Repellat neque ut facilis.
+                system_name: Itaque et rerum ut ea consequatur.
                 tools:
-                    - args_schema: Nisi vel iusto.
-                      bounded_result: true
-                      description: Voluptatem pariatur similique omnis dolore.
-                      id: Omnis aut quos rem qui sunt.
+                    - args_schema: Repudiandae illo autem.
+                      bounded_result: false
+                      description: Et laborum quis.
+                      id: Dolores et accusantium et.
                       injected_fields:
-                        - Soluta tenetur sint ullam aut illum.
-                        - Odit culpa distinctio nobis.
-                        - Voluptatum similique.
-                        - Nisi minima reprehenderit.
+                        - Molestiae velit quos tempora maxime corporis.
+                        - Voluptatem libero quae amet reiciendis voluptatem.
+                        - Quae ipsam.
+                        - Veniam rem consequatur libero tempora.
                       input_binding:
-                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                        args_schema: Nam libero temporibus veritatis enim dolorum.
                         injected_fields:
-                            - Quam laborum aut dolorum enim perferendis omnis.
-                            - Aut doloribus.
-                        lookup_args_schema: Qui itaque.
-                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                      name: Voluptatum voluptatem.
-                      requires_confirmation: true
-                      requires_ui: true
-                      return_schema: Omnis aut ab aliquam qui.
-                      text_only_args_schema: Suscipit dignissimos ut.
-                      toolset: Veniam aspernatur ad recusandae unde.
-                    - args_schema: Nisi vel iusto.
-                      bounded_result: true
-                      description: Voluptatem pariatur similique omnis dolore.
-                      id: Omnis aut quos rem qui sunt.
+                            - Beatae ut in.
+                            - Sunt distinctio nisi et adipisci cumque minus.
+                        lookup_args_schema: Nisi sunt pariatur at.
+                        lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                        text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                      name: Et quis sapiente tempora nihil est ut.
+                      requires_confirmation: false
+                      requires_ui: false
+                      return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                      text_only_args_schema: Facere voluptas rerum consectetur.
+                      toolset: Beatae repudiandae.
+                    - args_schema: Repudiandae illo autem.
+                      bounded_result: false
+                      description: Et laborum quis.
+                      id: Dolores et accusantium et.
                       injected_fields:
-                        - Soluta tenetur sint ullam aut illum.
-                        - Odit culpa distinctio nobis.
-                        - Voluptatum similique.
-                        - Nisi minima reprehenderit.
+                        - Molestiae velit quos tempora maxime corporis.
+                        - Voluptatem libero quae amet reiciendis voluptatem.
+                        - Quae ipsam.
+                        - Veniam rem consequatur libero tempora.
                       input_binding:
-                        args_schema: Qui qui illo assumenda dolores nemo harum.
+                        args_schema: Nam libero temporibus veritatis enim dolorum.
                         injected_fields:
-                            - Quam laborum aut dolorum enim perferendis omnis.
-                            - Aut doloribus.
-                        lookup_args_schema: Qui itaque.
-                        lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                        text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                      name: Voluptatum voluptatem.
-                      requires_confirmation: true
-                      requires_ui: true
-                      return_schema: Omnis aut ab aliquam qui.
-                      text_only_args_schema: Suscipit dignissimos ut.
-                      toolset: Veniam aspernatur ad recusandae unde.
+                            - Beatae ut in.
+                            - Sunt distinctio nisi et adipisci cumque minus.
+                        lookup_args_schema: Nisi sunt pariatur at.
+                        lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                        text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                      name: Et quis sapiente tempora nihil est ut.
+                      requires_confirmation: false
+                      requires_ui: false
+                      return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                      text_only_args_schema: Facere voluptas rerum consectetur.
+                      toolset: Beatae repudiandae.
+                    - args_schema: Repudiandae illo autem.
+                      bounded_result: false
+                      description: Et laborum quis.
+                      id: Dolores et accusantium et.
+                      injected_fields:
+                        - Molestiae velit quos tempora maxime corporis.
+                        - Voluptatem libero quae amet reiciendis voluptatem.
+                        - Quae ipsam.
+                        - Veniam rem consequatur libero tempora.
+                      input_binding:
+                        args_schema: Nam libero temporibus veritatis enim dolorum.
+                        injected_fields:
+                            - Beatae ut in.
+                            - Sunt distinctio nisi et adipisci cumque minus.
+                        lookup_args_schema: Nisi sunt pariatur at.
+                        lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                        text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                      name: Et quis sapiente tempora nihil est ut.
+                      requires_confirmation: false
+                      requires_ui: false
+                      return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                      text_only_args_schema: Facere voluptas rerum consectetur.
+                      toolset: Beatae repudiandae.
             required:
                 - change_id
                 - request_revision
@@ -999,27 +1011,31 @@ components:
                 name:
                     type: string
                     description: Human-readable builder scope name (for example, orders or api).
-                    example: Ut nulla.
+                    example: Libero cupiditate occaecati natus sed.
                 paths:
                     type: array
                     items:
                         type: string
-                        example: Tempora aut qui voluptatem iste exercitationem.
+                        example: At recusandae.
                     description: Repository-relative path globs owned by this builder.
                     example:
-                        - Tempora aut qui voluptatem iste exercitationem.
-                        - Sed quia et ullam libero et et.
+                        - At recusandae.
+                        - Ea ipsa sed ullam et quas.
+                        - Quia perferendis rerum.
+                        - Praesentium quia beatae dolorem vel.
                 preferred_profile_id:
                     type: string
                     description: Optional preference selecting a server-configured authenticated profile ID.
-                    example: Accusamus et et qui ut deserunt.
+                    example: Unde ut in.
             description: Explicit repository path ownership slice for a builder agent role.
             example:
-                name: Ut nulla.
+                name: Libero cupiditate occaecati natus sed.
                 paths:
-                    - Tempora aut qui voluptatem iste exercitationem.
-                    - Sed quia et ullam libero et et.
-                preferred_profile_id: Accusamus et et qui ut deserunt.
+                    - At recusandae.
+                    - Ea ipsa sed ullam et quas.
+                    - Quia perferendis rerum.
+                    - Praesentium quia beatae dolorem vel.
+                preferred_profile_id: Unde ut in.
             required:
                 - name
                 - paths
@@ -1029,15 +1045,15 @@ components:
                 description:
                     type: string
                     description: Summary of the container's responsibility.
-                    example: Tempora ab omnis minima veritatis.
+                    example: Architecto ipsa qui praesentium.
                 id:
                     type: string
                     description: Stable container identifier.
-                    example: Deserunt non quia earum.
+                    example: Nihil consequatur et fugit atque.
                 kind:
                     type: string
                     description: Declared service, agent, toolset, person, system, container, or component.
-                    example: toolset
+                    example: agent
                     enum:
                         - service
                         - agent
@@ -1049,13 +1065,13 @@ components:
                 name:
                     type: string
                     description: Human-readable container name.
-                    example: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                    example: Reprehenderit assumenda officia assumenda et quo.
             description: Architecture element declared by the target Goa, Goa-AI, or Model design.
             example:
-                description: Tempora ab omnis minima veritatis.
-                id: Deserunt non quia earum.
-                kind: toolset
-                name: Quaerat facilis eum quisquam magnam voluptatem corporis.
+                description: Architecto ipsa qui praesentium.
+                id: Nihil consequatur et fugit atque.
+                kind: agent
+                name: Reprehenderit assumenda officia assumenda et quo.
             required:
                 - id
                 - name
@@ -1067,20 +1083,20 @@ components:
                 from_id:
                     type: string
                     description: Source container ID.
-                    example: Ut esse ipsa.
+                    example: Corporis non sapiente.
                 protocol:
                     type: string
                     description: Contract or transport relationship.
-                    example: Et dolor neque non molestias voluptas.
+                    example: Cumque laboriosam fugit commodi voluptates.
                 to_id:
                     type: string
                     description: Target container ID.
-                    example: Non et dolor dolorum ipsa ullam.
+                    example: Totam labore pariatur magnam voluptates eum.
             description: Directed contract relationship between two C4 containers.
             example:
-                from_id: Ut esse ipsa.
-                protocol: Et dolor neque non molestias voluptas.
-                to_id: Non et dolor dolorum ipsa ullam.
+                from_id: Corporis non sapiente.
+                protocol: Cumque laboriosam fugit commodi voluptates.
+                to_id: Totam labore pariatur magnam voluptates eum.
             required:
                 - from_id
                 - to_id
@@ -1094,142 +1110,142 @@ components:
                         $ref: '#/components/schemas/AmbiguityQuestion'
                     description: Domain questions surfaced at CP1, retained for audit after confirmation.
                     example:
-                        - id: Aut fuga velit.
+                        - id: Incidunt quasi molestias itaque tempore animi.
                           options:
-                            - Ex aliquid est velit necessitatibus hic incidunt.
-                            - Quia aut qui maxime autem.
-                            - Facere voluptatum dolorem.
-                            - Sit qui nam odio itaque aut.
-                          question: Inventore maxime esse.
-                        - id: Aut fuga velit.
+                            - Et laudantium quibusdam aut voluptas atque magnam.
+                            - Vel voluptas deleniti nemo molestiae quia ipsa.
+                            - Et temporibus suscipit et tempore praesentium fuga.
+                            - Est ipsa et nihil aut omnis fugit.
+                          question: Labore harum illo eos ipsum deleniti possimus.
+                        - id: Incidunt quasi molestias itaque tempore animi.
                           options:
-                            - Ex aliquid est velit necessitatibus hic incidunt.
-                            - Quia aut qui maxime autem.
-                            - Facere voluptatum dolorem.
-                            - Sit qui nam odio itaque aut.
-                          question: Inventore maxime esse.
-                        - id: Aut fuga velit.
+                            - Et laudantium quibusdam aut voluptas atque magnam.
+                            - Vel voluptas deleniti nemo molestiae quia ipsa.
+                            - Et temporibus suscipit et tempore praesentium fuga.
+                            - Est ipsa et nihil aut omnis fugit.
+                          question: Labore harum illo eos ipsum deleniti possimus.
+                        - id: Incidunt quasi molestias itaque tempore animi.
                           options:
-                            - Ex aliquid est velit necessitatibus hic incidunt.
-                            - Quia aut qui maxime autem.
-                            - Facere voluptatum dolorem.
-                            - Sit qui nam odio itaque aut.
-                          question: Inventore maxime esse.
+                            - Et laudantium quibusdam aut voluptas atque magnam.
+                            - Vel voluptas deleniti nemo molestiae quia ipsa.
+                            - Et temporibus suscipit et tempore praesentium fuga.
+                            - Est ipsa et nihil aut omnis fugit.
+                          question: Labore harum illo eos ipsum deleniti possimus.
                 answers:
                     type: object
                     description: Confirmed resolution per ambiguity question ID.
                     example:
-                        Ducimus quo illo expedita.: Culpa vero voluptatum itaque facilis.
+                        Consequatur ex.: Veritatis alias non blanditiis.
                     additionalProperties:
                         type: string
-                        example: Culpa vero voluptatum itaque facilis.
+                        example: Veritatis alias non blanditiis.
                 change_id:
                     type: string
                     description: Change identifier.
-                    example: Dolor adipisci ut nam quia ad.
+                    example: Molestiae autem quas reprehenderit fugit.
                 confirmed_by:
                     type: string
                     description: Authenticated principal that confirmed the Change Card.
-                    example: Tenetur voluptas aspernatur officia ipsam ut.
+                    example: Accusamus harum velit earum libero ad.
                 examples:
                     type: array
                     items:
                         $ref: '#/components/schemas/ExampleItem'
                     description: Concrete examples mapped to evaluator checks.
                     example:
-                        - expected_outcome: Voluptatem necessitatibus numquam.
-                          id: Nemo libero.
-                          input_summary: Deserunt tempore deleniti.
-                          scenario: Vitae velit dicta excepturi distinctio.
-                          verification_kind: deterministic
-                        - expected_outcome: Voluptatem necessitatibus numquam.
-                          id: Nemo libero.
-                          input_summary: Deserunt tempore deleniti.
-                          scenario: Vitae velit dicta excepturi distinctio.
-                          verification_kind: deterministic
+                        - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                          id: Consequatur voluptatibus soluta sequi reiciendis.
+                          input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                          scenario: Facilis sed tempore.
+                          verification_kind: model_judged
+                        - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                          id: Consequatur voluptatibus soluta sequi reiciendis.
+                          input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                          scenario: Facilis sed tempore.
+                          verification_kind: model_judged
                 preserved_behaviors:
                     type: array
                     items:
                         type: string
-                        example: Qui quia assumenda vero fugit rerum sed.
+                        example: Aperiam quae cumque et quasi omnis aut.
                     description: Existing contract invariants preserved by this change.
                     example:
-                        - Qui quia assumenda vero fugit rerum sed.
-                        - Exercitationem ea dolores quo ab rerum adipisci.
-                        - Aut et nostrum.
-                        - Mollitia commodi qui error.
+                        - Aperiam quae cumque et quasi omnis aut.
+                        - Asperiores laboriosam aspernatur consequuntur voluptas rerum dolores.
+                        - At qui aut.
+                        - Animi unde.
                 prompt:
                     type: string
                     description: Original operator feature request.
-                    example: Culpa aut.
+                    example: Ea perferendis neque.
                 request_revision:
                     type: string
                     description: SHA-256 digest of the canonical versioned Change Card.
-                    example: Necessitatibus quos et ut natus voluptates corporis.
+                    example: Et maxime fugiat.
                 status:
                     type: string
                     description: Checkpoint status (needs_confirmation or confirmed).
-                    example: needs_confirmation
+                    example: confirmed
                     enum:
                         - needs_confirmation
                         - confirmed
                 summary:
                     type: string
                     description: Plain-English summary of requested behavior.
-                    example: Maiores voluptate soluta quasi et in.
+                    example: Et repellendus nemo.
                 ui_composition:
                     $ref: '#/components/schemas/UICompositionItem'
             description: Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.
             example:
                 ambiguities:
-                    - id: Aut fuga velit.
+                    - id: Incidunt quasi molestias itaque tempore animi.
                       options:
-                        - Ex aliquid est velit necessitatibus hic incidunt.
-                        - Quia aut qui maxime autem.
-                        - Facere voluptatum dolorem.
-                        - Sit qui nam odio itaque aut.
-                      question: Inventore maxime esse.
-                    - id: Aut fuga velit.
+                        - Et laudantium quibusdam aut voluptas atque magnam.
+                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                        - Et temporibus suscipit et tempore praesentium fuga.
+                        - Est ipsa et nihil aut omnis fugit.
+                      question: Labore harum illo eos ipsum deleniti possimus.
+                    - id: Incidunt quasi molestias itaque tempore animi.
                       options:
-                        - Ex aliquid est velit necessitatibus hic incidunt.
-                        - Quia aut qui maxime autem.
-                        - Facere voluptatum dolorem.
-                        - Sit qui nam odio itaque aut.
-                      question: Inventore maxime esse.
-                    - id: Aut fuga velit.
+                        - Et laudantium quibusdam aut voluptas atque magnam.
+                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                        - Et temporibus suscipit et tempore praesentium fuga.
+                        - Est ipsa et nihil aut omnis fugit.
+                      question: Labore harum illo eos ipsum deleniti possimus.
+                    - id: Incidunt quasi molestias itaque tempore animi.
                       options:
-                        - Ex aliquid est velit necessitatibus hic incidunt.
-                        - Quia aut qui maxime autem.
-                        - Facere voluptatum dolorem.
-                        - Sit qui nam odio itaque aut.
-                      question: Inventore maxime esse.
+                        - Et laudantium quibusdam aut voluptas atque magnam.
+                        - Vel voluptas deleniti nemo molestiae quia ipsa.
+                        - Et temporibus suscipit et tempore praesentium fuga.
+                        - Est ipsa et nihil aut omnis fugit.
+                      question: Labore harum illo eos ipsum deleniti possimus.
                 answers:
-                    Ducimus quo illo expedita.: Culpa vero voluptatum itaque facilis.
-                change_id: Dolor adipisci ut nam quia ad.
-                confirmed_by: Tenetur voluptas aspernatur officia ipsam ut.
+                    Consequatur ex.: Veritatis alias non blanditiis.
+                change_id: Molestiae autem quas reprehenderit fugit.
+                confirmed_by: Accusamus harum velit earum libero ad.
                 examples:
-                    - expected_outcome: Voluptatem necessitatibus numquam.
-                      id: Nemo libero.
-                      input_summary: Deserunt tempore deleniti.
-                      scenario: Vitae velit dicta excepturi distinctio.
-                      verification_kind: deterministic
-                    - expected_outcome: Voluptatem necessitatibus numquam.
-                      id: Nemo libero.
-                      input_summary: Deserunt tempore deleniti.
-                      scenario: Vitae velit dicta excepturi distinctio.
-                      verification_kind: deterministic
+                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                      scenario: Facilis sed tempore.
+                      verification_kind: model_judged
+                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                      scenario: Facilis sed tempore.
+                      verification_kind: model_judged
                 preserved_behaviors:
-                    - Qui quia assumenda vero fugit rerum sed.
-                    - Exercitationem ea dolores quo ab rerum adipisci.
-                    - Aut et nostrum.
-                    - Mollitia commodi qui error.
-                prompt: Culpa aut.
-                request_revision: Necessitatibus quos et ut natus voluptates corporis.
-                status: needs_confirmation
-                summary: Maiores voluptate soluta quasi et in.
+                    - Aperiam quae cumque et quasi omnis aut.
+                    - Asperiores laboriosam aspernatur consequuntur voluptas rerum dolores.
+                    - At qui aut.
+                    - Animi unde.
+                prompt: Ea perferendis neque.
+                request_revision: Et maxime fugiat.
+                status: confirmed
+                summary: Et repellendus nemo.
                 ui_composition:
-                    composed_for_revision: Aut neque voluptas.
-                    program: Repellat ex.
+                    composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
+                    program: Numquam provident excepturi et deleniti vel sed.
             required:
                 - change_id
                 - status
@@ -1245,65 +1261,53 @@ components:
                     type: object
                     description: Selected resolution per ambiguity question ID.
                     example:
-                        Cupiditate vel.: Omnis debitis sit.
-                        Modi voluptates.: Occaecati corporis laborum libero odit repellat sit.
-                        Optio id ut quae.: Aperiam labore autem est possimus ipsam sunt.
+                        Qui aut iure rem.: Deserunt vitae fuga nisi quia atque quia.
+                        Soluta cumque quas minus autem neque.: Quis exercitationem.
                     additionalProperties:
                         type: string
-                        example: Omnis debitis sit.
+                        example: Deserunt vitae fuga nisi quia atque quia.
                 change_id:
                     type: string
                     description: Change identifier.
-                    example: Aspernatur quia doloribus assumenda unde tenetur.
+                    example: Consectetur asperiores rem iusto.
                 examples:
                     type: array
                     items:
                         $ref: '#/components/schemas/ExampleItem'
                     description: Confirmed example table.
                     example:
-                        - expected_outcome: Voluptatem necessitatibus numquam.
-                          id: Nemo libero.
-                          input_summary: Deserunt tempore deleniti.
-                          scenario: Vitae velit dicta excepturi distinctio.
-                          verification_kind: deterministic
-                        - expected_outcome: Voluptatem necessitatibus numquam.
-                          id: Nemo libero.
-                          input_summary: Deserunt tempore deleniti.
-                          scenario: Vitae velit dicta excepturi distinctio.
-                          verification_kind: deterministic
-                        - expected_outcome: Voluptatem necessitatibus numquam.
-                          id: Nemo libero.
-                          input_summary: Deserunt tempore deleniti.
-                          scenario: Vitae velit dicta excepturi distinctio.
-                          verification_kind: deterministic
+                        - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                          id: Consequatur voluptatibus soluta sequi reiciendis.
+                          input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                          scenario: Facilis sed tempore.
+                          verification_kind: model_judged
+                        - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                          id: Consequatur voluptatibus soluta sequi reiciendis.
+                          input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                          scenario: Facilis sed tempore.
+                          verification_kind: model_judged
                 request_revision:
                     type: string
                     description: Reviewed CP1 request_revision digest being confirmed.
-                    example: Rerum consequatur iste necessitatibus ab dolor enim.
+                    example: Deserunt adipisci et corporis qui corporis architecto.
             description: Request body for confirm_intent.
             example:
                 answers:
-                    Cupiditate vel.: Omnis debitis sit.
-                    Modi voluptates.: Occaecati corporis laborum libero odit repellat sit.
-                    Optio id ut quae.: Aperiam labore autem est possimus ipsam sunt.
-                change_id: Aspernatur quia doloribus assumenda unde tenetur.
+                    Qui aut iure rem.: Deserunt vitae fuga nisi quia atque quia.
+                    Soluta cumque quas minus autem neque.: Quis exercitationem.
+                change_id: Consectetur asperiores rem iusto.
                 examples:
-                    - expected_outcome: Voluptatem necessitatibus numquam.
-                      id: Nemo libero.
-                      input_summary: Deserunt tempore deleniti.
-                      scenario: Vitae velit dicta excepturi distinctio.
-                      verification_kind: deterministic
-                    - expected_outcome: Voluptatem necessitatibus numquam.
-                      id: Nemo libero.
-                      input_summary: Deserunt tempore deleniti.
-                      scenario: Vitae velit dicta excepturi distinctio.
-                      verification_kind: deterministic
-                    - expected_outcome: Voluptatem necessitatibus numquam.
-                      id: Nemo libero.
-                      input_summary: Deserunt tempore deleniti.
-                      scenario: Vitae velit dicta excepturi distinctio.
-                      verification_kind: deterministic
-                request_revision: Rerum consequatur iste necessitatibus ab dolor enim.
+                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                      scenario: Facilis sed tempore.
+                      verification_kind: model_judged
+                    - expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                      id: Consequatur voluptatibus soluta sequi reiciendis.
+                      input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                      scenario: Facilis sed tempore.
+                      verification_kind: model_judged
+                request_revision: Deserunt adipisci et corporis qui corporis architecto.
             required:
                 - change_id
                 - request_revision
@@ -1316,18 +1320,16 @@ components:
                     type: object
                     description: File contents keyed by module-relative path, such as design/design.go or go.mod.
                     example:
-                        Amet qui.: Et ut dolore est.
-                        Beatae quia.: Impedit laboriosam repellendus nisi.
-                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                        Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                        Quaerat vitae quas rerum.: Vel in molestias et quaerat.
                     additionalProperties:
                         type: string
-                        example: Et ut dolore est.
+                        example: Vel in molestias et quaerat.
             description: Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.
             example:
                 files:
-                    Amet qui.: Et ut dolore est.
-                    Beatae quia.: Impedit laboriosam repellendus nisi.
-                    Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                    Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                    Quaerat vitae quas rerum.: Vel in molestias et quaerat.
             required:
                 - files
         DiffPayload:
@@ -1341,14 +1343,12 @@ components:
             example:
                 new:
                     files:
-                        Amet qui.: Et ut dolore est.
-                        Beatae quia.: Impedit laboriosam repellendus nisi.
-                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                        Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                        Quaerat vitae quas rerum.: Vel in molestias et quaerat.
                 old:
                     files:
-                        Amet qui.: Et ut dolore est.
-                        Beatae quia.: Impedit laboriosam repellendus nisi.
-                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
+                        Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                        Quaerat vitae quas rerum.: Vel in molestias et quaerat.
             required:
                 - old
                 - new
@@ -1359,13 +1359,13 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Nostrum at rerum voluptatem eligendi quia.
+                        example: Sint facilis dolorum officiis similique.
                     description: Added scoped declarations.
                     example:
-                        - Nostrum at rerum voluptatem eligendi quia.
-                        - Voluptates possimus.
-                        - Aut esse qui.
-                        - Debitis ut corrupti.
+                        - Sint facilis dolorum officiis similique.
+                        - Consequuntur voluptatem voluptatem hic voluptate.
+                        - Sed ratione doloremque.
+                        - Assumenda quod excepturi.
                 has_changes:
                     type: boolean
                     description: True when any declaration, evaluated contract schema, or module directive changed.
@@ -1374,57 +1374,57 @@ components:
                     type: array
                     items:
                         type: string
-                        example: Temporibus sunt dolorem quo.
+                        example: Et et molestias est est rerum doloribus.
                     description: Declarations whose evaluated schema, route, or policy changed.
                     example:
-                        - Temporibus sunt dolorem quo.
-                        - Numquam provident.
-                        - Beatae laborum qui ut.
+                        - Et et molestias est est rerum doloribus.
+                        - Quisquam labore qui id a quia necessitatibus.
+                        - Similique qui voluptas.
                 removed_declarations:
                     type: array
                     items:
                         type: string
-                        example: Quidem ea quidem sunt non.
+                        example: Ipsa ut ut est sapiente autem beatae.
                     description: Removed scoped declarations.
                     example:
-                        - Quidem ea quidem sunt non.
-                        - Perferendis et eum.
+                        - Ipsa ut ut est sapiente autem beatae.
+                        - Doloribus esse necessitatibus explicabo consectetur.
+                        - Similique expedita est.
                 summary:
                     type: string
                     description: Human-readable structural diff summary.
-                    example: Provident dolores nostrum.
+                    example: Aut dicta quia.
                 version_deltas:
                     type: array
                     items:
                         type: string
-                        example: Sint magnam.
+                        example: Explicabo cupiditate occaecati consequatur optio molestiae iure.
                     description: Changed module require, replace, or exclude directives.
                     example:
-                        - Sint magnam.
-                        - Aut dignissimos autem voluptas fuga dolorem inventore.
-                        - Velit nihil velit veritatis.
-                        - Non dicta corrupti natus rerum quidem.
+                        - Explicabo cupiditate occaecati consequatur optio molestiae iure.
+                        - Quibusdam soluta quisquam impedit pariatur laboriosam.
+                        - Minus eum corrupti culpa.
             description: Structural diff of evaluated Goa/Goa-AI declarations and go.mod directives.
             example:
                 added_declarations:
-                    - Nostrum at rerum voluptatem eligendi quia.
-                    - Voluptates possimus.
-                    - Aut esse qui.
-                    - Debitis ut corrupti.
+                    - Sint facilis dolorum officiis similique.
+                    - Consequuntur voluptatem voluptatem hic voluptate.
+                    - Sed ratione doloremque.
+                    - Assumenda quod excepturi.
                 has_changes: true
                 modified_declarations:
-                    - Temporibus sunt dolorem quo.
-                    - Numquam provident.
-                    - Beatae laborum qui ut.
+                    - Et et molestias est est rerum doloribus.
+                    - Quisquam labore qui id a quia necessitatibus.
+                    - Similique qui voluptas.
                 removed_declarations:
-                    - Quidem ea quidem sunt non.
-                    - Perferendis et eum.
-                summary: Provident dolores nostrum.
+                    - Ipsa ut ut est sapiente autem beatae.
+                    - Doloribus esse necessitatibus explicabo consectetur.
+                    - Similique expedita est.
+                summary: Aut dicta quia.
                 version_deltas:
-                    - Sint magnam.
-                    - Aut dignissimos autem voluptas fuga dolorem inventore.
-                    - Velit nihil velit veritatis.
-                    - Non dicta corrupti natus rerum quidem.
+                    - Explicabo cupiditate occaecati consequatur optio molestiae iure.
+                    - Quibusdam soluta quisquam impedit pariatur laboriosam.
+                    - Minus eum corrupti culpa.
             required:
                 - has_changes
                 - added_declarations
@@ -1438,23 +1438,23 @@ components:
                 new_content:
                     type: string
                     description: Updated prompt template text or rule expression.
-                    example: Et autem necessitatibus.
+                    example: Dolores explicabo.
                 prompt_id:
                     type: string
                     description: Registered prompt identifier when target_kind is prompt_template.
-                    example: Nesciunt et qui aut eaque.
+                    example: Quia ea soluta.
                 target_kind:
                     type: string
                     description: Override target kind (prompt_template or compiled_rule).
-                    example: compiled_rule
+                    example: prompt_template
                     enum:
                         - prompt_template
                         - compiled_rule
             description: Request body for draft_override.
             example:
-                new_content: Et autem necessitatibus.
-                prompt_id: Nesciunt et qui aut eaque.
-                target_kind: compiled_rule
+                new_content: Dolores explicabo.
+                prompt_id: Quia ea soluta.
+                target_kind: prompt_template
             required:
                 - target_kind
                 - new_content
@@ -1464,25 +1464,25 @@ components:
                 applied_in_store:
                     type: boolean
                     description: True when updated in the target platform's prompt.Store for 0s reload.
-                    example: false
+                    example: true
                 message:
                     type: string
                     description: Operator-facing status explanation.
-                    example: Ad assumenda iusto.
+                    example: Mollitia voluptatem error voluptatem molestiae quia.
                 prompt_version:
                     type: string
                     description: New prompt version digest returned by the target platform.
-                    example: Provident iste temporibus magni molestiae facilis dolores.
+                    example: Pariatur numquam quisquam sunt sequi recusandae adipisci.
                 requires_rebuild:
                     type: boolean
                     description: True when the change modifies a compiled Go business rule.
-                    example: false
+                    example: true
             description: Result of a Checkpoint 3 Fast Draft Mode override request.
             example:
-                applied_in_store: false
-                message: Ad assumenda iusto.
-                prompt_version: Provident iste temporibus magni molestiae facilis dolores.
-                requires_rebuild: false
+                applied_in_store: true
+                message: Mollitia voluptatem error voluptatem molestiae quia.
+                prompt_version: Pariatur numquam quisquam sunt sequi recusandae adipisci.
+                requires_rebuild: true
             required:
                 - applied_in_store
                 - requires_rebuild
@@ -1493,33 +1493,33 @@ components:
                 expected_outcome:
                     type: string
                     description: Expected side effect and response behavior.
-                    example: Voluptatem necessitatibus numquam.
+                    example: Sed minus voluptatum quis molestiae doloribus.
                 id:
                     type: string
                     description: Code-assigned stable example identifier.
-                    example: Nemo libero.
+                    example: Consequatur voluptatibus soluta sequi reiciendis.
                 input_summary:
                     type: string
                     description: Representative user request and domain fixture state.
-                    example: Deserunt tempore deleniti.
+                    example: Voluptate libero voluptatem molestias nesciunt dolore.
                 scenario:
                     type: string
                     description: Plain-English scenario description.
-                    example: Vitae velit dicta excepturi distinctio.
+                    example: Facilis sed tempore.
                 verification_kind:
                     type: string
                     description: Evaluator check classification (deterministic or model_judged).
-                    example: deterministic
+                    example: model_judged
                     enum:
                         - deterministic
                         - model_judged
             description: Concrete input and expected outcome confirmed at Checkpoint 1.
             example:
-                expected_outcome: Voluptatem necessitatibus numquam.
-                id: Nemo libero.
-                input_summary: Deserunt tempore deleniti.
-                scenario: Vitae velit dicta excepturi distinctio.
-                verification_kind: deterministic
+                expected_outcome: Sed minus voluptatum quis molestiae doloribus.
+                id: Consequatur voluptatibus soluta sequi reiciendis.
+                input_summary: Voluptate libero voluptatem molestias nesciunt dolore.
+                scenario: Facilis sed tempore.
+                verification_kind: model_judged
             required:
                 - id
                 - scenario
@@ -1535,66 +1535,81 @@ components:
                         $ref: '#/components/schemas/BuilderScopeItem'
                     description: Optional explicit builder path scopes for proposing the Chorus build roster.
                     example:
-                        - name: Ut nulla.
+                        - name: Libero cupiditate occaecati natus sed.
                           paths:
-                            - Tempora aut qui voluptatem iste exercitationem.
-                            - Sed quia et ullam libero et et.
-                          preferred_profile_id: Accusamus et et qui ut deserunt.
-                        - name: Ut nulla.
+                            - At recusandae.
+                            - Ea ipsa sed ullam et quas.
+                            - Quia perferendis rerum.
+                            - Praesentium quia beatae dolorem vel.
+                          preferred_profile_id: Unde ut in.
+                        - name: Libero cupiditate occaecati natus sed.
                           paths:
-                            - Tempora aut qui voluptatem iste exercitationem.
-                            - Sed quia et ullam libero et et.
-                          preferred_profile_id: Accusamus et et qui ut deserunt.
-                        - name: Ut nulla.
+                            - At recusandae.
+                            - Ea ipsa sed ullam et quas.
+                            - Quia perferendis rerum.
+                            - Praesentium quia beatae dolorem vel.
+                          preferred_profile_id: Unde ut in.
+                        - name: Libero cupiditate occaecati natus sed.
                           paths:
-                            - Tempora aut qui voluptatem iste exercitationem.
-                            - Sed quia et ullam libero et et.
-                          preferred_profile_id: Accusamus et et qui ut deserunt.
-                        - name: Ut nulla.
+                            - At recusandae.
+                            - Ea ipsa sed ullam et quas.
+                            - Quia perferendis rerum.
+                            - Praesentium quia beatae dolorem vel.
+                          preferred_profile_id: Unde ut in.
+                        - name: Libero cupiditate occaecati natus sed.
                           paths:
-                            - Tempora aut qui voluptatem iste exercitationem.
-                            - Sed quia et ullam libero et et.
-                          preferred_profile_id: Accusamus et et qui ut deserunt.
+                            - At recusandae.
+                            - Ea ipsa sed ullam et quas.
+                            - Quia perferendis rerum.
+                            - Praesentium quia beatae dolorem vel.
+                          preferred_profile_id: Unde ut in.
                 change_id:
                     type: string
                     description: Confirmed Change Card identifier.
-                    example: Nam ut commodi.
+                    example: Vel libero.
                 design:
                     $ref: '#/components/schemas/DesignSnapshot'
                 request_revision:
                     type: string
                     description: Expected CP1 request_revision digest.
-                    example: Et esse in incidunt repellendus in voluptate.
+                    example: Quisquam mollitia.
             description: Request body for preview_architecture.
             example:
                 builders:
-                    - name: Ut nulla.
+                    - name: Libero cupiditate occaecati natus sed.
                       paths:
-                        - Tempora aut qui voluptatem iste exercitationem.
-                        - Sed quia et ullam libero et et.
-                      preferred_profile_id: Accusamus et et qui ut deserunt.
-                    - name: Ut nulla.
+                        - At recusandae.
+                        - Ea ipsa sed ullam et quas.
+                        - Quia perferendis rerum.
+                        - Praesentium quia beatae dolorem vel.
+                      preferred_profile_id: Unde ut in.
+                    - name: Libero cupiditate occaecati natus sed.
                       paths:
-                        - Tempora aut qui voluptatem iste exercitationem.
-                        - Sed quia et ullam libero et et.
-                      preferred_profile_id: Accusamus et et qui ut deserunt.
-                    - name: Ut nulla.
+                        - At recusandae.
+                        - Ea ipsa sed ullam et quas.
+                        - Quia perferendis rerum.
+                        - Praesentium quia beatae dolorem vel.
+                      preferred_profile_id: Unde ut in.
+                    - name: Libero cupiditate occaecati natus sed.
                       paths:
-                        - Tempora aut qui voluptatem iste exercitationem.
-                        - Sed quia et ullam libero et et.
-                      preferred_profile_id: Accusamus et et qui ut deserunt.
-                    - name: Ut nulla.
+                        - At recusandae.
+                        - Ea ipsa sed ullam et quas.
+                        - Quia perferendis rerum.
+                        - Praesentium quia beatae dolorem vel.
+                      preferred_profile_id: Unde ut in.
+                    - name: Libero cupiditate occaecati natus sed.
                       paths:
-                        - Tempora aut qui voluptatem iste exercitationem.
-                        - Sed quia et ullam libero et et.
-                      preferred_profile_id: Accusamus et et qui ut deserunt.
-                change_id: Nam ut commodi.
+                        - At recusandae.
+                        - Ea ipsa sed ullam et quas.
+                        - Quia perferendis rerum.
+                        - Praesentium quia beatae dolorem vel.
+                      preferred_profile_id: Unde ut in.
+                change_id: Vel libero.
                 design:
                     files:
-                        Amet qui.: Et ut dolore est.
-                        Beatae quia.: Impedit laboriosam repellendus nisi.
-                        Impedit pariatur illum qui vel ut excepturi.: Est deleniti eos ipsa quis.
-                request_revision: Et esse in incidunt repellendus in voluptate.
+                        Doloribus repellat aut eveniet nesciunt natus labore.: Dolores magni.
+                        Quaerat vitae quas rerum.: Vel in molestias et quaerat.
+                request_revision: Quisquam mollitia.
             required:
                 - change_id
                 - request_revision
@@ -1605,20 +1620,20 @@ components:
                 change_id:
                     type: string
                     description: Unique change identifier.
-                    example: Molestiae debitis minima.
+                    example: Ipsum soluta officiis facilis dolorem quae.
                 design_source:
                     type: string
                     description: Current target Goa design source inspected by the CP1 model.
-                    example: Dolorem aut quidem molestiae nihil.
+                    example: Quia placeat maiores voluptatem voluptatem.
                 prompt:
                     type: string
                     description: Operator feature request.
-                    example: Nobis alias dolores tenetur.
+                    example: Enim distinctio et sunt sunt et.
             description: Request body for propose_change.
             example:
-                change_id: Molestiae debitis minima.
-                design_source: Dolorem aut quidem molestiae nihil.
-                prompt: Nobis alias dolores tenetur.
+                change_id: Ipsum soluta officiis facilis dolorem quae.
+                design_source: Quia placeat maiores voluptatem voluptatem.
+                prompt: Enim distinctio et sunt sunt et.
             required:
                 - change_id
                 - prompt
@@ -1631,81 +1646,75 @@ components:
                         $ref: '#/components/schemas/SwarmRoleItem'
                     description: Deterministic role assignments when status is configured.
                     example:
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
+                        - access_mode: read_only_after_cp2
+                          family: Et aut accusantium alias.
+                          handle: Quos et quo autem odio ratione.
+                          model: Velit impedit dolores quod saepe.
                           owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
+                            - Et harum fugiat.
+                            - Fuga sit ut.
+                            - Voluptatem temporibus provident.
+                            - Delectus minus.
+                          profile_id: Vitae sed autem sit.
+                          provider: Laboriosam veniam aut.
+                          role: builder
+                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                        - access_mode: read_only_after_cp2
+                          family: Et aut accusantium alias.
+                          handle: Quos et quo autem odio ratione.
+                          model: Velit impedit dolores quod saepe.
                           owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
+                            - Et harum fugiat.
+                            - Fuga sit ut.
+                            - Voluptatem temporibus provident.
+                            - Delectus minus.
+                          profile_id: Vitae sed autem sit.
+                          provider: Laboriosam veniam aut.
+                          role: builder
+                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                        - access_mode: read_only_after_cp2
+                          family: Et aut accusantium alias.
+                          handle: Quos et quo autem odio ratione.
+                          model: Velit impedit dolores quod saepe.
                           owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                        - access_mode: read_write_worktree
-                          family: Voluptatibus commodi omnis odio odio voluptatibus.
-                          handle: Labore alias in ex enim explicabo.
-                          model: Qui ut quo nam aspernatur incidunt.
-                          owned_paths:
-                            - Dolore nulla.
-                            - Officia reprehenderit dolor labore earum perferendis.
-                          profile_id: Sint quis exercitationem.
-                          provider: Alias et ab consequatur cupiditate.
-                          role: eval_author
-                          scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                            - Et harum fugiat.
+                            - Fuga sit ut.
+                            - Voluptatem temporibus provident.
+                            - Delectus minus.
+                          profile_id: Vitae sed autem sit.
+                          provider: Laboriosam veniam aut.
+                          role: builder
+                          scope_name: Sit expedita voluptatem rerum perferendis dolores.
                 cross_family_eval:
                     type: boolean
                     description: True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.
-                    example: false
+                    example: true
                 cross_family_review:
                     type: boolean
                     description: True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.
-                    example: true
+                    example: false
                 manifest:
                     type: string
                     description: Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.
-                    example: Adipisci suscipit corporis doloremque et.
+                    example: Voluptatum rerum.
                 missing_roles:
                     type: array
                     items:
                         type: string
-                        example: Totam ab ex quod ea nesciunt nobis.
+                        example: Quas a quia non accusantium ipsam facere.
                     description: Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.
                     example:
-                        - Totam ab ex quod ea nesciunt nobis.
-                        - Qui vero quos blanditiis autem et.
-                        - Et blanditiis tenetur occaecati est maxime.
-                        - Quam dignissimos animi sed possimus.
+                        - Quas a quia non accusantium ipsam facere.
+                        - Est rerum beatae quasi occaecati earum.
+                        - Qui dolores nam quis non ex.
                 single_family:
                     type: boolean
                     description: True when status is configured and all assigned roles share one model family.
-                    example: false
+                    example: true
                 status:
                     type: string
                     description: Roster configuration status.
-                    example: missing_capability
+                    example: configured
                     enum:
                         - configured
                         - unconfigured
@@ -1713,65 +1722,59 @@ components:
                 summary:
                     type: string
                     description: Plain-English summary of the proposed swarm roster and model-family posture.
-                    example: Blanditiis eligendi illo quia exercitationem voluptatem ut.
+                    example: Repellat neque ut facilis.
             description: Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.
             example:
                 assignments:
-                    - access_mode: read_write_worktree
-                      family: Voluptatibus commodi omnis odio odio voluptatibus.
-                      handle: Labore alias in ex enim explicabo.
-                      model: Qui ut quo nam aspernatur incidunt.
+                    - access_mode: read_only_after_cp2
+                      family: Et aut accusantium alias.
+                      handle: Quos et quo autem odio ratione.
+                      model: Velit impedit dolores quod saepe.
                       owned_paths:
-                        - Dolore nulla.
-                        - Officia reprehenderit dolor labore earum perferendis.
-                      profile_id: Sint quis exercitationem.
-                      provider: Alias et ab consequatur cupiditate.
-                      role: eval_author
-                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                    - access_mode: read_write_worktree
-                      family: Voluptatibus commodi omnis odio odio voluptatibus.
-                      handle: Labore alias in ex enim explicabo.
-                      model: Qui ut quo nam aspernatur incidunt.
+                        - Et harum fugiat.
+                        - Fuga sit ut.
+                        - Voluptatem temporibus provident.
+                        - Delectus minus.
+                      profile_id: Vitae sed autem sit.
+                      provider: Laboriosam veniam aut.
+                      role: builder
+                      scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                    - access_mode: read_only_after_cp2
+                      family: Et aut accusantium alias.
+                      handle: Quos et quo autem odio ratione.
+                      model: Velit impedit dolores quod saepe.
                       owned_paths:
-                        - Dolore nulla.
-                        - Officia reprehenderit dolor labore earum perferendis.
-                      profile_id: Sint quis exercitationem.
-                      provider: Alias et ab consequatur cupiditate.
-                      role: eval_author
-                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                    - access_mode: read_write_worktree
-                      family: Voluptatibus commodi omnis odio odio voluptatibus.
-                      handle: Labore alias in ex enim explicabo.
-                      model: Qui ut quo nam aspernatur incidunt.
+                        - Et harum fugiat.
+                        - Fuga sit ut.
+                        - Voluptatem temporibus provident.
+                        - Delectus minus.
+                      profile_id: Vitae sed autem sit.
+                      provider: Laboriosam veniam aut.
+                      role: builder
+                      scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                    - access_mode: read_only_after_cp2
+                      family: Et aut accusantium alias.
+                      handle: Quos et quo autem odio ratione.
+                      model: Velit impedit dolores quod saepe.
                       owned_paths:
-                        - Dolore nulla.
-                        - Officia reprehenderit dolor labore earum perferendis.
-                      profile_id: Sint quis exercitationem.
-                      provider: Alias et ab consequatur cupiditate.
-                      role: eval_author
-                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                    - access_mode: read_write_worktree
-                      family: Voluptatibus commodi omnis odio odio voluptatibus.
-                      handle: Labore alias in ex enim explicabo.
-                      model: Qui ut quo nam aspernatur incidunt.
-                      owned_paths:
-                        - Dolore nulla.
-                        - Officia reprehenderit dolor labore earum perferendis.
-                      profile_id: Sint quis exercitationem.
-                      provider: Alias et ab consequatur cupiditate.
-                      role: eval_author
-                      scope_name: Voluptatem consequatur modi fugit hic aut sint.
-                cross_family_eval: false
-                cross_family_review: true
-                manifest: Adipisci suscipit corporis doloremque et.
+                        - Et harum fugiat.
+                        - Fuga sit ut.
+                        - Voluptatem temporibus provident.
+                        - Delectus minus.
+                      profile_id: Vitae sed autem sit.
+                      provider: Laboriosam veniam aut.
+                      role: builder
+                      scope_name: Sit expedita voluptatem rerum perferendis dolores.
+                cross_family_eval: true
+                cross_family_review: false
+                manifest: Voluptatum rerum.
                 missing_roles:
-                    - Totam ab ex quod ea nesciunt nobis.
-                    - Qui vero quos blanditiis autem et.
-                    - Et blanditiis tenetur occaecati est maxime.
-                    - Quam dignissimos animi sed possimus.
-                single_family: false
-                status: missing_capability
-                summary: Blanditiis eligendi illo quia exercitationem voluptatem ut.
+                    - Quas a quia non accusantium ipsam facere.
+                    - Est rerum beatae quasi occaecati earum.
+                    - Qui dolores nam quis non ex.
+                single_family: true
+                status: configured
+                summary: Repellat neque ut facilis.
             required:
                 - status
                 - assignments
@@ -1785,7 +1788,7 @@ components:
                 access_mode:
                     type: string
                     description: Workspace access boundary required of the job runner.
-                    example: read_write_worktree
+                    example: read_only_after_cp2
                     enum:
                         - read_only_after_cp2
                         - read_write_worktree
@@ -1794,36 +1797,38 @@ components:
                 family:
                     type: string
                     description: Canonical model family identifier.
-                    example: Voluptatibus commodi omnis odio odio voluptatibus.
+                    example: Et aut accusantium alias.
                 handle:
                     type: string
                     description: Deterministic Chorus agent handle (without leading '@', at most 32 characters).
-                    example: Labore alias in ex enim explicabo.
+                    example: Quos et quo autem odio ratione.
                 model:
                     type: string
                     description: Assigned model identifier.
-                    example: Qui ut quo nam aspernatur incidunt.
+                    example: Velit impedit dolores quod saepe.
                 owned_paths:
                     type: array
                     items:
                         type: string
-                        example: Dolore nulla.
+                        example: Et harum fugiat.
                     description: Repository or workspace path globs owned by this role.
                     example:
-                        - Dolore nulla.
-                        - Officia reprehenderit dolor labore earum perferendis.
+                        - Et harum fugiat.
+                        - Fuga sit ut.
+                        - Voluptatem temporibus provident.
+                        - Delectus minus.
                 profile_id:
                     type: string
                     description: Assigned server-configured provider profile ID.
-                    example: Sint quis exercitationem.
+                    example: Vitae sed autem sit.
                 provider:
                     type: string
                     description: Assigned coding-agent provider name.
-                    example: Alias et ab consequatur cupiditate.
+                    example: Laboriosam veniam aut.
                 role:
                     type: string
                     description: Assigned swarm role kind.
-                    example: eval_author
+                    example: builder
                     enum:
                         - architect
                         - builder
@@ -1832,20 +1837,22 @@ components:
                 scope_name:
                     type: string
                     description: Human-readable scope label for this assignment.
-                    example: Voluptatem consequatur modi fugit hic aut sint.
+                    example: Sit expedita voluptatem rerum perferendis dolores.
             description: Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.
             example:
-                access_mode: read_write_worktree
-                family: Voluptatibus commodi omnis odio odio voluptatibus.
-                handle: Labore alias in ex enim explicabo.
-                model: Qui ut quo nam aspernatur incidunt.
+                access_mode: read_only_after_cp2
+                family: Et aut accusantium alias.
+                handle: Quos et quo autem odio ratione.
+                model: Velit impedit dolores quod saepe.
                 owned_paths:
-                    - Dolore nulla.
-                    - Officia reprehenderit dolor labore earum perferendis.
-                profile_id: Sint quis exercitationem.
-                provider: Alias et ab consequatur cupiditate.
-                role: eval_author
-                scope_name: Voluptatem consequatur modi fugit hic aut sint.
+                    - Et harum fugiat.
+                    - Fuga sit ut.
+                    - Voluptatem temporibus provident.
+                    - Delectus minus.
+                profile_id: Vitae sed autem sit.
+                provider: Laboriosam veniam aut.
+                role: builder
+                scope_name: Sit expedita voluptatem rerum perferendis dolores.
             required:
                 - handle
                 - role
@@ -1862,81 +1869,81 @@ components:
                 args_schema:
                     type: string
                     description: Generated provider model input before consumer binding.
-                    example: Nisi vel iusto.
+                    example: Repudiandae illo autem.
                 bounded_result:
                     type: boolean
                     description: True when the tool declares a BoundedResult cursor/truncation contract.
-                    example: true
+                    example: false
                 description:
                     type: string
                     description: Tool description.
-                    example: Voluptatem pariatur similique omnis dolore.
+                    example: Et laborum quis.
                 id:
                     type: string
                     description: Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>).
-                    example: Omnis aut quos rem qui sunt.
+                    example: Dolores et accusantium et.
                 injected_fields:
                     type: array
                     items:
                         type: string
-                        example: Soluta tenetur sint ullam aut illum.
+                        example: Molestiae velit quos tempora maxime corporis.
                     description: Compiler-listed runtime or provider fields omitted from the provider model input.
                     example:
-                        - Soluta tenetur sint ullam aut illum.
-                        - Odit culpa distinctio nobis.
-                        - Voluptatum similique.
-                        - Nisi minima reprehenderit.
+                        - Molestiae velit quos tempora maxime corporis.
+                        - Voluptatem libero quae amet reiciendis voluptatem.
+                        - Quae ipsam.
+                        - Veniam rem consequatur libero tempora.
                 input_binding:
                     $ref: '#/components/schemas/ToolInputBindingItem'
                 name:
                     type: string
                     description: Tool name.
-                    example: Voluptatum voluptatem.
+                    example: Et quis sapiente tempora nihil est ut.
                 requires_confirmation:
                     type: boolean
                     description: True when the tool declares a design-time Confirmation gate.
-                    example: true
+                    example: false
                 requires_ui:
                     type: boolean
                     description: True when the tool requires a UI-capable runtime.
-                    example: true
+                    example: false
                 return_schema:
                     type: string
                     description: Generated model-visible result schema; empty when the tool declares no result.
-                    example: Omnis aut ab aliquam qui.
+                    example: Nulla sit velit dolorem veritatis saepe eum.
                 text_only_args_schema:
                     type: string
                     description: Generated provider text-only input, when supported.
-                    example: Suscipit dignissimos ut.
+                    example: Facere voluptas rerum consectetur.
                 toolset:
                     type: string
                     description: Compiler-selected toolset registration route.
-                    example: Veniam aspernatur ad recusandae unde.
+                    example: Beatae repudiandae.
             description: Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.
             example:
-                args_schema: Nisi vel iusto.
-                bounded_result: true
-                description: Voluptatem pariatur similique omnis dolore.
-                id: Omnis aut quos rem qui sunt.
+                args_schema: Repudiandae illo autem.
+                bounded_result: false
+                description: Et laborum quis.
+                id: Dolores et accusantium et.
                 injected_fields:
-                    - Soluta tenetur sint ullam aut illum.
-                    - Odit culpa distinctio nobis.
-                    - Voluptatum similique.
-                    - Nisi minima reprehenderit.
+                    - Molestiae velit quos tempora maxime corporis.
+                    - Voluptatem libero quae amet reiciendis voluptatem.
+                    - Quae ipsam.
+                    - Veniam rem consequatur libero tempora.
                 input_binding:
-                    args_schema: Qui qui illo assumenda dolores nemo harum.
+                    args_schema: Nam libero temporibus veritatis enim dolorum.
                     injected_fields:
-                        - Quam laborum aut dolorum enim perferendis omnis.
-                        - Aut doloribus.
-                    lookup_args_schema: Qui itaque.
-                    lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                    text_only_args_schema: Reprehenderit iusto quis distinctio iure.
-                name: Voluptatum voluptatem.
-                requires_confirmation: true
-                requires_ui: true
-                return_schema: Omnis aut ab aliquam qui.
-                text_only_args_schema: Suscipit dignissimos ut.
-                toolset: Veniam aspernatur ad recusandae unde.
+                        - Beatae ut in.
+                        - Sunt distinctio nisi et adipisci cumque minus.
+                    lookup_args_schema: Nisi sunt pariatur at.
+                    lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                    text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
+                name: Et quis sapiente tempora nihil est ut.
+                requires_confirmation: false
+                requires_ui: false
+                return_schema: Nulla sit velit dolorem veritatis saepe eum.
+                text_only_args_schema: Facere voluptas rerum consectetur.
+                toolset: Beatae repudiandae.
             required:
                 - id
                 - toolset
@@ -1954,37 +1961,37 @@ components:
                 args_schema:
                     type: string
                     description: Generated ordinary bound model input.
-                    example: Qui qui illo assumenda dolores nemo harum.
+                    example: Nam libero temporibus veritatis enim dolorum.
                 injected_fields:
                     type: array
                     items:
                         type: string
-                        example: Quam laborum aut dolorum enim perferendis omnis.
+                        example: Beatae ut in.
                     description: Compiler-listed fields supplied outside the ordinary bound model input.
                     example:
-                        - Quam laborum aut dolorum enim perferendis omnis.
-                        - Aut doloribus.
+                        - Beatae ut in.
+                        - Sunt distinctio nisi et adipisci cumque minus.
                 lookup_args_schema:
                     type: string
                     description: Generated lookup-key input, when declared; application lookup values are not inspected.
-                    example: Qui itaque.
+                    example: Nisi sunt pariatur at.
                 lookup_text_only_args_schema:
                     type: string
                     description: Generated text-only lookup-key input, when supported.
-                    example: Consequuntur sit iste rerum.
+                    example: Enim ipsam impedit illum ratione.
                 text_only_args_schema:
                     type: string
                     description: Generated ordinary text-only input, when supported.
-                    example: Reprehenderit iusto quis distinctio iure.
+                    example: Qui voluptas consequatur autem ut perspiciatis tempora.
             description: Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.
             example:
-                args_schema: Qui qui illo assumenda dolores nemo harum.
+                args_schema: Nam libero temporibus veritatis enim dolorum.
                 injected_fields:
-                    - Quam laborum aut dolorum enim perferendis omnis.
-                    - Aut doloribus.
-                lookup_args_schema: Qui itaque.
-                lookup_text_only_args_schema: Consequuntur sit iste rerum.
-                text_only_args_schema: Reprehenderit iusto quis distinctio iure.
+                    - Beatae ut in.
+                    - Sunt distinctio nisi et adipisci cumque minus.
+                lookup_args_schema: Nisi sunt pariatur at.
+                lookup_text_only_args_schema: Enim ipsam impedit illum ratione.
+                text_only_args_schema: Qui voluptas consequatur autem ut perspiciatis tempora.
             required:
                 - args_schema
                 - injected_fields
@@ -1994,18 +2001,18 @@ components:
                 composed_for_revision:
                     type: string
                     description: request_revision of the Change Card this program was composed for.
-                    example: Aut neque voluptas.
+                    example: Est et sit voluptatibus quibusdam quisquam.
                 program:
                     type: string
-                    description: OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.
-                    example: Repellat ex.
+                    description: OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.
+                    example: Numquam provident excepturi et deleniti vel sed.
             description: 'Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card''s request_revision.'
             example:
-                composed_for_revision: Aut neque voluptas.
-                program: Repellat ex.
+                composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
+                program: Numquam provident excepturi et deleniti vel sed.
             required:
                 - program
                 - composed_for_revision
 tags:
-    - name: scantle
-      description: Scantle MCP software factory control plane.
+    - name: surla
+      description: Surla MCP software factory control plane.

@@ -18,7 +18,7 @@ import (
 
 // reservedDir is the snapshot directory the evaluator owns; snapshots must not
 // use it.
-const reservedDir = "scantle_designeval"
+const reservedDir = "surla_designeval"
 
 // validateSnapshot checks a design snapshot and returns its parsed go.mod.
 //

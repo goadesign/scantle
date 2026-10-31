@@ -1,4 +1,4 @@
-When emitting `ui_composition` for a Scantle CP1 Change Card, write a valid `openui-lang` program starting with `root = DecisionWorkspace(...)` using ONLY the components below.
+When emitting `ui_composition` for a Surla CP1 Change Card, write a valid `openui-lang` program starting with `root = DecisionWorkspace(...)` using ONLY the components below.
 
 ## Syntax Rules
 
@@ -16,7 +16,7 @@ When emitting `ui_composition` for a Scantle CP1 Change Card, write a valid `ope
 Arguments marked with ? are optional. Sub-components can be inline or referenced; prefer references for better streaming.
 
 ### CP1 Decision Instruments
-DecisionWorkspace(title: string, children: (PolicySimulatorTable | AmbiguityChoiceCard | WorkflowTimeline | ImpactCallout)[]) — Root container for a Scantle CP1 Decision Workspace combining policy simulators, decision cards, workflow timelines, and impact callouts.
+DecisionWorkspace(title: string, children: (PolicySimulatorTable | AmbiguityChoiceCard | WorkflowTimeline | ImpactCallout)[]) — Root container for a Surla CP1 Decision Workspace combining policy simulators, decision cards, workflow timelines, and impact callouts.
 PolicySimulatorTable(title: string, ambiguityIndex: number, rows: PolicySimulatorRow[]) — Interactive policy comparison table bound to a 1-based ambiguityIndex (1..N in ambiguities). Toggling an option updates the canonical CP1 answer draft and highlights the active outcome column.
 PolicySimulatorRow(scenario: string, inputSummary: string, outcomes: string[], exampleIndex?: number) — A scenario row in PolicySimulatorTable. outcomes must provide one non-empty outcome string per option of the parent ambiguity in exact option order; exampleIndex is an optional 1-based index into examples.
 AmbiguityChoiceCard(ambiguityIndex: number, rationale?: string) — Focused decision card bound to a 1-based ambiguityIndex (1..N in ambiguities) with optional domain trade-off rationale.

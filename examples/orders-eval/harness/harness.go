@@ -2,7 +2,7 @@
 // scenario and drives it through its public API.
 //
 // The evaluator never imports or directly executes candidate code. It starts
-// the candidate's digest-pinned binaries only through Scantle's
+// the candidate's digest-pinned binaries only through Surla's
 // verify/candidate.Exec, which runs each one as a single sandboxed process: an
 // explicit environment, a private state directory, loopback access to the
 // assigned ports only, and no child processes. The harness points the
@@ -31,9 +31,9 @@ import (
 	"strconv"
 	"time"
 
-	genordersclient "github.com/goadesign/scantle/examples/orders-eval/gen/http/orders/client"
-	genorders "github.com/goadesign/scantle/examples/orders-eval/gen/orders"
-	"github.com/goadesign/scantle/verify/candidate"
+	genordersclient "github.com/goadesign/surla/examples/orders-eval/gen/http/orders/client"
+	genorders "github.com/goadesign/surla/examples/orders-eval/gen/orders"
+	"github.com/goadesign/surla/verify/candidate"
 	"github.com/golang-jwt/jwt/v5"
 	goahttp "goa.design/goa/v3/http"
 )

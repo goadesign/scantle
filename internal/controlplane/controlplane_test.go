@@ -1,4 +1,4 @@
-// Package controlplane tests Checkpoints 1 through 3 (CP1–CP3) of the Scantle
+// Package controlplane tests Checkpoints 1 through 3 (CP1–CP3) of the Surla
 // MCP software factory control plane.
 package controlplane
 
@@ -16,11 +16,11 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"goa.design/goa-ai/features/model/anthropic"
 
-	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
-	genscantle "github.com/goadesign/scantle/gen/scantle"
-	"github.com/goadesign/scantle/internal/goldenpath"
-	"github.com/goadesign/scantle/internal/swarm"
-	"github.com/goadesign/scantle/internal/testmodule"
+	genmcpadapter "github.com/goadesign/surla/gen/mcp_surla"
+	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/internal/goldenpath"
+	"github.com/goadesign/surla/internal/swarm"
+	"github.com/goadesign/surla/internal/testmodule"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/prompt"
 )
@@ -106,7 +106,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	})
 
 	designSrc := `package design // orders service`
-	if _, err := cp.ProposeChange(context.Background(), &genscantle.ProposeChangePayload{
+	if _, err := cp.ProposeChange(context.Background(), &gensurla.ProposeChangePayload{
 		ChangeID:     "chg-refund-50",
 		Prompt:       "Refunds under $50 should be automatic, otherwise ask a manager.",
 		DesignSource: &designSrc,
@@ -114,7 +114,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		t.Fatal("expected unauthenticated ProposeChange to fail")
 	}
 
-	proposed, err := cp.ProposeChange(aliceCtx, &genscantle.ProposeChangePayload{
+	proposed, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{
 		ChangeID:     "chg-refund-50",
 		Prompt:       "Refunds under $50 should be automatic, otherwise ask a manager.",
 		DesignSource: &designSrc,
@@ -141,7 +141,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 
 	// Attempting to overwrite an existing change_id must be rejected.
-	if _, err := cp.ProposeChange(bobCtx, &genscantle.ProposeChangePayload{
+	if _, err := cp.ProposeChange(bobCtx, &gensurla.ProposeChangePayload{
 		ChangeID: "chg-refund-50",
 		Prompt:   "Attempt to clobber Alice's change_id",
 	}); err == nil {
@@ -149,7 +149,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 
 	// Non-owner principal cannot confirm Alice's Change Card.
-	if _, err := cp.ConfirmIntent(bobCtx, &genscantle.ConfirmIntentPayload{
+	if _, err := cp.ConfirmIntent(bobCtx, &gensurla.ConfirmIntentPayload{
 		ChangeID:        "chg-refund-50",
 		RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{
@@ -162,7 +162,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 	}
 
 	// Stale request_revision must be rejected.
-	if _, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
+	if _, err := cp.ConfirmIntent(aliceCtx, &gensurla.ConfirmIntentPayload{
 		ChangeID:        "chg-refund-50",
 		RequestRevision: "stale-revision",
 		Answers: map[string]string{
@@ -174,7 +174,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		t.Fatal("expected ConfirmIntent with mismatched request_revision to be rejected")
 	}
 
-	confirmed, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{
+	confirmed, err := cp.ConfirmIntent(aliceCtx, &gensurla.ConfirmIntentPayload{
 		ChangeID:        "chg-refund-50",
 		RequestRevision: proposed.RequestRevision,
 		Answers: map[string]string{
@@ -227,7 +227,7 @@ func TestCP1RejectsMalformedOrUnknownFieldsViaStructuredOutput(t *testing.T) {
 			cp := New(Options{
 				Analyzer: NewModelCP1Analyzer(newStubModelClient(t, tc.raw)),
 			})
-			if _, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+			if _, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{
 				ChangeID: "chg-" + tc.name,
 				Prompt:   "Test structured output validation rejection",
 			}); err == nil {
@@ -315,7 +315,7 @@ var _ = Service("orders", func() {
 	})
 })
 `
-	card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+	card, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{
 		ChangeID:     "chg-clear",
 		Prompt:       "Auto-approve when item_subtotal_cents < 5000; require manager when item_subtotal_cents >= 5000.",
 		DesignSource: &candidateDesign,
@@ -327,10 +327,10 @@ var _ = Service("orders", func() {
 		t.Fatalf("expected clear request to be immediately %q, got %q", StatusConfirmed, card.Status)
 	}
 
-	preview, err := cp.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
+	preview, err := cp.PreviewArchitecture(ctx, &gensurla.PreviewArchitecturePayload{
 		ChangeID:        card.ChangeID,
 		RequestRevision: card.RequestRevision,
-		Design:          &genscantle.DesignSnapshot{Files: testmodule.Snapshot(t, "", candidateDesign)},
+		Design:          &gensurla.DesignSnapshot{Files: testmodule.Snapshot(t, "", candidateDesign)},
 	})
 	if err != nil {
 		t.Fatalf("PreviewArchitecture failed: %v", err)
@@ -354,7 +354,7 @@ var _ = Service("orders", func() {
 
 	// CP3: Fast Draft Mode updates the bound TargetPromptUpdater and rejects compiled_rule hacks.
 	promptID := "orders.refund.system"
-	draftPrompt, err := cp.DraftOverride(ctx, &genscantle.DraftOverridePayload{
+	draftPrompt, err := cp.DraftOverride(ctx, &gensurla.DraftOverridePayload{
 		TargetKind: TargetKindPromptTemplate,
 		PromptID:   &promptID,
 		NewContent: "You are a concise, empathetic refund specialist.",
@@ -401,7 +401,7 @@ var _ = Service("orders", func() {
 	}
 
 	// MCP Adapter ToolsList (6 tools) and ResourcesRead.
-	adapter := genmcpadapter.NewMCPAdapter(genscantle.NewEndpoints(cp), nil)
+	adapter := genmcpadapter.NewMCPAdapter(gensurla.NewEndpoints(cp), nil)
 	toolsRes, err := adapter.ToolsList(ctx, &genmcpadapter.ToolsListPayload{})
 	if err != nil || len(toolsRes.Tools) != 6 {
 		t.Fatalf("expected 6 MCP tools from ToolsList, got %+v (err=%v)", toolsRes, err)
@@ -409,16 +409,16 @@ var _ = Service("orders", func() {
 	// Every tool, diff included, links the checkpoint viewer so an MCP Apps
 	// host can render its result.
 	for _, tool := range toolsRes.Tools {
-		if !strings.Contains(string(tool.Meta), `"resourceUri":"ui://scantle/checkpoint"`) {
-			t.Fatalf("tool %q does not link ui://scantle/checkpoint: _meta=%s", tool.Name, tool.Meta)
+		if !strings.Contains(string(tool.Meta), `"resourceUri":"ui://surla/checkpoint"`) {
+			t.Fatalf("tool %q does not link ui://surla/checkpoint: _meta=%s", tool.Name, tool.Meta)
 		}
 	}
-	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://scantle/checkpoint"})
+	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://surla/checkpoint"})
 	if err != nil {
-		t.Fatalf("ResourcesRead(ui://scantle/checkpoint) failed: %v", err)
+		t.Fatalf("ResourcesRead(ui://surla/checkpoint) failed: %v", err)
 	}
 	completeRes, ok := resRead.Outcome.AsComplete()
-	if !ok || len(completeRes.Contents) != 1 || completeRes.Contents[0].Text == nil || !strings.Contains(*completeRes.Contents[0].Text, "scantle-checkpoint-root") {
+	if !ok || len(completeRes.Contents) != 1 || completeRes.Contents[0].Text == nil || !strings.Contains(*completeRes.Contents[0].Text, "surla-checkpoint-root") {
 		t.Fatalf("unexpected ResourcesRead content: %+v", resRead)
 	}
 
@@ -428,7 +428,7 @@ var _ = Service("orders", func() {
 	}
 	goldenComplete, ok := goldenRes.Outcome.AsComplete()
 	if !ok || len(goldenComplete.Contents) != 1 || goldenComplete.Contents[0].Text == nil || *goldenComplete.Contents[0].Text != goldenpath.PlaybookMarkdown() {
-		t.Fatalf("unexpected scantle://golden-path content: %+v", goldenRes)
+		t.Fatalf("unexpected surla://golden-path content: %+v", goldenRes)
 	}
 
 	// CP2 with server-configured multi-family provider profiles proposes cross-family swarm roster.
@@ -474,7 +474,7 @@ var _ = Service("orders", func() {
 			},
 		},
 	})
-	cardSwarm, err := cpWithSwarm.ProposeChange(ctx, &genscantle.ProposeChangePayload{
+	cardSwarm, err := cpWithSwarm.ProposeChange(ctx, &gensurla.ProposeChangePayload{
 		ChangeID:     "chg-swarm",
 		Prompt:       "Auto-approve when item_subtotal_cents < 5000; require manager when item_subtotal_cents >= 5000.",
 		DesignSource: &candidateDesign,
@@ -482,11 +482,11 @@ var _ = Service("orders", func() {
 	if err != nil {
 		t.Fatalf("ProposeChange(chg-swarm) failed: %v", err)
 	}
-	previewSwarm, err := cpWithSwarm.PreviewArchitecture(ctx, &genscantle.PreviewArchitecturePayload{
+	previewSwarm, err := cpWithSwarm.PreviewArchitecture(ctx, &gensurla.PreviewArchitecturePayload{
 		ChangeID:        cardSwarm.ChangeID,
 		RequestRevision: cardSwarm.RequestRevision,
-		Design:          &genscantle.DesignSnapshot{Files: testmodule.Snapshot(t, "", candidateDesign)},
-		Builders: []*genscantle.BuilderScopeItem{
+		Design:          &gensurla.DesignSnapshot{Files: testmodule.Snapshot(t, "", candidateDesign)},
+		Builders: []*gensurla.BuilderScopeItem{
 			{Name: "orders", Paths: []string{"internal/orders/**"}},
 			{Name: "api", Paths: []string{"cmd/orders-api/**"}},
 		},
@@ -543,7 +543,7 @@ func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
 			}
 			cp := New(Options{Analyzer: NewModelCP1Analyzer(client)})
 
-			card, err := cp.ProposeChange(ctx, &genscantle.ProposeChangePayload{ChangeID: "vip", Prompt: "VIP refunds up to $150."})
+			card, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "vip", Prompt: "VIP refunds up to $150."})
 			if msgs.calls != 1 {
 				t.Fatalf("Anthropic Messages.New calls = %d, want 1 (err: %v)", msgs.calls, err)
 			}
@@ -685,22 +685,22 @@ func TestConfirmIntentRefinesNeedsConfirmationAndConfirmedCards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal analysis: %v", err)
 	}
-	propose := func(t *testing.T, analysis []byte) (*ControlPlane, *genscantle.ChangeCardResult) {
+	propose := func(t *testing.T, analysis []byte) (*ControlPlane, *gensurla.ChangeCardResult) {
 		t.Helper()
 		cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
-		card, err := cp.ProposeChange(aliceCtx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+		card, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 		if err != nil {
 			t.Fatalf("ProposeChange: %v", err)
 		}
 		return cp, card
 	}
-	confirm := func(ctx context.Context, cp *ControlPlane, rev string, answers map[string]string, examples []*genscantle.ExampleItem) (*genscantle.ChangeCardResult, error) {
-		return cp.ConfirmIntent(ctx, &genscantle.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: rev, Answers: answers, Examples: examples})
+	confirm := func(ctx context.Context, cp *ControlPlane, rev string, answers map[string]string, examples []*gensurla.ExampleItem) (*gensurla.ChangeCardResult, error) {
+		return cp.ConfirmIntent(ctx, &gensurla.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: rev, Answers: answers, Examples: examples})
 	}
-	edited := func(card *genscantle.ChangeCardResult, outcome string) []*genscantle.ExampleItem {
+	edited := func(card *gensurla.ChangeCardResult, outcome string) []*gensurla.ExampleItem {
 		ex := *card.Examples[0]
 		ex.ExpectedOutcome = outcome
-		return []*genscantle.ExampleItem{&ex}
+		return []*gensurla.ExampleItem{&ex}
 	}
 
 	t.Run("needs_confirmation card is confirmed, then refined", func(t *testing.T) {
@@ -746,8 +746,8 @@ func TestConfirmIntentRefinesNeedsConfirmationAndConfirmedCards(t *testing.T) {
 			t.Fatalf("missing answer err = %v, want missing confirmation answer", err)
 		}
 
-		_, err = cp.PreviewArchitecture(aliceCtx, &genscantle.PreviewArchitecturePayload{
-			ChangeID: "chg", RequestRevision: first.RequestRevision, Design: &genscantle.DesignSnapshot{},
+		_, err = cp.PreviewArchitecture(aliceCtx, &gensurla.PreviewArchitecturePayload{
+			ChangeID: "chg", RequestRevision: first.RequestRevision, Design: &gensurla.DesignSnapshot{},
 		})
 		if err == nil || !strings.Contains(err.Error(), "request_revision mismatch") {
 			t.Fatalf("preview bound to the earlier revision err = %v, want request_revision mismatch", err)
@@ -799,39 +799,39 @@ func TestGetChangeLetsAStaleEditorRecover(t *testing.T) {
 		t.Fatalf("marshal analysis: %v", err)
 	}
 	cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
-	start, err := cp.ProposeChange(aliceCtx, &genscantle.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	start, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 	if err != nil {
 		t.Fatalf("ProposeChange: %v", err)
 	}
-	withOutcome := func(card *genscantle.ChangeCardResult, outcome string) []*genscantle.ExampleItem {
+	withOutcome := func(card *gensurla.ChangeCardResult, outcome string) []*gensurla.ExampleItem {
 		ex := *card.Examples[0]
 		ex.ExpectedOutcome = outcome
-		return []*genscantle.ExampleItem{&ex}
+		return []*gensurla.ExampleItem{&ex}
 	}
 
 	// Editor B saves first; editor A then submits against the revision both started from.
-	saved, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: start.RequestRevision, Answers: map[string]string{}, Examples: withOutcome(start, "Waits for a manager")})
+	saved, err := cp.ConfirmIntent(aliceCtx, &gensurla.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: start.RequestRevision, Answers: map[string]string{}, Examples: withOutcome(start, "Waits for a manager")})
 	if err != nil {
 		t.Fatalf("editor B confirm: %v", err)
 	}
-	_, err = cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: start.RequestRevision, Answers: map[string]string{}, Examples: withOutcome(start, "Store credit within a day")})
+	_, err = cp.ConfirmIntent(aliceCtx, &gensurla.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: start.RequestRevision, Answers: map[string]string{}, Examples: withOutcome(start, "Store credit within a day")})
 	if err == nil || !strings.Contains(err.Error(), "request_revision mismatch") {
 		t.Fatalf("editor A stale submit err = %v, want request_revision mismatch", err)
 	}
 
-	current, err := cp.GetChange(aliceCtx, &genscantle.GetChangePayload{ChangeID: "chg"})
+	current, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
 	if err != nil {
 		t.Fatalf("GetChange: %v", err)
 	}
 	if current.RequestRevision != saved.RequestRevision || current.Examples[0].ExpectedOutcome != "Waits for a manager" {
 		t.Fatalf("GetChange = revision %q outcome %q, want editor B's saved card", current.RequestRevision, current.Examples[0].ExpectedOutcome)
 	}
-	again, err := cp.GetChange(aliceCtx, &genscantle.GetChangePayload{ChangeID: "chg"})
+	again, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
 	if err != nil || again.RequestRevision != current.RequestRevision {
 		t.Fatalf("second GetChange = %v, %v; reading must not change the card", again, err)
 	}
 
-	resubmitted, err := cp.ConfirmIntent(aliceCtx, &genscantle.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: current.RequestRevision, Answers: map[string]string{}, Examples: withOutcome(current, "Store credit within a day")})
+	resubmitted, err := cp.ConfirmIntent(aliceCtx, &gensurla.ConfirmIntentPayload{ChangeID: "chg", RequestRevision: current.RequestRevision, Answers: map[string]string{}, Examples: withOutcome(current, "Store credit within a day")})
 	if err != nil {
 		t.Fatalf("editor A resubmit after reading: %v", err)
 	}
@@ -839,10 +839,10 @@ func TestGetChangeLetsAStaleEditorRecover(t *testing.T) {
 		t.Fatal("editor A's reviewed change kept the revision")
 	}
 
-	if _, err := cp.GetChange(bobCtx, &genscantle.GetChangePayload{ChangeID: "chg"}); err == nil || !strings.Contains(err.Error(), "is not the owner") {
+	if _, err := cp.GetChange(bobCtx, &gensurla.GetChangePayload{ChangeID: "chg"}); err == nil || !strings.Contains(err.Error(), "is not the owner") {
 		t.Fatalf("other principal GetChange err = %v, want owner refusal", err)
 	}
-	if _, err := cp.GetChange(aliceCtx, &genscantle.GetChangePayload{ChangeID: "missing"}); err == nil || !strings.Contains(err.Error(), `unknown change_id "missing"`) {
+	if _, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "missing"}); err == nil || !strings.Contains(err.Error(), `unknown change_id "missing"`) {
 		t.Fatalf("unknown GetChange err = %v, want unknown change_id", err)
 	}
 

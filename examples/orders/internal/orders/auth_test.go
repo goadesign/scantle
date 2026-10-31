@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	genorders "github.com/goadesign/scantle/examples/orders/gen/orders"
+	genorders "github.com/goadesign/surla/examples/orders/gen/orders"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

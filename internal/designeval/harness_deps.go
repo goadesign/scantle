@@ -1,8 +1,8 @@
 //go:build designeval_harness
 
-// This file is never compiled into Scantle. It imports the generator packages
+// This file is never compiled into Surla. It imports the generator packages
 // the evaluator program (harnessMainHead) imports, so go mod tidy keeps their
-// modules in Scantle's go.mod: evaluatorGoMod reads those requirements as the
+// modules in Surla's go.mod: evaluatorGoMod reads those requirements as the
 // versions a design that does not require a generator module is evaluated
 // with.
 package designeval

@@ -40,7 +40,7 @@ type (
 
 const (
 	// harnessModulePath is the evaluator program's module path.
-	harnessModulePath = "scantle.local/designeval"
+	harnessModulePath = "surla.local/designeval"
 	// targetPseudoVersion is the version the harness requires the staged
 	// target at; a replace directive points it at the staged copy.
 	targetPseudoVersion = "v0.0.0-00010101000000-000000000000"

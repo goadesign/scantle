@@ -1,4 +1,4 @@
-/* Scantle Checkpoint Studio — shadcn/ui Design Tokens & Responsive Layout */
+/* Surla Checkpoint Studio — shadcn/ui Design Tokens & Responsive Layout */
 :root {
   color-scheme: light dark;
   --bg-light: #ffffff;
@@ -125,7 +125,7 @@ pre { background: var(--muted); padding: 0.65rem; border-radius: var(--radius); 
 ul { margin: 0.35rem 0; padding-left: 1.25rem; }
 li { margin-bottom: 0.35rem; }
 
-.shadcn-card, .scantle-meta, .scantle-card {
+.shadcn-card, .surla-meta, .surla-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -138,7 +138,7 @@ li { margin-bottom: 0.35rem; }
 .shadcn-card-title { font-size: 0.98rem; font-weight: 600; margin: 0; }
 .shadcn-card-desc { font-size: 0.83rem; color: var(--muted-foreground); margin-top: 0.15rem; }
 
-.shadcn-badge, .scantle-badge {
+.shadcn-badge, .surla-badge {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
@@ -157,7 +157,7 @@ li { margin-bottom: 0.35rem; }
 .shadcn-badge-accent { border-color: var(--accent); background: var(--accent-soft); }
 .shadcn-badge-destructive { border-color: var(--destructive); }
 
-.shadcn-btn, .scantle-pill, .scantle-btn {
+.shadcn-btn, .surla-pill, .surla-btn {
   -webkit-appearance: none;
   appearance: none;
   display: inline-flex;
@@ -173,24 +173,24 @@ li { margin-bottom: 0.35rem; }
   font-size: 0.84rem;
   font-weight: 500;
 }
-.shadcn-btn:focus-visible, .scantle-pill:focus-visible, .scantle-input:focus-visible, .scantle-table-wrap:focus-visible {
+.shadcn-btn:focus-visible, .surla-pill:focus-visible, .surla-input:focus-visible, .surla-table-wrap:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.shadcn-btn:disabled, .scantle-pill:disabled, .scantle-input:disabled {
+.shadcn-btn:disabled, .surla-pill:disabled, .surla-input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.scantle-pill[aria-pressed="true"], .scantle-btn-primary, .shadcn-btn-primary {
+.surla-pill[aria-pressed="true"], .surla-btn-primary, .shadcn-btn-primary {
   border-color: var(--accent);
   background-color: var(--accent-soft);
   color: var(--foreground);
   font-weight: 600;
 }
 
-.scantle-field-row { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: flex-start; margin: 0.35rem 0; }
-.scantle-field-label { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; font-size: 0.82rem; font-weight: 500; }
-.scantle-input {
+.surla-field-row { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: flex-start; margin: 0.35rem 0; }
+.surla-field-label { display: flex; flex-direction: column; gap: 0.2rem; flex: 1 1 12rem; font-size: 0.82rem; font-weight: 500; }
+.surla-input {
   width: 100%;
   padding: 0.35rem 0.5rem;
   border-radius: calc(var(--radius) - 2px);
@@ -210,13 +210,13 @@ li { margin-bottom: 0.35rem; }
   background: var(--muted);
 }
 .shadcn-alert-warning { border-color: var(--warning); }
-.shadcn-alert-destructive, .scantle-error { border: 2px solid var(--destructive); border-radius: var(--radius); padding: 0.75rem; margin-top: 0.5rem; }
+.shadcn-alert-destructive, .surla-error { border: 2px solid var(--destructive); border-radius: var(--radius); padding: 0.75rem; margin-top: 0.5rem; }
 
-.scantle-graph-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem; margin: 0.5rem 0 0.75rem 0; background: var(--card); }
-#scantle-c4-svg text { fill: currentColor; }
+.surla-graph-wrap { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem; margin: 0.5rem 0 0.75rem 0; background: var(--card); }
+#surla-c4-svg text { fill: currentColor; }
 
 /* Responsive table with container queries (modern-web-guidance: responsive-table) */
-.scantle-table-wrap {
+.surla-table-wrap {
   overflow: auto;
   max-inline-size: 100%;
   container-type: inline-size;
@@ -263,8 +263,8 @@ li { margin-bottom: 0.35rem; }
 }
 
 .shadcn-cell-active { background: var(--accent-soft); font-weight: 600; }
-.shadcn-timeline, .scantle-timeline { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0; padding-left: 0; list-style: none; }
-.shadcn-timeline-step, .scantle-timeline-step { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.65rem; border-left: 3px solid var(--accent); background: var(--muted); border-radius: 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0; }
-.scantle-details { margin-top: 0.35rem; font-size: 0.8rem; color: var(--muted-foreground); }
-.scantle-details summary { cursor: pointer; font-weight: 500; user-select: none; }
-.scantle-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.shadcn-timeline, .surla-timeline { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0; padding-left: 0; list-style: none; }
+.shadcn-timeline-step, .surla-timeline-step { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.65rem; border-left: 3px solid var(--accent); background: var(--muted); border-radius: 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0; }
+.surla-details { margin-top: 0.35rem; font-size: 0.8rem; color: var(--muted-foreground); }
+.surla-details summary { cursor: pointer; font-weight: 500; user-select: none; }
+.surla-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

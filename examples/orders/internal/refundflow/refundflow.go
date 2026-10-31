@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"time"
 
-	genpayments "github.com/goadesign/scantle/examples/orders/gen/payments"
-	"github.com/goadesign/scantle/examples/orders/internal/orders"
+	genpayments "github.com/goadesign/surla/examples/orders/gen/payments"
+	"github.com/goadesign/surla/examples/orders/internal/orders"
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"

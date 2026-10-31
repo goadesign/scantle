@@ -3,14 +3,14 @@
 // payments HTTP client types
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package client
 
 import (
 	"unicode/utf8"
 
-	payments "github.com/goadesign/scantle/examples/orders/gen/payments"
+	payments "github.com/goadesign/surla/examples/orders/gen/payments"
 	goa "goa.design/goa/v3/pkg"
 )
 

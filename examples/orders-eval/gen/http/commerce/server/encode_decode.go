@@ -3,7 +3,7 @@
 // commerce HTTP server encoders and decoders
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package server
 
@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	commerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
+	commerce "github.com/goadesign/surla/examples/orders-eval/gen/commerce"
 	goahttp "goa.design/goa/v3/http"
 	goa "goa.design/goa/v3/pkg"
 )

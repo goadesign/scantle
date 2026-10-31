@@ -3,7 +3,7 @@
 // orders registry declaration lookup
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package orders
 

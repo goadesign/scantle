@@ -3,7 +3,7 @@
 // payments HTTP client encoders and decoders
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package client
 
@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"net/url"
 
-	payments "github.com/goadesign/scantle/examples/orders/gen/payments"
+	payments "github.com/goadesign/surla/examples/orders/gen/payments"
 	goahttp "goa.design/goa/v3/http"
 )
 

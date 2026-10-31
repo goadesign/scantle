@@ -88,7 +88,7 @@ Here are the detailed cheat sheets for each agent you designed.
 <details>
 <summary><strong>Agent: <code>refund</code></strong> (ID: <code>orders.refund</code>)</summary>
 
-* **Package:** `github.com/goadesign/scantle/examples/orders/gen/orders/agents/refund`
+* **Package:** `github.com/goadesign/surla/examples/orders/gen/orders/agents/refund`
 * **Directory:** `gen/orders/agents/refund`
 * **Config Struct:** `RefundAgentConfig`
 * **Register Function:** `RegisterRefundAgent(ctx, rt, cfg)`

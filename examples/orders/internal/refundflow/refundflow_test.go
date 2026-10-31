@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	genpayments "github.com/goadesign/scantle/examples/orders/gen/payments"
+	genpayments "github.com/goadesign/surla/examples/orders/gen/payments"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/activity"

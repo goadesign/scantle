@@ -3,7 +3,7 @@
 // orders HTTP client CLI support package
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package cli
 
@@ -13,9 +13,9 @@ import (
 	"net/http"
 	"os"
 
-	commercec "github.com/goadesign/scantle/examples/orders/gen/http/commerce/client"
-	ordersc "github.com/goadesign/scantle/examples/orders/gen/http/orders/client"
-	paymentsc "github.com/goadesign/scantle/examples/orders/gen/http/payments/client"
+	commercec "github.com/goadesign/surla/examples/orders/gen/http/commerce/client"
+	ordersc "github.com/goadesign/surla/examples/orders/gen/http/orders/client"
+	paymentsc "github.com/goadesign/surla/examples/orders/gen/http/payments/client"
 	goahttp "goa.design/goa/v3/http"
 	goa "goa.design/goa/v3/pkg"
 )

@@ -12,11 +12,11 @@ import (
 	"slices"
 	"time"
 
-	gencommerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
-	genorders "github.com/goadesign/scantle/examples/orders-eval/gen/orders"
-	genpayments "github.com/goadesign/scantle/examples/orders-eval/gen/payments"
-	"github.com/goadesign/scantle/examples/orders-eval/harness"
-	"github.com/goadesign/scantle/examples/orders-eval/sim"
+	gencommerce "github.com/goadesign/surla/examples/orders-eval/gen/commerce"
+	genorders "github.com/goadesign/surla/examples/orders-eval/gen/orders"
+	genpayments "github.com/goadesign/surla/examples/orders-eval/gen/payments"
+	"github.com/goadesign/surla/examples/orders-eval/harness"
+	"github.com/goadesign/surla/examples/orders-eval/sim"
 	"goa.design/goa-ai/eval"
 	goa "goa.design/goa/v3/pkg"
 )

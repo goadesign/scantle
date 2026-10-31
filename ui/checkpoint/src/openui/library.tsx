@@ -1,4 +1,4 @@
-// Package openui defines the Scantle Decision Studio component library using
+// Package openui defines the Surla Decision Studio component library using
 // @openuidev/react-lang and Zod v4 schemas, validates completed CP1 OpenUI
 // compositions against the active Change Card, and exports the catalog prompt.
 
@@ -83,17 +83,17 @@ export const PolicySimulatorTable = defineComponent({
 
     return (
       <Card
-        className="scantle-openui-card"
+        className="surla-openui-card"
         data-openui-component="PolicySimulatorTable"
         data-openui-ambiguity-index={String(props.ambiguityIndex)}
       >
         <CardHeader>
-          <div className="scantle-field-row">
+          <div className="surla-field-row">
             <CardTitle>{props.title}</CardTitle>
             <Badge>{"Question " + String(props.ambiguityIndex)}</Badge>
           </div>
           <CardDescription>{amb.question}</CardDescription>
-          <details className="scantle-details">
+          <details className="surla-details">
             <summary>Details</summary>
             <p>
               <code>{amb.id}</code>
@@ -102,7 +102,7 @@ export const PolicySimulatorTable = defineComponent({
         </CardHeader>
         <CardContent>
           <div
-            className="scantle-field-row"
+            className="surla-field-row"
             role="group"
             aria-label={"Simulator options for " + amb.question}
           >
@@ -158,7 +158,7 @@ export const PolicySimulatorTable = defineComponent({
                       {exItem ? (
                         <div>
                           <Badge>{"Example " + String(row.exampleIndex)}</Badge>
-                          <details className="scantle-details">
+                          <details className="surla-details">
                             <summary>Details</summary>
                             <code>{exItem.id}</code>
                           </details>
@@ -208,17 +208,17 @@ export const AmbiguityChoiceCard = defineComponent({
 
     return (
       <Card
-        className="scantle-openui-card"
+        className="surla-openui-card"
         data-openui-component="AmbiguityChoiceCard"
         data-openui-ambiguity-index={String(props.ambiguityIndex)}
       >
         <CardHeader>
-          <div className="scantle-field-row">
+          <div className="surla-field-row">
             <CardTitle>{amb.question}</CardTitle>
             <Badge>{"Question " + String(props.ambiguityIndex)}</Badge>
           </div>
           {props.rationale ? <CardDescription>{props.rationale}</CardDescription> : null}
-          <details className="scantle-details">
+          <details className="surla-details">
             <summary>Details</summary>
             <p>
               <code>{amb.id}</code>
@@ -227,7 +227,7 @@ export const AmbiguityChoiceCard = defineComponent({
         </CardHeader>
         <CardContent>
           <div
-            className="scantle-field-row"
+            className="surla-field-row"
             role="group"
             aria-label={"Decision card options for " + amb.question}
           >
@@ -262,8 +262,8 @@ export const WorkflowStep = defineComponent({
   }),
   description: "A single workflow step showing the step name, actor, detail, and optional policy gate.",
   component: ({ props }) => (
-    <li className="scantle-timeline-step" data-openui-component="WorkflowStep">
-      <div className="scantle-field-row">
+    <li className="surla-timeline-step" data-openui-component="WorkflowStep">
+      <div className="surla-field-row">
         <strong>{props.step}</strong>
         <Badge>{props.actor}</Badge>
         {props.gate ? <Badge variant="accent">Gate: {props.gate}</Badge> : null}
@@ -282,12 +282,12 @@ export const WorkflowTimeline = defineComponent({
   }),
   description: "Ordered workflow sequence illustrating how actors and policy gates interact.",
   component: ({ props, renderNode }) => (
-    <Card className="scantle-openui-card" data-openui-component="WorkflowTimeline">
+    <Card className="surla-openui-card" data-openui-component="WorkflowTimeline">
       <CardHeader>
         <CardTitle>{props.title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ol className="scantle-timeline">{renderNode(props.steps)}</ol>
+        <ol className="surla-timeline">{renderNode(props.steps)}</ol>
       </CardContent>
     </Card>
   ),
@@ -330,7 +330,7 @@ export const DecisionWorkspace = defineComponent({
       .min(1),
   }),
   description:
-    "Root container for a Scantle CP1 Decision Workspace combining policy simulators, decision cards, workflow timelines, and impact callouts.",
+    "Root container for a Surla CP1 Decision Workspace combining policy simulators, decision cards, workflow timelines, and impact callouts.",
   component: ({ props, renderNode }) => {
     const draft = useCP1Draft();
     const composedRev =
@@ -338,8 +338,8 @@ export const DecisionWorkspace = defineComponent({
       draft?.card.request_revision ||
       "preview";
     return (
-      <div className="scantle-decision-workspace" data-openui-component="DecisionWorkspace">
-        <div className="scantle-field-row">
+      <div className="surla-decision-workspace" data-openui-component="DecisionWorkspace">
+        <div className="surla-field-row">
           <h3>{props.title}</h3>
           <Badge variant="accent">Decision Studio</Badge>
           <Badge variant="accent">Model-Proposed Illustration</Badge>
@@ -348,18 +348,18 @@ export const DecisionWorkspace = defineComponent({
           Compare how each option affects concrete scenarios below. Selecting an option updates your
           draft answer below.
         </p>
-        <details className="scantle-details">
+        <details className="surla-details">
           <summary>Details</summary>
           <p>
             composed_for_revision: <code>{composedRev}</code>
           </p>
         </details>
         {draft?.localExamplesEdited ? (
-          <Alert id="scantle-openui-local-edit-notice" variant="warning">
+          <Alert id="surla-openui-local-edit-notice" variant="warning">
             <strong>Local Examples Modified: </strong>
             You have edited the confirmation examples below. Instruments in this workspace reflect
             the model-proposed illustration for the saved revision until the change is re-analyzed.
-            <details className="scantle-details">
+            <details className="surla-details">
               <summary>Details</summary>
               <p>
                 request_revision: <code>{draft.card.request_revision}</code>
@@ -367,14 +367,14 @@ export const DecisionWorkspace = defineComponent({
             </details>
           </Alert>
         ) : null}
-        <div className="scantle-decision-grid">{renderNode(props.children)}</div>
+        <div className="surla-decision-grid">{renderNode(props.children)}</div>
       </div>
     );
   },
 });
 
-// scantleDecisionLibrary is the canonical OpenUI component library for Scantle CP1.
-export const scantleDecisionLibrary = createLibrary({
+// surlaDecisionLibrary is the canonical OpenUI component library for Surla CP1.
+export const surlaDecisionLibrary = createLibrary({
   root: "DecisionWorkspace",
   components: [
     DecisionWorkspace,
@@ -408,13 +408,13 @@ export const scantleDecisionLibrary = createLibrary({
   ],
 });
 
-const scantleDecisionParser = createParser(
-  scantleDecisionLibrary.toJSONSchema(),
-  scantleDecisionLibrary.root
+const surlaDecisionParser = createParser(
+  surlaDecisionLibrary.toJSONSchema(),
+  surlaDecisionLibrary.root
 );
 
 const schemaToComponentName = new Map<unknown, string>(
-  Object.values(scantleDecisionLibrary.components).map((comp) => [comp.props, comp.name])
+  Object.values(surlaDecisionLibrary.components).map((comp) => [comp.props, comp.name])
 );
 
 // allowedSlotComponentNames inspects a Zod v4 property schema and returns the
@@ -479,7 +479,7 @@ function projectAndValidateNode(
         ").",
     };
   }
-  const compDef = scantleDecisionLibrary.components[el.typeName];
+  const compDef = surlaDecisionLibrary.components[el.typeName];
   if (!compDef) {
     return { ok: false, error: "Unknown OpenUI component " + el.typeName + "." };
   }
@@ -591,7 +591,7 @@ function projectAndValidateNode(
 }
 
 // validateCompletedOpenUI validates a settled openui-lang program against both
-// the Scantle Decision Library schema and the active ChangeCardResult's
+// the Surla Decision Library schema and the active ChangeCardResult's
 // 1-based ambiguity/example ordinals and option counts.
 export function validateCompletedOpenUI(
   program: string,
@@ -615,8 +615,8 @@ export function validateCompletedOpenUI(
   if (!trimmed) {
     return { ok: false, error: "OpenUI program is empty." };
   }
-  const parsed = scantleDecisionParser.parse(trimmed);
-  if (!parsed.root || parsed.root.typeName !== scantleDecisionLibrary.root) {
+  const parsed = surlaDecisionParser.parse(trimmed);
+  if (!parsed.root || parsed.root.typeName !== surlaDecisionLibrary.root) {
     return {
       ok: false,
       error: "OpenUI program must define root = DecisionWorkspace(...).",
@@ -668,7 +668,7 @@ export function validateCompletedOpenUI(
 
   const rootCheck = projectAndValidateNode(
     parsed.root,
-    [scantleDecisionLibrary.root || "DecisionWorkspace"],
+    [surlaDecisionLibrary.root || "DecisionWorkspace"],
     card
   );
   if (!rootCheck.ok) {
@@ -680,9 +680,9 @@ export function validateCompletedOpenUI(
 // generateDecisionCatalogMarkdown exports the OpenUI prompt catalog for embedding
 // in the Go controlplane's CP1 semantic analyzer prompt.
 export function generateDecisionCatalogMarkdown(): string {
-  return scantleDecisionLibrary.prompt({
+  return surlaDecisionLibrary.prompt({
     preamble:
-      "When emitting `ui_composition` for a Scantle CP1 Change Card, write a valid `openui-lang` program starting with `root = DecisionWorkspace(...)` using ONLY the components below.",
+      "When emitting `ui_composition` for a Surla CP1 Change Card, write a valid `openui-lang` program starting with `root = DecisionWorkspace(...)` using ONLY the components below.",
     additionalRules: [
       "Refer to ambiguities ONLY by 1-based `ambiguityIndex` (1..N matching the `ambiguities` array order in your JSON output). Never invent `<change_id>-ambiguity-NN` IDs.",
       "Refer to confirmation examples ONLY by 1-based `exampleIndex` (1..M matching the `examples` array order in your JSON output).",

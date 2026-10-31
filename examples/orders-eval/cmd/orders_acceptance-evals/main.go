@@ -1,7 +1,7 @@
 // Command orders_acceptance-evals runs the evaluator-owned orders acceptance
 // suite against built candidate binaries.
 //
-// It follows Scantle's suite command contract:
+// It follows Surla's suite command contract:
 //
 //   - --describe prints the suite declaration as JSON ({"id", "environment",
 //     "scenarios": [{"id", "tags"}]}) and exits; it needs no artifacts. The
@@ -25,10 +25,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/goadesign/scantle/examples/orders-eval/acceptance"
-	genevals "github.com/goadesign/scantle/examples/orders-eval/gen/evals/orders_acceptance"
-	"github.com/goadesign/scantle/examples/orders-eval/harness"
-	"github.com/goadesign/scantle/verify/candidate"
+	"github.com/goadesign/surla/examples/orders-eval/acceptance"
+	genevals "github.com/goadesign/surla/examples/orders-eval/gen/evals/orders_acceptance"
+	"github.com/goadesign/surla/examples/orders-eval/harness"
+	"github.com/goadesign/surla/verify/candidate"
 	"goa.design/goa-ai/eval"
 )
 

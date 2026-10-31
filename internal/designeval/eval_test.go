@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goadesign/scantle/internal/testmodule"
+	"github.com/goadesign/surla/internal/testmodule"
 )
 
 func TestEvaluateEnforcesSandboxOnDesignInitAndBuildsJSONSchemas(t *testing.T) {

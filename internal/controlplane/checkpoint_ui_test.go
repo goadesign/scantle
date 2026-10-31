@@ -1,4 +1,4 @@
-// Package controlplane tests the stateless MCP Apps (`ui://scantle/checkpoint`)
+// Package controlplane tests the stateless MCP Apps (`ui://surla/checkpoint`)
 // viewer and its JSON-RPC 2.0 host lifecycle bridge.
 package controlplane
 
@@ -9,15 +9,15 @@ import (
 	"strings"
 	"testing"
 
-	genmcpadapter "github.com/goadesign/scantle/gen/mcp_scantle"
-	genscantle "github.com/goadesign/scantle/gen/scantle"
-	"github.com/goadesign/scantle/internal/swarm"
-	"github.com/goadesign/scantle/internal/testmodule"
+	genmcpadapter "github.com/goadesign/surla/gen/mcp_surla"
+	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/internal/swarm"
+	"github.com/goadesign/surla/internal/testmodule"
 	"goa.design/goa-ai/runtime/agent/prompt"
 )
 
 // TestCheckpointUIMCPAppsHandshakeAndToolResultRendering verifies that
-// `ui://scantle/checkpoint` serves a stateless MCP Apps viewer that performs
+// `ui://surla/checkpoint` serves a stateless MCP Apps viewer that performs
 // the `ui/initialize` -> `ui/notifications/initialized` postMessage handshake
 // with `window.parent`, rejects cross-origin messages where `event.source !==
 // window.parent`, replaces prior views on each new tool result without server
@@ -70,11 +70,11 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 			},
 		},
 	})
-	adapter := genmcpadapter.NewMCPAdapter(genscantle.NewEndpoints(cp), nil)
+	adapter := genmcpadapter.NewMCPAdapter(gensurla.NewEndpoints(cp), nil)
 
-	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://scantle/checkpoint"})
+	resRead, err := adapter.ResourcesRead(ctx, &genmcpadapter.ResourcesReadPayload{URI: "ui://surla/checkpoint"})
 	if err != nil {
-		t.Fatalf("ResourcesRead(ui://scantle/checkpoint): %v", err)
+		t.Fatalf("ResourcesRead(ui://surla/checkpoint): %v", err)
 	}
 	completeRes, ok := resRead.Outcome.AsComplete()
 	if !ok || len(completeRes.Contents) != 1 || completeRes.Contents[0].Text == nil || completeRes.Contents[0].MimeType == nil {
@@ -363,9 +363,9 @@ const dom = new JSDOM(input.htmlDoc, {
 });
 const guestWindow = dom.window;
 const documentObj = guestWindow.document;
-const root = documentObj.getElementById("scantle-checkpoint-root");
-const statusEl = documentObj.getElementById("scantle-checkpoint-status");
-const viewEl = documentObj.getElementById("scantle-checkpoint-view");
+const root = documentObj.getElementById("surla-checkpoint-root");
+const statusEl = documentObj.getElementById("surla-checkpoint-status");
+const viewEl = documentObj.getElementById("surla-checkpoint-view");
 
 const hostMessages = [];
 let messageListener = null;
@@ -472,7 +472,7 @@ messageListener({
     result: {
       protocolVersion: "2026-01-26",
       hostInfo: {
-        name: "scantle-test-host",
+        name: "surla-test-host",
         version: "1.0.0"
       },
       hostCapabilities: {}
@@ -495,8 +495,8 @@ messageListener({
     params: { structuredContent: input.cp1Structured }
   }
 });
-const editorRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-cp1-editor")[0];
-const resultRegion = findAll(viewEl, (n) => n.attributes["id"] === "scantle-result-view")[0];
+const editorRegion = findAll(viewEl, (n) => n.attributes["id"] === "surla-cp1-editor")[0];
+const resultRegion = findAll(viewEl, (n) => n.attributes["id"] === "surla-result-view")[0];
 const cp1Text = renderText(viewEl);
 if (root.dataset.state !== "cp1-change-card" || editorRegion.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("unexpected CP1 dataset: " + JSON.stringify(editorRegion.dataset));
@@ -521,9 +521,9 @@ if (outcomeInputs.length !== 1 || outcomeInputs[0].tagName !== "TEXTAREA") {
 }
 outcomeInputs[0].value = "  Instant store credit\nup to $50.00  ";
 outcomeInputs[0].dispatch("input", { target: outcomeInputs[0] });
-const submitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
+const submitBtns = findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit");
 if (submitBtns.length !== 1) {
-  throw new Error("expected #scantle-confirm-submit button");
+  throw new Error("expected #surla-confirm-submit button");
 }
 const msgCountBeforeConfirm = hostMessages.length;
 submitBtns[0].dispatch("click");
@@ -569,7 +569,7 @@ if (postConfirmInputs[0].value !== "post-confirm draft edit") {
 postConfirmInputs[0].value = "  Instant store credit\nup to $50.00  ";
 postConfirmInputs[0].dispatch("input", { target: postConfirmInputs[0] });
 // Clicking Refine with no edits on a whitespace/newline-bearing saved card must preserve verbatim text.
-const noEditSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
+const noEditSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit");
 const msgCountBeforeNoEdit = hostMessages.length;
 noEditSubmitBtns[0].dispatch("click");
 const noEditRefineReq = hostMessages[msgCountBeforeNoEdit].msg;
@@ -585,7 +585,7 @@ stalePills[0].dispatch("click");
 const staleOutcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
 staleOutcomeInputs[0].value = "Edited outcome preserved across stale error";
 staleOutcomeInputs[0].dispatch("input", { target: staleOutcomeInputs[0] });
-const staleSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit");
+const staleSubmitBtns = findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit");
 const msgCountBeforeStale = hostMessages.length;
 staleSubmitBtns[0].dispatch("click");
 const staleReq = hostMessages[msgCountBeforeStale].msg;
@@ -605,10 +605,10 @@ if (editorRegion.dataset.state !== "cp1-change-card" ||
   throw new Error("stale form submission did not update status, re-enable controls, preserve edits, or show recovery guidance: " + statusEl.textContent + " / " + staleViewText);
 }
 
-// 3c. Click #scantle-load-latest-card after stale error -> guest calls get_change and renders latest card alongside #scantle-preserved-draft.
-const loadLatestBtns = findAll(viewEl, (n) => n.attributes["id"] === "scantle-load-latest-card");
+// 3c. Click #surla-load-latest-card after stale error -> guest calls get_change and renders latest card alongside #surla-preserved-draft.
+const loadLatestBtns = findAll(viewEl, (n) => n.attributes["id"] === "surla-load-latest-card");
 if (loadLatestBtns.length !== 1) {
-  throw new Error("expected #scantle-load-latest-card button after stale error");
+  throw new Error("expected #surla-load-latest-card button after stale error");
 }
 const msgCountBeforeGetChange = hostMessages.length;
 loadLatestBtns[0].dispatch("click");
@@ -621,16 +621,16 @@ if (getChangeReq.method !== "tools/call" ||
     getChangeReq.params.arguments.change_id !== "chg-ui-test") {
   throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
 }
-// Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must retain active editor while get_change is pending, then render latest card + #scantle-preserved-draft on the matching tools/call reply.
+// Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must retain active editor while get_change is pending, then render latest card + #surla-preserved-draft on the matching tools/call reply.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1ConfirmedStructured } } });
 if (editorRegion.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("interleaved ui/notifications/tool-result replaced active editor before get_change reply");
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: getChangeReq.id, result: { content: [], structuredContent: input.getChangeStructured } } });
-// Same successful host tool-result notification arriving AFTER get_change reply must NOT drop #scantle-preserved-draft.
+// Same successful host tool-result notification arriving AFTER get_change reply must NOT drop #surla-preserved-draft.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.getChangeStructured } } });
 const recoveredViewText = renderText(viewEl);
-const preservedPanels = findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft");
+const preservedPanels = findAll(viewEl, (n) => n.attributes["id"] === "surla-preserved-draft");
 if (root.dataset.state !== "cp1-change-card" ||
     editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
     preservedPanels.length !== 1 ||
@@ -650,36 +650,36 @@ if (root.dataset.state !== "cp2-diff" ||
     resultRegion.dataset.requestRevision !== undefined ||
     root.dataset.changeId !== undefined ||
     root.dataset.requestRevision !== undefined ||
-    findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1 ||
+    findAll(viewEl, (n) => n.attributes["id"] === "surla-preserved-draft").length !== 1 ||
     !renderText(viewEl).includes("refund_agent")) {
   throw new Error("diff notification during recovery dropped preserved draft, failed to render diff, or leaked dataset bindings");
 }
 // Repeated get_change recovery without new form edits must retain the already-preserved draft lines.
-findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0].dispatch("click");
+findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit")[0].dispatch("click");
 const staleReq2 = hostMessages[hostMessages.length - 1].msg;
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: staleReq2.id, result: { isError: true, content: [{ type: "text", text: input.staleErrorText }] } } });
-findAll(viewEl, (n) => n.attributes["id"] === "scantle-load-latest-card")[0].dispatch("click");
+findAll(viewEl, (n) => n.attributes["id"] === "surla-load-latest-card")[0].dispatch("click");
 const getChangeReq2 = hostMessages[hostMessages.length - 1].msg;
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: getChangeReq2.id, result: { content: [], structuredContent: input.getChangeStructured } } });
 if (!renderText(editorRegion).includes("Edited outcome preserved across stale error")) {
   throw new Error("repeated get_change recovery lost prior preserved draft");
 }
 // Submitting confirm_intent while an incoming card B arrives in flight retains B and its switch button after A's reply completes.
-findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0].dispatch("click");
+findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit")[0].dispatch("click");
 const pendingIncomingConfirmReq = hostMessages[hostMessages.length - 1].msg;
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });
-findAll(resultRegion, (n) => n.attributes["id"] === "scantle-replace-incoming-card")[0].dispatch("click");
+findAll(resultRegion, (n) => n.attributes["id"] === "surla-replace-incoming-card")[0].dispatch("click");
 if (!statusEl.textContent.includes("Wait for the pending CP1 Change Card request")) {
   throw new Error("clicking switch button during pending RPC did not update status message");
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: pendingIncomingConfirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
-if (findAll(resultRegion, (n) => n.attributes["id"] === "scantle-replace-incoming-card").length !== 1 ||
+if (findAll(resultRegion, (n) => n.attributes["id"] === "surla-replace-incoming-card").length !== 1 ||
     editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
     resultRegion.dataset.requestRevision !== input.wantCP1Revision) {
   throw new Error("matching confirm_intent reply cleared incoming card B or broke per-region dataset bindings");
 }
 // Submitting confirm_intent while a diff arrives in flight retains the diff and per-region dataset bindings after the matching confirm_intent reply completes.
-const pendingConfirmSubmit = findAll(viewEl, (n) => n.attributes["id"] === "scantle-confirm-submit")[0];
+const pendingConfirmSubmit = findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit")[0];
 const msgCountBeforePendingDiff = hostMessages.length;
 pendingConfirmSubmit.dispatch("click");
 const pendingDiffConfirmReq = hostMessages[msgCountBeforePendingDiff].msg;
@@ -718,8 +718,8 @@ if (!cp2Text.includes(input.wantCP2Revision) ||
     !cp2Text.includes("Confirmation")) {
   throw new Error("CP2 view missing expected digests or guardrails: " + cp2Text);
 }
-const cp2Svg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
-const cp2SvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-node" && n.className && n.className.baseVal === "scantle-svg-node");
+const cp2Svg = findAll(viewEl, (n) => n.attributes["id"] === "surla-c4-svg");
+const cp2SvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "surla-svg-node" && n.className && n.className.baseVal === "surla-svg-node");
 const cp2SvgTexts = findAll(viewEl, (n) => n.tagName === "TEXT" && n.namespaceURI === "http://www.w3.org/2000/svg");
 if (cp2Svg.length !== 1 ||
     cp2SvgNodes.length !== input.cp2Structured.containers.length ||
@@ -757,9 +757,9 @@ messageListener({
     params: { structuredContent: largePreview }
   }
 });
-const largeSvg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
-const largeSvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-node");
-const largeSvgEdges = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-edge");
+const largeSvg = findAll(viewEl, (n) => n.attributes["id"] === "surla-c4-svg");
+const largeSvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "surla-svg-node");
+const largeSvgEdges = findAll(viewEl, (n) => n.attributes["class"] === "surla-svg-edge");
 const largeText = renderText(viewEl);
 const edge23Path = largeSvgEdges[1].children[0].attributes["d"];
 const edge32Path = largeSvgEdges[2].children[0].attributes["d"];

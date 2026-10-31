@@ -3,7 +3,7 @@
 // orders service executor
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package orders
 
@@ -12,8 +12,8 @@ import (
 	"errors"
 	"fmt"
 
-	orders "github.com/goadesign/scantle/examples/orders/gen/orders"
-	ordersspecs "github.com/goadesign/scantle/examples/orders/gen/orders/toolsets/orders"
+	orders "github.com/goadesign/surla/examples/orders/gen/orders"
+	ordersspecs "github.com/goadesign/surla/examples/orders/gen/orders/toolsets/orders"
 	agent "goa.design/goa-ai/runtime/agent"
 	planner "goa.design/goa-ai/runtime/agent/planner"
 	runtime "goa.design/goa-ai/runtime/agent/runtime"

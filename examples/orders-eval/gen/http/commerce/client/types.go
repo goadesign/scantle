@@ -3,14 +3,14 @@
 // commerce HTTP client types
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders-eval/design
+// $ goa gen github.com/goadesign/surla/examples/orders-eval/design
 
 package client
 
 import (
 	"unicode/utf8"
 
-	commerce "github.com/goadesign/scantle/examples/orders-eval/gen/commerce"
+	commerce "github.com/goadesign/surla/examples/orders-eval/gen/commerce"
 	goa "goa.design/goa/v3/pkg"
 )
 
