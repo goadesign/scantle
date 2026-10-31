@@ -9,16 +9,15 @@ package designeval
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/goadesign/surla"
 	gensurla "github.com/goadesign/surla/gen/surla"
 	"github.com/goadesign/surla/verify/candidate"
 	"golang.org/x/mod/modfile"
@@ -192,53 +191,14 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	return res, nil
 }
 
-// evaluatorGoMod returns the evaluator's own go.mod, which supplies the
-// generator versions a target that does not require them is evaluated with.
+// evaluatorGoMod returns the go.mod Surla was built from (surla.GoMod), which
+// supplies the generator versions a target that does not require them is
+// evaluated with. It is compiled into the binary, so the result is the same
+// whatever directory surla runs in.
 func evaluatorGoMod() (*modfile.File, error) {
-	root, _, err := locateModuleRoot()
-	if err != nil {
-		return nil, err
-	}
-	raw, err := os.ReadFile(filepath.Join(root, "go.mod"))
-	if err != nil {
-		return nil, fmt.Errorf("read evaluator go.mod: %w", err)
-	}
-	mod, err := modfile.Parse("go.mod", raw, nil)
+	mod, err := modfile.Parse("go.mod", []byte(surla.GoMod()), nil)
 	if err != nil {
 		return nil, fmt.Errorf("parse evaluator go.mod: %w", err)
 	}
 	return mod, nil
-}
-
-// locateModuleRoot resolves the repository root containing go.mod and returns
-// its directory path and declared module path.
-func locateModuleRoot() (string, string, error) {
-	var candidates []string
-	if envRoot := strings.TrimSpace(os.Getenv("SURLA_MODULE_ROOT")); envRoot != "" {
-		candidates = append(candidates, envRoot)
-	}
-	if wd, err := os.Getwd(); err == nil {
-		candidates = append(candidates, wd)
-	}
-	if _, file, _, ok := runtime.Caller(0); ok {
-		candidates = append(candidates, filepath.Dir(file))
-	}
-
-	for _, start := range candidates {
-		dir := start
-		for {
-			modFile := filepath.Join(dir, "go.mod")
-			if raw, err := os.ReadFile(modFile); err == nil {
-				if modPath := modfile.ModulePath(raw); modPath != "" {
-					return dir, modPath, nil
-				}
-			}
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
-	}
-	return "", "", errors.New("go.mod not found via SURLA_MODULE_ROOT, working directory, or caller path")
 }

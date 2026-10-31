@@ -68,3 +68,22 @@ func TestEvaluateUsesTheBuildToolchainToResolveModules(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, res.Declarations, "Service:orders/Method:get_order")
 }
+
+// TestEvaluatorGoModIgnoresTheWorkingDirectory checks that the generator
+// versions come from the go.mod compiled into Surla even when surla runs
+// inside another module, such as a user's application that does not require
+// goa.design/model.
+func TestEvaluatorGoModIgnoresTheWorkingDirectory(t *testing.T) {
+	app := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(app, "go.mod"), []byte("module example.com/app\n\ngo 1.24\n"), 0o600))
+	t.Chdir(app)
+
+	mod, err := evaluatorGoMod()
+	require.NoError(t, err)
+	assert.Equal(t, "github.com/goadesign/surla", mod.Module.Mod.Path)
+	for _, core := range []string{harnessGoaModule, harnessGoaAIModule, harnessModelModule} {
+		version, ok := requiredVersion(mod, core)
+		assert.True(t, ok, "Surla's go.mod requires %s", core)
+		assert.NotEmpty(t, version)
+	}
+}
