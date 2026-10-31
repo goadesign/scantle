@@ -111,8 +111,11 @@ type ProposeChangeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
@@ -143,8 +146,11 @@ type ConfirmIntentResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
@@ -175,8 +181,11 @@ type GetChangeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 
@@ -246,8 +255,11 @@ type ApproveMergeResponseBody struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItemResponseBody `form:"ui_composition,omitempty" json:"ui_composition,omitempty" xml:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ApprovalItemResponseBody `form:"approval,omitempty" json:"approval,omitempty" xml:"approval,omitempty"`
 }
 

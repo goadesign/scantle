@@ -237,8 +237,8 @@ func surlaUsage() {
 	fmt.Fprintln(os.Stderr, `    checkpoint-ui: Serve the interactive MCP Apps HTML host for Surla checkpoints.`)
 	fmt.Fprintln(os.Stderr, `    golden-path: Serve the Surla Golden Path architecture playbook for Goa-AI agentic platforms.`)
 	fmt.Fprintln(os.Stderr, `    propose-change: Evaluate a feature request at Checkpoint 1, surfacing concrete examples and any genuine domain ambiguity.`)
-	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.`)
-	fmt.Fprintln(os.Stderr, `    get-change: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.`)
+	fmt.Fprintln(os.Stderr, `    confirm-intent: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is, with its approval only while that approval still matches the promotion target's current inputs. The call fails when the card has an approval and the promotion target cannot report its current inputs.`)
+	fmt.Fprintln(os.Stderr, `    get-change: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card. A recorded approval is included only while it still matches the promotion target's current suite, environment and binary digests; the call fails when the card has an approval and the target cannot report them.`)
 	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
 	fmt.Fprintln(os.Stderr, `    approve-merge: Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.`)
@@ -305,7 +305,7 @@ func surlaConfirmIntentUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.`)
+	fmt.Fprintln(os.Stderr, `Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is, with its approval only while that approval still matches the promotion target's current inputs. The call fails when the card has an approval and the promotion target cannot report its current inputs.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)
@@ -323,7 +323,7 @@ func surlaGetChangeUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.`)
+	fmt.Fprintln(os.Stderr, `Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card. A recorded approval is included only while it still matches the promotion target's current suite, environment and binary digests; the call fails when the card has an approval and the target cannot report them.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -change-id STRING: Change identifier.`)

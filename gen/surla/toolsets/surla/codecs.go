@@ -482,7 +482,7 @@ var approveMergeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
 		JSONType:    "object",
-		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+		Description: "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
@@ -729,7 +729,7 @@ var confirmIntentResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
 		JSONType:    "object",
-		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+		Description: "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
@@ -1065,7 +1065,7 @@ var getChangeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
 		JSONType:    "object",
-		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+		Description: "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
@@ -1679,7 +1679,7 @@ var proposeChangeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval")},
 		JSONType:    "object",
-		Description: "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+		Description: "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.",
 	},
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("approval"), tools.FixedField("approved_by")},
@@ -3839,7 +3839,7 @@ func validateProposeChangeResultJSONValue(path string, value any, description st
 		case "approval":
 			if err := validateProposeChangeResultApprovalItemTransportJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+				typed[key], "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.",
 			); err != nil {
 				return err
 			}

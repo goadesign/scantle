@@ -53,8 +53,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// ConfirmIntentPayloadTransport is the internal JSON transport type for ConfirmIntentPayload.
@@ -100,8 +103,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// DiffPayloadTransport is the internal JSON transport type for DiffPayload.
@@ -196,8 +202,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// PreviewArchitecturePayloadTransport is the internal JSON transport type for PreviewArchitecturePayload.
@@ -282,8 +291,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItemTransport `json:"ui_composition,omitempty"`
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItemTransport `json:"approval,omitempty"`
 	}
 	// AgentPolicyItemTransport is the internal JSON transport type for AgentPolicyItemTransport.
