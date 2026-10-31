@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Scantle Checkpoint Host</title>
   <style>
@@ -77,7 +78,8 @@
     var SVG_NS = "http://www.w3.org/2000/svg";
     var initPending = false;
     var nextRequestId = 2;
-    var pendingToolRequest = null;
+    var pendingRequests = {};
+    var activePreservedDraft = null;
     var root = document.getElementById("scantle-checkpoint-root");
     var statusEl = document.getElementById("scantle-checkpoint-status");
     var viewEl = document.getElementById("scantle-checkpoint-view");
@@ -143,10 +145,10 @@
     }
 
     function clearDatasetKeys() {
-      pendingToolRequest = null;
       delete root.dataset.changeId;
       delete root.dataset.requestRevision;
       delete root.dataset.designDigest;
+      delete root.dataset.targetKind;
       delete root.dataset.hasChanges;
     }
 
@@ -167,6 +169,8 @@
     }
 
     function renderCancelled(reason) {
+      pendingRequests = {};
+      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cancelled";
       statusEl.textContent = "Checkpoint tool call cancelled";
@@ -181,6 +185,7 @@
     }
 
     function renderError(message) {
+      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "error";
       statusEl.textContent = "Checkpoint payload error";
@@ -284,13 +289,17 @@
         (d.prompt_version === undefined || typeof d.prompt_version === "string");
     }
 
-    function callServerTool(toolName, args, onSuccess, onError) {
+    function callServerTool(toolName, args, validateFn, onSuccess, onError) {
       if (!window.parent || window.parent === window) {
         onError("Cannot invoke " + toolName + ": no MCP Apps host frame is attached.");
         return;
       }
       var reqId = nextRequestId++;
-      pendingToolRequest = { id: reqId, onSuccess: onSuccess, onError: onError };
+      pendingRequests[String(reqId)] = {
+        validate: validateFn,
+        onSuccess: onSuccess,
+        onError: onError
+      };
       window.parent.postMessage({
         jsonrpc: "2.0",
         id: reqId,
@@ -301,6 +310,15 @@
 
     function renderChangeCard(card, preservedDraft) {
       clearDatasetKeys();
+      if (isPlainObject(preservedDraft)) {
+        activePreservedDraft = preservedDraft;
+      } else if (isPlainObject(activePreservedDraft) &&
+                 activePreservedDraft.changeId === card.change_id &&
+                 activePreservedDraft.priorRevision !== card.request_revision) {
+        preservedDraft = activePreservedDraft;
+      } else {
+        activePreservedDraft = null;
+      }
       root.dataset.state = "cp1-change-card";
       root.dataset.changeId = card.change_id;
       root.dataset.requestRevision = card.request_revision;
@@ -317,22 +335,37 @@
           verification_kind: ex.verification_kind
         };
       });
+      var rpcInFlight = false;
       var feedbackEl = el("div", { id: "scantle-confirm-feedback" }, []);
 
+      function snapshotDraft() {
+        return {
+          changeId: card.change_id,
+          priorRevision: card.request_revision,
+          answers: Object.assign({}, draftAnswers),
+          examples: draftExamples.map(function (item) { return Object.assign({}, item); })
+        };
+      }
+
       function showFormError(msg) {
+        rpcInFlight = false;
+        submitBtn.disabled = false;
+        activePreservedDraft = snapshotDraft();
         var loadLatestBtn = el("button", {
           type: "button",
           id: "scantle-load-latest-card",
           className: "scantle-btn",
           textContent: "Load Latest Card (get_change)",
           onClick: function () {
+            if (rpcInFlight) { return; }
+            rpcInFlight = true;
+            submitBtn.disabled = true;
+            loadLatestBtn.disabled = true;
+            var savedDraft = snapshotDraft();
+            activePreservedDraft = savedDraft;
             statusEl.textContent = "Loading latest Change Card via get_change...";
-            callServerTool("get_change", { change_id: card.change_id }, function (latestCard) {
-              renderChangeCard(latestCard, {
-                priorRevision: card.request_revision,
-                answers: Object.assign({}, draftAnswers),
-                examples: draftExamples.map(function (item) { return Object.assign({}, item); })
-              });
+            callServerTool("get_change", { change_id: card.change_id }, isValidChangeCard, function (latestCard) {
+              renderChangeCard(latestCard, savedDraft);
             }, showFormError);
           }
         });
@@ -439,6 +472,7 @@
         className: "scantle-btn scantle-btn-primary",
         textContent: card.status === "needs_confirmation" ? "Confirm Intent & Lock Examples" : "Refine Confirmed Answers & Examples",
         onClick: function () {
+          if (rpcInFlight) { return; }
           for (var i = 0; i < ambiguities.length; i++) {
             if (!draftAnswers[ambiguities[i].id]) {
               showFormError("Select an option for ambiguity " + ambiguities[i].id + " before confirming.");
@@ -452,6 +486,9 @@
               return;
             }
           }
+          rpcInFlight = true;
+          submitBtn.disabled = true;
+          activePreservedDraft = null;
           replaceChildren(feedbackEl, []);
           statusEl.textContent = "Submitting confirm_intent to MCP Apps host...";
           callServerTool("confirm_intent", {
@@ -467,7 +504,7 @@
                 verification_kind: item.verification_kind
               };
             })
-          }, function (updatedCard) {
+          }, isValidChangeCard, function (updatedCard) {
             renderChangeCard(updatedCard, null);
           }, showFormError);
         }
@@ -522,7 +559,7 @@
       });
 
       var maxRows = Math.max(1, colRows[0], colRows[1], colRows[2]);
-      var svgWidth = 800;
+      var svgWidth = 840;
       var svgHeight = Math.max(140, maxRows * rowStep + 36);
 
       var defs = svgEl("defs", {}, [
@@ -552,15 +589,22 @@
           pathD = "M " + sx + " " + (sy - 10) + " C " + (sx + 44) + " " + (sy - 32) + ", " + (sx + 44) + " " + (sy + 32) + ", " + sx + " " + (sy + 10);
           labelX = sx + 24;
           labelY = sy;
+        } else if (src.col === dst.col) {
+          var ix1 = src.x + boxW;
+          var iy1 = src.y + boxH / 2;
+          var ix2 = dst.x + boxW;
+          var iy2 = dst.y + boxH / 2;
+          var intraArc = 26 + seen * 18;
+          var imx = ix1 + intraArc;
+          var imy = (iy1 + iy2) / 2;
+          pathD = "M " + ix1 + " " + iy1 + " Q " + imx + " " + imy + " " + ix2 + " " + iy2;
+          labelX = imx + 4;
+          labelY = imy + (seen % 2 === 0 ? -4 : 10);
         } else {
           var x1 = src.x <= dst.x ? src.x + boxW : src.x;
           var y1 = src.y + boxH / 2;
           var x2 = src.x <= dst.x ? dst.x : dst.x + boxW;
           var y2 = dst.y + boxH / 2;
-          if (src.col === dst.col) {
-            x1 = src.x + boxW;
-            x2 = dst.x + boxW;
-          }
           var mx = (x1 + x2) / 2;
           var my = (y1 + y2) / 2 + curveOffset;
           pathD = "M " + x1 + " " + y1 + " Q " + mx + " " + my + " " + x2 + " " + y2;
@@ -598,6 +642,7 @@
     }
 
     function renderArchitecturePreview(preview) {
+      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cp2-architecture-preview";
       root.dataset.changeId = preview.change_id;
@@ -693,6 +738,7 @@
     }
 
     function renderDiffResult(diff) {
+      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cp2-diff";
       root.dataset.hasChanges = String(diff.has_changes);
@@ -718,6 +764,7 @@
     }
 
     function renderDraftOverride(draft) {
+      activePreservedDraft = null;
       clearDatasetKeys();
       root.dataset.state = "cp3-draft-override";
       statusEl.textContent = "Rendered Checkpoint 3 Fast Draft Override";
@@ -788,6 +835,8 @@
       if (typeof msg.method === "string") {
         if (msg.id !== undefined && msg.id !== null) {
           if (msg.method === "ui/resource-teardown") {
+            pendingRequests = {};
+            activePreservedDraft = null;
             clearDatasetKeys();
             root.dataset.state = "terminated";
             statusEl.textContent = "Checkpoint resource torn down.";
@@ -826,9 +875,10 @@
         }
         return;
       }
-      if (pendingToolRequest && msg.id === pendingToolRequest.id) {
-        var activeReq = pendingToolRequest;
-        pendingToolRequest = null;
+      var reqKey = msg.id !== undefined && msg.id !== null ? String(msg.id) : "";
+      if (reqKey && Object.prototype.hasOwnProperty.call(pendingRequests, reqKey)) {
+        var activeReq = pendingRequests[reqKey];
+        delete pendingRequests[reqKey];
         if (msg.error) {
           var rpcErr = isPlainObject(msg.error) && typeof msg.error.message === "string"
             ? msg.error.message
@@ -844,8 +894,9 @@
           activeReq.onError(extractErrorText(msg.result));
           return;
         }
-        if (!isPlainObject(msg.result.structuredContent) || !isValidChangeCard(msg.result.structuredContent)) {
-          activeReq.onError("Tool response is missing a valid ChangeCardResult.");
+        if (!isPlainObject(msg.result.structuredContent) ||
+            (typeof activeReq.validate === "function" && !activeReq.validate(msg.result.structuredContent))) {
+          activeReq.onError("Tool response is missing a valid structured checkpoint payload.");
           return;
         }
         activeReq.onSuccess(msg.result.structuredContent);

@@ -88,6 +88,7 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 		t.Fatal("checkpointUIHTML must not use innerHTML")
 	}
 	for _, want := range []string{
+		`http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';"`,
 		`data-profile="mcp-app"`,
 		`"ui/initialize"`,
 		`"ui/notifications/initialized"`,
@@ -508,8 +509,10 @@ if (submitBtns.length !== 1) {
 }
 const msgCountBeforeConfirm = hostMessages.length;
 submitBtns[0].dispatch("click");
-if (hostMessages.length !== msgCountBeforeConfirm + 1) {
-  throw new Error("expected tools/call request after clicking confirm submit");
+// Duplicate click while in flight must be ignored.
+submitBtns[0].dispatch("click");
+if (hostMessages.length !== msgCountBeforeConfirm + 1 || submitBtns[0].disabled !== true) {
+  throw new Error("expected single tools/call request and disabled submit button while in flight");
 }
 const confirmReq = hostMessages[msgCountBeforeConfirm].msg;
 if (confirmReq.method !== "tools/call" ||
@@ -588,6 +591,18 @@ if (getChangeReq.method !== "tools/call" ||
     getChangeReq.params.name !== "get_change" ||
     getChangeReq.params.arguments.change_id !== "chg-ui-test") {
   throw new Error("unexpected get_change tools/call payload: " + JSON.stringify(getChangeReq));
+}
+// Host broadcasts ui/notifications/tool-result BEFORE delivering the tools/call get_change JSON-RPC response -> must still preserve #scantle-preserved-draft and not drop the pending request.
+messageListener({
+  source: parentWindow,
+  data: {
+    jsonrpc: "2.0",
+    method: "ui/notifications/tool-result",
+    params: { structuredContent: input.cp1ConfirmedStructured }
+  }
+});
+if (findAll(viewEl, (n) => n.attributes["id"] === "scantle-preserved-draft").length !== 1) {
+  throw new Error("interleaved ui/notifications/tool-result lost #scantle-preserved-draft");
 }
 messageListener({
   source: parentWindow,
@@ -670,11 +685,22 @@ messageListener({
     params: { structuredContent: largePreview }
   }
 });
+const largeSvg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
 const largeSvgNodes = findAll(viewEl, (n) => n.className === "scantle-svg-node");
 const largeSvgEdges = findAll(viewEl, (n) => n.className === "scantle-svg-edge");
 const largeText = renderText(viewEl);
-if (largeSvgNodes.length !== 15 || largeSvgEdges.length !== 5 || !largeText.includes("node-15") || !largeText.includes("Self Loop")) {
-  throw new Error("expected 15 SVG nodes and 5 cyclic/self-loop edges with inspectable list, got nodes=" + largeSvgNodes.length + " edges=" + largeSvgEdges.length);
+const edge23Path = largeSvgEdges[1].children[0].attributes["d"];
+const edge32Path = largeSvgEdges[2].children[0].attributes["d"];
+if (largeSvg.length !== 1 ||
+    largeSvg[0].attributes["width"] !== "840" ||
+    largeSvgNodes.length !== 15 ||
+    largeSvgEdges.length !== 5 ||
+    edge23Path === edge32Path ||
+    !edge23Path.includes("Q 526") ||
+    !edge32Path.includes("Q 544") ||
+    !largeText.includes("node-15") ||
+    !largeText.includes("Self Loop")) {
+  throw new Error("expected 840px SVG with 15 nodes and distinct intra-column cyclic/self-loop edges, got width=" + (largeSvg[0] && largeSvg[0].attributes["width"]) + " e23=" + edge23Path + " e32=" + edge32Path);
 }
 
 // 4b. Deliver CP2 DiffResult from MCP diff codec -> renders unbound structural diff and clears CP1/CP2 dataset keys.
