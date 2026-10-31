@@ -168,6 +168,24 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 		t.Fatalf("unmarshal confirmedWire: %v", err)
 	}
 
+	getChangeArgs, err := json.Marshal(map[string]any{
+		"change_id": confirmedWire.ChangeID,
+	})
+	if err != nil {
+		t.Fatalf("marshal getChangeArgs: %v", err)
+	}
+	getChangeCall, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      "get_change",
+		Arguments: getChangeArgs,
+	})
+	if err != nil {
+		t.Fatalf("ToolsCall(get_change): %v", err)
+	}
+	getChangeOut, ok := getChangeCall.Outcome.AsComplete()
+	if !ok || len(getChangeOut.StructuredContent) == 0 {
+		t.Fatalf("unexpected get_change outcome: %+v", getChangeCall)
+	}
+
 	candidateDesign := `package design
 
 import (
@@ -318,6 +336,7 @@ var _ = Service("orders", func() {
 		"script":                 scriptBody,
 		"cp1Structured":          json.RawMessage(proposeOut.StructuredContent),
 		"cp1ConfirmedStructured": json.RawMessage(confirmOut.StructuredContent),
+		"getChangeStructured":    json.RawMessage(getChangeOut.StructuredContent),
 		"cp2Structured":          json.RawMessage(previewOut.StructuredContent),
 		"diffStructured":         json.RawMessage(diffOut.StructuredContent),
 		"cp3Structured":          json.RawMessage(draftOut.StructuredContent),
@@ -611,7 +630,7 @@ messageListener({
     id: getChangeReq.id,
     result: {
       content: [],
-      structuredContent: input.cp1ConfirmedStructured
+      structuredContent: input.getChangeStructured
     }
   }
 });
@@ -823,11 +842,73 @@ messageListener({
 if (hostMessages.length !== beforeCount + 2 || hostMessages[beforeCount + 1].msg.id !== 1 || !hostMessages[beforeCount + 1].msg.result || root.dataset.state !== "terminated") {
   throw new Error("expected resource-teardown result for id=1 and terminated state, got: " + JSON.stringify(hostMessages.slice(beforeCount)) + " / " + root.dataset.state);
 }
+
+process.stdout.write(JSON.stringify({
+  confirmCall: confirmReq.params,
+  staleCall: staleReq.params,
+  getChangeCall: getChangeReq.params
+}));
 `
 	cmd := exec.CommandContext(ctx, nodePath, "-e", nodeHarness)
 	cmd.Stdin = strings.NewReader(string(harnessInput))
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := cmd.CombinedOutput()
+	if err != nil {
 		t.Fatalf("MCP Apps JS bridge harness failed: %v\n%s", err, string(out))
+	}
+
+	// Execute the exact guest-emitted tools/call payloads through the real MCP adapter.
+	var captured struct {
+		ConfirmCall struct {
+			Name      string         `json:"name"`
+			Arguments map[string]any `json:"arguments"`
+		} `json:"confirmCall"`
+		StaleCall struct {
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+		} `json:"staleCall"`
+		GetChangeCall struct {
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+		} `json:"getChangeCall"`
+	}
+	if err := json.Unmarshal(out, &captured); err != nil {
+		t.Fatalf("unmarshal guest tools/call output: %v (raw=%s)", err, string(out))
+	}
+	guestGetRes, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      captured.GetChangeCall.Name,
+		Arguments: captured.GetChangeCall.Arguments,
+	})
+	if err != nil {
+		t.Fatalf("adapter.ToolsCall(guest get_change): %v", err)
+	}
+	if getComplete, ok := guestGetRes.Outcome.AsComplete(); !ok || len(getComplete.StructuredContent) == 0 {
+		t.Fatalf("unexpected guest get_change outcome: %+v", guestGetRes)
+	}
+	guestStaleRes, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      captured.StaleCall.Name,
+		Arguments: captured.StaleCall.Arguments,
+	})
+	if err != nil {
+		t.Fatalf("adapter.ToolsCall(guest stale confirm_intent): %v", err)
+	}
+	if staleComplete, ok := guestStaleRes.Outcome.AsComplete(); !ok || staleComplete.IsError == nil || !*staleComplete.IsError {
+		t.Fatalf("expected guest stale confirm_intent to return tool error, got: %+v", guestStaleRes)
+	}
+	captured.ConfirmCall.Arguments["request_revision"] = confirmedWire.RequestRevision
+	refineArgs, err := json.Marshal(captured.ConfirmCall.Arguments)
+	if err != nil {
+		t.Fatalf("marshal refineArgs: %v", err)
+	}
+	guestRefineRes, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      captured.ConfirmCall.Name,
+		Arguments: refineArgs,
+	})
+	if err != nil {
+		t.Fatalf("adapter.ToolsCall(guest confirm_intent refine): %v", err)
+	}
+	refineComplete, ok := guestRefineRes.Outcome.AsComplete()
+	if !ok || len(refineComplete.StructuredContent) == 0 || !strings.Contains(string(refineComplete.StructuredContent), "Instant store credit up to $50.00") {
+		t.Fatalf("unexpected guest confirm_intent refine outcome: %+v", guestRefineRes)
 	}
 }
 

@@ -102,7 +102,10 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
   - Analyzes a feature request at `CP1` using the embedded Golden Path prompt, returning concrete `examples`, `ambiguities`, `preserved_behaviors`, and a canonical `request_revision` digest.
 - **`confirm_intent`** (`POST /changes/confirm`)
   - **Input:** `change_id`, `request_revision`, `answers`, `examples` → **Output:** `ChangeCardResult`
-  - Locks the operator's ambiguity `answers` and confirmed `examples` at `CP1`, transitioning the Change Card to `confirmed`.
+  - Confirms a `needs_confirmation` Change Card or refines an already `confirmed` Change Card at `CP1` when called by the owning principal with the current `request_revision` and complete `answers` and `examples`. No-op submissions return the stored `request_revision`; changed answers or examples mint a new canonical `request_revision` digest.
+- **`get_change`** (`GET /changes/{change_id}`)
+  - **Input:** `change_id` → **Output:** `ChangeCardResult`
+  - Reads the stored `ChangeCardResult` for `change_id` without mutating state (restricted to the owning principal) so a stale editor can fetch the latest saved card after a `request_revision` conflict.
 - **`preview_architecture`** (`POST /changes/preview`)
   - **Input:** `change_id`, `request_revision`, `design`, `builders?` → **Output:** `ArchitecturePreviewResult`
   - Evaluates a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed Chorus `swarm` plan.
@@ -111,14 +114,14 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
   - Applies a `prompt_template` to a target configured through `controlplane.Options.TargetUpdater`, without rebuilding Go code, or reports that a `compiled_rule` requires a rebuild. The `serve` command does not bind a prompt updater, so its `prompt_template` requests return `no target prompt updater is bound to this control plane`.
 - **`diff`** (`POST /diff`)
   - **Input:** `old` (`DesignSnapshot`), `new` (`DesignSnapshot`) → **Output:** `DiffResult`
-  - Compares two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives.
+  - Compares two `DesignSnapshot` modules by evaluating their generated Goa/Goa-AI artifacts, tool schemas, and `go.mod` directives, paired with `ToolUI("ui://scantle/checkpoint")` for structural diff visualization.
 
 ### MCP Resources
 
 - **`scantle://golden-path`** (`text/markdown` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /golden-path`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
 - **`ui://scantle/checkpoint`** (`text/html;profile=mcp-app` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /ui/checkpoint`)
-  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`). Completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders validated `ChangeCardResult` (`CP1`), `ArchitecturePreviewResult` (`CP2`), and `DraftOverrideResult` (`CP3`) payloads delivered by the host via `ui/notifications/tool-result` without server-retained preview state (interactive role-switching/replay controls and `openui.v1` action dispatch remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough)).
+  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`). Completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders interactive `ChangeCardResult` forms (`CP1`, dispatching `confirm_intent` and `get_change` via host `tools/call` and preserving unsaved draft edits across stale-revision conflicts), `ArchitecturePreviewResult` (`CP2`, with an inline scrollable C4 SVG directed graph above the inspectable lists), unbound structural `DiffResult` views (`CP2` `diff`), and `DraftOverrideResult` (`CP3`) payloads delivered by the host via `ui/notifications/tool-result` without server-retained preview state (interactive role-switching/replay controls and `openui.v1` action dispatch remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough)).
 
 ---
 
