@@ -307,9 +307,9 @@ Next:
 README.md in the project explains each part and the -request-revision value.
 `
 
-// shellQuote quotes s as one POSIX shell word: wrapped in single quotes, with
-// each single quote inside written as '\”. For example, my dir becomes
-// 'my dir'.
+// shellQuote quotes s as one POSIX shell word: it wraps s in single quotes
+// and writes each single quote inside s as a closing quote, an escaped quote
+// and an opening quote. For example, my dir becomes 'my dir'.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
