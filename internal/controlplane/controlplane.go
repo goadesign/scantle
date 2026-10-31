@@ -90,7 +90,10 @@ type (
 		// PreservedBehaviors lists existing contract invariants preserved by the change.
 		PreservedBehaviors []string `json:"preserved_behaviors"`
 		// UIComposition is an optional OpenUI Lang decision view composed from
-		// the Scantle decision catalog. Nil means the model composed none.
+		// the Scantle decision catalog. Nil means the model composed none. Any
+		// string the model returns, including an empty or invalid program, is
+		// carried to the card unchanged: it is presentation only, so a bad
+		// program never costs the operator the authoritative analysis.
 		UIComposition *string `json:"ui_composition,omitempty"`
 	}
 
@@ -276,8 +279,7 @@ var (
       }
     },
     "ui_composition": {
-      "type": "string",
-      "minLength": 1
+      "type": "string"
     }
   }
 }`)
@@ -489,9 +491,6 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *genscantle.ProposeC
 	summary, ambiguities, examples, preserved, err := validateCP1Analysis(p.ChangeID, analysis)
 	if err != nil {
 		return nil, fmt.Errorf("invalid cp1 analysis: %w", err)
-	}
-	if analysis.UIComposition != nil && strings.TrimSpace(*analysis.UIComposition) == "" {
-		return nil, errors.New("invalid cp1 analysis: ui_composition must not be blank")
 	}
 
 	status := StatusConfirmed

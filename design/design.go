@@ -55,9 +55,7 @@ var GetChangePayload = Type("GetChangePayload", func() {
 // Change Card revision.
 var UICompositionItem = Type("UICompositionItem", func() {
 	Description("Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.")
-	Attribute("program", String, "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.", func() {
-		MinLength(1)
-	})
+	Attribute("program", String, "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.")
 	Attribute("composed_for_revision", String, "request_revision of the Change Card this program was composed for.")
 	Required("program", "composed_for_revision")
 })

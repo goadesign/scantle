@@ -406,7 +406,10 @@ type ToolInputBindingItem struct {
 // composed_for_revision equals the card's request_revision.
 type UICompositionItem struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program string
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision string
@@ -1325,7 +1328,10 @@ func validatejsonToolInputBindingItemTransport(value *jsonToolInputBindingItemTr
 // jsonUICompositionItemTransport stores JSON fields until they have been validated.
 type jsonUICompositionItemTransport struct {
 	// OpenUI Lang program composed by the CP1 model from the Scantle decision
-	// component catalog.
+	// component catalog, exactly as the model returned it. The server does not
+	// check it; the checkpoint viewer validates it and shows its error state, with
+	// the rest of the card still usable, when the program is not a valid
+	// composition.
 	Program *string `json:"program"`
 	// request_revision of the Change Card this program was composed for.
 	ComposedForRevision *string `json:"composed_for_revision"`
@@ -1341,11 +1347,6 @@ func validatejsonUICompositionItemTransport(value *jsonUICompositionItemTranspor
 	}
 	if value.ComposedForRevision == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("composed_for_revision", "body"))
-	}
-	if value.Program != nil {
-		if utf8.RuneCountInString(*value.Program) < 1 {
-			err = goa.MergeErrors(err, goa.InvalidLengthError("body.program", *value.Program, utf8.RuneCountInString(*value.Program), 1, true))
-		}
 	}
 	return err
 }
@@ -1491,11 +1492,6 @@ func validateChangeCardResultOriginal(value *ChangeCardResult) (err error) {
 			}
 		}
 	}
-	if value.UIComposition != nil {
-		if err2 := validateUICompositionItemOriginal(value.UIComposition); err2 != nil {
-			err = goa.MergeErrors(err, err2)
-		}
-	}
 	return err
 }
 
@@ -1503,14 +1499,6 @@ func validateChangeCardResultOriginal(value *ChangeCardResult) (err error) {
 func validateExampleItemOriginal(value *ExampleItem) (err error) {
 	if !(value.VerificationKind == "deterministic" || value.VerificationKind == "model_judged") {
 		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.verification_kind", value.VerificationKind, []any{"deterministic", "model_judged"}))
-	}
-	return err
-}
-
-// validateUICompositionItemOriginal checks the original typed value before JSON conversion.
-func validateUICompositionItemOriginal(value *UICompositionItem) (err error) {
-	if utf8.RuneCountInString(value.Program) < 1 {
-		err = goa.MergeErrors(err, goa.InvalidLengthError("value.program", value.Program, utf8.RuneCountInString(value.Program), 1, true))
 	}
 	return err
 }
@@ -3962,9 +3950,6 @@ func EncodeUICompositionItem(in *UICompositionItem) ([]byte, error) {
 	if err := checkUICompositionItemValue(in); err != nil {
 		return nil, fmt.Errorf("encode UICompositionItem JSON: %w", err)
 	}
-	if err := validateUICompositionItemOriginal(in); err != nil {
-		return nil, fmt.Errorf("validate UICompositionItem value: %w", err)
-	}
 	var body *jsonUICompositionItemTransport
 	{
 		body = &jsonUICompositionItemTransport{
@@ -3987,9 +3972,6 @@ func EncodeUICompositionItem(in *UICompositionItem) ([]byte, error) {
 
 func ValidateUICompositionItemValue(in *UICompositionItem) error {
 	if err := checkUICompositionItemValue(in); err != nil {
-		return fmt.Errorf("validate UICompositionItem value: %w", err)
-	}
-	if err := validateUICompositionItemOriginal(in); err != nil {
 		return fmt.Errorf("validate UICompositionItem value: %w", err)
 	}
 
@@ -5880,7 +5862,7 @@ func validateChangeCardResultJSONValue7(path string, value any, description stri
 		case "program":
 			if err := validateAgentPolicyItemJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.",
+				typed[key], "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.",
 			); err != nil {
 				return err
 			}

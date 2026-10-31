@@ -359,7 +359,10 @@ type (
 	// UICompositionItem is a nested type used by the generated JSON contract.
 	UICompositionItem = struct {
 		// OpenUI Lang program composed by the CP1 model from the Scantle decision
-		// component catalog.
+		// component catalog, exactly as the model returned it. The server does not
+		// check it; the checkpoint viewer validates it and shows its error state, with
+		// the rest of the card still usable, when the program is not a valid
+		// composition.
 		Program string
 		// request_revision of the Change Card this program was composed for.
 		ComposedForRevision string

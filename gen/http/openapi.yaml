@@ -881,7 +881,7 @@ definitions:
             summary: Maiores voluptate soluta quasi et in.
             ui_composition:
                 composed_for_revision: Aut neque voluptas.
-                program: 6j4
+                program: Repellat ex.
         required:
             - change_id
             - status
@@ -1658,13 +1658,12 @@ definitions:
                 example: Aut neque voluptas.
             program:
                 type: string
-                description: OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog.
-                example: 6j4
-                minLength: 1
+                description: OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.
+                example: Repellat ex.
         description: 'Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card''s request_revision.'
         example:
             composed_for_revision: Aut neque voluptas.
-            program: 6j4
+            program: Repellat ex.
         required:
             - program
             - composed_for_revision
