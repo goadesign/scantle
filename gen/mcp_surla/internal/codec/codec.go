@@ -207,8 +207,11 @@ type ApproveMergeResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *ApproveMergeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ApproveMergeResultApprovalItemTransport `json:"approval,omitempty"`
 }
 
@@ -527,8 +530,11 @@ type ConfirmIntentResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *ConfirmIntentResultUICompositionItemTransport `json:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ConfirmIntentResultApprovalItemTransport `json:"approval,omitempty"`
 }
 
@@ -934,8 +940,11 @@ type GetChangeResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *GetChangeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *GetChangeResultApprovalItemTransport `json:"approval,omitempty"`
 }
 
@@ -1724,8 +1733,11 @@ type ProposeChangeResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *ProposeChangeResultUICompositionItemTransport `json:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ProposeChangeResultApprovalItemTransport `json:"approval,omitempty"`
 }
 

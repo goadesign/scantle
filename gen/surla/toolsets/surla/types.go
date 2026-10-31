@@ -47,8 +47,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItem
 	}
 	// ConfirmIntentPayload defines the JSON payload for the surla.confirm_intent tool.
@@ -88,8 +91,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItem
 	}
 	// DiffPayload defines the JSON payload for the surla.diff tool.
@@ -166,8 +172,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItem
 	}
 	// PreviewArchitecturePayload defines the JSON payload for the surla.preview_architecture tool.
@@ -240,8 +249,11 @@ type (
 		// one. A confirm_intent that changes answers or examples returns the new
 		// revision without it.
 		UIComposition *UICompositionItem
-		// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-		// never hashed into request_revision.
+		// Checkpoint 5 approval of this revision, present only while it matches the
+		// promotion target's current inputs. It is absent before approve_merge
+		// succeeds and whenever the target's suite, environment or binary digests have
+		// changed since; it comes back if they match again. It is never hashed into
+		// request_revision.
 		Approval *ApprovalItem
 	}
 	// AgentPolicyItem is a nested type used by the generated JSON contract.

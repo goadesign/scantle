@@ -125,7 +125,13 @@ type (
 		LoadReport(ctx context.Context, digest string) (verify.Report, error)
 		// CurrentInputs returns the evaluator suite and environment the
 		// promotion requires and the digests of the candidate binaries
-		// measured independently for candidateCommit.
+		// measured independently for candidateCommit, as one coherent
+		// snapshot the implementation does not change after returning it.
+		// It fails when those facts do not fix the target's behavior, for
+		// example while the target runs runtime prompt overrides, which no
+		// verification report covers (see the verify package). approve_merge
+		// checks a report against it, and get_change and confirm_intent
+		// return a saved approval only while it still matches.
 		CurrentInputs(ctx context.Context, candidateCommit string) (PromotionInputs, error)
 	}
 
@@ -579,7 +585,9 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeCha
 
 // GetChange returns the current Change Card for change_id to its owner. It
 // fails for an unknown change_id or a caller who does not own the card, and
-// never changes the card.
+// never changes the card. A saved approval is included only while it still
+// matches the promotion target's current inputs (see currentCard); reading
+// them fails the call when the target cannot report them.
 func (c *ControlPlane) GetChange(ctx context.Context, p *gensurla.GetChangePayload) (*gensurla.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
@@ -594,7 +602,7 @@ func (c *ControlPlane) GetChange(ctx context.Context, p *gensurla.GetChangePaylo
 	if record.owner != principal.ID {
 		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
 	}
-	return record.card, nil
+	return c.currentCard(ctx, record.card)
 }
 
 // ConfirmIntent records the owner's complete answers and example table for a
@@ -606,6 +614,10 @@ func (c *ControlPlane) GetChange(ctx context.Context, p *gensurla.GetChangePaylo
 // request_revision, so previews and verification reports bound to the earlier
 // revision no longer match it. The prompt, summary and preserved behaviors
 // never change here: a new requirement needs a new propose_change.
+//
+// An unchanged submission returns the saved card the same way get_change
+// does: with its approval only while that approval still matches the
+// promotion target's current inputs.
 func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *gensurla.ConfirmIntentPayload) (*gensurla.ChangeCardResult, error) {
 	principal, ok := PrincipalFromContext(ctx)
 	if !ok {
@@ -614,60 +626,13 @@ func (c *ControlPlane) ConfirmIntent(ctx context.Context, p *gensurla.ConfirmInt
 	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.RequestRevision) == "" {
 		return nil, errors.New("change_id and request_revision are required")
 	}
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	record, ok := c.cards[p.ChangeID]
-	if !ok {
-		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	card, changed, err := c.confirm(principal, p)
+	if err != nil || changed {
+		return card, err
 	}
-	if record.owner != principal.ID {
-		return nil, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
-	}
-	existing := record.card
-	if existing.RequestRevision != p.RequestRevision {
-		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, existing.RequestRevision)
-	}
-
-	if err := validateAmbiguityAnswers(existing.Ambiguities, p.Answers); err != nil {
-		return nil, err
-	}
-	examples, err := validateConfirmedExamples(p.Examples)
-	if err != nil {
-		return nil, fmt.Errorf("invalid confirmed examples: %w", err)
-	}
-	// confirmed carries no ui_composition: a composition describes only the
-	// revision it was composed for, and changed answers or examples produce a
-	// new revision. An unchanged submission returns existing, composition
-	// included, below.
-	confirmedBy := principal.ID
-	confirmed := &gensurla.ChangeCardResult{
-		ChangeID:           existing.ChangeID,
-		Status:             StatusConfirmed,
-		Prompt:             existing.Prompt,
-		Summary:            existing.Summary,
-		Ambiguities:        existing.Ambiguities,
-		Answers:            maps.Clone(p.Answers),
-		Examples:           examples,
-		PreservedBehaviors: slices.Clone(existing.PreservedBehaviors),
-		ConfirmedBy:        &confirmedBy,
-	}
-	rev, err := computeCanonicalRevision(confirmed, record.owner, record.designSource)
-	if err != nil {
-		return nil, err
-	}
-	if rev == existing.RequestRevision {
-		// Same answers and examples on an already confirmed card.
-		return existing, nil
-	}
-	confirmed.RequestRevision = rev
-	c.cards[p.ChangeID] = storedChangeCard{
-		card:         confirmed,
-		owner:        record.owner,
-		designSource: record.designSource,
-	}
-	return confirmed, nil
+	// The saved card is checked against the promotion target after c.mu is
+	// released, because the target may be slow.
+	return c.currentCard(ctx, card)
 }
 
 // PreviewArchitecture evaluates the candidate design module snapshot via the
@@ -1038,4 +1003,93 @@ func planSwarmRoster(
 		Summary:           plan.Summary,
 		Manifest:          manifestPtr,
 	}, nil
+}
+
+// confirm applies a confirm_intent submission under c.mu. It returns the new
+// confirmed card and true when the answers or examples changed the revision,
+// or the unchanged saved card and false.
+func (c *ControlPlane) confirm(principal Principal, p *gensurla.ConfirmIntentPayload) (*gensurla.ChangeCardResult, bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	record, ok := c.cards[p.ChangeID]
+	if !ok {
+		return nil, false, fmt.Errorf("unknown change_id %q", p.ChangeID)
+	}
+	if record.owner != principal.ID {
+		return nil, false, fmt.Errorf("principal %q is not the owner of change_id %q", principal.ID, p.ChangeID)
+	}
+	existing := record.card
+	if existing.RequestRevision != p.RequestRevision {
+		return nil, false, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, existing.RequestRevision)
+	}
+
+	if err := validateAmbiguityAnswers(existing.Ambiguities, p.Answers); err != nil {
+		return nil, false, err
+	}
+	examples, err := validateConfirmedExamples(p.Examples)
+	if err != nil {
+		return nil, false, fmt.Errorf("invalid confirmed examples: %w", err)
+	}
+	// confirmed carries no ui_composition: a composition describes only the
+	// revision it was composed for, and changed answers or examples produce a
+	// new revision. An unchanged submission returns existing, composition
+	// included, below.
+	confirmedBy := principal.ID
+	confirmed := &gensurla.ChangeCardResult{
+		ChangeID:           existing.ChangeID,
+		Status:             StatusConfirmed,
+		Prompt:             existing.Prompt,
+		Summary:            existing.Summary,
+		Ambiguities:        existing.Ambiguities,
+		Answers:            maps.Clone(p.Answers),
+		Examples:           examples,
+		PreservedBehaviors: slices.Clone(existing.PreservedBehaviors),
+		ConfirmedBy:        &confirmedBy,
+	}
+	rev, err := computeCanonicalRevision(confirmed, record.owner, record.designSource)
+	if err != nil {
+		return nil, false, err
+	}
+	if rev == existing.RequestRevision {
+		// Same answers and examples on an already confirmed card.
+		return existing, false, nil
+	}
+	confirmed.RequestRevision = rev
+	c.cards[p.ChangeID] = storedChangeCard{
+		card:         confirmed,
+		owner:        record.owner,
+		designSource: record.designSource,
+	}
+	return confirmed, true, nil
+}
+
+// currentCard returns card as get_change and an unchanged confirm_intent
+// report it: card itself when it has no approval or when its approval still
+// matches the promotion target's current inputs for the approved candidate
+// commit, and otherwise a copy without the approval. The saved card is never
+// changed, so the approval remains the record of what was checked; it is
+// only not presented as current. An approval can exist only on a card of the
+// revision it was recorded for, because a changed confirmation creates a new
+// card without one. It fails when the current inputs cannot be read, rather
+// than present an approval nobody can confirm. Callers must not hold c.mu:
+// the target may be slow.
+func (c *ControlPlane) currentCard(ctx context.Context, card *gensurla.ChangeCardResult) (*gensurla.ChangeCardResult, error) {
+	a := card.Approval
+	if a == nil {
+		return card, nil
+	}
+	// Only approve_merge records approvals, and it requires the promotion
+	// target, which is fixed when the control plane is built.
+	inputs, err := c.promotionTarget.CurrentInputs(ctx, a.CandidateCommit)
+	if err != nil {
+		return nil, fmt.Errorf("check approval of %q against current promotion inputs for %s: %w", card.ChangeID, a.CandidateCommit, err)
+	}
+	if inputs.SuiteID == a.SuiteID && inputs.SuiteCommit == a.SuiteCommit &&
+		inputs.Environment == a.Environment && maps.Equal(inputs.Artifacts, a.Artifacts) {
+		return card, nil
+	}
+	unapproved := *card
+	unapproved.Approval = nil
+	return &unapproved, nil
 }

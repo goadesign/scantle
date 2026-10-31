@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -962,6 +963,135 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 		assert.Nil(t, changed.Approval, "a new revision drops the approval")
 	})
 
+	t.Run("a saved approval is current only while the target's inputs match", func(t *testing.T) {
+		changes := []struct {
+			name   string
+			change func(*PromotionInputs)
+		}{
+			{"suite", func(in *PromotionInputs) { in.SuiteID = "other_suite" }},
+			{"suite commit", func(in *PromotionInputs) { in.SuiteCommit = "suite-2" }},
+			{"environment", func(in *PromotionInputs) { in.Environment = "staging" }},
+			{"binary digest", func(in *PromotionInputs) { in.Artifacts = map[string]string{"orders": "d2"} }},
+			{"extra binary", func(in *PromotionInputs) { in.Artifacts = map[string]string{"orders": "d1", "worker": "d3"} }},
+		}
+		for _, tc := range changes {
+			t.Run(tc.name, func(t *testing.T) {
+				cp, target, card := setup(t)
+				approved, err := approve(aliceCtx, cp, card, target.report.Digest)
+				require.NoError(t, err)
+				saved := *approved.Approval
+
+				// The target changes on its own, without draft_override.
+				changed := inputs
+				changed.Artifacts = maps.Clone(inputs.Artifacts)
+				tc.change(&changed)
+				target.inputs = changed
+
+				read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+				require.NoError(t, err)
+				assert.Nil(t, read.Approval, "get_change does not present a stale approval")
+				assert.Equal(t, card.RequestRevision, read.RequestRevision)
+				same, err := reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+				require.NoError(t, err)
+				assert.Nil(t, same.Approval, "an unchanged confirm_intent does not either")
+				assert.Equal(t, card.RequestRevision, same.RequestRevision)
+				assert.Equal(t, saved, *approved.Approval, "the returned approval record is not changed")
+
+				// Restoring the approved inputs presents the saved approval again.
+				target.inputs = inputs
+				read, err = cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+				require.NoError(t, err)
+				assert.Equal(t, &saved, read.Approval)
+			})
+		}
+	})
+
+	t.Run("an approval is not presented when current inputs cannot be read", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		target.inputsErr = errors.New("target runs prompt overrides no report covers")
+		_, err = cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		assert.ErrorContains(t, err, "prompt overrides no report covers")
+		_, err = reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+		assert.ErrorContains(t, err, "prompt overrides no report covers")
+	})
+
+	t.Run("a card without an approval never reads the target", func(t *testing.T) {
+		cp, target, _ := setup(t)
+		target.inputsErr = errors.New("must not be called")
+		read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		require.NoError(t, err)
+		assert.Nil(t, read.Approval)
+	})
+
+	t.Run("checking an approval does not hold the card lock", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		reading, release := make(chan struct{}), make(chan struct{})
+		target.inputsReading, target.inputsRelease = reading, release
+		got := make(chan *gensurla.ChangeCardResult, 1)
+		go func() {
+			read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+			assert.NoError(t, err)
+			got <- read
+		}()
+		<-reading
+		// While get_change waits on the target, a confirmation that takes
+		// the lock completes.
+		changed, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err)
+		assert.Nil(t, changed.Approval)
+		close(release)
+		read := <-got
+		assert.Equal(t, card.RequestRevision, read.RequestRevision, "get_change answers for the card it read")
+	})
+
+	t.Run("an unchanged confirmation checking the approval does not hold the card lock", func(t *testing.T) {
+		cp, target, card := setup(t)
+		_, err := approve(aliceCtx, cp, card, target.report.Digest)
+		require.NoError(t, err)
+		reading, release := make(chan struct{}), make(chan struct{})
+		target.inputsReading, target.inputsRelease = reading, release
+		got := make(chan *gensurla.ChangeCardResult, 1)
+		go func() {
+			same, err := reconfirm(cp, card, card.Examples[0].ExpectedOutcome)
+			assert.NoError(t, err)
+			got <- same
+		}()
+		<-reading
+		changed, err := reconfirm(cp, card, "Manager approval")
+		require.NoError(t, err, "a second confirmation takes the lock while the first waits on the target")
+		assert.NotEqual(t, card.RequestRevision, changed.RequestRevision)
+		close(release)
+		same := <-got
+		assert.Equal(t, card.RequestRevision, same.RequestRevision)
+	})
+
+	t.Run("an approval recorded from inputs measured before the target changed is not presented", func(t *testing.T) {
+		cp, target, card := setup(t)
+		reading, release := make(chan struct{}), make(chan struct{})
+		target.inputsReading, target.inputsRelease = reading, release
+		errc := make(chan error, 1)
+		go func() {
+			_, err := approve(aliceCtx, cp, card, target.report.Digest)
+			errc <- err
+		}()
+		<-reading
+		// approve_merge has measured the old inputs; the target now changes.
+		target.inputs = PromotionInputs{
+			SuiteID: inputs.SuiteID, SuiteCommit: inputs.SuiteCommit, Environment: inputs.Environment,
+			Artifacts: map[string]string{"orders": "d2"},
+		}
+		close(release)
+		require.NoError(t, <-errc, "the approval matched what was measured")
+
+		read, err := cp.GetChange(aliceCtx, &gensurla.GetChangePayload{ChangeID: "chg"})
+		require.NoError(t, err)
+		assert.Nil(t, read.Approval, "a fresh read checks the changed target")
+	})
+
 	t.Run("a revision minted while the report loads is not approved", func(t *testing.T) {
 		cp, target, card := setup(t)
 		target.loading = make(chan struct{})
@@ -1090,6 +1220,10 @@ type promotionTargetStub struct {
 	loadErr error
 	// inputsErr, when set, is returned by CurrentInputs.
 	inputsErr error
+	// inputsReading, when set, is closed when CurrentInputs starts.
+	inputsReading chan struct{}
+	// inputsRelease, when set, is waited on before CurrentInputs returns.
+	inputsRelease chan struct{}
 }
 
 // LoadReport returns s.report, or s.loadErr when set, after the optional
@@ -1105,12 +1239,23 @@ func (s *promotionTargetStub) LoadReport(context.Context, string) (verify.Report
 	return s.report, nil
 }
 
-// CurrentInputs returns s.inputs, or s.inputsErr when set.
+// CurrentInputs returns s.inputs, or s.inputsErr when set. When
+// inputsReading is set, the first call closes it and waits on inputsRelease.
+// The snapshot is taken when the call starts, so a test that changes
+// s.inputs while the call is held models a target that changed after it was
+// measured.
 func (s *promotionTargetStub) CurrentInputs(context.Context, string) (PromotionInputs, error) {
-	if s.inputsErr != nil {
-		return PromotionInputs{}, s.inputsErr
+	inputs, err := s.inputs, s.inputsErr
+	if s.inputsReading != nil {
+		reading, release := s.inputsReading, s.inputsRelease
+		s.inputsReading, s.inputsRelease = nil, nil
+		close(reading)
+		<-release
 	}
-	return s.inputs, nil
+	if err != nil {
+		return PromotionInputs{}, err
+	}
+	return inputs, nil
 }
 
 // passingReport assembles a report in which both declared scenarios passed

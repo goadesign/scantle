@@ -63,7 +63,7 @@ var UICompositionItem = Type("UICompositionItem", func() {
 // ApprovalItem records a passed CP5 promotion check for one Change Card
 // revision.
 var ApprovalItem = Type("ApprovalItem", func() {
-	Description("Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision.")
+	Description("Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted: the exact candidate commit, suite, environment and binary digests it checked. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision. get_change and confirm_intent return it only while the promotion target's current suite, environment and binary digests still equal the ones it records, so a returned approval was current when that response was made, not afterwards.")
 	Attribute("approved_by", String, "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.")
 	Attribute("report_digest", String, "SHA-256 digest of the approved CP4 verification report.")
 	Attribute("candidate_commit", String, "Candidate commit the report was checked against.")
@@ -91,7 +91,7 @@ var ChangeCardResult = Type("ChangeCardResult", func() {
 	Attribute("confirmed_by", String, "Authenticated principal that confirmed the Change Card.")
 	Attribute("request_revision", String, "SHA-256 digest of the canonical versioned Change Card.")
 	Attribute("ui_composition", UICompositionItem, "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.")
-	Attribute("approval", ApprovalItem, "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.")
+	Attribute("approval", ApprovalItem, "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.")
 	Required("change_id", "status", "prompt", "summary", "examples", "preserved_behaviors", "request_revision")
 })
 
@@ -393,7 +393,7 @@ var _ = Service("surla", func() {
 	})
 
 	Method("confirm_intent", func() {
-		Description("Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.")
+		Description("Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is, with its approval only while that approval still matches the promotion target's current inputs. The call fails when the card has an approval and the promotion target cannot report its current inputs.")
 		Payload(ConfirmIntentPayload)
 		Result(ChangeCardResult)
 		Tool("confirm_intent", "Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision.", func() {
@@ -406,7 +406,7 @@ var _ = Service("surla", func() {
 	})
 
 	Method("get_change", func() {
-		Description("Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.")
+		Description("Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card. A recorded approval is included only while it still matches the promotion target's current suite, environment and binary digests; the call fails when the card has an approval and the target cannot report them.")
 		Payload(GetChangePayload)
 		Result(ChangeCardResult)
 		Tool("get_change", "Read the current Checkpoint 1 Change Card and its request_revision.", func() {

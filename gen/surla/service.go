@@ -34,11 +34,16 @@ type Service interface {
 	// Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity
 	// answers and example table, bound to its current request_revision. Changed
 	// answers or examples produce a new request_revision; unchanged ones return
-	// the card as it is.
+	// the card as it is, with its approval only while that approval still matches
+	// the promotion target's current inputs. The call fails when the card has an
+	// approval and the promotion target cannot report its current inputs.
 	ConfirmIntent(context.Context, *ConfirmIntentPayload) (res *ChangeCardResult, err error)
 	// Return the current Change Card, including its request_revision, to its
 	// owner, for example after confirm_intent refused an edit made against an
-	// older revision. Reading never confirms or changes the card.
+	// older revision. Reading never confirms or changes the card. A recorded
+	// approval is included only while it still matches the promotion target's
+	// current suite, environment and binary digests; the call fails when the card
+	// has an approval and the target cannot report them.
 	GetChange(context.Context, *GetChangePayload) (res *ChangeCardResult, err error)
 	// Extract and validate the Checkpoint 2 C4 container topology, tool contracts,
 	// Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa
@@ -108,10 +113,14 @@ type AmbiguityQuestion struct {
 }
 
 // Checkpoint 5 approval recorded by approve_merge after the evaluator-written
-// verification report passed and matched the change being promoted. It is held
-// only in the running control plane's memory, merges and deploys nothing, is
-// replaced by the next successful approve_merge for the same revision, and is
-// dropped when confirm_intent mints a new request_revision.
+// verification report passed and matched the change being promoted: the exact
+// candidate commit, suite, environment and binary digests it checked. It is
+// held only in the running control plane's memory, merges and deploys nothing,
+// is replaced by the next successful approve_merge for the same revision, and
+// is dropped when confirm_intent mints a new request_revision. get_change and
+// confirm_intent return it only while the promotion target's current suite,
+// environment and binary digests still equal the ones it records, so a
+// returned approval was current when that response was made, not afterwards.
 type ApprovalItem struct {
 	// Authenticated bearer principal that owns the card and called approve_merge.
 	// Bearer authentication does not prove that a human, rather than a coding
@@ -234,8 +243,11 @@ type ChangeCardResult struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *UICompositionItem
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *ApprovalItem
 }
 
@@ -892,8 +904,11 @@ type jsonChangeCardResultTransport struct {
 	// one. A confirm_intent that changes answers or examples returns the new
 	// revision without it.
 	UIComposition *jsonUICompositionItemTransport `json:"ui_composition,omitempty"`
-	// Checkpoint 5 approval of this revision, once approve_merge succeeded. It is
-	// never hashed into request_revision.
+	// Checkpoint 5 approval of this revision, present only while it matches the
+	// promotion target's current inputs. It is absent before approve_merge
+	// succeeds and whenever the target's suite, environment or binary digests have
+	// changed since; it comes back if they match again. It is never hashed into
+	// request_revision.
 	Approval *jsonApprovalItemTransport `json:"approval,omitempty"`
 }
 
@@ -6218,7 +6233,7 @@ func validateChangeCardResultJSONValue(path string, value any, description strin
 		case "approval":
 			if err := validateApprovalItemJSONValue(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Checkpoint 5 approval of this revision, once approve_merge succeeded. It is never hashed into request_revision.",
+				typed[key], "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.",
 			); err != nil {
 				return err
 			}

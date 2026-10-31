@@ -10,10 +10,13 @@
 // view returned to builders.
 //
 // Precondition: the candidate's prompts and configuration are fixed by its
-// binaries and by the flags the evaluator suite passes. A candidate that loads
-// prompt overrides at runtime (a goa-ai prompt.Store) is not yet covered; the
-// prompt references its model calls actually used will be recorded once the
-// evaluator owns the model gateway.
+// binaries, whose digests the report binds, and by what the trusted evaluator
+// suite applies when it launches them. A report says nothing about prompt
+// overrides a running target loads at runtime (a goa-ai prompt.Store): a
+// promotion target with such overrides active must refuse to report its
+// current inputs. The prompt references a candidate attaches to its model
+// requests are the candidate's own claims; an evaluator can use them to
+// corroborate what it applied, never to establish it.
 package verify
 
 import (

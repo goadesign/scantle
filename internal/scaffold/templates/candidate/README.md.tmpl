@@ -21,7 +21,9 @@ evaluator suite that `surla verify` can run against it.
   `[[.Name]]` binary in Surla's sandbox, serves a scripted model (not an LLM)
   through its own model gateway, asks "How much is tea?" and "How much is
   coffee?", and checks both the answer and that the agent called
-  `lookup_price` and answered from that call's result.
+  `lookup_price` and answered from that call's result. After changing
+  `eval/design/`, regenerate its code with
+  `(cd eval && goa gen [[.Module]]/eval/design)`.
 
 The evaluator suite lives in this repository, so anyone who can read the code
 can read its scenarios. Its `holdout` tag only hides that scenario's details

@@ -18,7 +18,7 @@ paths:
             tags:
                 - surla
             summary: get_change surla
-            description: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card.
+            description: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card. A recorded approval is included only while it still matches the promotion target's current suite, environment and binary digests; the call fails when the card has an approval and the target cannot report them.
             operationId: surla#get_change
             parameters:
                 - name: change_id
@@ -79,7 +79,7 @@ paths:
             tags:
                 - surla
             summary: confirm_intent surla
-            description: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is.
+            description: Confirm or refine a Checkpoint 1 Change Card with the complete ambiguity answers and example table, bound to its current request_revision. Changed answers or examples produce a new request_revision; unchanged ones return the card as it is, with its approval only while that approval still matches the promotion target's current inputs. The call fails when the card has an approval and the promotion target cannot report its current inputs.
             operationId: surla#confirm_intent
             parameters:
                 - name: confirm_intent_request_body
@@ -396,7 +396,7 @@ definitions:
                 type: string
                 description: Evaluator suite the promotion target requires.
                 example: Accusantium quae ducimus.
-        description: Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision.
+        description: 'Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted: the exact candidate commit, suite, environment and binary digests it checked. It is held only in the running control plane''s memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision. get_change and confirm_intent return it only while the promotion target''s current suite, environment and binary digests still equal the ones it records, so a returned approval was current when that response was made, not afterwards.'
         example:
             approved_by: Quia fuga rem fugiat quasi.
             artifacts:
