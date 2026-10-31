@@ -31,14 +31,16 @@ func Run(cmd *exec.Cmd, sig syscall.Signal, grace, stopTimeout time.Duration) (r
 	cmd.WaitDelay = grace
 	runErr = cmd.Run()
 	if cmd.Process != nil {
-		stopErr = stop(cmd.Process.Pid, stopTimeout)
+		stopErr = Stop(cmd.Process.Pid, stopTimeout)
 	}
 	return runErr, stopErr
 }
 
-// stop kills every process remaining in the group led by pgid and waits, up to
-// timeout, until the group no longer exists.
-func stop(pgid int, timeout time.Duration) error {
+// Stop kills every process remaining in the group led by pgid and waits, up to
+// timeout, until the group no longer exists. A group that does not empty in
+// time is an error; the caller must then not release resources its remaining
+// processes may use.
+func Stop(pgid int, timeout time.Duration) error {
 	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return fmt.Errorf("kill process group %d: %w", pgid, err)
 	}
