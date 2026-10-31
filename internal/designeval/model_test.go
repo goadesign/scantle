@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"testing"
 
-	genscantleclient "github.com/goadesign/scantle/gen/http/scantle/client"
-	"github.com/goadesign/scantle/internal/testmodule"
+	gensurlaclient "github.com/goadesign/surla/gen/http/surla/client"
+	"github.com/goadesign/surla/internal/testmodule"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +47,7 @@ var _ = m.Design("Architecture", "Scoped relationships", func() {
 			apiCount := 0
 			componentID := ""
 			for _, node := range result.Containers {
-				require.NoError(t, genscantleclient.ValidateC4ContainerItemResponseBody(&genscantleclient.C4ContainerItemResponseBody{
+				require.NoError(t, gensurlaclient.ValidateC4ContainerItemResponseBody(&gensurlaclient.C4ContainerItemResponseBody{
 					ID:          &node.ID,
 					Name:        &node.Name,
 					Kind:        &node.Kind,

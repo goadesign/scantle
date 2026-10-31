@@ -1,7 +1,7 @@
 openapi: 3.2.0
 info:
     title: Orders reference platform
-    description: Refund assistant used as Scantle's reference target under test.
+    description: Refund assistant used as Surla's reference target under test.
     version: 0.0.1
 servers:
     - url: http://localhost:80

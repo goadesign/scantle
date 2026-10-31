@@ -1,6 +1,6 @@
 // Package swarm plans deterministic Chorus multi-agent role assignments,
 // capability- and cross-family model routing, and pinned collaboration
-// manifests for Scantle builds.
+// manifests for Surla builds.
 //
 // Chorus (`who`, `join`, `send`, `read`) owns real-time message routing,
 // channel subscriptions, and pinned channel manifests. This package owns the
@@ -18,7 +18,7 @@ import (
 )
 
 type (
-	// RoleKind identifies a specialized agent role in a Scantle build swarm.
+	// RoleKind identifies a specialized agent role in a Surla build swarm.
 	RoleKind string
 
 	// ProviderProfile describes one server-configured coding-agent model profile.
@@ -36,7 +36,7 @@ type (
 		Family string `json:"family"`
 		// Authenticated is true only when the server has verified usable credentials for this profile.
 		Authenticated bool `json:"authenticated"`
-		// Capabilities lists the Scantle swarm roles this profile can perform.
+		// Capabilities lists the Surla swarm roles this profile can perform.
 		Capabilities []RoleKind `json:"capabilities"`
 	}
 
@@ -50,7 +50,7 @@ type (
 		PreferredProfileID string `json:"preferred_profile_id,omitempty"`
 	}
 
-	// Request specifies the inputs for planning a Scantle build swarm roster.
+	// Request specifies the inputs for planning a Surla build swarm roster.
 	Request struct {
 		// ChangeID is the Change Card identifier being planned.
 		ChangeID string `json:"change_id"`
@@ -68,7 +68,7 @@ type (
 		EvalPaths []string `json:"eval_paths,omitempty"`
 	}
 
-	// Assignment describes one proposed agent role in the Scantle build swarm.
+	// Assignment describes one proposed agent role in the Surla build swarm.
 	Assignment struct {
 		// Handle is the deterministic Chorus agent handle (without leading '@', <= 32 chars).
 		Handle string `json:"handle"`
@@ -147,7 +147,7 @@ const (
 )
 
 var (
-	// requiredRoles is the canonical ordered list of roles every Scantle build requires.
+	// requiredRoles is the canonical ordered list of roles every Surla build requires.
 	requiredRoles = []RoleKind{
 		RoleArchitect,
 		RoleBuilder,
@@ -338,7 +338,7 @@ func FormatManifest(changeID, designDigest string, plan PlanResult) (string, err
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "[SCANTLE SWARM MANIFEST | change=%s | design=%s]\n", strings.TrimSpace(changeID), strings.TrimSpace(designDigest))
+	fmt.Fprintf(&b, "[SURLA SWARM MANIFEST | change=%s | design=%s]\n", strings.TrimSpace(changeID), strings.TrimSpace(designDigest))
 	fmt.Fprintf(
 		&b,
 		"Status: proposed/configured (cross_family_review=%t, cross_family_eval=%t, single_family=%t)\n",

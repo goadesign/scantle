@@ -3,7 +3,7 @@
 // orders HTTP server encoders and decoders
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package server
 
@@ -15,7 +15,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	orders "github.com/goadesign/scantle/examples/orders/gen/orders"
+	orders "github.com/goadesign/surla/examples/orders/gen/orders"
 	goahttp "goa.design/goa/v3/http"
 	goa "goa.design/goa/v3/pkg"
 )

@@ -3,12 +3,12 @@
 // orders used tool helpers
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package orders
 
 import (
-	ordersspecs "github.com/goadesign/scantle/examples/orders/gen/orders/toolsets/orders"
+	ordersspecs "github.com/goadesign/surla/examples/orders/gen/orders/toolsets/orders"
 	planner "goa.design/goa-ai/runtime/agent/planner"
 	tools "goa.design/goa-ai/runtime/agent/tools"
 )

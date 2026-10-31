@@ -1,5 +1,5 @@
-// Package main implements the Scantle Checkpoint Studio MCP Apps guest bridge,
-// coordinating the two-region layout (#scantle-cp1-editor and #scantle-result-view),
+// Package main implements the Surla Checkpoint Studio MCP Apps guest bridge,
+// coordinating the two-region layout (#surla-cp1-editor and #surla-result-view),
 // JSON-RPC 2.0 host lifecycle notifications, theme synchronization, and
 // synchronous React 19 rendering.
 
@@ -130,9 +130,9 @@ function applyHostTheme(candidate: unknown) {
 // bootstrapCheckpointApp mounts the two-region Checkpoint Studio inside the
 // MCP Apps host document and registers the window postMessage bridge.
 export function bootstrapCheckpointApp() {
-  const rawRootEl = document.getElementById("scantle-checkpoint-root");
-  const rawStatusEl = document.getElementById("scantle-checkpoint-status");
-  const viewEl = document.getElementById("scantle-checkpoint-view");
+  const rawRootEl = document.getElementById("surla-checkpoint-root");
+  const rawStatusEl = document.getElementById("surla-checkpoint-status");
+  const viewEl = document.getElementById("surla-checkpoint-view");
   if (!rawRootEl || !rawStatusEl || !viewEl) {
     return;
   }
@@ -140,9 +140,9 @@ export function bootstrapCheckpointApp() {
   const statusEl: HTMLElement = rawStatusEl;
 
   const editorRegionEl = document.createElement("div");
-  editorRegionEl.setAttribute("id", "scantle-cp1-editor");
+  editorRegionEl.setAttribute("id", "surla-cp1-editor");
   const resultRegionEl = document.createElement("div");
-  resultRegionEl.setAttribute("id", "scantle-result-view");
+  resultRegionEl.setAttribute("id", "surla-result-view");
   while (viewEl.firstChild) {
     viewEl.removeChild(viewEl.firstChild);
   }
@@ -321,11 +321,11 @@ export function bootstrapCheckpointApp() {
         res.reason.length > 0
           ? "Tool call was cancelled (" +
             res.reason +
-            "). Re-run the Scantle checkpoint tool to inspect a fresh result."
-          : "Tool call was cancelled before completion. Re-run the Scantle checkpoint tool to inspect a fresh result.";
+            "). Re-run the Surla checkpoint tool to inspect a fresh result."
+          : "Tool call was cancelled before completion. Re-run the Surla checkpoint tool to inspect a fresh result.";
       flushSync(() => {
         resultRoot.render(
-          <Card className="scantle-meta" role="status">
+          <Card className="surla-meta" role="status">
             <strong>Cancelled: </strong>
             {detail}
           </Card>
@@ -596,7 +596,7 @@ export function bootstrapCheckpointApp() {
       statusEl.textContent = "Showing Fast Draft prompt and rule update.";
       return;
     }
-    renderError("Unsupported or malformed Scantle checkpoint payload.");
+    renderError("Unsupported or malformed Surla checkpoint payload.");
   }
 
   function handleMessage(event: MessageEvent) {
@@ -765,7 +765,7 @@ export function bootstrapCheckpointApp() {
         method: "ui/initialize",
         params: {
           protocolVersion: PROTOCOL_VERSION,
-          appInfo: { name: "scantle-checkpoint", version: "1.0.0" },
+          appInfo: { name: "surla-checkpoint", version: "1.0.0" },
           appCapabilities: {},
         },
       },

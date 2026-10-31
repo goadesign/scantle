@@ -1,4 +1,4 @@
-// Package design defines the Goa and Goa-AI MCP contract for the Scantle
+// Package design defines the Goa and Goa-AI MCP contract for the Surla
 // software factory control plane.
 package design
 
@@ -7,8 +7,8 @@ import (
 	. "goa.design/goa/v3/dsl"
 )
 
-var _ = API("scantle", func() {
-	Title("Scantle MCP Software Factory Control Plane")
+var _ = API("surla", func() {
+	Title("Surla MCP Software Factory Control Plane")
 	Description("MCP-native control plane for creating, verifying, and evolving production Goa-AI agentic platforms.")
 	Version("1.0.0")
 })
@@ -55,7 +55,7 @@ var GetChangePayload = Type("GetChangePayload", func() {
 // Change Card revision.
 var UICompositionItem = Type("UICompositionItem", func() {
 	Description("Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.")
-	Attribute("program", String, "OpenUI Lang program composed by the CP1 model from the Scantle decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.")
+	Attribute("program", String, "OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.")
 	Attribute("composed_for_revision", String, "request_revision of the Change Card this program was composed for.")
 	Required("program", "composed_for_revision")
 })
@@ -184,7 +184,7 @@ var BuilderScopeItem = Type("BuilderScopeItem", func() {
 	Required("name", "paths")
 })
 
-// SwarmRoleItem describes one proposed agent role assignment in a Scantle build swarm.
+// SwarmRoleItem describes one proposed agent role assignment in a Surla build swarm.
 var SwarmRoleItem = Type("SwarmRoleItem", func() {
 	Description("Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.")
 	Attribute("handle", String, "Deterministic Chorus agent handle (without leading '@', at most 32 characters).")
@@ -321,18 +321,18 @@ var DiffResult = Type("DiffResult", func() {
 	Required("has_changes", "added_declarations", "removed_declarations", "modified_declarations", "version_deltas", "summary")
 })
 
-var _ = Service("scantle", func() {
-	Description("Scantle MCP software factory control plane.")
+var _ = Service("surla", func() {
+	Description("Surla MCP software factory control plane.")
 
-	MCP("scantle", "1.0.0")
+	MCP("surla", "1.0.0")
 	JSONRPC(func() {
 		POST("/mcp")
 	})
 
 	Method("checkpoint_ui", func() {
-		Description("Serve the interactive MCP Apps HTML host for Scantle checkpoints.")
+		Description("Serve the interactive MCP Apps HTML host for Surla checkpoints.")
 		Result(String)
-		Resource("checkpoint_ui", "ui://scantle/checkpoint", "text/html;profile=mcp-app")
+		Resource("checkpoint_ui", "ui://surla/checkpoint", "text/html;profile=mcp-app")
 		HTTP(func() {
 			GET("/ui/checkpoint")
 			Response(StatusOK)
@@ -340,9 +340,9 @@ var _ = Service("scantle", func() {
 	})
 
 	Method("golden_path", func() {
-		Description("Serve the Scantle Golden Path architecture playbook for Goa-AI agentic platforms.")
+		Description("Serve the Surla Golden Path architecture playbook for Goa-AI agentic platforms.")
 		Result(String)
-		Resource("golden_path", "scantle://golden-path", "text/markdown")
+		Resource("golden_path", "surla://golden-path", "text/markdown")
 		HTTP(func() {
 			GET("/golden-path")
 			Response(StatusOK)
@@ -354,7 +354,7 @@ var _ = Service("scantle", func() {
 		Payload(ProposeChangePayload)
 		Result(ChangeCardResult)
 		Tool("propose_change", "Propose a feature change and generate a Checkpoint 1 Change Card.", func() {
-			ToolUI("ui://scantle/checkpoint")
+			ToolUI("ui://surla/checkpoint")
 		})
 		HTTP(func() {
 			POST("/changes/propose")
@@ -367,7 +367,7 @@ var _ = Service("scantle", func() {
 		Payload(ConfirmIntentPayload)
 		Result(ChangeCardResult)
 		Tool("confirm_intent", "Confirm or refine Checkpoint 1 ambiguity answers and example checks for the card's current request_revision.", func() {
-			ToolUI("ui://scantle/checkpoint")
+			ToolUI("ui://surla/checkpoint")
 		})
 		HTTP(func() {
 			POST("/changes/confirm")
@@ -380,7 +380,7 @@ var _ = Service("scantle", func() {
 		Payload(GetChangePayload)
 		Result(ChangeCardResult)
 		Tool("get_change", "Read the current Checkpoint 1 Change Card and its request_revision.", func() {
-			ToolUI("ui://scantle/checkpoint")
+			ToolUI("ui://surla/checkpoint")
 		})
 		HTTP(func() {
 			GET("/changes/{change_id}")
@@ -393,7 +393,7 @@ var _ = Service("scantle", func() {
 		Payload(PreviewArchitecturePayload)
 		Result(ArchitecturePreviewResult)
 		Tool("preview_architecture", "Preview Checkpoint 2 C4 container topology, Goa-AI guardrails, and proposed Chorus swarm roster for a confirmed Change Card.", func() {
-			ToolUI("ui://scantle/checkpoint")
+			ToolUI("ui://surla/checkpoint")
 		})
 		HTTP(func() {
 			POST("/changes/preview")
@@ -406,7 +406,7 @@ var _ = Service("scantle", func() {
 		Payload(DraftOverridePayload)
 		Result(DraftOverrideResult)
 		Tool("draft_override", "Hot-reload a prompt template in 0s or flag a compiled business rule change.", func() {
-			ToolUI("ui://scantle/checkpoint")
+			ToolUI("ui://surla/checkpoint")
 		})
 		HTTP(func() {
 			POST("/sandbox/draft")
@@ -419,7 +419,7 @@ var _ = Service("scantle", func() {
 		Payload(DiffPayload)
 		Result(DiffResult)
 		Tool("diff", "Compute structural Goa design and go.mod dependency diffs.", func() {
-			ToolUI("ui://scantle/checkpoint")
+			ToolUI("ui://surla/checkpoint")
 		})
 		HTTP(func() {
 			POST("/diff")

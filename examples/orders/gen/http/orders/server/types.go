@@ -3,14 +3,14 @@
 // orders HTTP server types
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package server
 
 import (
 	"unicode/utf8"
 
-	orders "github.com/goadesign/scantle/examples/orders/gen/orders"
+	orders "github.com/goadesign/surla/examples/orders/gen/orders"
 	goa "goa.design/goa/v3/pkg"
 )
 

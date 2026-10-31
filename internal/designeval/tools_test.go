@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	genscantle "github.com/goadesign/scantle/gen/scantle"
-	"github.com/goadesign/scantle/internal/testmodule"
+	gensurla "github.com/goadesign/surla/gen/surla"
+	"github.com/goadesign/surla/internal/testmodule"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -87,7 +87,7 @@ var _ = Service("reader", func() {
 			assert.NotContains(t, *card.InputBinding.TextOnlyArgsSchema, `"scope"`)
 			assert.NotContains(t, *card.InputBinding.TextOnlyArgsSchema, `"render"`)
 		}
-		encoded, err := genscantle.EncodeToolContractItem(card)
+		encoded, err := gensurla.EncodeToolContractItem(card)
 		require.NoError(t, err)
 		assert.NotEmpty(t, encoded)
 	}

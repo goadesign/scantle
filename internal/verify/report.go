@@ -1,4 +1,4 @@
-// Package verify turns an evaluator suite's eval.Report into Scantle's CP4
+// Package verify turns an evaluator suite's eval.Report into Surla's CP4
 // verification report and checks, at CP5, that the report still describes the
 // change being promoted.
 //

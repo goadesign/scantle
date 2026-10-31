@@ -2,7 +2,7 @@
 // playbook (`GOLDEN_PATH.md`) for building multi-service agentic platforms on
 // the Goa Design suite (goa, goa-ai, pulse, clue, model, and chorus).
 //
-// Scantle serves the embedded playbook at the `scantle://golden-path` MCP
+// Surla serves the embedded playbook at the `surla://golden-path` MCP
 // resource and injects it into Checkpoint 1 (`CP1`) analysis so the architect
 // agent decomposes requirements along clean trust, transport, inference, and
 // state-ownership boundaries.
@@ -14,7 +14,7 @@ import (
 
 const (
 	// ResourceURI is the canonical MCP resource URI serving the Golden Path playbook.
-	ResourceURI = "scantle://golden-path"
+	ResourceURI = "surla://golden-path"
 
 	// cp1InstructionHeader precedes the embedded Golden Path Markdown in the
 	// CP1 architect system prompt.
@@ -31,7 +31,7 @@ const (
 var playbookMarkdown string
 
 // PlaybookMarkdown returns the embedded Golden Path architecture playbook
-// Markdown served by the `scantle://golden-path` MCP resource.
+// Markdown served by the `surla://golden-path` MCP resource.
 func PlaybookMarkdown() string {
 	return playbookMarkdown
 }

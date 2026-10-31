@@ -1,4 +1,4 @@
-module github.com/goadesign/scantle
+module github.com/goadesign/surla
 
 go 1.27.3
 

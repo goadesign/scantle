@@ -6,7 +6,7 @@ import (
 
 // The C4 model of the orders platform: who uses it, which processes it runs,
 // what each one owns, and which external systems it calls. goa gen renders it
-// to gen/structurizr/model.json, and Scantle's architecture preview shows it
+// to gen/structurizr/model.json, and Surla's architecture preview shows it
 // as the platform's containers and their connections.
 var _ = m.Design("Orders platform", "Refund assistant for a merchant's customers.", func() {
 	m.Person("Customer", "Shopper asking for a refund on their own orders.", func() {

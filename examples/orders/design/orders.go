@@ -1,4 +1,4 @@
-// Package design declares the reference orders platform that Scantle builds
+// Package design declares the reference orders platform that Surla builds
 // and verifies: a refund agent over a commerce system and a payment provider.
 package design
 
@@ -17,7 +17,7 @@ var JWTAuth = JWTSecurity("jwt", func() {
 
 var _ = API("orders", func() {
 	Title("Orders reference platform")
-	Description("Refund assistant used as Scantle's reference target under test.")
+	Description("Refund assistant used as Surla's reference target under test.")
 })
 
 // orderTools are the tools the refund agent can call. Tenant and customer

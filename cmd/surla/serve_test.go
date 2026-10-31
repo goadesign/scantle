@@ -1,0 +1,272 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync/atomic"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"goa.design/goa-ai/features/model/gateway"
+	"goa.design/goa-ai/runtime/agent/model"
+	"google.golang.org/grpc"
+
+	"github.com/goadesign/surla/internal/controlplane"
+	"github.com/goadesign/surla/internal/swarm"
+)
+
+// scriptedCP1Provider is a model.Provider served by a local model gateway in
+// tests. It answers every Complete call with one fixed CP1 analysis and
+// records the output allowance the gateway forwarded.
+type scriptedCP1Provider struct {
+	// analysis is the JSON CP1 analysis returned as assistant text.
+	analysis string
+	// maxTokens is the MaxTokens of the last request the gateway delivered.
+	maxTokens atomic.Int64
+}
+
+func TestNewCP1AnalyzerSelectsModelFromFlags(t *testing.T) {
+	env := map[string]string{
+		"ANTHROPIC_API_KEY": "test-anthropic-key",
+		"OPENAI_API_KEY":    "test-openai-key",
+	}
+	cases := []struct {
+		name         string
+		cfg          serveConfig
+		env          map[string]string
+		wantAnalyzer bool
+		wantErr      string
+	}{
+		{name: "no model flags leaves CP1 unconfigured", cfg: serveConfig{}, env: env},
+		{name: "gateway", cfg: serveConfig{gatewayAddr: "127.0.0.1:9090"}, env: env, wantAnalyzer: true},
+		{name: "anthropic", cfg: serveConfig{provider: "anthropic", modelName: "claude-test"}, env: env, wantAnalyzer: true},
+		{name: "openai", cfg: serveConfig{provider: "openai", modelName: "gpt-test"}, env: env, wantAnalyzer: true},
+		{
+			name:    "gateway with model name",
+			cfg:     serveConfig{gatewayAddr: "127.0.0.1:9090", modelName: "claude-test"},
+			env:     env,
+			wantErr: "-model-gateway-addr cannot be combined",
+		},
+		{
+			name:    "gateway with provider",
+			cfg:     serveConfig{gatewayAddr: "127.0.0.1:9090", provider: "anthropic"},
+			env:     env,
+			wantErr: "-model-gateway-addr cannot be combined",
+		},
+		{name: "provider without model", cfg: serveConfig{provider: "anthropic"}, env: env, wantErr: "must be set together"},
+		{name: "model without provider", cfg: serveConfig{modelName: "claude-test"}, env: env, wantErr: "must be set together"},
+		{
+			name:    "unknown provider",
+			cfg:     serveConfig{provider: "Anthropic", modelName: "claude-test"},
+			env:     env,
+			wantErr: `unsupported -model-provider "Anthropic"`,
+		},
+		{
+			name:    "missing api key",
+			cfg:     serveConfig{provider: "openai", modelName: "gpt-test"},
+			env:     map[string]string{"ANTHROPIC_API_KEY": "test-anthropic-key"},
+			wantErr: "-model-provider openai requires OPENAI_API_KEY",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			analyzer, closeModel, err := newCP1Analyzer(tc.cfg, func(k string) string { return tc.env[k] })
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.NotContains(t, err.Error(), "test-anthropic-key")
+				assert.NotContains(t, err.Error(), "test-openai-key")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantAnalyzer, analyzer != nil)
+			assert.NoError(t, closeModel())
+		})
+	}
+}
+
+func TestLoadSwarmProfilesDecodesStrictly(t *testing.T) {
+	cases := []struct {
+		name    string
+		content string
+		want    []swarm.ProviderProfile
+		wantErr string
+	}{
+		{
+			name: "valid profiles",
+			content: `[{"id":"claude-a","provider":"anthropic","model":"model-a","family":"claude",` +
+				`"authenticated":true,"capabilities":["architect","builder"]}]`,
+			want: []swarm.ProviderProfile{{
+				ID:            "claude-a",
+				Provider:      "anthropic",
+				Model:         "model-a",
+				Family:        "claude",
+				Authenticated: true,
+				Capabilities:  []swarm.RoleKind{swarm.RoleArchitect, swarm.RoleBuilder},
+			}},
+		},
+		{name: "unknown field", content: `[{"id":"a","api_key":"x"}]`, wantErr: `unknown field "api_key"`},
+		{name: "trailing data", content: `[] []`, wantErr: "trailing data"},
+		{name: "empty array", content: `[]`, want: []swarm.ProviderProfile{}},
+		{name: "not an array", content: `{"id":"a"}`, wantErr: "decode -swarm-profiles"},
+		{name: "null", content: `null`, wantErr: "expected a JSON array, got null"},
+		{
+			name: "duplicate id",
+			content: `[{"id":"a","provider":"openai","model":"m","family":"gpt"},` +
+				`{"id":"a","provider":"anthropic","model":"n","family":"claude"}]`,
+			wantErr: `duplicate provider profile id "a"`,
+		},
+		{name: "empty required field", content: `[{"id":"a","provider":"openai","family":"gpt"}]`, wantErr: "requires non-empty"},
+		{
+			name:    "unknown capability",
+			content: `[{"id":"a","provider":"openai","model":"m","family":"gpt","capabilities":["deployer"]}]`,
+			wantErr: `unsupported capability "deployer"`,
+		},
+		{
+			name:    "valid profiles without builder capability",
+			content: `[{"id":"a","provider":"openai","model":"m","family":"gpt","capabilities":["reviewer"]}]`,
+			want: []swarm.ProviderProfile{{
+				ID: "a", Provider: "openai", Model: "m", Family: "gpt",
+				Capabilities: []swarm.RoleKind{swarm.RoleReviewer},
+			}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "profiles.json")
+			require.NoError(t, os.WriteFile(path, []byte(tc.content), 0o600))
+			got, err := loadSwarmProfiles(path)
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestServeOptionsWiresAnalyzerAndProfiles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "profiles.json")
+	require.NoError(t, os.WriteFile(path, []byte(`[{"id":"a","provider":"openai","model":"m","family":"gpt"}]`), 0o600))
+
+	opts, closeModel, err := serveOptions(
+		serveConfig{provider: "openai", modelName: "gpt-test", swarmProfilesPath: path},
+		func(string) string { return "test-key" },
+	)
+	require.NoError(t, err)
+	assert.NotNil(t, opts.Analyzer)
+	assert.Equal(t, []swarm.ProviderProfile{{ID: "a", Provider: "openai", Model: "m", Family: "gpt"}}, opts.SwarmProfiles)
+	assert.Nil(t, opts.TargetUpdater)
+	assert.NoError(t, closeModel())
+
+	opts, closeModel, err = serveOptions(serveConfig{}, func(string) string { return "" })
+	require.NoError(t, err)
+	assert.Nil(t, opts.Analyzer)
+	assert.Nil(t, opts.SwarmProfiles)
+	assert.NoError(t, closeModel())
+
+	_, _, err = serveOptions(serveConfig{swarmProfilesPath: filepath.Join(t.TempDir(), "missing.json")}, os.Getenv)
+	require.ErrorContains(t, err, "read -swarm-profiles")
+}
+
+// TestServeGatewayModeAnswersProposeChangeOverHTTP drives the path that used
+// to fail: serve options built with -model-gateway-addr, a real gRPC model
+// gateway, and an authenticated HTTP propose_change call. A clear request
+// (no open questions) comes back confirmed with code-owned check IDs and a
+// SHA-256 request revision, and the CP1 output allowance reaches the provider.
+func TestServeGatewayModeAnswersProposeChangeOverHTTP(t *testing.T) {
+	analysis, err := json.Marshal(controlplane.CP1SemanticAnalysis{
+		Summary:     "Give VIP customers instant store credit up to $150.",
+		Ambiguities: []controlplane.CP1ModelAmbiguity{},
+		Examples: []controlplane.CP1ModelExample{{
+			Scenario:         "VIP refund under the limit",
+			InputSummary:     "VIP customer, $120.00 total",
+			ExpectedOutcome:  "Instant store credit, no manager approval",
+			VerificationKind: "deterministic",
+		}},
+		PreservedBehaviors: []string{"Non-VIP refunds over $50.00 still wait for a manager."},
+	})
+	require.NoError(t, err)
+	provider := &scriptedCP1Provider{analysis: string(analysis)}
+	gatewayAddr := startModelGateway(t, provider)
+
+	opts, closeModel, err := serveOptions(serveConfig{gatewayAddr: gatewayAddr}, func(string) string { return "" })
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, closeModel()) })
+	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{
+		"test-token": {ID: "operator@example.com"},
+	})
+	srv := httptest.NewServer(controlplane.NewHTTPHandler(controlplane.New(opts), auth))
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodPost, srv.URL+"/changes/propose",
+		strings.NewReader(`{"change_id":"vip-refunds","prompt":"VIP customers get instant store credit up to $150."}`))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var card struct {
+		Status          string  `json:"status"`
+		ConfirmedBy     *string `json:"confirmed_by"`
+		RequestRevision string  `json:"request_revision"`
+		Examples        []struct {
+			ID string `json:"id"`
+		} `json:"examples"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&card))
+	assert.Equal(t, controlplane.StatusConfirmed, card.Status)
+	require.NotNil(t, card.ConfirmedBy)
+	assert.Equal(t, "operator@example.com", *card.ConfirmedBy)
+	require.Len(t, card.Examples, 1)
+	assert.Equal(t, "vip-refunds-check-01", card.Examples[0].ID)
+	assert.Regexp(t, regexp.MustCompile(`^[0-9a-f]{64}$`), card.RequestRevision)
+	assert.EqualValues(t, 6144, provider.maxTokens.Load(), "CP1 output allowance must reach the provider through the gateway")
+}
+
+// Complete returns the scripted CP1 analysis as assistant text.
+func (p *scriptedCP1Provider) Complete(_ context.Context, req *model.Request) (*model.Response, error) {
+	p.maxTokens.Store(int64(req.MaxTokens))
+	return &model.Response{
+		Content: []model.Message{{
+			Role:  model.ConversationRoleAssistant,
+			Parts: []model.Part{model.TextPart{Text: p.analysis}},
+		}},
+		StopReason: "stop",
+	}, nil
+}
+
+// Stream is unused because the CP1 analyzer only calls Complete.
+func (p *scriptedCP1Provider) Stream(_ context.Context, _ *model.Request) (model.Streamer, error) {
+	return nil, errors.New("streaming not used by CP1 analyzer")
+}
+
+// startModelGateway serves provider through a Goa-AI model gateway on a
+// loopback gRPC listener and returns its address. The server stops when the
+// test ends.
+func startModelGateway(t *testing.T, provider model.Provider) string {
+	t.Helper()
+	gw, err := gateway.NewServer(gateway.WithProvider(provider))
+	require.NoError(t, err)
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	grpcSrv := grpc.NewServer()
+	gateway.RegisterGRPCServer(grpcSrv, gw)
+	go func() { assert.NoError(t, grpcSrv.Serve(lis)) }()
+	t.Cleanup(grpcSrv.Stop)
+	return lis.Addr().String()
+}

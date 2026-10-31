@@ -3,7 +3,7 @@
 // orders tool codecs
 //
 // Command:
-// $ goa gen github.com/goadesign/scantle/examples/orders/design
+// $ goa gen github.com/goadesign/surla/examples/orders/design
 
 package orders
 
@@ -17,7 +17,7 @@ import (
 	"strings"
 	utf8 "unicode/utf8"
 
-	toolhttp "github.com/goadesign/scantle/examples/orders/gen/orders/toolsets/orders/http"
+	toolhttp "github.com/goadesign/surla/examples/orders/gen/orders/toolsets/orders/http"
 	tools "goa.design/goa-ai/runtime/agent/tools"
 	goa "goa.design/goa/v3/pkg"
 )

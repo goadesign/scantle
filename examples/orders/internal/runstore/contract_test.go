@@ -14,7 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/goadesign/scantle/examples/orders/internal/runstore"
+	"github.com/goadesign/surla/examples/orders/internal/runstore"
 	genregistry "goa.design/goa-ai/registry/gen/registry"
 	genrunterminal "goa.design/goa-ai/registry/gen/runterminal"
 	"goa.design/goa-ai/runtime/agent/runlog"

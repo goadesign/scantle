@@ -23,19 +23,19 @@ func Snapshot(t testing.TB, goaVersion, design string) map[string]string {
 }
 
 // Module returns the files of a tidy module at modulePath holding files. It
-// requires goa.design/goa/v3 at goaVersion (Scantle's own version when empty)
-// and goa.design/goa-ai and goa.design/model at Scantle's versions; go mod
+// requires goa.design/goa/v3 at goaVersion (Surla's own version when empty)
+// and goa.design/goa-ai and goa.design/model at Surla's versions; go mod
 // tidy drops the ones the files do not import and completes go.mod and go.sum.
 func Module(t testing.TB, modulePath, goaVersion string, files map[string]string) map[string]string {
 	t.Helper()
 	if goaVersion == "" {
-		goaVersion = ScantleVersion(t, "goa.design/goa/v3")
+		goaVersion = SurlaVersion(t, "goa.design/goa/v3")
 	}
 	out := maps.Clone(files)
 	out["go.mod"] = "module " + modulePath + "\n\ngo 1.24\n\nrequire (\n" +
 		"\tgoa.design/goa/v3 " + goaVersion + "\n" +
-		"\tgoa.design/goa-ai " + ScantleVersion(t, "goa.design/goa-ai") + "\n" +
-		"\tgoa.design/model " + ScantleVersion(t, "goa.design/model") + "\n)\n"
+		"\tgoa.design/goa-ai " + SurlaVersion(t, "goa.design/goa-ai") + "\n" +
+		"\tgoa.design/model " + SurlaVersion(t, "goa.design/model") + "\n)\n"
 	return Tidy(t, out)
 }
 
@@ -71,8 +71,8 @@ func Tidy(t testing.TB, files map[string]string) map[string]string {
 	return out
 }
 
-// ScantleVersion returns the version Scantle's own go.mod requires of path.
-func ScantleVersion(t testing.TB, path string) string {
+// SurlaVersion returns the version Surla's own go.mod requires of path.
+func SurlaVersion(t testing.TB, path string) string {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
 	root := filepath.Join(filepath.Dir(file), "..", "..")
@@ -89,7 +89,7 @@ func ScantleVersion(t testing.TB, path string) string {
 			return r.Mod.Version
 		}
 	}
-	t.Fatalf("Scantle's go.mod does not require %s", path)
+	t.Fatalf("Surla's go.mod does not require %s", path)
 	return ""
 }
 
