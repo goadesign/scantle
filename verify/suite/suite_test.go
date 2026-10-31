@@ -88,6 +88,12 @@ func testCommand(failing bool) Command {
 		Environment:    "sim",
 		Binaries:       []string{"app"},
 		MaxConcurrency: 2,
+		Declare: func() (eval.Suite, error) {
+			return eval.Suite{ID: "starter", Scenarios: []eval.Scenario{
+				{ID: "smoke", Tags: []string{"smoke"}},
+				{ID: "hidden", Tags: []string{"holdout"}},
+			}}, nil
+		},
 		Suite: func(pinned map[string]candidate.Artifact) (eval.Suite, error) {
 			scenario := func(id, tag string, passed bool) eval.Scenario {
 				return eval.Scenario{ID: id, Tags: []string{tag}, Timeout: time.Minute, Run: func(context.Context) (eval.Result, error) {

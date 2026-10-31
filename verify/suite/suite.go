@@ -51,10 +51,13 @@ type (
 		// MaxConcurrency is the default maximum number of scenarios in
 		// flight; --max-concurrency overrides it. It must be positive.
 		MaxConcurrency int
+		// Declare returns the generated eval.Suite for --describe. Only its ID
+		// and its scenarios' IDs and tags are read; its scenarios never run,
+		// so it needs no binaries and builds no runtime state.
+		Declare func() (eval.Suite, error)
 		// Suite returns the generated eval.Suite whose scenarios run the given
-		// pinned binaries, keyed by name. For --describe it is called with a
-		// nil map: the suite's structure must not depend on the binaries, and
-		// its scenarios are never run.
+		// pinned binaries, keyed by name. pinned holds exactly Binaries. Its
+		// declared scenarios must match Declare's.
 		Suite func(pinned map[string]candidate.Artifact) (eval.Suite, error)
 	}
 
@@ -166,7 +169,7 @@ func (l *listFlag) Set(v string) error {
 
 // writeDeclaration writes the Declaration of c's suite to w as JSON.
 func writeDeclaration(w io.Writer, c Command) error {
-	s, err := c.Suite(nil)
+	s, err := c.Declare()
 	if err != nil {
 		return err
 	}

@@ -20,12 +20,19 @@ func main() {
 		Environment:    harness.Environment,
 		Binaries:       []string{"orders", "orders-worker"},
 		MaxConcurrency: 4,
+		Declare:        declare,
 		Suite:          newSuite,
 	})
 }
 
+// declare returns the acceptance suite's declaration for --describe; its hooks
+// are never run.
+func declare() (eval.Suite, error) {
+	return genevals.New(&acceptance.Hooks{}, genevals.Inputs{})
+}
+
 // newSuite returns the acceptance suite running the pinned orders API and
-// refund worker. For --describe pinned is nil and the scenarios never run.
+// refund worker.
 func newSuite(pinned map[string]candidate.Artifact) (eval.Suite, error) {
 	env, err := harness.NewEnv(pinned["orders"], pinned["orders-worker"])
 	if err != nil {
