@@ -8,6 +8,7 @@ import {
   areExamplesModified,
   CP1DraftContext,
   CP1DraftContextValue,
+  isDraftDirty,
   PreservedDraft,
 } from "../context/cp1-draft";
 import {
@@ -133,6 +134,10 @@ export function CP1EditorView({
 }: CP1EditorProps) {
   const ambiguities = Array.isArray(card.ambiguities) ? card.ambiguities : [];
   const localExamplesEdited = areExamplesModified(card.examples, draftExamples);
+  const draftDirty = isDraftDirty(card, draftAnswers, draftExamples);
+  const artifactNames = card.approval
+    ? Object.keys(card.approval.artifacts || {}).sort()
+    : [];
 
   const ctxValue: CP1DraftContextValue = {
     card,
@@ -185,6 +190,7 @@ export function CP1EditorView({
         </h2>
         <p>
           <Badge>{card.status === "confirmed" ? "Confirmed" : "Needs confirmation"}</Badge>
+          {card.approval ? <Badge variant="accent">Approved for promotion</Badge> : null}
           <strong>Summary: </strong>
           {card.summary}
         </p>
@@ -206,6 +212,59 @@ export function CP1EditorView({
           </p>
         </details>
       </Card>
+
+      {card.approval ? (
+        <Card
+          id="surla-cp5-approval"
+          className="surla-card"
+          role="region"
+          aria-label="Checkpoint 5 Promotion Approval"
+        >
+          <div className="surla-field-row">
+            <h3>Checkpoint 5 Promotion Approval</h3>
+            <Badge variant="accent">In-memory approval recorded</Badge>
+            <Badge>No merge or deploy side effect</Badge>
+          </div>
+          <p>
+            Approval recorded by bearer principal <code>{card.approval.approved_by}</code> for this
+            confirmed <code>request_revision</code> in control-plane memory. Recording approval does
+            not merge branches or deploy binaries.
+          </p>
+          {draftDirty ? (
+            <Alert id="surla-cp5-approval-dirty-warning" variant="warning" role="status">
+              <strong>Unsaved draft edits detected: </strong>
+              Saving refined answers or examples will mint a new <code>request_revision</code> and
+              clear this approval.
+            </Alert>
+          ) : null}
+          <p>
+            <strong>Approved by: </strong>
+            <code>{card.approval.approved_by}</code> · <strong>Environment: </strong>
+            <code>{card.approval.environment}</code> · <strong>Scenarios passed: </strong>
+            <code>{String(card.approval.scenario_count)}</code>
+          </p>
+          <p>
+            <strong>Candidate commit: </strong>
+            <code>{card.approval.candidate_commit}</code>
+          </p>
+          <p>
+            <strong>Verification report digest: </strong>
+            <code>{card.approval.report_digest}</code>
+          </p>
+          <p>
+            <strong>Evaluator suite: </strong>
+            <code>{card.approval.suite_id}</code> @ <code>{card.approval.suite_commit}</code>
+          </p>
+          <h4>{"Verified Candidate Artifacts (" + artifactNames.length + ")"}</h4>
+          <ul>
+            {artifactNames.map((name) => (
+              <li key={name}>
+                <code>{name}</code>: <code>{card.approval!.artifacts[name]}</code>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {preservedDraft && Array.isArray(preservedDraft.lines) ? (
         <Card

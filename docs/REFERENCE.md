@@ -102,10 +102,13 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
   - Analyzes a feature request at `CP1` using the embedded Golden Path prompt, returning concrete `examples`, `ambiguities`, `preserved_behaviors`, and a canonical `request_revision` digest. When the model also composed a decision view, the card carries `ui_composition` (`program`, `composed_for_revision`): it is presentation only, never hashed into `request_revision`, and dropped when `confirm_intent` changes answers or examples. When the request includes a `progressToken`, the tool sends MCP progress updates before and after the model call.
 - **`confirm_intent`** (`POST /changes/confirm`)
   - **Input:** `change_id`, `request_revision`, `answers`, `examples` → **Output:** `ChangeCardResult`
-  - Confirms a `needs_confirmation` Change Card or refines an already `confirmed` Change Card at `CP1` when called by the owning principal with the current `request_revision` and complete `answers` and `examples`. No-op submissions return the stored `request_revision`; changed answers or examples mint a new canonical `request_revision` digest.
+  - Confirms a `needs_confirmation` Change Card or refines an already `confirmed` Change Card at `CP1` when called by the owning principal with the current `request_revision` and complete `answers` and `examples`. No-op submissions return the stored `request_revision` (preserving any recorded `approval`); changed answers or examples mint a new canonical `request_revision` digest and clear `approval`.
 - **`get_change`** (`GET /changes/{change_id}`)
   - **Input:** `change_id` → **Output:** `ChangeCardResult`
-  - Reads the stored `ChangeCardResult` for `change_id` without mutating state (restricted to the owning principal) so a stale editor can fetch the latest saved card after a `request_revision` conflict.
+  - Reads the stored `ChangeCardResult` (including any recorded `approval`) for `change_id` without mutating state (restricted to the owning principal) so a stale editor can fetch the latest saved card after a `request_revision` conflict.
+- **`approve_merge`** (`POST /changes/approve`)
+  - **Input:** `change_id`, `request_revision`, `candidate_commit`, `report_digest` → **Output:** `ChangeCardResult`
+  - Records Checkpoint 5 (`CP5`) promotion approval on the owning principal's confirmed `ChangeCardResult` when `controlplane.Options.PromotionTarget` is bound. It loads the full `verify.Report` for `report_digest` and the current `PromotionInputs` (`SuiteID`, `SuiteCommit`, `Environment`, measured candidate binary `Artifacts`) for `candidate_commit` from `PromotionTarget`, runs `verify.Approve`, re-verifies that the card still has `request_revision`, and returns the updated `ChangeCardResult` with `approval` (`ApprovalItem`: `approved_by`, `report_digest`, `candidate_commit`, `suite_id`, `suite_commit`, `environment`, `artifacts`, `scenario_count`) populated in control-plane memory. Recording approval does not merge branches or deploy binaries. Standalone `surla serve` does not bind a `PromotionTarget`, so its `approve_merge` requests return `no promotion target is bound to this control plane`.
 - **`preview_architecture`** (`POST /changes/preview`)
   - **Input:** `change_id`, `request_revision`, `design`, `builders?` → **Output:** `ArchitecturePreviewResult`
   - Evaluates a candidate `DesignSnapshot` in a sandboxed subprocess at `CP2`, returning C4 `containers` and `edges`, `agent_policies`, `tools` (`input_binding`), and the proposed `swarm` plan. When the request includes a `progressToken`, the tool sends MCP progress updates as design evaluation and roster planning start and finish.
@@ -121,7 +124,7 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 - **`surla://golden-path`** (`text/markdown` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /golden-path`)
   - Serves the embedded Golden Path architecture playbook ([`internal/goldenpath/GOLDEN_PATH.md`](../internal/goldenpath/GOLDEN_PATH.md)) for Goa and Goa-AI platforms.
 - **`ui://surla/checkpoint`** (`text/html;profile=mcp-app` via MCP `resources/read` on `POST /mcp`; JSON-encoded string on `GET /ui/checkpoint`)
-  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`, built from [`ui/checkpoint/`](../ui/checkpoint/)). It completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders results delivered by the host via `ui/notifications/tool-result`, without server-retained preview state: the `CP1` Change Card form (saving through `confirm_intent` and recovering with `get_change` via host `tools/call`, keeping unsaved edits across stale-revision conflicts), the optional OpenUI decision view from `ui_composition` (labeled as a model-proposed illustration and sharing the form's draft), `CP2` architecture previews (a scrollable C4 graph above inspectable lists), unbound structural diffs, and `CP3` draft results. Interactive role-switching and replay controls, and `openui.v1` action dispatch, remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough).
+  - Serves the stateless MCP Apps checkpoint viewer (`internal/controlplane/checkpoint.html`, built from [`ui/checkpoint/`](../ui/checkpoint/)). It completes the `ui/initialize` → `ui/notifications/initialized` host handshake and renders results delivered by the host via `ui/notifications/tool-result`, without server-retained preview state: the `CP1` Change Card form (saving through `confirm_intent` and recovering with `get_change` via host `tools/call`, keeping unsaved edits across stale-revision conflicts, and rendering the `#surla-cp5-approval` promotion sign-off panel when `approval` is present on the card), the optional OpenUI decision view from `ui_composition` (labeled as a model-proposed illustration and sharing the form's draft), `CP2` architecture previews (a scrollable C4 graph above inspectable lists), unbound structural diffs, and `CP3` draft results. Interactive role-switching and replay controls, and `openui.v1` action dispatch, remain planned; see [`docs/HOW_IT_WORKS.md`](HOW_IT_WORKS.md#checkpoint-3-cp3-fast-draft-overrides--live-sandbox-walkthrough).
 
 ---
 
@@ -158,6 +161,16 @@ Clones the committed candidate and evaluator suite into an isolated work directo
 - `-work-dir <path>` — Private working directory for clones, sandboxed builds, and evidence; must be missing or empty at run start and must not be shared with or readable by builder agents *(required)*.
 - `-report-dir <path>` — Directory that receives the full canonical report as `<digest>.json`; must not be readable by builder agents when holdout privacy is required *(required)*.
 - `-builder-view` — Optional boolean flag; when set, `stdout` prints `Report.ForBuilders()`, which redacts `"holdout"` scenarios to `"id": "holdout-N"` with scenario names, inputs, declarations, checks, and failure logs stripped (the full unredacted report is still written to `-report-dir`).
+
+### `surla approve`
+Decodes a saved full `verify.Report` JSON file with `verify.DecodeReport`, checks it against explicit promotion flags with `verify.Approve`, and prints an indented JSON approval summary (`report_digest`, `binding`, `counts`) to `stdout` (exiting `0` when the report passed and matches every flag, or exiting `1` without stdout output if any flag is missing or the report is stale, failed, or unreadable). `surla approve` validates the report file only; it does not contact a control plane, record a Change Card approval, or merge/deploy.
+- `-report <path>` — Path of the full verification report JSON written by `surla verify` *(required)*.
+- `-candidate-commit <sha>` — Full commit ID of the candidate being promoted *(required)*.
+- `-request-revision <digest>` — Current confirmed `request_revision` digest of the change *(required)*.
+- `-suite-id <id>` — Evaluator suite identifier required for promotion *(required)*.
+- `-suite-commit <sha>` — Full commit ID of the evaluator suite required for promotion *(required)*.
+- `-environment <env>` — Dependency profile required for promotion, such as `sim` *(required)*.
+- `-artifact <name=sha256>` — Candidate binary artifact name and 64-character lowercase hex SHA-256 digest measured for promotion (repeatable, at least one *required*; duplicate artifact names are rejected).
 
 ---
 
@@ -204,20 +217,20 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   └── design.go                 # Surla Goa & Goa-AI MCP 1.0.0 DSL contract
 ├── cmd/
 │   └── surla/
-│       └── main.go               # CLI entrypoint (`surla serve`, `surla diff`, and `surla verify`)
+│       └── main.go               # CLI entrypoint (`surla serve`, `surla diff`, `surla verify`, and `surla approve`)
 ├── docs/
 │   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & independent verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview
 │   └── REFERENCE.md              # MCP tools/resources, CLI flags & repo layout
 ├── internal/
-│   ├── controlplane/             # CP1–CP3 handlers, bearer auth, embedded checkpoint viewer, CP1 schema validator
+│   ├── controlplane/             # CP1–CP3 & CP5 handlers, bearer auth, embedded checkpoint viewer, CP1 schema validator
 │   ├── designeval/               # Sandboxed Goa/Goa-AI/Model subprocess evaluator & C4 extractor
 │   ├── diff/                     # Structural declaration, tool schema, and go.mod version diff engine
 │   ├── gitcapture/               # Read-only dirty git working-tree snapshot capture
 │   ├── goldenpath/               # Embedded GOLDEN_PATH.md playbook & CP1 architect system prompt
 │   ├── procgroup/                # Process-group lifecycle management for sandboxed child processes
 │   ├── swarm/                    # Deterministic Chorus role assignment & cross-family model router
-│   └── verify/                   # Worktree verifier (`surla verify`), holdout redactor, and library merge-gate check
+│   └── verify/                   # Worktree verifier (`surla verify`), holdout redactor, and promotion check (`surla approve`)
 ├── ui/
 │   └── checkpoint/               # React + OpenUI checkpoint viewer source; build.mjs writes checkpoint.html, decision_catalog.md, and generated types
 ├── verify/

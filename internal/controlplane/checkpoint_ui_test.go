@@ -48,9 +48,18 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 	}
 
 	targetStore := prompt.NewInMemoryStore()
+	promotionTarget := &promotionTargetStub{
+		inputs: PromotionInputs{
+			SuiteID:     "orders_acceptance",
+			SuiteCommit: "2222222222222222222222222222222222222222",
+			Environment: "sim",
+			Artifacts:   map[string]string{"orders": strings.Repeat("a", 64)},
+		},
+	}
 	cp := New(Options{
-		Analyzer:      NewModelCP1Analyzer(newStubModelClient(t, string(analysisJSON))),
-		TargetUpdater: &boundTargetPromptUpdater{store: targetStore},
+		Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(analysisJSON))),
+		TargetUpdater:   &boundTargetPromptUpdater{store: targetStore},
+		PromotionTarget: promotionTarget,
 		SwarmProfiles: []swarm.ProviderProfile{
 			{
 				ID:            "claude-opus",
@@ -183,6 +192,29 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 	getChangeOut, ok := getChangeCall.Outcome.AsComplete()
 	if !ok || len(getChangeOut.StructuredContent) == 0 {
 		t.Fatalf("unexpected get_change outcome: %+v", getChangeCall)
+	}
+
+	const candidateCommit = "1111111111111111111111111111111111111111"
+	promotionTarget.report = passingReport(t, confirmedWire.RequestRevision, candidateCommit, promotionTarget.inputs)
+	approveArgs, err := json.Marshal(map[string]any{
+		"change_id":        confirmedWire.ChangeID,
+		"request_revision": confirmedWire.RequestRevision,
+		"candidate_commit": candidateCommit,
+		"report_digest":    promotionTarget.report.Digest,
+	})
+	if err != nil {
+		t.Fatalf("marshal approveArgs: %v", err)
+	}
+	approveCall, err := adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{
+		Name:      "approve_merge",
+		Arguments: approveArgs,
+	})
+	if err != nil {
+		t.Fatalf("ToolsCall(approve_merge): %v", err)
+	}
+	approveOut, ok := approveCall.Outcome.AsComplete()
+	if !ok || len(approveOut.StructuredContent) == 0 {
+		t.Fatalf("unexpected approve_merge outcome: %+v", approveCall)
 	}
 
 	candidateDesign := `package design
@@ -337,6 +369,7 @@ var _ = Service("orders", func() {
 		"script":                 scriptBody,
 		"cp1Structured":          json.RawMessage(proposeOut.StructuredContent),
 		"cp1ConfirmedStructured": json.RawMessage(confirmOut.StructuredContent),
+		"cp5ApprovedStructured":  json.RawMessage(approveOut.StructuredContent),
 		"getChangeStructured":    json.RawMessage(getChangeOut.StructuredContent),
 		"cp2Structured":          json.RawMessage(previewOut.StructuredContent),
 		"diffStructured":         json.RawMessage(diffOut.StructuredContent),
@@ -345,6 +378,8 @@ var _ = Service("orders", func() {
 		"wantCP1Revision":        proposedWire.RequestRevision,
 		"wantCP2Revision":        confirmedWire.RequestRevision,
 		"wantDesignDigest":       previewWire.DesignDigest,
+		"wantReportDigest":       promotionTarget.report.Digest,
+		"wantCandidateCommit":    candidateCommit,
 		"wantAmbiguityText":      "Does the $50 limit include tax?",
 	})
 	if err != nil {
@@ -577,6 +612,32 @@ if (noEditRefineReq.params.arguments.examples[0].expected_outcome !== "  Instant
   throw new Error("no-edit refine mutated multiline/whitespace field: " + JSON.stringify(noEditRefineReq));
 }
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: noEditRefineReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
+
+// 3a-cp5. Deliver CP5 approve_merge ChangeCardResult on the same request_revision -> updates active editor in place, renders #surla-cp5-approval, and shows #surla-cp5-approval-dirty-warning when local draft edits would supersede the approved revision.
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp5ApprovedStructured } } });
+const approvalPanels = findAll(viewEl, (n) => n.attributes["id"] === "surla-cp5-approval");
+const approvalText = approvalPanels.length === 1 ? renderText(approvalPanels[0]) : "";
+if (approvalPanels.length !== 1 ||
+    !approvalText.includes("In-memory approval recorded") ||
+    !approvalText.includes("No merge or deploy side effect") ||
+    !approvalText.includes("alice@example.com") ||
+    !approvalText.includes(input.wantCandidateCommit) ||
+    !approvalText.includes(input.wantReportDigest) ||
+    !approvalText.includes("orders_acceptance") ||
+    findAll(viewEl, (n) => n.attributes["id"] === "surla-cp5-approval-dirty-warning").length !== 0) {
+  throw new Error("expected #surla-cp5-approval panel without dirty warning on clean approved card, got: " + approvalText);
+}
+const approvedOutcomeInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
+approvedOutcomeInputs[0].value = "edited after approval";
+approvedOutcomeInputs[0].dispatch("input", { target: approvedOutcomeInputs[0] });
+if (findAll(viewEl, (n) => n.attributes["id"] === "surla-cp5-approval-dirty-warning").length !== 1) {
+  throw new Error("expected #surla-cp5-approval-dirty-warning when approved card has unsaved draft edits");
+}
+approvedOutcomeInputs[0].value = "  Instant store credit\nup to $50.00  ";
+approvedOutcomeInputs[0].dispatch("input", { target: approvedOutcomeInputs[0] });
+if (findAll(viewEl, (n) => n.attributes["id"] === "surla-cp5-approval-dirty-warning").length !== 0) {
+  throw new Error("expected #surla-cp5-approval-dirty-warning to clear when draft matches saved approved card");
+}
 
 // 3b. Exercise stale-revision CP1 form submission with broadcast error notification arriving BEFORE direct RPC error reply.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });

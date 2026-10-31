@@ -129,6 +129,24 @@ go run ./cmd/surla verify \
 
 In `-builder-view`, stdout prints `Report.ForBuilders()` where the `"holdout"` scenario is redacted to `"id": "holdout-1"` with all scenario inputs, declarations, checks, and failure logs stripped. *(Note: in this public reference repo, `examples/orders-eval` is checked in alongside `examples/orders` to demonstrate the mechanism; in production, actual unseen holdouts require keeping the evaluator suite repository (`-suite-repo`), `-work-dir`, and `-report-dir` unreadable to builder agents, since `ForBuilders()` redacts the report JSON while workspace boundaries protect the suite source and raw evidence on disk.)*
 
+Once `surla verify` writes the full report to `"$WORK_DIR/reports/<digest>.json"`, run `surla approve` (`verify.Approve`) to re-derive the report from its raw evidence and verify that the candidate commit, confirmed `request_revision`, evaluator suite, environment, and measured candidate binary SHA-256 digests match the change being promoted:
+
+```bash
+REPORT_FILE="$(ls "$WORK_DIR/reports/"*.json | head -n 1)"
+ORDERS_SHA="$(shasum -a 256 "$WORK_DIR/work/candidate-bin/orders" | awk '{print $1}')"
+WORKER_SHA="$(shasum -a 256 "$WORK_DIR/work/candidate-bin/orders-worker" | awk '{print $1}')"
+
+go run ./cmd/surla approve \
+  -report "$REPORT_FILE" \
+  -candidate-commit "$COMMIT" \
+  -request-revision rev-orders-demo \
+  -suite-id orders_acceptance \
+  -suite-commit "$COMMIT" \
+  -environment sim \
+  -artifact "orders=$ORDERS_SHA" \
+  -artifact "orders-worker=$WORKER_SHA"
+```
+
 ---
 
 ## 4. See the Token Budget Catch Seeded Payload Bloat
