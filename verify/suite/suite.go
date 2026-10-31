@@ -81,7 +81,10 @@ type (
 		// ID is the scenario identifier.
 		ID string `json:"id"`
 		// Tags are the scenario's declared tags. The tag "holdout" marks a
-		// scenario whose details builders never see.
+		// scenario that verify.Report.ForBuilders, the report view given to
+		// builders, shows only as an anonymous outcome. That redaction is the
+		// only protection: the suite's source and raw output still name the
+		// scenario to anyone who can read them.
 		Tags []string `json:"tags"`
 	}
 
