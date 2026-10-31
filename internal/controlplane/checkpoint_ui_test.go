@@ -678,8 +678,12 @@ if (!cp2Text.includes(input.wantCP2Revision) ||
 }
 const cp2Svg = findAll(viewEl, (n) => n.attributes["id"] === "scantle-c4-svg");
 const cp2SvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "scantle-svg-node" && n.className && n.className.baseVal === "scantle-svg-node");
-if (cp2Svg.length !== 1 || cp2SvgNodes.length !== input.cp2Structured.containers.length) {
-  throw new Error("expected CP2 SVG graph with all containers, got svg=" + cp2Svg.length + " nodes=" + cp2SvgNodes.length);
+const cp2SvgTexts = findAll(viewEl, (n) => n.tagName === "TEXT" && n.namespaceURI === "http://www.w3.org/2000/svg");
+if (cp2Svg.length !== 1 ||
+    cp2SvgNodes.length !== input.cp2Structured.containers.length ||
+    cp2SvgTexts.length === 0 ||
+    !cp2SvgTexts.every((t) => t.attributes["fill"] === "currentColor")) {
+  throw new Error("expected CP2 SVG graph with all containers and fill=currentColor on all SVG text, got svg=" + cp2Svg.length + " nodes=" + cp2SvgNodes.length);
 }
 
 // 4a. Deliver 15-node cyclic + colliding-name + self-loop CP2 fixture -> no node cutoff, all 15 nodes and cyclic/self-loop edges rendered alongside inspectable list.

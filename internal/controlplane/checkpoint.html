@@ -55,6 +55,7 @@
       overflow: auto; border: 1px solid rgba(127, 127, 127, 0.35);
       border-radius: 6px; padding: 0.5rem; margin: 0.5rem 0 0.75rem 0;
     }
+    #scantle-c4-svg text { fill: currentColor; }
     .scantle-error {
       border: 2px solid #c62828; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;
     }
@@ -623,7 +624,7 @@
           className: "scantle-svg-edge", "data-from-id": e.from_id, "data-to-id": e.to_id, "data-edge-index": String(idx)
         }, [
           svgEl("path", { d: pathD, fill: "none", stroke: "currentColor", "stroke-width": "1.5", "marker-end": "url(#scantle-arrow)" }, []),
-          svgEl("text", { x: String(Math.round(labelX)), y: String(Math.round(labelY)), "text-anchor": "middle", "font-size": "11", textContent: e.protocol }, [])
+          svgEl("text", { x: String(Math.round(labelX)), y: String(Math.round(labelY)), fill: "currentColor", "text-anchor": "middle", "font-size": "11", textContent: e.protocol }, [])
         ]));
       });
 
@@ -634,8 +635,8 @@
           transform: "translate(" + pos.x + "," + pos.y + ")"
         }, [
           svgEl("rect", { width: String(boxW), height: String(boxH), rx: "6", ry: "6", fill: "none", stroke: "currentColor", "stroke-width": "1.5" }, []),
-          svgEl("text", { x: "10", y: "21", "font-size": "12", "font-weight": "600", textContent: c.name }, []),
-          svgEl("text", { x: "10", y: "40", "font-size": "11", textContent: "[" + c.kind + "] " + c.id }, [])
+          svgEl("text", { x: "10", y: "21", fill: "currentColor", "font-size": "12", "font-weight": "600", textContent: c.name }, []),
+          svgEl("text", { x: "10", y: "40", fill: "currentColor", "font-size": "11", textContent: "[" + c.kind + "] " + c.id }, [])
         ]);
       });
 
