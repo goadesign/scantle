@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
+  <!-- Outer r=204 Circular Caliper Arcs -->
+  <!-- Left Gauge Arc (Rose-Coral) -->
+  <path d="M 154.0 432.7 A 204 204 0 0 1 154.0 79.3" stroke="#F43F5E" stroke-width="40" stroke-linecap="round" />
+  <!-- Top-Right Arc (Amber) -->
+  <path d="M 224.1 54.5 A 204 204 0 0 1 425.1 141.9" stroke="#F59E0B" stroke-width="40" stroke-linecap="round" />
+  <!-- Middle-Right Arc (Teal) -->
+  <path d="M 454.9 211.6 A 204 204 0 0 1 454.9 300.4" stroke="#14B8A6" stroke-width="40" stroke-linecap="round" />
+  <!-- Bottom-Right Arc (Cobalt Blue) -->
+  <path d="M 425.1 370.1 A 204 204 0 0 1 224.1 457.5" stroke="#3B82F6" stroke-width="40" stroke-linecap="round" />
+
+  <!-- Vertical Scantle Gauge Spine & 3 Precision Notches (Rose-Coral) -->
+  <rect x="136" y="128" width="38" height="256" rx="19" fill="#F43F5E" />
+  <rect x="136" y="149" width="70" height="38" rx="19" fill="#F43F5E" />
+  <rect x="136" y="237" width="70" height="38" rx="19" fill="#F43F5E" />
+  <rect x="136" y="325" width="70" height="38" rx="19" fill="#F43F5E" />
+
+  <!-- 3 Measured Slate Bars (Amber, Teal, Cobalt Blue) -->
+  <rect x="228" y="149" width="136" height="38" rx="19" fill="#F59E0B" />
+  <rect x="228" y="237" width="168" height="38" rx="19" fill="#14B8A6" />
+  <rect x="228" y="325" width="136" height="38" rx="19" fill="#3B82F6" />
+</svg>
