@@ -155,6 +155,9 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 		{name: "unknown command", args: []string{"unknown"}, wantErr: `unknown command "unknown"; run "surla help"`},
 		{name: "verify without flags", args: []string{"verify"}, wantErr: "verify requires -candidate-repo"},
 		{name: "approve without flags", args: []string{"approve"}, wantErr: "approve requires -report"},
+		{name: "init without flags", args: []string{"init"}, wantErr: "init requires -dir and -module"},
+		{name: "help for init", args: []string{"help", "init"}},
+		{name: "init with a mutable version", args: []string{"init", "-dir", "x", "-module", "example.com/x", "-surla-version", "latest"}, wantErr: "not an exact module version"},
 		{name: "serve without credentials", args: []string{"serve"}, wantErr: "serve requires -principal and -auth-token"},
 		{name: "preview with a bad flag", args: []string{"preview", "-nope"}, wantErr: "flag provided but not defined"},
 	}
@@ -175,6 +178,17 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 				assert.Empty(t, out.String())
 			}
 		})
+	}
+}
+
+func TestShellQuoteMakesOneShellWord(t *testing.T) {
+	for in, want := range map[string]string{
+		"./shop":      `'./shop'`,
+		"my dir":      `'my dir'`,
+		"it's":        `'it'\''s'`,
+		"$(rm -rf /)": `'$(rm -rf /)'`,
+	} {
+		assert.Equal(t, want, shellQuote(in), in)
 	}
 }
 

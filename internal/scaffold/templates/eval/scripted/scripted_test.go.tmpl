@@ -1,0 +1,37 @@
+package scripted
+
+import (
+	"testing"
+)
+
+func TestDecodePriceEnforcesTheLookupPriceContract(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		content   string
+		wantKnown bool
+		wantCents int
+		wantErr   bool
+	}{
+		{name: "known", content: `{"item":"tea","known":true,"cents":350}`, wantKnown: true, wantCents: 350},
+		{name: "unknown", content: `{"item":"tea","known":false,"cents":0}`},
+		{name: "missing known", content: `{"item":"tea","cents":0}`, wantErr: true},
+		{name: "missing cents", content: `{"item":"tea","known":false}`, wantErr: true},
+		{name: "only item", content: `{"item":"tea"}`, wantErr: true},
+		{name: "other item", content: `{"item":"cake","known":true,"cents":350}`, wantErr: true},
+		{name: "cents for unknown", content: `{"item":"tea","known":false,"cents":5}`, wantErr: true},
+		{name: "unexpected field", content: `{"item":"tea","known":true,"cents":350,"note":"x"}`, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			known, cents, err := decodePrice([]byte(tc.content), "tea")
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("decodePrice(%s) succeeded, want an error", tc.content)
+				}
+				return
+			}
+			if err != nil || known != tc.wantKnown || cents != tc.wantCents {
+				t.Fatalf("decodePrice(%s) = %t, %d, %v; want %t, %d", tc.content, known, cents, err, tc.wantKnown, tc.wantCents)
+			}
+		})
+	}
+}

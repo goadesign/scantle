@@ -1,0 +1,89 @@
+// Command [[.Name]] serves the [[.Name]] API. Its helper agent runs in memory and plans
+// every step through a goa-ai model gateway, which owns the model provider and
+// its keys.
+//
+// Usage:
+//
+//	[[.Name]] -listen 127.0.0.1:8080 -model-gateway 127.0.0.1:9090
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	goahttp "goa.design/goa/v3/http"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
+	"goa.design/goa-ai/features/model/gateway"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	genhttp[[.Name]] "[[.Module]]/gen/http/[[.Name]]/server"
+	gen[[.Name]] "[[.Module]]/gen/[[.Name]]"
+	"[[.Module]]/internal/service"
+)
+
+func main() {
+	listen := flag.String("listen", "127.0.0.1:8080", "HTTP listen address")
+	modelGateway := flag.String("model-gateway", "", "gRPC address of the goa-ai model gateway (required)")
+	flag.Parse()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, *listen, *modelGateway); err != nil {
+		fmt.Fprintln(os.Stderr, "[[.Name]]:", err)
+		os.Exit(1)
+	}
+}
+
+// run connects to the model gateway and serves the [[.Name]] API until ctx
+// ends. Each question runs the helper agent in its own in-memory runtime (see
+// service.Service.Ask).
+func run(ctx context.Context, listen, modelGateway string) error {
+	if modelGateway == "" {
+		return errors.New("-model-gateway is required")
+	}
+	conn, err := grpc.NewClient(modelGateway, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("connect to model gateway %s: %w", modelGateway, err)
+	}
+	defer conn.Close()
+	mc, err := gateway.NewGRPCClient(conn)
+	if err != nil {
+		return fmt.Errorf("create model client: %w", err)
+	}
+
+	endpoints := gen[[.Name]].NewEndpoints(service.New(mc))
+	mux := goahttp.NewMuxer()
+	genhttp[[.Name]].Mount(mux, genhttp[[.Name]].New(endpoints, mux, goahttp.RequestDecoder, goahttp.ResponseEncoder, errorHandler, nil))
+	// otelhttp starts a span for every request; it records to the global
+	// OpenTelemetry tracer provider, which discards spans until one is set.
+	srv := &http.Server{Addr: listen, Handler: otelhttp.NewHandler(mux, "[[.Name]]"), ReadHeaderTimeout: 10 * time.Second}
+	errc := make(chan error, 1)
+	go func() { errc <- srv.ListenAndServe() }()
+	slog.Info("[[.Name]] listening", "addr", listen, "model_gateway", modelGateway)
+	select {
+	case err := <-errc:
+		return fmt.Errorf("serve: %w", err)
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	}
+}
+
+// errorHandler records an error the HTTP layer could not encode on the
+// request's span.
+func errorHandler(ctx context.Context, _ http.ResponseWriter, err error) {
+	span := trace.SpanFromContext(ctx)
+	span.RecordError(err)
+	span.SetStatus(codes.Error, "encode response")
+}

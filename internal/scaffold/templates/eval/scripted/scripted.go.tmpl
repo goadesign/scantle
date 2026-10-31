@@ -1,0 +1,235 @@
+// Package scripted is the evaluator's stand-in for a language model. It is
+// not an LLM: it follows a fixed two-step script and signs every answer with
+// "[scripted]". The evaluator serves it through its own goa-ai model gateway,
+// so the [[.Name]] under test cannot change how it behaves.
+//
+// Step 1: for a question naming an item, it calls catalog.lookup_price for
+// that item. Step 2: it answers only after a later request carries a
+// successful result for that exact call (matched by tool call ID), and an
+// error result fails the step. Every exchange is recorded for the scenario's
+// checks. This shows the [[.Name]]'s generated runtime path delivered the
+// tool result to the model; it cannot prove what arbitrary code inside the
+// [[.Name]] did to produce it.
+package scripted
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"regexp"
+	"strings"
+	"sync"
+
+	"goa.design/goa-ai/runtime/agent/model"
+	"goa.design/goa-ai/runtime/agent/tools"
+)
+
+type (
+	// Model is the scripted model.Provider. It is safe for concurrent use.
+	Model struct {
+		// mu guards exchanges.
+		mu sync.Mutex
+		// exchanges records every completed step in order.
+		exchanges []Exchange
+	}
+
+	// Exchange is one step the script took: the tool call it made, or the
+	// tool result it received and the answer it gave.
+	Exchange struct {
+		// Item is the item the question named.
+		Item string
+		// CallID is the ID of the lookup_price call the script made.
+		CallID string
+		// Result is the tool result received for CallID, as JSON; empty on
+		// the first step.
+		Result string
+		// Known is the result's known field: whether the catalog priced the
+		// item.
+		Known bool
+		// Answer is the final answer; empty on the first step.
+		Answer string
+	}
+
+	// stream replays precomputed chunks and their response.
+	stream struct {
+		// chunks are returned by Recv in order.
+		chunks []model.Chunk
+		// next is the index of the next chunk.
+		next int
+		// response is the canonical response matching chunks.
+		response *model.Response
+	}
+)
+
+// toolName is the generated identity of the lookup_price tool.
+const toolName = tools.Ident("catalog.lookup_price")
+
+// itemMention finds the item in "How much is <item>?".
+var itemMention = regexp.MustCompile(`(?i)how much is (?:a |an )?([a-z]+)`)
+
+// New returns an empty scripted model.
+func New() *Model {
+	return &Model{}
+}
+
+// Exchanges returns a copy of every recorded step.
+func (m *Model) Exchanges() []Exchange {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return append([]Exchange(nil), m.exchanges...)
+}
+
+// Complete is not used by the [[.Name]]'s planner, which streams.
+func (m *Model) Complete(context.Context, *model.Request) (*model.Response, error) {
+	return nil, errors.New("scripted model supports streaming only")
+}
+
+// Stream takes the script's next step for the conversation so far.
+func (m *Model) Stream(_ context.Context, req *model.Request) (model.Streamer, error) {
+	item := mentionedItem(req.Messages)
+	if item == "" {
+		return nil, errors.New("scripted model: the question names no item")
+	}
+	callID := "call-" + item
+	result, ok := toolResult(req.Messages, callID)
+	if !ok {
+		if !advertised(req, toolName) {
+			return nil, fmt.Errorf("scripted model: %s is not advertised", toolName)
+		}
+		args, err := json.Marshal(map[string]string{"item": item})
+		if err != nil {
+			return nil, fmt.Errorf("encode lookup_price arguments: %w", err)
+		}
+		m.record(Exchange{Item: item, CallID: callID})
+		call := model.ToolCall{ID: callID, Name: toolName, Payload: args}
+		return reply(nil, &call), nil
+	}
+	if result.IsError {
+		return nil, fmt.Errorf("scripted model: %s failed: %v", toolName, result.Content)
+	}
+	content, err := json.Marshal(result.Content)
+	if err != nil {
+		return nil, fmt.Errorf("encode tool result: %w", err)
+	}
+	known, cents, err := decodePrice(content, item)
+	if err != nil {
+		return nil, err
+	}
+	answer := fmt.Sprintf("[scripted] I could not find a price for %s.", item)
+	if known {
+		answer = fmt.Sprintf("[scripted] %s costs $%d.%02d.", strings.ToUpper(item[:1])+item[1:], cents/100, cents%100)
+	}
+	m.record(Exchange{Item: item, CallID: callID, Result: string(content), Known: known, Answer: answer})
+	return reply(&answer, nil), nil
+}
+
+// record appends one exchange.
+func (m *Model) record(e Exchange) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.exchanges = append(m.exchanges, e)
+}
+
+// decodePrice decodes a lookup_price result for item and enforces its
+// contract: item, known and cents are all present and nothing else is, the
+// item is the one asked about, and cents is 0 when known is false.
+func decodePrice(content []byte, item string) (known bool, cents int, err error) {
+	var price struct {
+		Item  *string `json:"item"`
+		Known *bool   `json:"known"`
+		Cents *int    `json:"cents"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(content))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&price); err != nil {
+		return false, 0, fmt.Errorf("decode %s result %s: %w", toolName, content, err)
+	}
+	switch {
+	case price.Item == nil || price.Known == nil || price.Cents == nil:
+		return false, 0, fmt.Errorf("scripted model: %s result %s lacks item, known or cents", toolName, content)
+	case *price.Item != item:
+		return false, 0, fmt.Errorf("scripted model: %s returned %q for a call about %q", toolName, *price.Item, item)
+	case !*price.Known && *price.Cents != 0:
+		return false, 0, fmt.Errorf("scripted model: %s result %s has cents for an unknown item", toolName, content)
+	}
+	return *price.Known, *price.Cents, nil
+}
+
+// reply builds a one-message stream holding the answer or the tool call.
+func reply(text *string, call *model.ToolCall) *stream {
+	msg := model.Message{Role: model.ConversationRoleAssistant}
+	resp := &model.Response{StopReason: "end_turn"}
+	var chunks []model.Chunk
+	if text != nil {
+		msg.Parts = append(msg.Parts, model.TextPart{Text: *text})
+		chunks = append(chunks, model.TextChunk{Message: model.Message{
+			Role: model.ConversationRoleAssistant, Parts: []model.Part{model.TextPart{Text: *text}},
+		}})
+	}
+	if call != nil {
+		msg.Parts = append(msg.Parts, model.ToolUsePart{ID: call.ID, Name: string(call.Name), Input: call.Payload})
+		chunks = append(chunks, model.ToolCallChunk{ToolCall: *call})
+		resp.StopReason = "tool_use"
+	}
+	resp.Content = []model.Message{msg}
+	chunks = append(chunks, model.StopChunk{Reason: resp.StopReason})
+	return &stream{chunks: chunks, response: resp}
+}
+
+// mentionedItem returns the item named in the first user message.
+func mentionedItem(msgs []*model.Message) string {
+	for _, msg := range msgs {
+		if msg.Role != model.ConversationRoleUser {
+			continue
+		}
+		if m := itemMention.FindStringSubmatch(msg.Text()); m != nil {
+			return strings.ToLower(m[1])
+		}
+	}
+	return ""
+}
+
+// toolResult returns the tool result for callID, if the conversation has one.
+func toolResult(msgs []*model.Message, callID string) (model.ToolResultPart, bool) {
+	for _, msg := range msgs {
+		for _, p := range msg.Parts {
+			if r, ok := p.(model.ToolResultPart); ok && r.ToolUseID == callID {
+				return r, true
+			}
+		}
+	}
+	return model.ToolResultPart{}, false
+}
+
+// advertised reports whether the request offers the tool named name.
+func advertised(req *model.Request, name tools.Ident) bool {
+	for _, t := range req.Tools {
+		if tools.Ident(t.Name) == name {
+			return true
+		}
+	}
+	return false
+}
+
+// Recv returns the next chunk or io.EOF.
+func (s *stream) Recv() (model.Chunk, error) {
+	if s.next >= len(s.chunks) {
+		return nil, io.EOF
+	}
+	c := s.chunks[s.next]
+	s.next++
+	return c, nil
+}
+
+// Response returns the canonical response once the stream is drained.
+func (s *stream) Response() *model.Response {
+	return s.response
+}
+
+// Close releases nothing.
+func (s *stream) Close() error {
+	return nil
+}

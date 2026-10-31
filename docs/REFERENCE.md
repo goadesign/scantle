@@ -145,6 +145,13 @@ All tools and resources are served over MCP JSON-RPC at `POST /mcp` and over HTT
 
 Running `surla`, `surla help`, `surla -h`, or `surla --help` prints top-level usage to `stdout` and exits `0`. Running `surla help <command>` or `surla <command> -h` prints that subcommand's flags to `stderr` and exits `0`.
 
+### `surla init`
+Creates a Goa + Goa-AI + `goa.design/model` service in `<dir>` and a separate evaluator module in `<dir>/eval`. It resolves dependencies, generates code with `go run goa.design/goa/v3/cmd/goa gen`, checks both modules with `go vet ./...`, and prints the commands to commit, preview, and verify the project. Both module files start with the Go and library versions saved in the `surla` binary (`surla.GoMod()`). Before generating the evaluator, `surla init` pins its exact Surla dependency with `go get github.com/goadesign/surla@<version>`; Go may select newer library versions required by that dependency.
+- `-dir <path>` — Directory to create; it must not exist *(required)*. `surla init` builds the project in a sibling staging directory (`<dir>.surla-init-*`) under `procgroup.Run` (`GOWORK=off`) and renames it to `-dir` only after every step succeeds (removing the staging directory on any command failure or cancellation when the process group exits cleanly, or keeping it and reporting its path if a child process fails to stop).
+- `-module <path>` — Go module path of the candidate service, such as `example.com/shop` *(required)*. Its last path element names the service and must be a lowercase Go identifier (`^[a-z][a-z0-9]*$`, excluding Go keywords and `main`).
+- `-surla-version <version>` — Exact canonical semantic version (`golang.org/x/mod/semver`) of `github.com/goadesign/surla` required by `<dir>/eval/go.mod` (default: the build-info `Main.Version` stamped into the `surla` binary; required explicitly when running from a `(devel)` or `+dirty` build, and mutable labels such as `latest` or `main` are rejected).
+- **Starter scope & visible-suite note:** The generated candidate (`cmd/<name>`) runs an in-memory Goa-AI `helper` agent (`RunPolicy`, `BindTo("price")`, and C4 `System`/`Container` model) connecting to `-model-gateway <host:port>`. The generated `<dir>/eval/` module runs a scripted `goa-ai` model gateway and two starter scenarios (`prices_tea` tagged `"repair"` and `unknown_item` tagged `"holdout"`, checking the correlated `catalog.lookup_price` tool call and `ToolResultPart` exchange plus `pinned.Evidence("<name>")`). Because `eval/` lives inside the same repository as the starter code, its `"holdout"` tag demonstrates `Report.ForBuilders()` redaction only; real unseen holdouts belong in an evaluator repository that builder agents cannot read.
+
 ### `surla preview`
 Reads a Go design module on disk into a symlink-safe snapshot (`go.mod`, `go.sum`, and non-test `.go` files; run `go mod tidy` first if `go.sum` is missing), evaluates it inside the sandboxed Goa/Goa-AI/Model compiler (`designeval.Evaluate`) at **0 LLM tokens**, and prints the indented JSON `designeval.Result` (`system_name`, `declarations`, C4 `containers` and `edges`, `agent_policies`, and `tools`) to `stdout`. Needs no running server, no Change Card, and no LLM API key.
 - `-dir <path>` — Root directory of the design module holding `go.mod`, `go.sum`, and `design/` (default `.`).
@@ -283,7 +290,7 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   └── design.go                 # Surla Goa & Goa-AI MCP 1.0.0 DSL contract
 ├── cmd/
 │   └── surla/
-│       └── main.go               # CLI entrypoint (`surla serve`, `surla preview`, `surla diff`, `surla verify`, and `surla approve`)
+│       └── main.go               # CLI entrypoint (`surla init`, `surla serve`, `surla preview`, `surla diff`, `surla verify`, and `surla approve`)
 ├── docs/
 │   ├── HOW_IT_WORKS.md           # The 5 checkpoints, Chorus routing & independent verification
 │   ├── ARCHITECTURE_PLAYBOOK.md  # Golden Path rules & Goa Design suite overview
@@ -295,6 +302,7 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 │   ├── gitcapture/               # Read-only dirty git working-tree snapshot capture
 │   ├── goldenpath/               # Embedded GOLDEN_PATH.md playbook & CP1 architect system prompt
 │   ├── procgroup/                # Process-group lifecycle management for sandboxed child processes
+│   ├── scaffold/                 # Starter project scaffolder (`surla init`) & embedded templates
 │   ├── swarm/                    # Deterministic Chorus role assignment & cross-family model router
 │   └── verify/                   # Worktree verifier (`surla verify`), holdout redactor, and promotion check (`surla approve`)
 ├── ui/
