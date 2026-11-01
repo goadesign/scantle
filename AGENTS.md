@@ -27,9 +27,11 @@ comments, tests, fixtures, docs, commits, branches, issues, or pull requests.
    before editing files or running commands that change state.
 5. **Report honestly.** Say what you verified, how, and what remains
    unverified. If a test fails or a step was skipped, say so.
-6. **Run tools non-interactively.** Close standard input and set `CI=true`
-   for package runners and CLIs (`node`, `npx`, `gh`), so a hidden prompt
-   never blocks a command.
+6. **Run tools non-interactively and bounded.** Close standard input and set
+   `CI=true` for package runners and CLIs (`node`, `npx`, `gh`), so a hidden
+   prompt never blocks a command. Wait on long work with tools that stop on
+   failure (`gh pr checks --watch --fail-fast`, `gh run watch --exit-status`),
+   never with an open-ended polling loop.
 
 Example of the plain-English standard used in every reply, comment, doc, and
 pull request (state the input, what happens, and what the caller sees before
@@ -76,6 +78,17 @@ For every addition, answer: "If we omit this, which required case fails, and
 why can't the existing owner handle it?" Name the exact decision or resource
 a new limit protects and the narrowest lifetime where its value is fixed.
 
+When a consumer (an evaluator check, a UI view, an alert, or a caller) reaches
+a wrong conclusion from a report, payload, or span, first decide whether the
+reported fact is false or the consumer's rule is wrong, and read every field
+the fact already carries before adding state or lookups. Never change a true
+fact to steer a consumer.
+
+When you remove or replace a producer (a tool, event, enum value, API method,
+or CLI flag), search the repository for anything that still consumes its
+output, and delete each piece that no longer has a producer (types,
+handlers, UI views, flags, docs, and test fixtures) in the same change.
+
 ### Reviews
 
 Before finalizing a design-touching change or pull request, run a review by
@@ -84,7 +97,9 @@ problem, the owning contracts, the callers, and the diff, and tell it to
 assume the answer to "Is this the simplest correct design given every flow
 on `origin/main`?" is "No" until it has checked every caller. When a review
 finds a high-priority or design-touching issue, fix it and run another fresh
-review, until a review finds none. Set each subagent's model explicitly.
+review, until a review finds none. Set each subagent's model explicitly: a
+frontier reasoning model for design, coding, and review, and a small fast
+model only for mechanical read-only status checks that return raw evidence.
 
 ## 3. Ownership and state
 
@@ -172,6 +187,7 @@ spans to quiet an alert; fix the alert instead.
 - Run the smallest test set that exercises the change. At integration
   points, run:
   - `go test -race ./...`
+  - `go test -race -tags e2e ./internal/verify`
   - `(cd examples/orders && go test -race ./...)`
   - `(cd examples/orders-eval && go test -race -tags e2e ./acceptance)`
 
