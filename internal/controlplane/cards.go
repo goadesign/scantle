@@ -24,8 +24,8 @@ type (
 	// directory, so cards outlive the process that wrote them. The files are
 	// the only copy: each read decodes the file and each change replaces it.
 	// One process at a time may use a directory; openCardStore holds an
-	// exclusive lock on it until close. Callers serialize every call,
-	// including close, with ControlPlane.mu.
+	// exclusive lock on it until close. Callers hold ControlPlane.mu for
+	// every call: the read lock for loads, the write lock for saves and close.
 	cardStore struct {
 		// dir holds one <hex sha256(change_id)>.json file per card.
 		dir string
@@ -133,11 +133,11 @@ func (s *cardStore) load(changeID string) (storedChangeCard, bool, error) {
 	if f.Card == nil || f.Card.ChangeID != changeID || f.Owner == "" {
 		return storedChangeCard{}, false, fmt.Errorf("change card file for %q does not hold that card", changeID)
 	}
-	// request_revision is the digest of the card's content, owner and design
-	// source, so recomputing it checks every field it covers.
 	if f.Card.Status != StatusNeedsConfirmation && f.Card.Status != StatusConfirmed {
 		return storedChangeCard{}, false, fmt.Errorf("change card %q has unknown status %q", changeID, f.Card.Status)
 	}
+	// request_revision is the digest of the card's content, owner and design
+	// source, so recomputing it checks every field it covers.
 	rev, err := computeCanonicalRevision(f.Card, f.Owner, f.DesignSource)
 	if err != nil {
 		return storedChangeCard{}, false, err

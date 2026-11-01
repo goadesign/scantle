@@ -402,16 +402,6 @@ func New(opts Options) (*ControlPlane, error) {
 	}, nil
 }
 
-// Close releases the cards directory so another process can use it. It
-// waits for a card read or save in progress; requests that reach the cards
-// afterwards, such as one still waiting on a model or promotion target, fail
-// without writing. Closing twice does nothing.
-func (c *ControlPlane) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.cards.close()
-}
-
 // NewHTTPHandler mounts both the Goa HTTP endpoints and the MCP JSON-RPC
 // server (`/mcp`) for svc onto a single HTTP handler protected by auth.
 func NewHTTPHandler(svc gensurla.Service, auth RequestAuthenticator) http.Handler {
@@ -612,6 +602,16 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeCha
 		return nil, err
 	}
 	return card, nil
+}
+
+// Close releases the cards directory so another process can use it. It
+// waits for a card read or save in progress; requests that reach the cards
+// afterwards, such as one still waiting on a model or promotion target, fail
+// without writing. Closing twice does nothing.
+func (c *ControlPlane) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cards.close()
 }
 
 // GetChange returns the current Change Card for change_id to its owner. It

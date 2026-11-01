@@ -128,12 +128,13 @@ type AmbiguityQuestion struct {
 // Checkpoint 5 approval recorded by approve_merge after the evaluator-written
 // verification report passed and matched the change being promoted: the exact
 // candidate commit, suite, environment and binary digests it checked. It is
-// held only in the running control plane's memory, merges and deploys nothing,
-// is replaced by the next successful approve_merge for the same revision, and
-// is dropped when confirm_intent mints a new request_revision. get_change and
-// confirm_intent return it only while the promotion target's current suite,
-// environment and binary digests still equal the ones it records, so a
-// returned approval was current when that response was made, not afterwards.
+// saved with the card in the control plane's cards directory, merges and
+// deploys nothing, is replaced by the next successful approve_merge for the
+// same revision, and is dropped when confirm_intent mints a new
+// request_revision. get_change and confirm_intent return it only while the
+// promotion target's current suite, environment and binary digests still equal
+// the ones it records, so a returned approval was current when that response
+// was made, not afterwards.
 type ApprovalItem struct {
 	// Authenticated bearer principal that owns the card and called approve_merge.
 	// Bearer authentication does not prove that a human, rather than a coding

@@ -244,3 +244,40 @@ func confirmedCardFile(t *testing.T) string {
 	require.NoError(t, err)
 	return string(data)
 }
+
+// TestOpeningRemovesUnfinishedSaves checks that a temporary file left by a
+// save that crashed before its rename is removed when the directory is
+// opened again, and that saved cards are kept.
+func TestOpeningRemovesUnfinishedSaves(t *testing.T) {
+	dir := t.TempDir()
+	first, err := New(Options{CardsDir: dir})
+	require.NoError(t, err)
+	card := saveCard(t, first, nil)
+	require.NoError(t, first.Close())
+	leftover := filepath.Join(dir, "card-123.tmp")
+	require.NoError(t, os.WriteFile(leftover, []byte("{"), 0o600))
+
+	next := newControlPlane(t, Options{CardsDir: dir})
+	assert.NoFileExists(t, leftover)
+	got, err := next.GetChange(WithPrincipal(context.Background(), Principal{ID: "alice@example.com"}), &gensurla.GetChangePayload{ChangeID: "chg"})
+	require.NoError(t, err)
+	assert.Equal(t, card, got)
+}
+
+// TestCardsWithInvalidUTF8RoundTrip saves a card whose text holds invalid
+// UTF-8, which only a Go caller can supply, and checks it reads back under
+// the same request_revision: json.Marshal writes such bytes as U+FFFD, and so
+// does every later encoding of the decoded card.
+func TestCardsWithInvalidUTF8RoundTrip(t *testing.T) {
+	cp := newControlPlane(t, Options{})
+	confirmedBy := "alice\xff"
+	card := &gensurla.ChangeCardResult{ChangeID: "chg", Status: StatusConfirmed, Prompt: "Refunds \xff", ConfirmedBy: &confirmedBy}
+	rev, err := computeCanonicalRevision(card, "alice\xff", "design \xff")
+	require.NoError(t, err)
+	card.RequestRevision = rev
+	require.NoError(t, cp.cards.save(storedChangeCard{card: card, owner: "alice\xff", designSource: "design \xff"}))
+	saved, ok, err := cp.cards.load("chg")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, rev, saved.card.RequestRevision)
+}
