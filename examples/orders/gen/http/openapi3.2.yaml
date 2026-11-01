@@ -64,7 +64,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run or approval does not exist.'
+                    description: 'not_found: The run, approval or prompt does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -77,7 +77,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_refund: The refund breaks a business rule.'
+                    description: 'invalid_prompt: The prompt template does not render.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -86,7 +86,98 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_refund
+                                name: invalid_prompt
+                                temporary: false
+                                timeout: false
+            security:
+                - jwt_header_Authorization: []
+    /prompts/{prompt_id}:
+        put:
+            tags:
+                - orders
+            summary: override_prompt orders
+            description: Replace the text of a registered prompt for every tenant. The agent's next model request uses the new text. The change lasts until the service restarts, which restores the built-in text.
+            operationId: orders#override_prompt
+            parameters:
+                - name: prompt_id
+                  in: path
+                  description: Registered prompt to replace.
+                  required: true
+                  schema:
+                    type: string
+                    description: Registered prompt to replace.
+                    example: orders.refund.system
+                    minLength: 1
+                  example: orders.refund.system
+            requestBody:
+                description: Request body for override_prompt.
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/OverridePromptRequestBody'
+                        example:
+                            template: "n"
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/PromptVersion'
+                            example:
+                                prompt_id: At id autem tenetur rem aut.
+                                version: Fuga quos quia.
+                "401":
+                    description: 'unauthorized: The bearer token is missing or invalid.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: unauthorized
+                                temporary: false
+                                timeout: false
+                "403":
+                    description: 'forbidden: The caller may not perform this action.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: forbidden
+                                temporary: false
+                                timeout: false
+                "404":
+                    description: 'not_found: The run, approval or prompt does not exist.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: not_found
+                                temporary: false
+                                timeout: false
+                "422":
+                    description: 'invalid_prompt: The prompt template does not render.'
+                    content:
+                        application/vnd.goa.error:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+                            example:
+                                fault: false
+                                id: 123abc
+                                message: parameter 'p' must be an integer
+                                name: invalid_prompt
                                 temporary: false
                                 timeout: false
             security:
@@ -149,7 +240,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run or approval does not exist.'
+                    description: 'not_found: The run, approval or prompt does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -162,7 +253,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_refund: The refund breaks a business rule.'
+                    description: 'invalid_prompt: The prompt template does not render.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -171,7 +262,7 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_refund
+                                name: invalid_prompt
                                 temporary: false
                                 timeout: false
             security:
@@ -244,7 +335,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run or approval does not exist.'
+                    description: 'not_found: The run, approval or prompt does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -257,7 +348,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_refund: The refund breaks a business rule.'
+                    description: 'invalid_prompt: The prompt template does not render.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -266,7 +357,7 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_refund
+                                name: invalid_prompt
                                 temporary: false
                                 timeout: false
             security:
@@ -675,6 +766,36 @@ components:
             required:
                 - orders
                 - total
+        OverridePromptRequestBody:
+            type: object
+            properties:
+                template:
+                    type: string
+                    description: New prompt text, as a Go text/template. It must render with no template data.
+                    example: "n"
+                    minLength: 1
+            description: Request body for override_prompt.
+            example:
+                template: "n"
+            required:
+                - template
+        PromptVersion:
+            type: object
+            properties:
+                prompt_id:
+                    type: string
+                    description: Prompt that was replaced.
+                    example: At id autem tenetur rem aut.
+                version:
+                    type: string
+                    description: 'Version of the accepted text: "sha256:" followed by the hex SHA-256 of the template. Model requests that use it carry this version.'
+                    example: Fuga quos quia.
+            example:
+                prompt_id: At id autem tenetur rem aut.
+                version: Fuga quos quia.
+            required:
+                - prompt_id
+                - version
         Receipt:
             type: object
             properties:

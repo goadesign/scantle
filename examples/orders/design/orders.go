@@ -8,11 +8,13 @@ import (
 )
 
 // JWTAuth secures the public orders API. Customers hold the "orders:chat"
-// scope; managers additionally hold "refunds:approve".
+// scope; managers additionally hold "refunds:approve". Operators who may change
+// the refund agent's prompts for every tenant hold "prompts:manage".
 var JWTAuth = JWTSecurity("jwt", func() {
 	Description("Bearer token issued by the merchant's identity provider.")
 	Scope("orders:chat", "Talk to the refund assistant about your own orders.")
 	Scope("refunds:approve", "Approve or deny refunds that need a manager.")
+	Scope("prompts:manage", "Change the refund agent's prompts for every tenant.")
 })
 
 var _ = API("orders", func() {
@@ -115,19 +117,28 @@ var RunView = Type("RunView", func() {
 	Required("run_id", "status")
 })
 
+// PromptVersion identifies the prompt text now in use.
+var PromptVersion = Type("PromptVersion", func() {
+	Attribute("prompt_id", String, "Prompt that was replaced.")
+	Attribute("version", String, "Version of the accepted text: \"sha256:\" followed by the hex SHA-256 of the template. Model requests that use it carry this version.")
+	Required("prompt_id", "version")
+})
+
 var _ = Service("orders", func() {
 	Description("Refund assistant for a merchant's customers.")
 	Security(JWTAuth, func() { Scope("orders:chat") })
 	Error("unauthorized", ErrorResult, "The bearer token is missing or invalid.")
 	Error("forbidden", ErrorResult, "The caller may not perform this action.")
-	Error("not_found", ErrorResult, "The run or approval does not exist.")
+	Error("not_found", ErrorResult, "The run, approval or prompt does not exist.")
 	Error("invalid_refund", ErrorResult, "The refund breaks a business rule.")
+	Error("invalid_prompt", ErrorResult, "The prompt template does not render.")
 
 	HTTP(func() {
 		Response("unauthorized", StatusUnauthorized)
 		Response("forbidden", StatusForbidden)
 		Response("not_found", StatusNotFound)
 		Response("invalid_refund", StatusUnprocessableEntity)
+		Response("invalid_prompt", StatusUnprocessableEntity)
 	})
 
 	Method("chat", func() {
@@ -172,6 +183,25 @@ var _ = Service("orders", func() {
 		HTTP(func() {
 			POST("/runs/{run_id}/approval")
 			Response(StatusAccepted)
+		})
+	})
+
+	Method("override_prompt", func() {
+		Description("Replace the text of a registered prompt for every tenant. The agent's next model request uses the new text. The change lasts until the service restarts, which restores the built-in text.")
+		Security(JWTAuth, func() { Scope("prompts:manage") })
+		Payload(func() {
+			Token("token", String, "Operator bearer token.")
+			Attribute("prompt_id", String, "Registered prompt to replace.", func() {
+				MinLength(1)
+				Example("orders.refund.system")
+			})
+			Attribute("template", String, "New prompt text, as a Go text/template. It must render with no template data.", func() { MinLength(1) })
+			Required("token", "prompt_id", "template")
+		})
+		Result(PromptVersion)
+		HTTP(func() {
+			PUT("/prompts/{prompt_id}")
+			Response(StatusOK)
 		})
 	})
 
