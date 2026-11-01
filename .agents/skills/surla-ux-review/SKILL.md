@@ -34,8 +34,8 @@ Otherwise use the defaults:
 ## 1. Set up the run
 
 **Where to start.** Run this skill from a folder with no Surla `AGENTS.md` in
-it or above it. Coding-agent harnesses load that file into every subagent,
-and it describes Surla's internals. The skill lives in Surla's
+it or above it. Some coding-agent harnesses load the working directory's
+`AGENTS.md` into every subagent, and Surla's describes its internals. The skill lives in Surla's
 `.agents/skills/surla-ux-review/`. To start it from elsewhere, link that
 folder into your personal skills folder once:
 
@@ -74,17 +74,17 @@ source out of its view.
   set, never its value;
 - whether commands run inside an agent sandbox and whether they have network
   access. `surla init` downloads modules, and Surla's verification uses macOS
-  `sandbox-exec`, which usually cannot run inside another sandbox. Either lift
-  these restrictions for the participant or mark the affected milestones as
-  not supported;
+  `sandbox-exec`, which usually cannot run inside another sandbox. Lift these
+  restrictions for the participant where you can. The tester marks the
+  milestones that the remaining restrictions block as not supported;
 - **how the participant reaches Surla's MCP server.** The README tells a user
   to point a coding agent at `http://<addr>/mcp`. A subagent cannot add an MCP
   server to its own session. The participant therefore runs its own
   coding-agent CLI non-interactively in `work/`, with an MCP configuration it
   writes itself, for example `claude -p`, `codex exec`, or `gemini -p`.
-  Record which CLIs it may use. If none can run here, mark the milestones
-  that need MCP as not supported. Do not hand it an undocumented HTTP route,
-  because working that out from outside the README is coaching.
+  Record which CLIs it may use, or that none can run here. Do not hand it an
+  undocumented HTTP route, because working that out from outside the README
+  is coaching.
 
 ## 2. Start the two subagents
 
@@ -140,15 +140,17 @@ copy as part of the hint.
 are its own account, so compare them with its actual tool calls wherever your
 harness keeps a subagent transcript. Also read the logs its coding agent saved
 in `work/agent-logs/`. A leak is reading anything outside the participant's
-allowed list, or building the product without Surla. Tell the tester about
-any leak. It records the leak as a finding, because reaching for the source
-usually means the docs failed, and it reminds the participant of the rules.
-If nothing can be checked, note in the limitations that leaks were only
-self-reported.
+allowed list, loading this skill, or building the product without Surla.
 
-The participant reports the PIDs and ports of any long-running processes it
-starts, such as `surla serve` or a Temporal dev server. Stop them when an
-attempt ends.
+A participant cannot unlearn what it read, so a leak ends the attempt. Tell
+the tester what was read and when. The tester records the leak as a finding,
+because reaching for the source usually means the docs failed, and marks
+later milestones in that attempt as not valid. Then restart, as in section
+4 step 4, with the same build. If nothing can be checked, note in the
+limitations that leaks were only self-reported.
+
+Stop the long-running processes the participant reports, such as `surla
+serve` or a Temporal dev server, when an attempt ends.
 
 ## 4. Handle a blocking bug
 
@@ -182,9 +184,8 @@ participant cannot get past it however well it uses Surla.
    5. Keep the same tester and tell it that a new attempt has begun on that
       commit. Its earlier findings carry into the report.
 
-By default, stop and report instead of restarting after the third blocking
-bug. With that many blockers, the report and the fixes are worth more than
-another attempt. The person invoking the skill may ask for a different limit.
+Fix and restart after every blocking bug. If the person invoking the skill
+set a limit on attempts, stop and report when it is reached.
 
 ## 5. Debrief and report
 

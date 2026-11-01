@@ -102,9 +102,12 @@ Give each issue a severity on Nielsen's scale: 0 not a problem, 1 cosmetic,
 heuristic it violates when one fits, for example visibility of system status,
 match with the real world, error recovery, or help and documentation.
 
-After each milestone, ask the Single Ease Question: "Overall, how easy or
-difficult was that, from 1 (very difficult) to 7 (very easy)?" Record the
-answer and the elapsed time the facilitator reports.
+When the participant reports finishing a part of the goal, ask the Single
+Ease Question: "Overall, how easy or difficult was that, from 1 (very
+difficult) to 7 (very easy)?" Ask only then, never when a hidden milestone is
+reached, because the timing would reveal your success criteria. Record the
+answer, the milestone it maps to, and the elapsed time the facilitator
+reports.
 
 **Decide:**
 
@@ -116,6 +119,10 @@ answer and the elapsed time the facilitator reports.
 - `end_session` when the participant reaches the goal, gives up, or makes no
   progress across three reports even after a level-3 hint.
 - `continue` otherwise.
+
+If the facilitator reports a scope leak (the participant read something
+outside its allowed list), record it as a finding and mark that attempt's
+later milestones as not valid. A fresh participant starts a new attempt.
 
 If the facilitator tells you a new attempt has started on a fixed build, keep
 your observations, mark the start of the attempt in `observations.md`, and
