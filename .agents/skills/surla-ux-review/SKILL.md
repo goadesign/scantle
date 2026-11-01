@@ -46,7 +46,7 @@ folder into your personal skills folder once:
 participant's folder and, apart from it, the tester's folder:
 
 ```text
-~/src/surla-ux-<id>/
+~/src/surla-ux-<id>-a1/   # one new folder per attempt: -a2, -a3, ...
   surla/       # git clone of github.com/goadesign/surla at the commit under test
   work/        # empty; the participant builds its product here
 ~/surla-ux-reports/<id>/
@@ -69,6 +69,10 @@ source out of its view.
 `attempt-1/transcript.md`:
 
 - the Surla commit, the date, and the OS;
+- whether the folder in the README's `surla init -dir` example (such as
+  `/tmp/shop`) already exists. `surla init` refuses an existing folder, so a
+  leftover one would show up as a false usability problem. Do not delete it
+  unless you can show this study created it; tell the tester it exists;
 - the `-surla-version` that the README tells `surla init` to use. A scaffolded
   project downloads that version, not the commit under test;
 - the versions of `go`, `goa`, and `temporal`, or that they are missing;
@@ -77,11 +81,15 @@ source out of its view.
 - any personal instruction files your harness loads into every subagent, such
   as a global `CLAUDE.md` or `AGENTS.md`. These can tell the participant
   things the README does not, so the report lists them as a limitation;
-- whether commands run inside an agent sandbox and whether they have network
-  access. `surla init` downloads modules, and Surla's verification uses macOS
-  `sandbox-exec`, which usually cannot run inside another sandbox. Lift these
-  restrictions for the participant where you can. The tester marks the
-  milestones that the remaining restrictions block as not supported;
+- whether commands run inside your coding agent's own sandbox, and whether
+  they have network access. `surla init` downloads modules, and Surla's
+  verification builds and runs the code under test inside its own macOS
+  `sandbox-exec` sandbox (`verify/candidate`), which usually cannot start
+  inside the agent's sandbox. Give the participant the host access you are
+  authorized to give. Never let anything build or run code under test outside
+  Surla's sandbox. If the access Surla needs is not available, that is an
+  environment limitation: the tester marks the milestones it blocks as not
+  supported;
 - **how the participant reaches Surla's MCP server.** The README tells a user
   to point a coding agent at `http://<addr>/mcp`. A subagent cannot add an MCP
   server to its own session. The participant therefore runs its own
@@ -106,7 +114,15 @@ fill in every placeholder:
 | `{{TESTER}}` | the tester's folder |
 | `{{CHALLENGE}}` | the tester's challenge text, word for word |
 
-Start each role as its own subagent, with the model set explicitly to your
+Start each role as a new subagent that does not inherit this conversation.
+This conversation holds the skill, may hold Surla's source or an earlier
+attempt, and a participant that sees any of it is no longer a first-time
+user. In Claude Code, that means a fresh `general-purpose` agent, not a
+`fork`. If your harness can only start subagents that inherit the parent
+conversation, stop: report that the participant would be contaminated, and
+do not present a run as a first-time experience.
+
+Set each subagent's model explicitly to your
 harness's frontier reasoning model, such as Opus in Claude Code or the
 high-reasoning model in Codex or Gemini CLI. Both roles need judgment, and a
 weaker model turns its own confusion into false usability findings.
@@ -154,8 +170,21 @@ later milestones in that attempt as not valid. Then restart, as in section
 4 step 4, with the same build. If nothing can be checked, note in the
 limitations that leaks were only self-reported.
 
-Stop the long-running processes the participant reports, such as `surla
-serve` or a Temporal dev server, when an attempt ends.
+**When an attempt or the session ends**, clean up what the participant
+created, checking each target first, because a reported PID or path does not
+prove ownership:
+
+- Stop the long-running processes it reported, such as `surla serve` or a
+  Temporal dev server. Check first that each PID still runs the command it
+  started, for example that `ps -p <pid> -o command=` shows the reported
+  binary and folder. PIDs get reused.
+- Look for project folders it created outside `work/`, whether it reported
+  them or they appear in `work/agent-logs/`. An example is `/tmp/shop` from
+  the README's `surla init -dir` example. Inspect each one, and remove it only
+  when its contents and timestamps show this attempt created it. Otherwise
+  leave it, and record it as a pre-existing path in the next transcript.
+- Keep the attempt's own folder, transcripts, and logs. They are the
+  evidence for the report.
 
 ## 4. Handle a blocking bug
 
@@ -164,8 +193,10 @@ to reproduce it. A blocking bug is one where Surla crashes, or behaves
 differently from its documentation, and no documented workaround exists. The
 participant cannot get past it however well it uses Surla.
 
-1. Reproduce the bug yourself, outside any agent sandbox and with network
-   access, so a harness restriction is not mistaken for a Surla bug.
+1. Reproduce the bug yourself with the trusted Surla CLI, using the host and
+   network access you are authorized to use, so a restriction in your coding
+   agent is not mistaken for a Surla bug. Code under test still builds and
+   runs only through Surla's own sandbox.
    - If the failure comes from the harness, tell the tester "environment
      limitation, not a Surla bug" and which milestones it affects.
    - If Surla behaves as designed, tell the tester "reproduced; behavior is as
@@ -182,16 +213,14 @@ participant cannot get past it however well it uses Surla.
    as `go list -m github.com/goadesign/surla@<sha>` prints it). This is the
    same way main updates `examples/orders` after a release.
 4. Restart from scratch:
-   1. Stop the participant's processes.
-   2. Replace `surla/` with a clone at the newest commit of the fix,
-      including any `-surla-version` follow-up.
+   1. Clean up as in section 3.
+   2. Create a new participant folder, `~/src/surla-ux-<id>-a<N+1>/`, holding
+      a clone at the newest commit of the fix, including any
+      `-surla-version` follow-up, and an empty `work/`. Leave the previous
+      attempt's folder in place as evidence.
    3. Copy the user docs from that commit into the tester's `docs/` again, so
       the tester judges the participant against the docs it is reading.
-   4. Clear `work/`, and remove any folder outside it that the participant
-      reported creating for its project, such as `/tmp/shop` from the
-      README's `surla init -dir` example. `surla init` refuses a folder that
-      already exists. Then start `attempt-<N+1>/transcript.md` with the newly
-      recorded facts.
+   4. Start `attempt-<N+1>/transcript.md` with the newly recorded facts.
    5. Start a **fresh** participant. One that remembers the failed attempt
       would skip the steps that confused it.
    6. Keep the same tester. Tell it that a new attempt has begun on that
