@@ -194,6 +194,56 @@ func BuildDraftOverridePayload(surlaDraftOverrideBody *string) (*surla.DraftOver
 	return v, nil
 }
 
+// BuildVerifyChangePayload builds the payload for the surla verify_change
+// endpoint from CLI flags.
+func BuildVerifyChangePayload(surlaVerifyChangeBody *string, surlaVerifyChangeChangeID *string) (*surla.VerifyChangePayload, error) {
+	var err error
+	var body VerifyChangeRequestBody
+	{
+		if surlaVerifyChangeBody == nil {
+			return nil, fmt.Errorf("missing required flag --body")
+		}
+		err = json.Unmarshal([]byte(*surlaVerifyChangeBody), &body)
+		if err != nil {
+			return nil, fmt.Errorf("invalid JSON for body, \nerror: %s, \nexample of valid JSON:\n%s", err, "'{\n      \"candidate_commit\": \"4efffd1df01a87d1242013e87a6a177ab079e433\",\n      \"request_revision\": \"Temporibus soluta.\"\n   }'")
+		}
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", body.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	var changeID string
+	{
+		if surlaVerifyChangeChangeID == nil {
+			return nil, fmt.Errorf("missing required flag --change-id")
+		}
+		changeID = *surlaVerifyChangeChangeID
+	}
+	v := &surla.VerifyChangePayload{
+		RequestRevision: body.RequestRevision,
+		CandidateCommit: body.CandidateCommit,
+	}
+	v.ChangeID = changeID
+
+	return v, nil
+}
+
+// BuildGetVerificationPayload builds the payload for the surla
+// get_verification endpoint from CLI flags.
+func BuildGetVerificationPayload(surlaGetVerificationRunID *string) (*surla.GetVerificationPayload, error) {
+	var runID string
+	{
+		if surlaGetVerificationRunID == nil {
+			return nil, fmt.Errorf("missing required flag --run-id")
+		}
+		runID = *surlaGetVerificationRunID
+	}
+	v := &surla.GetVerificationPayload{}
+	v.RunID = runID
+
+	return v, nil
+}
+
 // BuildApproveMergePayload builds the payload for the surla approve_merge
 // endpoint from CLI flags.
 func BuildApproveMergePayload(surlaApproveMergeBody *string) (*surla.ApproveMergePayload, error) {

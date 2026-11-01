@@ -20,7 +20,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/goadesign/surla/internal/procgroup"
 	"github.com/goadesign/surla/verify/candidate"
 	"github.com/goadesign/surla/verify/suite"
 	"goa.design/goa-ai/eval"
@@ -72,25 +71,75 @@ type (
 		// ReportDir receives the report, named by its digest.
 		ReportDir string
 	}
+
+	// Stage names the step of Run that stopped a verification.
+	Stage string
+
+	// StageError is every error Run returns: the step that failed, a summary
+	// that is safe to show builders, and the full error. Err may quote command
+	// output and must stay with the evaluator.
+	StageError struct {
+		// Stage is the step that failed.
+		Stage Stage
+		// Summary describes the failure in one sentence without command output.
+		Summary string
+		// Err is the full error.
+		Err error
+	}
+
+	// runner runs the verifier's commands with file-backed output.
+	runner struct {
+		// evidenceDir receives every command's stdout and stderr.
+		evidenceDir string
+	}
+
+	// buildToolchain is what a sandboxed candidate build runs with.
+	buildToolchain struct {
+		// goroot is the resolved toolchain the candidate module selects.
+		goroot string
+		// modCache is the module cache holding the candidate's dependencies.
+		modCache string
+		// workDir is the build's private HOME, TMPDIR and GOCACHE.
+		workDir string
+	}
+)
+
+const (
+	// StageCheckout covers the plan, the work directory and the candidate and
+	// suite checkouts.
+	StageCheckout Stage = "checkout"
+	// StageBuild covers preparing and building the candidate and the suite.
+	StageBuild Stage = "build"
+	// StageDescribe is the suite's --describe.
+	StageDescribe Stage = "describe"
+	// StageSuite is running the suite against the candidate.
+	StageSuite Stage = "suite"
+	// StageReport is assembling and saving the report.
+	StageReport Stage = "report"
+
+	// holdoutTag marks a scenario whose details builders must never see.
+	holdoutTag = "holdout"
+	// maxErrorExcerpt bounds how much of a failed command's output an error
+	// message quotes; the full output stays in the evidence directory.
+	maxErrorExcerpt = 4 << 10
+	// suiteStopGrace is how long the suite gets to stop its candidates and
+	// report after SIGTERM before it is killed.
+	suiteStopGrace = 30 * time.Second
+	// summaryPlan is the builder-safe summary of an invalid verification plan
+	// or work directory, which the operator configures.
+	summaryPlan = "The operator's verification configuration is invalid."
+	// summaryCandidateBuild is the builder-safe summary of a candidate that
+	// did not build.
+	summaryCandidateBuild = "The candidate did not build."
+	// summarySuiteBuild is the builder-safe summary of an evaluator suite that
+	// did not build.
+	summarySuiteBuild = "The evaluator suite did not build."
 )
 
 // commitID matches a full commit ID in either Git object format: 40 hex digits
 // for SHA-1 repositories, 64 for SHA-256 ones. The checkout then requires HEAD
 // to equal it, which only the full ID in the repository's own format can.
 var commitID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
-
-const (
-	// holdoutTag marks a scenario whose details builders must never see.
-	holdoutTag = "holdout"
-	// maxErrorExcerpt bounds how much of a failed command's output an error
-	// message quotes; the full output stays in the evidence directory.
-	maxErrorExcerpt = 4 << 10
-	// suiteStopGrace is how long the suite's process group gets to clean up
-	// after SIGTERM before it is killed.
-	suiteStopGrace = 30 * time.Second
-	// groupStopTimeout bounds waiting for a killed process group to empty.
-	groupStopTimeout = 30 * time.Second
-)
 
 // Run clones the candidate at its exact commit and builds its binaries into
 // WorkDir/candidate-bin, then clones the suite at its exact commit, builds it
@@ -110,48 +159,55 @@ const (
 // output goes to files under WorkDir/evidence; errors quote only a bounded
 // excerpt.
 //
-// A suite that produces no decodable eval.Report is an error. Otherwise the
-// report keeps the suite's evidence and exit status: a suite that ran and
-// failed, or that exited abnormally after writing partial results, yields a
-// report that does not pass.
+// Run starts its builds, the suite and the candidates the suite runs in the
+// caller's process group and does not stop processes they leave behind: its
+// caller must run it inside an owning group that it stops afterwards, as
+// `surla verify-run execute` does under its supervisor.
+//
+// Every error is a *StageError naming the step that failed and a summary
+// safe to show builders; its Err may quote command output and stays with the
+// evaluator. A suite that produces no decodable eval.Report is an error.
+// Otherwise the report keeps the suite's evidence and exit status: a suite
+// that ran and failed, or that exited abnormally after writing partial
+// results, yields a report that does not pass.
 func Run(ctx context.Context, p Plan) (Report, error) {
 	for name, commit := range map[string]string{"candidate": p.CandidateCommit, "suite": p.SuiteCommit} {
 		if !commitID.MatchString(commit) {
-			return Report{}, fmt.Errorf("%s commit %q is not a full commit ID", name, commit)
+			return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("%s commit %q is not a full commit ID", name, commit))
 		}
 	}
 	for name, pkg := range p.Binaries {
 		if err := validateArtifactName(name); err != nil {
-			return Report{}, err
+			return Report{}, stageError(StageCheckout, summaryPlan, err)
 		}
 		if err := validatePackagePath(pkg); err != nil {
-			return Report{}, fmt.Errorf("binary %q: %w", name, err)
+			return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("binary %q: %w", name, err))
 		}
 	}
 	if err := validatePackagePath(p.SuiteCommand); err != nil {
-		return Report{}, fmt.Errorf("suite command: %w", err)
+		return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("suite command: %w", err))
 	}
 	if p.WorkDir == "" {
-		return Report{}, errors.New("work directory is required")
+		return Report{}, stageError(StageCheckout, summaryPlan, errors.New("work directory is required"))
 	}
 	workDir, err := filepath.Abs(p.WorkDir)
 	if err != nil {
-		return Report{}, fmt.Errorf("work directory: %w", err)
+		return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("work directory: %w", err))
 	}
 	p.WorkDir = workDir
 	switch entries, err := os.ReadDir(p.WorkDir); {
 	case errors.Is(err, fs.ErrNotExist):
 	case err != nil:
-		return Report{}, fmt.Errorf("work directory: %w", err)
+		return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("work directory: %w", err))
 	case len(entries) > 0:
-		return Report{}, fmt.Errorf("work directory %s must be missing or empty", p.WorkDir)
+		return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("work directory %s must be missing or empty", p.WorkDir))
 	}
 	evidenceDir := filepath.Join(p.WorkDir, "evidence")
 	candidateBinDir := filepath.Join(p.WorkDir, "candidate-bin")
 	suiteBinDir := filepath.Join(p.WorkDir, "suite-bin")
 	for _, dir := range []string{evidenceDir, candidateBinDir, suiteBinDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return Report{}, fmt.Errorf("create %s: %w", dir, err)
+			return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("create %s: %w", dir, err))
 		}
 	}
 	r := &runner{evidenceDir: evidenceDir}
@@ -164,20 +220,20 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 
 	candidateDir := filepath.Join(p.WorkDir, "candidate")
 	if err := r.checkout(ctx, "candidate", p.CandidateRepo, p.CandidateCommit, candidateDir); err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageCheckout, "Checking out the candidate commit failed.", err)
 	}
 	moduleDir, err := resolveInside(candidateDir, p.CandidateModule)
 	if err != nil {
-		return Report{}, fmt.Errorf("candidate module %q: %w", p.CandidateModule, err)
+		return Report{}, stageError(StageCheckout, "The candidate commit does not contain the configured module.", fmt.Errorf("candidate module %q: %w", p.CandidateModule, err))
 	}
 	for name, pkg := range p.Binaries {
 		if _, err := resolveInside(moduleDir, pkg); err != nil {
-			return Report{}, fmt.Errorf("binary %q package %q: %w", name, pkg, err)
+			return Report{}, stageError(StageCheckout, "The candidate commit does not contain a configured binary package.", fmt.Errorf("binary %q package %q: %w", name, pkg, err))
 		}
 	}
 	toolchain, err := r.prepareBuild(ctx, "candidate", moduleDir, p.WorkDir)
 	if err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageBuild, summaryCandidateBuild, err)
 	}
 	var artifactFlags []string
 	for _, name := range slices.Sorted(maps.Keys(p.Binaries)) {
@@ -186,12 +242,12 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 			SourceDir: moduleDir, ModuleDir: moduleDir, Package: p.Binaries[name], Out: out,
 			GOROOT: toolchain.goroot, ModCache: toolchain.modCache, WorkDir: toolchain.workDir,
 			LogFile: filepath.Join(r.evidenceDir, "build-"+name+".log"),
-		}); err != nil {
-			return Report{}, fmt.Errorf("build candidate %s: %w", name, err)
+		}, (*exec.Cmd).Run); err != nil {
+			return Report{}, stageError(StageBuild, summaryCandidateBuild, fmt.Errorf("build candidate %s: %w", name, err))
 		}
 		digest, err := sha256File(out)
 		if err != nil {
-			return Report{}, err
+			return Report{}, stageError(StageBuild, summaryCandidateBuild, err)
 		}
 		binding.Artifacts[name] = digest
 		artifactFlags = append(artifactFlags, "--artifact", name+"="+out)
@@ -199,18 +255,18 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 
 	suiteDir := filepath.Join(p.WorkDir, "suite")
 	if err := r.checkout(ctx, "suite", p.SuiteRepo, p.SuiteCommit, suiteDir); err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageCheckout, "Checking out the evaluator suite failed.", err)
 	}
 	suiteModuleDir, err := resolveInside(suiteDir, p.SuiteModule)
 	if err != nil {
-		return Report{}, fmt.Errorf("suite module %q: %w", p.SuiteModule, err)
+		return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("suite module %q: %w", p.SuiteModule, err))
 	}
 	if _, err := resolveInside(suiteModuleDir, p.SuiteCommand); err != nil {
-		return Report{}, fmt.Errorf("suite command %q: %w", p.SuiteCommand, err)
+		return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("suite command %q: %w", p.SuiteCommand, err))
 	}
 	suiteToolchain, err := r.prepareBuild(ctx, "suite", suiteModuleDir, p.WorkDir)
 	if err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageBuild, summarySuiteBuild, err)
 	}
 	// The suite builds in the same sandbox as the candidate, readable only
 	// within its own checkout: its module may replace sibling modules there,
@@ -220,26 +276,36 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 		SourceDir: suiteDir, ModuleDir: suiteModuleDir, Package: p.SuiteCommand, Out: suiteBin,
 		GOROOT: suiteToolchain.goroot, ModCache: suiteToolchain.modCache, WorkDir: suiteToolchain.workDir,
 		LogFile: filepath.Join(r.evidenceDir, "build-suite.log"),
-	}); err != nil {
-		return Report{}, fmt.Errorf("build suite: %w", err)
+	}, (*exec.Cmd).Run); err != nil {
+		return Report{}, stageError(StageBuild, summarySuiteBuild, fmt.Errorf("build suite: %w", err))
 	}
 	declared, err := r.describe(ctx, suiteBin)
 	if err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageDescribe, "The evaluator suite did not describe its scenarios.", err)
 	}
 	binding.SuiteID, binding.Environment = declared.ID, declared.Environment
 	evidence, exit, err := r.runSuite(ctx, suiteBin, artifactFlags)
 	if err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageSuite, "The evaluator suite ended without a report.", err)
 	}
 	report, err := Assemble(binding, declared, evidence, exit)
 	if err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageReport, "The evaluator suite's report does not match its declaration or the binaries it was given.", err)
 	}
 	if err := writeReport(p.ReportDir, report); err != nil {
-		return Report{}, err
+		return Report{}, stageError(StageReport, "Saving the verification report failed.", err)
 	}
 	return report, nil
+}
+
+// Error returns the step, the summary and the full error.
+func (e *StageError) Error() string {
+	return fmt.Sprintf("%s: %s %v", e.Stage, e.Summary, e.Err)
+}
+
+// Unwrap returns the full error.
+func (e *StageError) Unwrap() error {
+	return e.Err
 }
 
 // resolveInside resolves rel, a path relative to the directory root, following
@@ -286,12 +352,6 @@ func validateArtifactName(name string) error {
 	return nil
 }
 
-// runner runs the verifier's commands with file-backed output.
-type runner struct {
-	// evidenceDir receives every command's stdout and stderr.
-	evidenceDir string
-}
-
 // checkout clones repo into dir and checks out commit, detached. The source
 // repository is only read; clone hooks and templates are disabled.
 func (r *runner) checkout(ctx context.Context, label, repo, commit, dir string) error {
@@ -333,12 +393,11 @@ func (r *runner) describe(ctx context.Context, suiteBin string) (Suite, error) {
 	return s, nil
 }
 
-// runSuite runs the suite in its own process group and returns its eval.Report
-// and exit status. Cancellation sends SIGTERM to the whole group, so the
-// suite's candidate and Temporal processes stop with it. After the suite
-// process ends, every process left in its group is killed and runSuite waits
-// until the group is empty before returning; a group that does not empty in
-// time is an error and its state is not released. A report is decoded
+// runSuite runs the suite and returns its eval.Report and exit status. The
+// suite and the candidates it starts run in the caller's process group, which
+// stops and reaps them (surla verify-run supervise owns that group).
+// Cancellation sends SIGTERM to the suite so it can stop its candidates and
+// report what it has; it is killed after suiteStopGrace. A report is decoded
 // whatever the outcome; a canceled or abnormal end gets exit status -1 and
 // never passes. Only a missing or undecodable report is an error.
 func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []string) (eval.Report, int, error) {
@@ -350,10 +409,12 @@ func (r *runner) runSuite(ctx context.Context, suiteBin string, artifactFlags []
 	defer stderr.Close()
 	cmd := exec.CommandContext(ctx, suiteBin, artifactFlags...)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	runErr, stopErr := procgroup.Run(cmd, syscall.SIGTERM, suiteStopGrace, groupStopTimeout)
-	if stopErr != nil {
-		return eval.Report{}, 0, fmt.Errorf("stop suite processes: %w", stopErr)
-	}
+	// Cancellation asks the suite to stop its candidates and report; it gets
+	// suiteStopGrace before it is killed. The suite and whatever it starts
+	// stay in the caller's process group, which owns their cleanup.
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = suiteStopGrace
+	runErr := cmd.Run()
 	var report eval.Report
 	decodeErr := decodeFile(filepath.Join(r.evidenceDir, "suite.stdout"), &report)
 	exit := 0
@@ -431,16 +492,6 @@ func (r *runner) excerpt(label string) string {
 	return "\nstderr" + note + ", full output in " + path + ":\n" + strings.TrimSpace(string(b))
 }
 
-// buildToolchain is what a sandboxed candidate build runs with.
-type buildToolchain struct {
-	// goroot is the resolved toolchain the candidate module selects.
-	goroot string
-	// modCache is the module cache holding the candidate's dependencies.
-	modCache string
-	// workDir is the build's private HOME, TMPDIR and GOCACHE.
-	workDir string
-}
-
 // prepareBuild resolves the toolchain the module at moduleDir selects and
 // downloads its module dependencies, outside the sandbox, for the build named
 // label ("candidate" or "suite"). These steps fetch checksum-verified modules
@@ -503,4 +554,9 @@ func sha256File(path string) (string, error) {
 		return "", fmt.Errorf("hash %s: %w", path, err)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// stageError wraps err as the *StageError Run returns.
+func stageError(stage Stage, summary string, err error) error {
+	return &StageError{Stage: stage, Summary: summary, Err: err}
 }

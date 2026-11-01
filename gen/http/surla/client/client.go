@@ -45,6 +45,14 @@ type Client struct {
 	// draft_override endpoint.
 	DraftOverrideDoer goahttp.Doer
 
+	// VerifyChange Doer is the HTTP client used to make requests to the
+	// verify_change endpoint.
+	VerifyChangeDoer goahttp.Doer
+
+	// GetVerification Doer is the HTTP client used to make requests to the
+	// get_verification endpoint.
+	GetVerificationDoer goahttp.Doer
+
 	// ApproveMerge Doer is the HTTP client used to make requests to the
 	// approve_merge endpoint.
 	ApproveMergeDoer goahttp.Doer
@@ -79,6 +87,8 @@ func NewClient(
 		GetChangeDoer:           doer,
 		PreviewArchitectureDoer: doer,
 		DraftOverrideDoer:       doer,
+		VerifyChangeDoer:        doer,
+		GetVerificationDoer:     doer,
 		ApproveMergeDoer:        doer,
 		DiffDoer:                doer,
 		RestoreResponseBody:     restoreBody,
@@ -237,6 +247,49 @@ func (c *Client) DraftOverride() goa.Endpoint {
 		resp, err := c.DraftOverrideDoer.Do(req)
 		if err != nil {
 			return nil, goahttp.ErrRequestError("surla", "draft_override", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// VerifyChange returns an endpoint that makes HTTP requests to the surla
+// service verify_change server.
+func (c *Client) VerifyChange() goa.Endpoint {
+	var (
+		encodeRequest  = EncodeVerifyChangeRequest(c.encoder)
+		decodeResponse = DecodeVerifyChangeResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildVerifyChangeRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		err = encodeRequest(req, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.VerifyChangeDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("surla", "verify_change", err)
+		}
+		return decodeResponse(resp)
+	}
+}
+
+// GetVerification returns an endpoint that makes HTTP requests to the surla
+// service get_verification server.
+func (c *Client) GetVerification() goa.Endpoint {
+	var (
+		decodeResponse = DecodeGetVerificationResponse(c.decoder, c.RestoreResponseBody)
+	)
+	return func(ctx context.Context, v any) (any, error) {
+		req, err := c.BuildGetVerificationRequest(ctx, v)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := c.GetVerificationDoer.Do(req)
+		if err != nil {
+			return nil, goahttp.ErrRequestError("surla", "get_verification", err)
 		}
 		return decodeResponse(resp)
 	}

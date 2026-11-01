@@ -8,10 +8,10 @@
 package surla
 
 import (
-	bytes "bytes"
+	"bytes"
 	"context"
-	json "encoding/json"
-	fmt "fmt"
+	"encoding/json"
+	"fmt"
 	io "io"
 	sort "sort"
 	strconv "strconv"
@@ -52,6 +52,19 @@ type Service interface {
 	// Apply a Fast Draft Mode prompt override on the bound target or reject a
 	// compiled-rule prompt hack.
 	DraftOverride(context.Context, *DraftOverridePayload) (res *DraftOverrideResult, err error)
+	// Start Checkpoint 4 verification of a candidate commit for the owner's
+	// confirmed Change Card revision and return its run_id at once. The server
+	// builds the commit in Surla's sandbox and runs the evaluator suite the
+	// operator configured, in a separate process that keeps running when the
+	// caller disconnects or the server restarts; get_verification reads its state.
+	// Only the builder view of the report is ever returned. A server started
+	// without verification configured rejects every call.
+	VerifyChange(context.Context, *VerifyChangePayload) (res *VerificationStatusResult, err error)
+	// Return the current state of a verification run to the owner who started it:
+	// running, completed with the builder view of its report, or not completed
+	// with where it stopped. A run keeps the Change Card revision it was started
+	// for.
+	GetVerification(context.Context, *GetVerificationPayload) (res *VerificationStatusResult, err error)
 	// Record Checkpoint 5 approval for the owner's confirmed Change Card revision.
 	// The control plane loads the verification report by digest and the expected
 	// suite, environment and candidate binary digests from its promotion target,
@@ -80,7 +93,7 @@ const ServiceName = "surla"
 // MethodNames lists the service method names as defined in the design. These
 // are the same values that are set in the endpoint request contexts under the
 // MethodKey key.
-var MethodNames = [9]string{"checkpoint_ui", "golden_path", "propose_change", "confirm_intent", "get_change", "preview_architecture", "draft_override", "approve_merge", "diff"}
+var MethodNames = [11]string{"checkpoint_ui", "golden_path", "propose_change", "confirm_intent", "get_change", "preview_architecture", "draft_override", "verify_change", "get_verification", "approve_merge", "diff"}
 
 // Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.
 type AgentPolicyItem struct {
@@ -192,6 +205,24 @@ type BuilderScopeItem struct {
 	Paths []string
 	// Optional preference selecting a server-configured authenticated profile ID.
 	PreferredProfileID *string
+}
+
+// The builder view of a Checkpoint 4 verification report: counts, verdict and
+// repair scenario checks. Holdout details, evidence and logs stay with the
+// evaluator.
+type BuilderVerificationReport struct {
+	// SHA-256 digest of the full report the evaluator saved; approve_merge and
+	// surla approve take this digest.
+	ReportDigest string
+	// Every declared scenario, counted by outcome.
+	Counts *VerificationCounts
+	// The verdict: true only when every declared scenario passed and the suite ran
+	// cleanly.
+	Passed bool
+	// Whether the evaluator suite itself failed or ended abnormally.
+	SuiteFailed bool
+	// Every declared scenario in declaration order.
+	Scenarios []*VerificationScenario
 }
 
 // Architecture element declared by the target Goa, Goa-AI, or Model design.
@@ -344,6 +375,13 @@ type GetChangePayload struct {
 	ChangeID string
 }
 
+// GetVerificationPayload is the payload type of the surla service
+// get_verification method.
+type GetVerificationPayload struct {
+	// Verification run identifier returned by verify_change.
+	RunID string
+}
+
 // PreviewArchitecturePayload is the payload type of the surla service
 // preview_architecture method.
 type PreviewArchitecturePayload struct {
@@ -480,6 +518,103 @@ type UICompositionItem struct {
 	ComposedForRevision string
 }
 
+// One deterministic check of a repair scenario.
+type VerificationCheck struct {
+	// Check name.
+	Name string
+	// Whether the check passed.
+	Passed bool
+	// Why the check failed; empty when it passed.
+	Diagnostic *string
+}
+
+// The run produced a verification report. Its verdict is report.passed.
+type VerificationCompleted struct {
+	// Evaluator suite the report was produced by.
+	SuiteID string
+	// Dependency profile the suite ran the candidate with, such as sim.
+	Environment string
+	// The builder view of the report.
+	Report *BuilderVerificationReport
+}
+
+// Every declared scenario, counted by outcome.
+type VerificationCounts struct {
+	// Scenarios the suite declares.
+	Required int
+	// Scenarios that passed.
+	Passed int
+	// Scenarios whose checks failed.
+	Failed int
+	// Declared scenarios the suite did not report.
+	NotRun int
+	// Scenarios that could not be evaluated.
+	HarnessError int
+}
+
+// The run was accepted but did not complete: a step failed, or its processes
+// ended or were canceled or timed out before it finished. The summary states
+// where it stopped, without command output; full evidence, including any
+// partial report saved while it was being stopped, stays with the evaluator.
+type VerificationNotCompleted struct {
+	// execution_failed when a step failed; interrupted when the run's process
+	// ended before it finished.
+	Kind string
+	// Where the run stopped.
+	Stage string
+	// Builder-safe description of what stopped the run; never command output.
+	Summary string
+}
+
+// The run is still building or evaluating the candidate.
+type VerificationRunning struct {
+	// When the run was accepted.
+	StartedAt string
+}
+
+// One declared scenario as builders see it. Repair scenarios carry their name,
+// checks and environment error; holdout scenarios appear only as holdout-<n>
+// with their outcome.
+type VerificationScenario struct {
+	// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+	ID string
+	// How the scenario ended.
+	Outcome string
+	// The repair scenario's checks; empty for holdouts.
+	Checks []*VerificationCheck
+	// The repair scenario's environment error; empty for holdouts.
+	Error *string
+}
+
+// VerificationStatusResult is the result type of the surla service
+// verify_change method.
+type VerificationStatusResult struct {
+	// Verification run identifier; get_verification takes it.
+	RunID string
+	// Change Card the run verifies.
+	ChangeID string
+	// Change Card revision the run verifies.
+	RequestRevision string
+	// Candidate commit the run builds and verifies.
+	CandidateCommit string
+	// Evaluator suite commit the operator configured for the run.
+	SuiteCommit string
+	// Exactly one of running, completed or not_completed.
+	State State
+}
+
+// VerifyChangePayload is the payload type of the surla service verify_change
+// method.
+type VerifyChangePayload struct {
+	// Confirmed Change Card identifier.
+	ChangeID string
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision string
+	// Full commit ID of the candidate to build and verify (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit string
+}
+
 // agentPolicyItemIntTransport stores JSON fields until they have been validated.
 type agentPolicyItemIntTransport int
 
@@ -516,6 +651,26 @@ func (value *approvalItemIntTransport) UnmarshalJSON(data []byte) error {
 
 // ValidateapprovalItemIntTransport checks decoded JSON before it becomes a service value.
 func ValidateapprovalItemIntTransport(value approvalItemIntTransport) (err error) {
+
+	return err
+}
+
+// builderVerificationReportIntTransport stores JSON fields until they have been validated.
+type builderVerificationReportIntTransport int
+
+// UnmarshalJSON reads an exact whole JSON number and stores it within this type's
+// declared range. Decimal and exponent spellings do not change its value.
+func (value *builderVerificationReportIntTransport) UnmarshalJSON(data []byte) error {
+	number, err := rawjson.DecodeInteger[int](data)
+	if err != nil {
+		return fmt.Errorf("decode builderVerificationReportIntTransport integer: %w", err)
+	}
+	*value = builderVerificationReportIntTransport(number)
+	return nil
+}
+
+// ValidatebuilderVerificationReportIntTransport checks decoded JSON before it becomes a service value.
+func ValidatebuilderVerificationReportIntTransport(value builderVerificationReportIntTransport) (err error) {
 
 	return err
 }
@@ -810,6 +965,57 @@ func validatejsonBuilderScopeItemTransport(value *jsonBuilderScopeItemTransport)
 	}
 	if value.Paths == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("paths", "body"))
+	}
+	return err
+}
+
+// jsonBuilderVerificationReportTransport stores JSON fields until they have been validated.
+type jsonBuilderVerificationReportTransport struct {
+	// SHA-256 digest of the full report the evaluator saved; approve_merge and
+	// surla approve take this digest.
+	ReportDigest *string `json:"report_digest"`
+	// Every declared scenario, counted by outcome.
+	Counts *jsonVerificationCountsTransport `json:"counts"`
+	// The verdict: true only when every declared scenario passed and the suite ran
+	// cleanly.
+	Passed *bool `json:"passed"`
+	// Whether the evaluator suite itself failed or ended abnormally.
+	SuiteFailed *bool `json:"suite_failed"`
+	// Every declared scenario in declaration order.
+	Scenarios []*jsonVerificationScenarioTransport `json:"scenarios"`
+}
+
+// validatejsonBuilderVerificationReportTransport checks decoded JSON before it becomes a service value.
+func validatejsonBuilderVerificationReportTransport(value *jsonBuilderVerificationReportTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ReportDigest == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report_digest", "body"))
+	}
+	if value.Counts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("counts", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	if value.SuiteFailed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_failed", "body"))
+	}
+	if value.Scenarios == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenarios", "body"))
+	}
+	if value.Counts != nil {
+		if err2 := validatejsonVerificationCountsTransport(value.Counts); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	for _, e := range value.Scenarios {
+		if e != nil {
+			if err2 := validatejsonVerificationScenarioTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
 	}
 	return err
 }
@@ -1219,6 +1425,23 @@ func validatejsonGetChangePayloadTransport(value *jsonGetChangePayloadTransport)
 	return err
 }
 
+// jsonGetVerificationPayloadTransport stores JSON fields until they have been validated.
+type jsonGetVerificationPayloadTransport struct {
+	// Verification run identifier returned by verify_change.
+	RunID *string `json:"run_id"`
+}
+
+// validatejsonGetVerificationPayloadTransport checks decoded JSON before it becomes a service value.
+func validatejsonGetVerificationPayloadTransport(value *jsonGetVerificationPayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.RunID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("run_id", "body"))
+	}
+	return err
+}
+
 // jsonPreviewArchitecturePayloadTransport stores JSON fields until they have been validated.
 type jsonPreviewArchitecturePayloadTransport struct {
 	// Confirmed Change Card identifier.
@@ -1542,6 +1765,299 @@ func validatejsonUICompositionItemTransport(value *jsonUICompositionItemTranspor
 	return err
 }
 
+// jsonVerificationCheckTransport stores JSON fields until they have been validated.
+type jsonVerificationCheckTransport struct {
+	// Check name.
+	Name *string `json:"name"`
+	// Whether the check passed.
+	Passed *bool `json:"passed"`
+	// Why the check failed; empty when it passed.
+	Diagnostic *string `json:"diagnostic,omitempty"`
+}
+
+// validatejsonVerificationCheckTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationCheckTransport(value *jsonVerificationCheckTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	return err
+}
+
+// jsonVerificationCompletedTransport stores JSON fields until they have been validated.
+type jsonVerificationCompletedTransport struct {
+	// Evaluator suite the report was produced by.
+	SuiteID *string `json:"suite_id"`
+	// Dependency profile the suite ran the candidate with, such as sim.
+	Environment *string `json:"environment"`
+	// The builder view of the report.
+	Report *jsonBuilderVerificationReportTransport `json:"report"`
+}
+
+// validatejsonVerificationCompletedTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationCompletedTransport(value *jsonVerificationCompletedTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.SuiteID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_id", "body"))
+	}
+	if value.Environment == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("environment", "body"))
+	}
+	if value.Report == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report", "body"))
+	}
+	if value.Report != nil {
+		if err2 := validatejsonBuilderVerificationReportTransport(value.Report); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// jsonVerificationCountsTransport stores JSON fields until they have been validated.
+type jsonVerificationCountsTransport struct {
+	// Scenarios the suite declares.
+	Required *builderVerificationReportIntTransport `json:"required"`
+	// Scenarios that passed.
+	Passed *builderVerificationReportIntTransport `json:"passed"`
+	// Scenarios whose checks failed.
+	Failed *builderVerificationReportIntTransport `json:"failed"`
+	// Declared scenarios the suite did not report.
+	NotRun *builderVerificationReportIntTransport `json:"not_run"`
+	// Scenarios that could not be evaluated.
+	HarnessError *builderVerificationReportIntTransport `json:"harness_error"`
+}
+
+// validatejsonVerificationCountsTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationCountsTransport(value *jsonVerificationCountsTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Required == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("required", "body"))
+	}
+	if value.Passed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("passed", "body"))
+	}
+	if value.Failed == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("failed", "body"))
+	}
+	if value.NotRun == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("not_run", "body"))
+	}
+	if value.HarnessError == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("harness_error", "body"))
+	}
+	return err
+}
+
+// jsonVerificationNotCompletedTransport stores JSON fields until they have been validated.
+type jsonVerificationNotCompletedTransport struct {
+	// execution_failed when a step failed; interrupted when the run's process
+	// ended before it finished.
+	Kind *string `json:"kind"`
+	// Where the run stopped.
+	Stage *string `json:"stage"`
+	// Builder-safe description of what stopped the run; never command output.
+	Summary *string `json:"summary"`
+}
+
+// validatejsonVerificationNotCompletedTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationNotCompletedTransport(value *jsonVerificationNotCompletedTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.Kind == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("kind", "body"))
+	}
+	if value.Stage == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("stage", "body"))
+	}
+	if value.Summary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("summary", "body"))
+	}
+	if value.Kind != nil {
+		if !(*value.Kind == "execution_failed" || *value.Kind == "interrupted") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.kind", *value.Kind, []any{"execution_failed", "interrupted"}))
+		}
+	}
+	if value.Stage != nil {
+		if !(*value.Stage == "checkout" || *value.Stage == "build" || *value.Stage == "describe" || *value.Stage == "suite" || *value.Stage == "report" || *value.Stage == "supervise") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.stage", *value.Stage, []any{"checkout", "build", "describe", "suite", "report", "supervise"}))
+		}
+	}
+	return err
+}
+
+// jsonVerificationRunningTransport stores JSON fields until they have been validated.
+type jsonVerificationRunningTransport struct {
+	// When the run was accepted.
+	StartedAt *string `json:"started_at"`
+}
+
+// validatejsonVerificationRunningTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationRunningTransport(value *jsonVerificationRunningTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.StartedAt == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("started_at", "body"))
+	}
+	if value.StartedAt != nil {
+		err = goa.MergeErrors(err, goa.ValidateFormat("body.started_at", *value.StartedAt, goa.FormatDateTime))
+	}
+	return err
+}
+
+// jsonVerificationScenarioTransport stores JSON fields until they have been validated.
+type jsonVerificationScenarioTransport struct {
+	// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+	ID *string `json:"id"`
+	// How the scenario ended.
+	Outcome *string `json:"outcome"`
+	// The repair scenario's checks; empty for holdouts.
+	Checks []*jsonVerificationCheckTransport `json:"checks,omitempty"`
+	// The repair scenario's environment error; empty for holdouts.
+	Error *string `json:"error,omitempty"`
+}
+
+// validatejsonVerificationScenarioTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationScenarioTransport(value *jsonVerificationScenarioTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if value.Outcome == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("outcome", "body"))
+	}
+	if value.Outcome != nil {
+		if !(*value.Outcome == "passed" || *value.Outcome == "failed" || *value.Outcome == "not_run" || *value.Outcome == "harness_error") {
+			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.outcome", *value.Outcome, []any{"passed", "failed", "not_run", "harness_error"}))
+		}
+	}
+	for _, e := range value.Checks {
+		if e != nil {
+			if err2 := validatejsonVerificationCheckTransport(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// jsonVerificationStatusResultTransport stores JSON fields until they have been validated.
+type jsonVerificationStatusResultTransport struct {
+	// Verification run identifier; get_verification takes it.
+	RunID *string `json:"run_id"`
+	// Change Card the run verifies.
+	ChangeID *string `json:"change_id"`
+	// Change Card revision the run verifies.
+	RequestRevision *string `json:"request_revision"`
+	// Candidate commit the run builds and verifies.
+	CandidateCommit *string `json:"candidate_commit"`
+	// Evaluator suite commit the operator configured for the run.
+	SuiteCommit *string `json:"suite_commit"`
+	// Exactly one of running, completed or not_completed.
+	State *jsonStateTransport `json:"state"`
+}
+
+// validatejsonVerificationStatusResultTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerificationStatusResultTransport(value *jsonVerificationStatusResultTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.RunID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("run_id", "body"))
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.SuiteCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("suite_commit", "body"))
+	}
+	if value.State == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("state", "body"))
+	}
+	if value.State != nil {
+
+		if err2 := value.State.Validate(); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		} else {
+			switch string(value.State.Kind()) {
+			case "running":
+				actual, _ := value.State.AsRunning()
+				if actual != nil {
+					if err2 := validatejsonVerificationRunningTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			case "completed":
+				actual, _ := value.State.AsCompleted()
+				if actual != nil {
+					if err2 := validatejsonVerificationCompletedTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			case "not_completed":
+				actual, _ := value.State.AsNotCompleted()
+				if actual != nil {
+					if err2 := validatejsonVerificationNotCompletedTransport(actual); err2 != nil {
+						err = goa.MergeErrors(err, err2)
+					}
+				}
+			}
+		}
+
+	}
+	return err
+}
+
+// jsonVerifyChangePayloadTransport stores JSON fields until they have been validated.
+type jsonVerifyChangePayloadTransport struct {
+	// Confirmed Change Card identifier.
+	ChangeID *string `json:"change_id"`
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision *string `json:"request_revision"`
+	// Full commit ID of the candidate to build and verify (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit *string `json:"candidate_commit"`
+}
+
+// validatejsonVerifyChangePayloadTransport checks decoded JSON before it becomes a service value.
+func validatejsonVerifyChangePayloadTransport(value *jsonVerifyChangePayloadTransport) (err error) {
+	if value == nil {
+		return goa.MissingFieldError("body", "JSON value")
+	}
+	if value.ChangeID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("change_id", "body"))
+	}
+	if value.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if value.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if value.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *value.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	}
+	return err
+}
+
 // validateAmbiguityQuestionOriginal checks the original typed value before JSON conversion.
 func validateAmbiguityQuestionOriginal(value *AmbiguityQuestion) (err error) {
 	if value.Options == nil {
@@ -1669,6 +2185,32 @@ func validateSwarmRoleItemOriginal(value *SwarmRoleItem) (err error) {
 func validateBuilderScopeItemOriginal(value *BuilderScopeItem) (err error) {
 	if value.Paths == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("paths", "value"))
+	}
+	return err
+}
+
+// validateBuilderVerificationReportOriginal checks the original typed value before JSON conversion.
+func validateBuilderVerificationReportOriginal(value *BuilderVerificationReport) (err error) {
+	if value.Counts == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("counts", "value"))
+	}
+	if value.Scenarios == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("scenarios", "value"))
+	}
+	for _, e := range value.Scenarios {
+		if e != nil {
+			if err2 := validateVerificationScenarioOriginal(e); err2 != nil {
+				err = goa.MergeErrors(err, err2)
+			}
+		}
+	}
+	return err
+}
+
+// validateVerificationScenarioOriginal checks the original typed value before JSON conversion.
+func validateVerificationScenarioOriginal(value *VerificationScenario) (err error) {
+	if !(value.Outcome == "passed" || value.Outcome == "failed" || value.Outcome == "not_run" || value.Outcome == "harness_error") {
+		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.outcome", value.Outcome, []any{"passed", "failed", "not_run", "harness_error"}))
 	}
 	return err
 }
@@ -1804,6 +2346,265 @@ func validatePreviewArchitecturePayloadOriginal(value *PreviewArchitecturePayloa
 		}
 	}
 	return err
+}
+
+// validateVerificationCompletedOriginal checks the original typed value before JSON conversion.
+func validateVerificationCompletedOriginal(value *VerificationCompleted) (err error) {
+	if value.Report == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("report", "value"))
+	}
+	if value.Report != nil {
+		if err2 := validateBuilderVerificationReportOriginal(value.Report); err2 != nil {
+			err = goa.MergeErrors(err, err2)
+		}
+	}
+	return err
+}
+
+// validateVerificationNotCompletedOriginal checks the original typed value before JSON conversion.
+func validateVerificationNotCompletedOriginal(value *VerificationNotCompleted) (err error) {
+	if !(value.Kind == "execution_failed" || value.Kind == "interrupted") {
+		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.kind", value.Kind, []any{"execution_failed", "interrupted"}))
+	}
+	if !(value.Stage == "checkout" || value.Stage == "build" || value.Stage == "describe" || value.Stage == "suite" || value.Stage == "report" || value.Stage == "supervise") {
+		err = goa.MergeErrors(err, goa.InvalidEnumValueError("value.stage", value.Stage, []any{"checkout", "build", "describe", "suite", "report", "supervise"}))
+	}
+	return err
+}
+
+// validateVerificationRunningOriginal checks the original typed value before JSON conversion.
+func validateVerificationRunningOriginal(value *VerificationRunning) (err error) {
+	err = goa.MergeErrors(err, goa.ValidateFormat("value.started_at", value.StartedAt, goa.FormatDateTime))
+	return err
+}
+
+// validateVerificationStatusResultOriginal checks the original typed value before JSON conversion.
+func validateVerificationStatusResultOriginal(value *VerificationStatusResult) (err error) {
+	if value.State.Kind() == "" {
+		err = goa.MergeErrors(err, goa.MissingFieldError("state", "value"))
+	}
+
+	if err2 := value.State.Validate(); err2 != nil {
+		err = goa.MergeErrors(err, err2)
+	} else {
+		switch string(value.State.Kind()) {
+		case "running":
+			actual, _ := value.State.AsRunning()
+			if actual != nil {
+				if err2 := validateVerificationRunningOriginal(actual); err2 != nil {
+					err = goa.MergeErrors(err, err2)
+				}
+			}
+		case "completed":
+			actual, _ := value.State.AsCompleted()
+			if actual != nil {
+				if err2 := validateVerificationCompletedOriginal(actual); err2 != nil {
+					err = goa.MergeErrors(err, err2)
+				}
+			}
+		case "not_completed":
+			actual, _ := value.State.AsNotCompleted()
+			if actual != nil {
+				if err2 := validateVerificationNotCompletedOriginal(actual); err2 != nil {
+					err = goa.MergeErrors(err, err2)
+				}
+			}
+		}
+	}
+
+	return err
+}
+
+// validateVerifyChangePayloadOriginal checks the original typed value before JSON conversion.
+func validateVerifyChangePayloadOriginal(value *VerifyChangePayload) (err error) {
+	err = goa.MergeErrors(err, goa.ValidatePattern("value.candidate_commit", value.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
+	return err
+}
+
+// jsonStateTransport stores exactly one selected Goa OneOf branch.
+type jsonStateTransport struct {
+	kind         jsonStateTransportKind
+	Running      *jsonVerificationRunningTransport
+	Completed    *jsonVerificationCompletedTransport
+	NotCompleted *jsonVerificationNotCompletedTransport
+}
+
+// jsonStateTransportKind identifies the selected branch of jsonStateTransport.
+type jsonStateTransportKind string
+
+const (
+	jsonStateTransportKindRunning      jsonStateTransportKind = "running"
+	jsonStateTransportKindCompleted    jsonStateTransportKind = "completed"
+	jsonStateTransportKindNotCompleted jsonStateTransportKind = "not_completed"
+)
+
+// Kind returns the selected branch.
+func (u jsonStateTransport) Kind() jsonStateTransportKind {
+	return u.kind
+}
+
+// newjsonStateTransportRunning creates jsonStateTransport with its running branch selected.
+func newjsonStateTransportRunning(value *jsonVerificationRunningTransport) jsonStateTransport {
+	return jsonStateTransport{kind: jsonStateTransportKindRunning, Running: value}
+}
+
+// AsRunning returns the running branch when it is selected.
+func (u jsonStateTransport) AsRunning() (_ *jsonVerificationRunningTransport, ok bool) {
+	if u.kind != jsonStateTransportKindRunning {
+		return
+	}
+	return u.Running, true
+}
+
+// SetRunning selects the running branch.
+func (u *jsonStateTransport) SetRunning(value *jsonVerificationRunningTransport) {
+	u.kind = jsonStateTransportKindRunning
+	u.Running = value
+}
+
+// newjsonStateTransportCompleted creates jsonStateTransport with its completed branch selected.
+func newjsonStateTransportCompleted(value *jsonVerificationCompletedTransport) jsonStateTransport {
+	return jsonStateTransport{kind: jsonStateTransportKindCompleted, Completed: value}
+}
+
+// AsCompleted returns the completed branch when it is selected.
+func (u jsonStateTransport) AsCompleted() (_ *jsonVerificationCompletedTransport, ok bool) {
+	if u.kind != jsonStateTransportKindCompleted {
+		return
+	}
+	return u.Completed, true
+}
+
+// SetCompleted selects the completed branch.
+func (u *jsonStateTransport) SetCompleted(value *jsonVerificationCompletedTransport) {
+	u.kind = jsonStateTransportKindCompleted
+	u.Completed = value
+}
+
+// newjsonStateTransportNotCompleted creates jsonStateTransport with its not_completed branch selected.
+func newjsonStateTransportNotCompleted(value *jsonVerificationNotCompletedTransport) jsonStateTransport {
+	return jsonStateTransport{kind: jsonStateTransportKindNotCompleted, NotCompleted: value}
+}
+
+// AsNotCompleted returns the not_completed branch when it is selected.
+func (u jsonStateTransport) AsNotCompleted() (_ *jsonVerificationNotCompletedTransport, ok bool) {
+	if u.kind != jsonStateTransportKindNotCompleted {
+		return
+	}
+	return u.NotCompleted, true
+}
+
+// SetNotCompleted selects the not_completed branch.
+func (u *jsonStateTransport) SetNotCompleted(value *jsonVerificationNotCompletedTransport) {
+	u.kind = jsonStateTransportKindNotCompleted
+	u.NotCompleted = value
+}
+
+// Validate checks that one complete branch is selected.
+func (u jsonStateTransport) Validate() error {
+	switch u.kind {
+	case jsonStateTransportKindRunning:
+		if u.Running == nil {
+			return goa.MissingFieldError("value", "jsonStateTransport")
+		}
+		return nil
+	case jsonStateTransportKindCompleted:
+		if u.Completed == nil {
+			return goa.MissingFieldError("value", "jsonStateTransport")
+		}
+		return nil
+	case jsonStateTransportKindNotCompleted:
+		if u.NotCompleted == nil {
+			return goa.MissingFieldError("value", "jsonStateTransport")
+		}
+		return nil
+	case "":
+		return goa.MissingFieldError("type", "jsonStateTransport")
+	default:
+		return goa.InvalidEnumValueError("type", u.kind, []any{string(jsonStateTransportKindRunning), string(jsonStateTransportKindCompleted), string(jsonStateTransportKindNotCompleted)})
+	}
+}
+
+// MarshalJSON writes the selected branch name and value.
+func (u jsonStateTransport) MarshalJSON() ([]byte, error) {
+	if err := u.Validate(); err != nil {
+		return nil, err
+	}
+	var value any
+	switch u.kind {
+	case jsonStateTransportKindRunning:
+		value = u.Running
+	case jsonStateTransportKindCompleted:
+		value = u.Completed
+	case jsonStateTransportKindNotCompleted:
+		value = u.NotCompleted
+	default:
+		return nil, fmt.Errorf("unexpected jsonStateTransport branch %q", u.kind)
+	}
+	return json.Marshal(struct {
+		Type  string `json:"type"`
+		Value any    `json:"value"`
+	}{Type: string(u.kind), Value: value})
+}
+
+// UnmarshalJSON reads one complete branch name and value.
+func (u *jsonStateTransport) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type  string          `json:"type"`
+		Value json.RawMessage `json:"value"`
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&raw); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("decode jsonStateTransport JSON: multiple JSON values")
+		}
+		return err
+	}
+	if raw.Type == "" {
+		return goa.MissingFieldError("type", "jsonStateTransport")
+	}
+	if len(raw.Value) == 0 {
+		return goa.MissingFieldError("value", "jsonStateTransport")
+	}
+	if bytes.Equal(bytes.TrimSpace(raw.Value), []byte("null")) {
+		return goa.InvalidFieldTypeError("value", nil, "non-null JSON value")
+	}
+	switch raw.Type {
+	case string(jsonStateTransportKindRunning):
+		var value *jsonVerificationRunningTransport
+		decoder := json.NewDecoder(bytes.NewReader(raw.Value))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&value); err != nil {
+			return err
+		}
+		u.kind = jsonStateTransportKindRunning
+		u.Running = value
+	case string(jsonStateTransportKindCompleted):
+		var value *jsonVerificationCompletedTransport
+		decoder := json.NewDecoder(bytes.NewReader(raw.Value))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&value); err != nil {
+			return err
+		}
+		u.kind = jsonStateTransportKindCompleted
+		u.Completed = value
+	case string(jsonStateTransportKindNotCompleted):
+		var value *jsonVerificationNotCompletedTransport
+		decoder := json.NewDecoder(bytes.NewReader(raw.Value))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&value); err != nil {
+			return err
+		}
+		u.kind = jsonStateTransportKindNotCompleted
+		u.NotCompleted = value
+	default:
+		return goa.InvalidEnumValueError("type", raw.Type, []any{string(jsonStateTransportKindRunning), string(jsonStateTransportKindCompleted), string(jsonStateTransportKindNotCompleted)})
+	}
+	return u.Validate()
 }
 
 // EncodeAgentPolicyItem turns a service value into JSON using the field names in the Goa design.
@@ -2512,6 +3313,122 @@ func DecodeBuilderScopeItem(data []byte) (out *BuilderScopeItem, err error) {
 		out.Paths = make([]string, len(body.Paths))
 		for i, val := range body.Paths {
 			out.Paths[i] = val
+		}
+	}
+	return out, nil
+}
+
+// EncodeBuilderVerificationReport turns a service value into JSON using the field names in the Goa design.
+func EncodeBuilderVerificationReport(in *BuilderVerificationReport) ([]byte, error) {
+	if err := checkBuilderVerificationReportValue(in); err != nil {
+		return nil, fmt.Errorf("encode BuilderVerificationReport JSON: %w", err)
+	}
+	if err := validateBuilderVerificationReportOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate BuilderVerificationReport value: %w", err)
+	}
+	var body *jsonBuilderVerificationReportTransport
+	{
+		body = &jsonBuilderVerificationReportTransport{
+			ReportDigest: &in.ReportDigest,
+			Passed:       &in.Passed,
+			SuiteFailed:  &in.SuiteFailed,
+		}
+		body.Counts = encodeVerificationCountsToVerificationCountsTransport(in.Counts)
+		body.Scenarios = make([]*jsonVerificationScenarioTransport, len(in.Scenarios))
+		for i, val := range in.Scenarios {
+			if val == nil {
+				body.Scenarios[i] = nil
+				continue
+			}
+			body.Scenarios[i] = encodeVerificationScenarioToVerificationScenarioTransport(val)
+		}
+	}
+	if err := validatejsonBuilderVerificationReportTransport(body); err != nil {
+		return nil, fmt.Errorf("validate BuilderVerificationReport JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode BuilderVerificationReport JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateBuilderVerificationReportValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateBuilderVerificationReportValue(in *BuilderVerificationReport) error {
+	if err := checkBuilderVerificationReportValue(in); err != nil {
+		return fmt.Errorf("validate BuilderVerificationReport value: %w", err)
+	}
+	if err := validateBuilderVerificationReportOriginal(in); err != nil {
+		return fmt.Errorf("validate BuilderVerificationReport value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "BuilderVerificationReport")
+	}
+
+	var body *jsonBuilderVerificationReportTransport
+	{
+		body = &jsonBuilderVerificationReportTransport{
+			ReportDigest: &in.ReportDigest,
+			Passed:       &in.Passed,
+			SuiteFailed:  &in.SuiteFailed,
+		}
+		body.Counts = encodeVerificationCountsToVerificationCountsTransport(in.Counts)
+		body.Scenarios = make([]*jsonVerificationScenarioTransport, len(in.Scenarios))
+		for i, val := range in.Scenarios {
+			if val == nil {
+				body.Scenarios[i] = nil
+				continue
+			}
+			body.Scenarios[i] = encodeVerificationScenarioToVerificationScenarioTransport(val)
+		}
+	}
+	if err := validatejsonBuilderVerificationReportTransport(body); err != nil {
+		return fmt.Errorf("validate BuilderVerificationReport value: %w", err)
+	}
+	return nil
+}
+
+// DecodeBuilderVerificationReport checks JSON field names from the Goa design and returns a service value.
+func DecodeBuilderVerificationReport(data []byte) (out *BuilderVerificationReport, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode BuilderVerificationReport JSON: %w", err)
+	}
+	if err := validateBuilderVerificationReportJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode BuilderVerificationReport JSON: %w", err)
+	}
+	var body *jsonBuilderVerificationReportTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode BuilderVerificationReport JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode BuilderVerificationReport JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode BuilderVerificationReport JSON after first value: %w", err)
+	}
+	if err := validatejsonBuilderVerificationReportTransport(body); err != nil {
+		return out, fmt.Errorf("validate BuilderVerificationReport JSON: %w", err)
+	}
+	{
+		out = &BuilderVerificationReport{
+			ReportDigest: *body.ReportDigest,
+			Passed:       *body.Passed,
+			SuiteFailed:  *body.SuiteFailed,
+		}
+		out.Counts = decodeVerificationCountsTransportToVerificationCounts(body.Counts)
+		out.Scenarios = make([]*VerificationScenario, len(body.Scenarios))
+		for i, val := range body.Scenarios {
+			if val == nil {
+				out.Scenarios[i] = nil
+				continue
+			}
+			out.Scenarios[i] = decodeVerificationScenarioTransportToVerificationScenario(val)
 		}
 	}
 	return out, nil
@@ -3685,6 +4602,83 @@ func DecodeGetChangePayload(data []byte) (out *GetChangePayload, err error) {
 	return out, nil
 }
 
+// EncodeGetVerificationPayload turns a service value into JSON using the field names in the Goa design.
+func EncodeGetVerificationPayload(in *GetVerificationPayload) ([]byte, error) {
+	if err := checkGetVerificationPayloadValue(in); err != nil {
+		return nil, fmt.Errorf("encode GetVerificationPayload JSON: %w", err)
+	}
+	var body *jsonGetVerificationPayloadTransport
+	{
+		body = &jsonGetVerificationPayloadTransport{
+			RunID: &in.RunID,
+		}
+	}
+	if err := validatejsonGetVerificationPayloadTransport(body); err != nil {
+		return nil, fmt.Errorf("validate GetVerificationPayload JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode GetVerificationPayload JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateGetVerificationPayloadValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateGetVerificationPayloadValue(in *GetVerificationPayload) error {
+	if err := checkGetVerificationPayloadValue(in); err != nil {
+		return fmt.Errorf("validate GetVerificationPayload value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "GetVerificationPayload")
+	}
+
+	var body *jsonGetVerificationPayloadTransport
+	{
+		body = &jsonGetVerificationPayloadTransport{
+			RunID: &in.RunID,
+		}
+	}
+	if err := validatejsonGetVerificationPayloadTransport(body); err != nil {
+		return fmt.Errorf("validate GetVerificationPayload value: %w", err)
+	}
+	return nil
+}
+
+// DecodeGetVerificationPayload checks JSON field names from the Goa design and returns a service value.
+func DecodeGetVerificationPayload(data []byte) (out *GetVerificationPayload, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode GetVerificationPayload JSON: %w", err)
+	}
+	if err := validateGetVerificationPayloadJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode GetVerificationPayload JSON: %w", err)
+	}
+	var body *jsonGetVerificationPayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode GetVerificationPayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode GetVerificationPayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode GetVerificationPayload JSON after first value: %w", err)
+	}
+	if err := validatejsonGetVerificationPayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate GetVerificationPayload JSON: %w", err)
+	}
+	{
+		out = &GetVerificationPayload{
+			RunID: *body.RunID,
+		}
+	}
+	return out, nil
+}
+
 // EncodePreviewArchitecturePayload turns a service value into JSON using the field names in the Goa design.
 func EncodePreviewArchitecturePayload(in *PreviewArchitecturePayload) ([]byte, error) {
 	if err := checkPreviewArchitecturePayloadValue(in); err != nil {
@@ -4458,6 +5452,841 @@ func DecodeUICompositionItem(data []byte) (out *UICompositionItem, err error) {
 	return out, nil
 }
 
+// EncodeVerificationCheck turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationCheck(in *VerificationCheck) ([]byte, error) {
+	if err := checkVerificationCheckValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationCheck JSON: %w", err)
+	}
+	var body *jsonVerificationCheckTransport
+	{
+		body = &jsonVerificationCheckTransport{
+			Name:       &in.Name,
+			Passed:     &in.Passed,
+			Diagnostic: in.Diagnostic,
+		}
+	}
+	if err := validatejsonVerificationCheckTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationCheck JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationCheck JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationCheckValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationCheckValue(in *VerificationCheck) error {
+	if err := checkVerificationCheckValue(in); err != nil {
+		return fmt.Errorf("validate VerificationCheck value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationCheck")
+	}
+
+	var body *jsonVerificationCheckTransport
+	{
+		body = &jsonVerificationCheckTransport{
+			Name:       &in.Name,
+			Passed:     &in.Passed,
+			Diagnostic: in.Diagnostic,
+		}
+	}
+	if err := validatejsonVerificationCheckTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationCheck value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationCheck checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationCheck(data []byte) (out *VerificationCheck, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationCheck JSON: %w", err)
+	}
+	if err := validateBuilderVerificationReportJSONValue6("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationCheck JSON: %w", err)
+	}
+	var body *jsonVerificationCheckTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationCheck JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationCheck JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationCheck JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationCheckTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationCheck JSON: %w", err)
+	}
+	{
+		out = &VerificationCheck{
+			Name:       *body.Name,
+			Passed:     *body.Passed,
+			Diagnostic: body.Diagnostic,
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerificationCompleted turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationCompleted(in *VerificationCompleted) ([]byte, error) {
+	if err := checkVerificationCompletedValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationCompleted JSON: %w", err)
+	}
+	if err := validateVerificationCompletedOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate VerificationCompleted value: %w", err)
+	}
+	var body *jsonVerificationCompletedTransport
+	{
+		body = &jsonVerificationCompletedTransport{
+			SuiteID:     &in.SuiteID,
+			Environment: &in.Environment,
+		}
+		body.Report = encodeBuilderVerificationReportToBuilderVerificationReportTransport(in.Report)
+	}
+	if err := validatejsonVerificationCompletedTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationCompleted JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationCompleted JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationCompletedValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationCompletedValue(in *VerificationCompleted) error {
+	if err := checkVerificationCompletedValue(in); err != nil {
+		return fmt.Errorf("validate VerificationCompleted value: %w", err)
+	}
+	if err := validateVerificationCompletedOriginal(in); err != nil {
+		return fmt.Errorf("validate VerificationCompleted value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationCompleted")
+	}
+
+	var body *jsonVerificationCompletedTransport
+	{
+		body = &jsonVerificationCompletedTransport{
+			SuiteID:     &in.SuiteID,
+			Environment: &in.Environment,
+		}
+		body.Report = encodeBuilderVerificationReportToBuilderVerificationReportTransport(in.Report)
+	}
+	if err := validatejsonVerificationCompletedTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationCompleted value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationCompleted checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationCompleted(data []byte) (out *VerificationCompleted, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationCompleted JSON: %w", err)
+	}
+	if err := validateVerificationCompletedJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationCompleted JSON: %w", err)
+	}
+	var body *jsonVerificationCompletedTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationCompleted JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationCompleted JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationCompleted JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationCompletedTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationCompleted JSON: %w", err)
+	}
+	{
+		out = &VerificationCompleted{
+			SuiteID:     *body.SuiteID,
+			Environment: *body.Environment,
+		}
+		out.Report = decodeBuilderVerificationReportTransportToBuilderVerificationReport(body.Report)
+	}
+	return out, nil
+}
+
+// EncodeVerificationCounts turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationCounts(in *VerificationCounts) ([]byte, error) {
+	if err := checkVerificationCountsValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationCounts JSON: %w", err)
+	}
+	var body *jsonVerificationCountsTransport
+	{
+		body = &jsonVerificationCountsTransport{}
+		required := builderVerificationReportIntTransport(in.Required)
+		body.Required = &required
+		passed := builderVerificationReportIntTransport(in.Passed)
+		body.Passed = &passed
+		failed := builderVerificationReportIntTransport(in.Failed)
+		body.Failed = &failed
+		notRun := builderVerificationReportIntTransport(in.NotRun)
+		body.NotRun = &notRun
+		harnessError := builderVerificationReportIntTransport(in.HarnessError)
+		body.HarnessError = &harnessError
+	}
+	if err := validatejsonVerificationCountsTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationCounts JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationCounts JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationCountsValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationCountsValue(in *VerificationCounts) error {
+	if err := checkVerificationCountsValue(in); err != nil {
+		return fmt.Errorf("validate VerificationCounts value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationCounts")
+	}
+
+	var body *jsonVerificationCountsTransport
+	{
+		body = &jsonVerificationCountsTransport{}
+		required := builderVerificationReportIntTransport(in.Required)
+		body.Required = &required
+		passed := builderVerificationReportIntTransport(in.Passed)
+		body.Passed = &passed
+		failed := builderVerificationReportIntTransport(in.Failed)
+		body.Failed = &failed
+		notRun := builderVerificationReportIntTransport(in.NotRun)
+		body.NotRun = &notRun
+		harnessError := builderVerificationReportIntTransport(in.HarnessError)
+		body.HarnessError = &harnessError
+	}
+	if err := validatejsonVerificationCountsTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationCounts value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationCounts checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationCounts(data []byte) (out *VerificationCounts, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationCounts JSON: %w", err)
+	}
+	if err := validateBuilderVerificationReportJSONValue2("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationCounts JSON: %w", err)
+	}
+	var body *jsonVerificationCountsTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationCounts JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationCounts JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationCounts JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationCountsTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationCounts JSON: %w", err)
+	}
+	{
+		out = &VerificationCounts{
+			Required:     int(*body.Required),
+			Passed:       int(*body.Passed),
+			Failed:       int(*body.Failed),
+			NotRun:       int(*body.NotRun),
+			HarnessError: int(*body.HarnessError),
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerificationNotCompleted turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationNotCompleted(in *VerificationNotCompleted) ([]byte, error) {
+	if err := checkVerificationNotCompletedValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationNotCompleted JSON: %w", err)
+	}
+	if err := validateVerificationNotCompletedOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate VerificationNotCompleted value: %w", err)
+	}
+	var body *jsonVerificationNotCompletedTransport
+	{
+		body = &jsonVerificationNotCompletedTransport{
+			Kind:    &in.Kind,
+			Stage:   &in.Stage,
+			Summary: &in.Summary,
+		}
+	}
+	if err := validatejsonVerificationNotCompletedTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationNotCompleted JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationNotCompleted JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationNotCompletedValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationNotCompletedValue(in *VerificationNotCompleted) error {
+	if err := checkVerificationNotCompletedValue(in); err != nil {
+		return fmt.Errorf("validate VerificationNotCompleted value: %w", err)
+	}
+	if err := validateVerificationNotCompletedOriginal(in); err != nil {
+		return fmt.Errorf("validate VerificationNotCompleted value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationNotCompleted")
+	}
+
+	var body *jsonVerificationNotCompletedTransport
+	{
+		body = &jsonVerificationNotCompletedTransport{
+			Kind:    &in.Kind,
+			Stage:   &in.Stage,
+			Summary: &in.Summary,
+		}
+	}
+	if err := validatejsonVerificationNotCompletedTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationNotCompleted value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationNotCompleted checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationNotCompleted(data []byte) (out *VerificationNotCompleted, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationNotCompleted JSON: %w", err)
+	}
+	if err := validateVerificationNotCompletedJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationNotCompleted JSON: %w", err)
+	}
+	var body *jsonVerificationNotCompletedTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationNotCompleted JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationNotCompleted JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationNotCompleted JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationNotCompletedTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationNotCompleted JSON: %w", err)
+	}
+	{
+		out = &VerificationNotCompleted{
+			Kind:    *body.Kind,
+			Stage:   *body.Stage,
+			Summary: *body.Summary,
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerificationRunning turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationRunning(in *VerificationRunning) ([]byte, error) {
+	if err := checkVerificationRunningValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationRunning JSON: %w", err)
+	}
+	if err := validateVerificationRunningOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate VerificationRunning value: %w", err)
+	}
+	var body *jsonVerificationRunningTransport
+	{
+		body = &jsonVerificationRunningTransport{
+			StartedAt: &in.StartedAt,
+		}
+	}
+	if err := validatejsonVerificationRunningTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationRunning JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationRunning JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationRunningValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationRunningValue(in *VerificationRunning) error {
+	if err := checkVerificationRunningValue(in); err != nil {
+		return fmt.Errorf("validate VerificationRunning value: %w", err)
+	}
+	if err := validateVerificationRunningOriginal(in); err != nil {
+		return fmt.Errorf("validate VerificationRunning value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationRunning")
+	}
+
+	var body *jsonVerificationRunningTransport
+	{
+		body = &jsonVerificationRunningTransport{
+			StartedAt: &in.StartedAt,
+		}
+	}
+	if err := validatejsonVerificationRunningTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationRunning value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationRunning checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationRunning(data []byte) (out *VerificationRunning, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationRunning JSON: %w", err)
+	}
+	if err := validateVerificationRunningJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationRunning JSON: %w", err)
+	}
+	var body *jsonVerificationRunningTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationRunning JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationRunning JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationRunning JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationRunningTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationRunning JSON: %w", err)
+	}
+	{
+		out = &VerificationRunning{
+			StartedAt: *body.StartedAt,
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerificationScenario turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationScenario(in *VerificationScenario) ([]byte, error) {
+	if err := checkVerificationScenarioValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationScenario JSON: %w", err)
+	}
+	if err := validateVerificationScenarioOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate VerificationScenario value: %w", err)
+	}
+	var body *jsonVerificationScenarioTransport
+	{
+		body = &jsonVerificationScenarioTransport{
+			ID:      &in.ID,
+			Outcome: &in.Outcome,
+			Error:   in.Error,
+		}
+		if in.Checks != nil {
+			body.Checks = make([]*jsonVerificationCheckTransport, len(in.Checks))
+			for i, val := range in.Checks {
+				if val == nil {
+					body.Checks[i] = nil
+					continue
+				}
+				body.Checks[i] = encodeVerificationCheckToVerificationCheckTransport(val)
+			}
+		}
+	}
+	if err := validatejsonVerificationScenarioTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationScenario JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationScenario JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationScenarioValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationScenarioValue(in *VerificationScenario) error {
+	if err := checkVerificationScenarioValue(in); err != nil {
+		return fmt.Errorf("validate VerificationScenario value: %w", err)
+	}
+	if err := validateVerificationScenarioOriginal(in); err != nil {
+		return fmt.Errorf("validate VerificationScenario value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationScenario")
+	}
+
+	var body *jsonVerificationScenarioTransport
+	{
+		body = &jsonVerificationScenarioTransport{
+			ID:      &in.ID,
+			Outcome: &in.Outcome,
+			Error:   in.Error,
+		}
+		if in.Checks != nil {
+			body.Checks = make([]*jsonVerificationCheckTransport, len(in.Checks))
+			for i, val := range in.Checks {
+				if val == nil {
+					body.Checks[i] = nil
+					continue
+				}
+				body.Checks[i] = encodeVerificationCheckToVerificationCheckTransport(val)
+			}
+		}
+	}
+	if err := validatejsonVerificationScenarioTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationScenario value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationScenario checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationScenario(data []byte) (out *VerificationScenario, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationScenario JSON: %w", err)
+	}
+	if err := validateBuilderVerificationReportJSONValue4("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationScenario JSON: %w", err)
+	}
+	var body *jsonVerificationScenarioTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationScenario JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationScenario JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationScenario JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationScenarioTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationScenario JSON: %w", err)
+	}
+	{
+		out = &VerificationScenario{
+			ID:      *body.ID,
+			Outcome: *body.Outcome,
+			Error:   body.Error,
+		}
+		if body.Checks != nil {
+			out.Checks = make([]*VerificationCheck, len(body.Checks))
+			for i, val := range body.Checks {
+				if val == nil {
+					out.Checks[i] = nil
+					continue
+				}
+				out.Checks[i] = decodeVerificationCheckTransportToVerificationCheck(val)
+			}
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerificationStatusResult turns a service value into JSON using the field names in the Goa design.
+func EncodeVerificationStatusResult(in *VerificationStatusResult) ([]byte, error) {
+	if err := checkVerificationStatusResultValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerificationStatusResult JSON: %w", err)
+	}
+	if err := validateVerificationStatusResultOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate VerificationStatusResult value: %w", err)
+	}
+	var body *jsonVerificationStatusResultTransport
+	{
+		body = &jsonVerificationStatusResultTransport{
+			RunID:           &in.RunID,
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+			SuiteCommit:     &in.SuiteCommit,
+		}
+		var stateValue jsonStateTransport
+		switch string(in.State.Kind()) {
+		case "running":
+			actual, _ := in.State.AsRunning()
+			var obj *jsonVerificationRunningTransport
+			if actual != nil {
+				obj = encodeVerificationRunningToVerificationRunningTransport(actual)
+			}
+			u := stateValue
+			u.SetRunning((*jsonVerificationRunningTransport)(obj))
+			stateValue = u
+		case "completed":
+			actual, _ := in.State.AsCompleted()
+			var obj *jsonVerificationCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationCompletedToVerificationCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetCompleted((*jsonVerificationCompletedTransport)(obj))
+			stateValue = u
+		case "not_completed":
+			actual, _ := in.State.AsNotCompleted()
+			var obj *jsonVerificationNotCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationNotCompletedToVerificationNotCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetNotCompleted((*jsonVerificationNotCompletedTransport)(obj))
+			stateValue = u
+		}
+		body.State = &stateValue
+	}
+	if err := validatejsonVerificationStatusResultTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerificationStatusResult JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerificationStatusResult JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerificationStatusResultValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerificationStatusResultValue(in *VerificationStatusResult) error {
+	if err := checkVerificationStatusResultValue(in); err != nil {
+		return fmt.Errorf("validate VerificationStatusResult value: %w", err)
+	}
+	if err := validateVerificationStatusResultOriginal(in); err != nil {
+		return fmt.Errorf("validate VerificationStatusResult value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerificationStatusResult")
+	}
+
+	var body *jsonVerificationStatusResultTransport
+	{
+		body = &jsonVerificationStatusResultTransport{
+			RunID:           &in.RunID,
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+			SuiteCommit:     &in.SuiteCommit,
+		}
+		var stateValue jsonStateTransport
+		switch string(in.State.Kind()) {
+		case "running":
+			actual, _ := in.State.AsRunning()
+			var obj *jsonVerificationRunningTransport
+			if actual != nil {
+				obj = encodeVerificationRunningToVerificationRunningTransport(actual)
+			}
+			u := stateValue
+			u.SetRunning((*jsonVerificationRunningTransport)(obj))
+			stateValue = u
+		case "completed":
+			actual, _ := in.State.AsCompleted()
+			var obj *jsonVerificationCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationCompletedToVerificationCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetCompleted((*jsonVerificationCompletedTransport)(obj))
+			stateValue = u
+		case "not_completed":
+			actual, _ := in.State.AsNotCompleted()
+			var obj *jsonVerificationNotCompletedTransport
+			if actual != nil {
+				obj = encodeVerificationNotCompletedToVerificationNotCompletedTransport(actual)
+			}
+			u := stateValue
+			u.SetNotCompleted((*jsonVerificationNotCompletedTransport)(obj))
+			stateValue = u
+		}
+		body.State = &stateValue
+	}
+	if err := validatejsonVerificationStatusResultTransport(body); err != nil {
+		return fmt.Errorf("validate VerificationStatusResult value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerificationStatusResult checks JSON field names from the Goa design and returns a service value.
+func DecodeVerificationStatusResult(data []byte) (out *VerificationStatusResult, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerificationStatusResult JSON: %w", err)
+	}
+	if err := validateVerificationStatusResultJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerificationStatusResult JSON: %w", err)
+	}
+	var body *jsonVerificationStatusResultTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerificationStatusResult JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerificationStatusResult JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerificationStatusResult JSON after first value: %w", err)
+	}
+	if err := validatejsonVerificationStatusResultTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerificationStatusResult JSON: %w", err)
+	}
+	{
+		out = &VerificationStatusResult{
+			RunID:           *body.RunID,
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			CandidateCommit: *body.CandidateCommit,
+			SuiteCommit:     *body.SuiteCommit,
+		}
+		switch string(body.State.Kind()) {
+		case "running":
+			actual, _ := body.State.AsRunning()
+			var obj *VerificationRunning
+			if actual != nil {
+				obj = decodeVerificationRunningTransportToVerificationRunning(actual)
+			}
+			u := out.State
+			u.SetRunning((*VerificationRunning)(obj))
+			out.State = u
+		case "completed":
+			actual, _ := body.State.AsCompleted()
+			var obj *VerificationCompleted
+			if actual != nil {
+				obj = decodeVerificationCompletedTransportToVerificationCompleted(actual)
+			}
+			u := out.State
+			u.SetCompleted((*VerificationCompleted)(obj))
+			out.State = u
+		case "not_completed":
+			actual, _ := body.State.AsNotCompleted()
+			var obj *VerificationNotCompleted
+			if actual != nil {
+				obj = decodeVerificationNotCompletedTransportToVerificationNotCompleted(actual)
+			}
+			u := out.State
+			u.SetNotCompleted((*VerificationNotCompleted)(obj))
+			out.State = u
+		}
+	}
+	return out, nil
+}
+
+// EncodeVerifyChangePayload turns a service value into JSON using the field names in the Goa design.
+func EncodeVerifyChangePayload(in *VerifyChangePayload) ([]byte, error) {
+	if err := checkVerifyChangePayloadValue(in); err != nil {
+		return nil, fmt.Errorf("encode VerifyChangePayload JSON: %w", err)
+	}
+	if err := validateVerifyChangePayloadOriginal(in); err != nil {
+		return nil, fmt.Errorf("validate VerifyChangePayload value: %w", err)
+	}
+	var body *jsonVerifyChangePayloadTransport
+	{
+		body = &jsonVerifyChangePayloadTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+		}
+	}
+	if err := validatejsonVerifyChangePayloadTransport(body); err != nil {
+		return nil, fmt.Errorf("validate VerifyChangePayload JSON: %w", err)
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode VerifyChangePayload JSON: %w", err)
+	}
+	return data, nil
+}
+
+// ValidateVerifyChangePayloadValue checks the original Go fields against their declared constraints.
+// It returns validation errors without encoding the value as JSON.
+
+func ValidateVerifyChangePayloadValue(in *VerifyChangePayload) error {
+	if err := checkVerifyChangePayloadValue(in); err != nil {
+		return fmt.Errorf("validate VerifyChangePayload value: %w", err)
+	}
+	if err := validateVerifyChangePayloadOriginal(in); err != nil {
+		return fmt.Errorf("validate VerifyChangePayload value: %w", err)
+	}
+
+	if in == nil {
+		return goa.MissingFieldError("result", "VerifyChangePayload")
+	}
+
+	var body *jsonVerifyChangePayloadTransport
+	{
+		body = &jsonVerifyChangePayloadTransport{
+			ChangeID:        &in.ChangeID,
+			RequestRevision: &in.RequestRevision,
+			CandidateCommit: &in.CandidateCommit,
+		}
+	}
+	if err := validatejsonVerifyChangePayloadTransport(body); err != nil {
+		return fmt.Errorf("validate VerifyChangePayload value: %w", err)
+	}
+	return nil
+}
+
+// DecodeVerifyChangePayload checks JSON field names from the Goa design and returns a service value.
+func DecodeVerifyChangePayload(data []byte) (out *VerifyChangePayload, err error) {
+	root, err := readStrictJSON(data)
+	if err != nil {
+		return out, fmt.Errorf("decode VerifyChangePayload JSON: %w", err)
+	}
+	if err := validateVerifyChangePayloadJSONValue("", root, ""); err != nil {
+		return out, fmt.Errorf("decode VerifyChangePayload JSON: %w", err)
+	}
+	var body *jsonVerifyChangePayloadTransport
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&body); err != nil {
+		return out, fmt.Errorf("decode VerifyChangePayload JSON: %w", err)
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return out, fmt.Errorf("decode VerifyChangePayload JSON: multiple JSON values")
+		}
+		return out, fmt.Errorf("decode VerifyChangePayload JSON after first value: %w", err)
+	}
+	if err := validatejsonVerifyChangePayloadTransport(body); err != nil {
+		return out, fmt.Errorf("validate VerifyChangePayload JSON: %w", err)
+	}
+	{
+		out = &VerifyChangePayload{
+			ChangeID:        *body.ChangeID,
+			RequestRevision: *body.RequestRevision,
+			CandidateCommit: *body.CandidateCommit,
+		}
+	}
+	return out, nil
+}
+
 func decodeAgentPolicyItemTransportToAgentPolicyItem(v *jsonAgentPolicyItemTransport) *AgentPolicyItem {
 	res := &AgentPolicyItem{
 		AgentID:             *v.AgentID,
@@ -4514,6 +6343,25 @@ func decodeBuilderScopeItemTransportToBuilderScopeItem(v *jsonBuilderScopeItemTr
 	res.Paths = make([]string, len(v.Paths))
 	for i, val := range v.Paths {
 		res.Paths[i] = val
+	}
+
+	return res
+}
+
+func decodeBuilderVerificationReportTransportToBuilderVerificationReport(v *jsonBuilderVerificationReportTransport) *BuilderVerificationReport {
+	res := &BuilderVerificationReport{
+		ReportDigest: *v.ReportDigest,
+		Passed:       *v.Passed,
+		SuiteFailed:  *v.SuiteFailed,
+	}
+	res.Counts = decodeVerificationCountsTransportToVerificationCounts(v.Counts)
+	res.Scenarios = make([]*VerificationScenario, len(v.Scenarios))
+	for i, val := range v.Scenarios {
+		if val == nil {
+			res.Scenarios[i] = nil
+			continue
+		}
+		res.Scenarios[i] = decodeVerificationScenarioTransportToVerificationScenario(val)
 	}
 
 	return res
@@ -4658,6 +6506,76 @@ func decodeUICompositionItemTransportToUICompositionItem(v *jsonUICompositionIte
 	return res
 }
 
+func decodeVerificationCheckTransportToVerificationCheck(v *jsonVerificationCheckTransport) *VerificationCheck {
+	res := &VerificationCheck{
+		Name:       *v.Name,
+		Passed:     *v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+
+func decodeVerificationCompletedTransportToVerificationCompleted(v *jsonVerificationCompletedTransport) *VerificationCompleted {
+	res := &VerificationCompleted{
+		SuiteID:     *v.SuiteID,
+		Environment: *v.Environment,
+	}
+	res.Report = decodeBuilderVerificationReportTransportToBuilderVerificationReport(v.Report)
+
+	return res
+}
+
+func decodeVerificationCountsTransportToVerificationCounts(v *jsonVerificationCountsTransport) *VerificationCounts {
+	res := &VerificationCounts{
+		Required:     int(*v.Required),
+		Passed:       int(*v.Passed),
+		Failed:       int(*v.Failed),
+		NotRun:       int(*v.NotRun),
+		HarnessError: int(*v.HarnessError),
+	}
+
+	return res
+}
+
+func decodeVerificationNotCompletedTransportToVerificationNotCompleted(v *jsonVerificationNotCompletedTransport) *VerificationNotCompleted {
+	res := &VerificationNotCompleted{
+		Kind:    *v.Kind,
+		Stage:   *v.Stage,
+		Summary: *v.Summary,
+	}
+
+	return res
+}
+
+func decodeVerificationRunningTransportToVerificationRunning(v *jsonVerificationRunningTransport) *VerificationRunning {
+	res := &VerificationRunning{
+		StartedAt: *v.StartedAt,
+	}
+
+	return res
+}
+
+func decodeVerificationScenarioTransportToVerificationScenario(v *jsonVerificationScenarioTransport) *VerificationScenario {
+	res := &VerificationScenario{
+		ID:      *v.ID,
+		Outcome: *v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*VerificationCheck, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = decodeVerificationCheckTransportToVerificationCheck(val)
+		}
+	}
+
+	return res
+}
+
 func encodeAgentPolicyItemToAgentPolicyItemTransport(v *AgentPolicyItem) *jsonAgentPolicyItemTransport {
 	res := &jsonAgentPolicyItemTransport{
 		AgentID:          &v.AgentID,
@@ -4720,6 +6638,25 @@ func encodeBuilderScopeItemToBuilderScopeItemTransport(v *BuilderScopeItem) *jso
 	res.Paths = make([]string, len(v.Paths))
 	for i, val := range v.Paths {
 		res.Paths[i] = val
+	}
+
+	return res
+}
+
+func encodeBuilderVerificationReportToBuilderVerificationReportTransport(v *BuilderVerificationReport) *jsonBuilderVerificationReportTransport {
+	res := &jsonBuilderVerificationReportTransport{
+		ReportDigest: &v.ReportDigest,
+		Passed:       &v.Passed,
+		SuiteFailed:  &v.SuiteFailed,
+	}
+	res.Counts = encodeVerificationCountsToVerificationCountsTransport(v.Counts)
+	res.Scenarios = make([]*jsonVerificationScenarioTransport, len(v.Scenarios))
+	for i, val := range v.Scenarios {
+		if val == nil {
+			res.Scenarios[i] = nil
+			continue
+		}
+		res.Scenarios[i] = encodeVerificationScenarioToVerificationScenarioTransport(val)
 	}
 
 	return res
@@ -4883,6 +6820,80 @@ func encodeUICompositionItemToUICompositionItemTransport(v *UICompositionItem) *
 	res := &jsonUICompositionItemTransport{
 		Program:             &v.Program,
 		ComposedForRevision: &v.ComposedForRevision,
+	}
+
+	return res
+}
+
+func encodeVerificationCheckToVerificationCheckTransport(v *VerificationCheck) *jsonVerificationCheckTransport {
+	res := &jsonVerificationCheckTransport{
+		Name:       &v.Name,
+		Passed:     &v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+
+func encodeVerificationCompletedToVerificationCompletedTransport(v *VerificationCompleted) *jsonVerificationCompletedTransport {
+	res := &jsonVerificationCompletedTransport{
+		SuiteID:     &v.SuiteID,
+		Environment: &v.Environment,
+	}
+	res.Report = encodeBuilderVerificationReportToBuilderVerificationReportTransport(v.Report)
+
+	return res
+}
+
+func encodeVerificationCountsToVerificationCountsTransport(v *VerificationCounts) *jsonVerificationCountsTransport {
+	res := &jsonVerificationCountsTransport{}
+	required := builderVerificationReportIntTransport(v.Required)
+	res.Required = &required
+	passed := builderVerificationReportIntTransport(v.Passed)
+	res.Passed = &passed
+	failed := builderVerificationReportIntTransport(v.Failed)
+	res.Failed = &failed
+	notRun := builderVerificationReportIntTransport(v.NotRun)
+	res.NotRun = &notRun
+	harnessError := builderVerificationReportIntTransport(v.HarnessError)
+	res.HarnessError = &harnessError
+
+	return res
+}
+
+func encodeVerificationNotCompletedToVerificationNotCompletedTransport(v *VerificationNotCompleted) *jsonVerificationNotCompletedTransport {
+	res := &jsonVerificationNotCompletedTransport{
+		Kind:    &v.Kind,
+		Stage:   &v.Stage,
+		Summary: &v.Summary,
+	}
+
+	return res
+}
+
+func encodeVerificationRunningToVerificationRunningTransport(v *VerificationRunning) *jsonVerificationRunningTransport {
+	res := &jsonVerificationRunningTransport{
+		StartedAt: &v.StartedAt,
+	}
+
+	return res
+}
+
+func encodeVerificationScenarioToVerificationScenarioTransport(v *VerificationScenario) *jsonVerificationScenarioTransport {
+	res := &jsonVerificationScenarioTransport{
+		ID:      &v.ID,
+		Outcome: &v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*jsonVerificationCheckTransport, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = encodeVerificationCheckToVerificationCheckTransport(val)
+		}
 	}
 
 	return res
@@ -6196,6 +8207,308 @@ func validateBuilderScopeItemJSONValue2(path string, value any, description stri
 	return nil
 }
 
+// validateBuilderVerificationReportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBuilderVerificationReportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "counts":
+			if err := validateBuilderVerificationReportJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Every declared scenario, counted by outcome.",
+			); err != nil {
+				return err
+			}
+		case "passed":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The verdict: true only when every declared scenario passed and the suite ran cleanly.",
+			); err != nil {
+				return err
+			}
+		case "report_digest":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.",
+			); err != nil {
+				return err
+			}
+		case "scenarios":
+			if err := validateBuilderVerificationReportJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Every declared scenario in declaration order.",
+			); err != nil {
+				return err
+			}
+		case "suite_failed":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Whether the evaluator suite itself failed or ended abnormally.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"counts",
+				"passed",
+				"report_digest",
+				"scenarios",
+				"suite_failed",
+			})
+		}
+	}
+	return nil
+}
+
+// validateBuilderVerificationReportJSONValue2 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBuilderVerificationReportJSONValue2(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "failed":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios whose checks failed.",
+			); err != nil {
+				return err
+			}
+		case "harness_error":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios that could not be evaluated.",
+			); err != nil {
+				return err
+			}
+		case "not_run":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Declared scenarios the suite did not report.",
+			); err != nil {
+				return err
+			}
+		case "passed":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios that passed.",
+			); err != nil {
+				return err
+			}
+		case "required":
+			if err := validateAgentPolicyItemJSONValue4(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios the suite declares.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"failed",
+				"harness_error",
+				"not_run",
+				"passed",
+				"required",
+			})
+		}
+	}
+	return nil
+}
+
+// validateBuilderVerificationReportJSONValue3 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBuilderVerificationReportJSONValue3(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if item == nil {
+			continue
+		}
+		if err := validateBuilderVerificationReportJSONValue4(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateBuilderVerificationReportJSONValue4 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBuilderVerificationReportJSONValue4(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "checks":
+			if err := validateBuilderVerificationReportJSONValue5(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The repair scenario's checks; empty for holdouts.",
+			); err != nil {
+				return err
+			}
+		case "error":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The repair scenario's environment error; empty for holdouts.",
+			); err != nil {
+				return err
+			}
+		case "id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenario name for a repair scenario, or holdout-<n> for a holdout.",
+			); err != nil {
+				return err
+			}
+		case "outcome":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "How the scenario ended.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"checks",
+				"error",
+				"id",
+				"outcome",
+			})
+		}
+	}
+	return nil
+}
+
+// validateBuilderVerificationReportJSONValue5 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBuilderVerificationReportJSONValue5(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if item == nil {
+			continue
+		}
+		if err := validateBuilderVerificationReportJSONValue6(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateBuilderVerificationReportJSONValue6 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateBuilderVerificationReportJSONValue6(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "diagnostic":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Why the check failed; empty when it passed.",
+			); err != nil {
+				return err
+			}
+		case "name":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Check name.",
+			); err != nil {
+				return err
+			}
+		case "passed":
+			if err := validateAgentPolicyItemJSONValue3(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Whether the check passed.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"diagnostic",
+				"name",
+				"passed",
+			})
+		}
+	}
+	return nil
+}
+
 // validateChangeCardResultJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validateChangeCardResultJSONValue(path string, value any, description string) error {
 	field := path
@@ -7084,6 +9397,42 @@ func validateGetChangePayloadJSONValue(path string, value any, description strin
 	return nil
 }
 
+// validateGetVerificationPayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateGetVerificationPayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "run_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Verification run identifier returned by verify_change.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"run_id",
+			})
+		}
+	}
+	return nil
+}
+
 // validatePreviewArchitecturePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validatePreviewArchitecturePayloadJSONValue(path string, value any, description string) error {
 	field := path
@@ -7217,6 +9566,312 @@ func validateProposeChangePayloadJSONValue(path string, value any, description s
 				"change_id",
 				"design_source",
 				"prompt",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerificationCompletedJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerificationCompletedJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "environment":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Dependency profile the suite ran the candidate with, such as sim.",
+			); err != nil {
+				return err
+			}
+		case "report":
+			if err := validateBuilderVerificationReportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The builder view of the report.",
+			); err != nil {
+				return err
+			}
+		case "suite_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite the report was produced by.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"environment",
+				"report",
+				"suite_id",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerificationNotCompletedJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerificationNotCompletedJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "kind":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "execution_failed when a step failed; interrupted when the run's process ended before it finished.",
+			); err != nil {
+				return err
+			}
+		case "stage":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Where the run stopped.",
+			); err != nil {
+				return err
+			}
+		case "summary":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Builder-safe description of what stopped the run; never command output.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"kind",
+				"stage",
+				"summary",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerificationRunningJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerificationRunningJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "started_at":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "When the run was accepted.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"started_at",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerificationStatusResultJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerificationStatusResultJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "candidate_commit":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Candidate commit the run builds and verifies.",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Change Card the run verifies.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Change Card revision the run verifies.",
+			); err != nil {
+				return err
+			}
+		case "run_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Verification run identifier; get_verification takes it.",
+			); err != nil {
+				return err
+			}
+		case "state":
+			if err := validateVerificationStatusResultJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Exactly one of running, completed or not_completed.",
+			); err != nil {
+				return err
+			}
+		case "suite_commit":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite commit the operator configured for the run.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"candidate_commit",
+				"change_id",
+				"request_revision",
+				"run_id",
+				"state",
+				"suite_commit",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerificationStatusResultJSONValue2 checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerificationStatusResultJSONValue2(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	for key := range typed {
+		if key != "type" && key != "value" {
+			return unknownJSONFieldError(path, key, []string{"type", "value"})
+		}
+	}
+	discriminator, ok := typed["type"].(string)
+	if !ok {
+		return fmt.Errorf("%s: missing or invalid union discriminator", field)
+	}
+	branch, exists := typed["value"]
+	if !exists {
+		return fmt.Errorf("%s: missing union value", field)
+	}
+	switch discriminator {
+	case "running":
+		return validateVerificationRunningJSONValue(generatedJSONChildPath(path, "value", false), branch, "")
+	case "completed":
+		return validateVerificationCompletedJSONValue(generatedJSONChildPath(path, "value", false), branch, "")
+	case "not_completed":
+		return validateVerificationNotCompletedJSONValue(generatedJSONChildPath(path, "value", false), branch, "")
+	default:
+		return fmt.Errorf("%s: unknown union discriminator %q", field, discriminator)
+	}
+}
+
+// validateVerifyChangePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "candidate_commit":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Confirmed Change Card identifier.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateAgentPolicyItemJSONValue2(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Current request_revision of the confirmed Change Card.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"candidate_commit",
+				"change_id",
+				"request_revision",
 			})
 		}
 	}
@@ -7883,6 +10538,117 @@ func checkBuilderScopeItemBuilderScopeItemValue(in *BuilderScopeItem, field stri
 	return nil
 }
 
+// checkBuilderVerificationReportValue checks text and cycles before conversion.
+func checkBuilderVerificationReportValue(in *BuilderVerificationReport) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkBuilderVerificationReportBuilderVerificationReportValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkBuilderVerificationReportBuilderVerificationReportValue checks one generated value on the active path.
+func checkBuilderVerificationReportBuilderVerificationReportValue(in *BuilderVerificationReport, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ReportDigest)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "report_digest", false))
+		}
+		if err := checkBuilderVerificationReportVerificationCountsValue(in.Counts, generatedJSONChildPath(field, "counts", false), active); err != nil {
+			return err
+		}
+		for index1, item1 := range in.Scenarios {
+			_ = index1
+			_ = item1
+			if err := checkBuilderVerificationReportVerificationScenarioValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "scenarios", false), strconv.Itoa(index1), true), active); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// checkBuilderVerificationReportVerificationCountsValue checks one generated value on the active path.
+func checkBuilderVerificationReportVerificationCountsValue(in *VerificationCounts, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+	}
+	return nil
+}
+
+// checkBuilderVerificationReportVerificationScenarioValue checks one generated value on the active path.
+func checkBuilderVerificationReportVerificationScenarioValue(in *VerificationScenario, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "id", false))
+		}
+		if !utf8.ValidString(string(in.Outcome)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "outcome", false))
+		}
+		for index1, item1 := range in.Checks {
+			_ = index1
+			_ = item1
+			if err := checkBuilderVerificationReportVerificationCheckValue(item1, generatedJSONChildPath(generatedJSONChildPath(field, "checks", false), strconv.Itoa(index1), true), active); err != nil {
+				return err
+			}
+		}
+		if in.Error != nil {
+			if !utf8.ValidString(string(*in.Error)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "error", false))
+			}
+		}
+	}
+	return nil
+}
+
+// checkBuilderVerificationReportVerificationCheckValue checks one generated value on the active path.
+func checkBuilderVerificationReportVerificationCheckValue(in *VerificationCheck, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.Name)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "name", false))
+		}
+		if in.Diagnostic != nil {
+			if !utf8.ValidString(string(*in.Diagnostic)) {
+				return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "diagnostic", false))
+			}
+		}
+	}
+	return nil
+}
+
 // checkC4ContainerItemValue checks text and cycles before conversion.
 func checkC4ContainerItemValue(in *C4ContainerItem) error {
 	if in == nil {
@@ -8332,6 +11098,36 @@ func checkGetChangePayloadGetChangePayloadValue(in *GetChangePayload, field stri
 	return nil
 }
 
+// checkGetVerificationPayloadValue checks text and cycles before conversion.
+func checkGetVerificationPayloadValue(in *GetVerificationPayload) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkGetVerificationPayloadGetVerificationPayloadValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkGetVerificationPayloadGetVerificationPayloadValue checks one generated value on the active path.
+func checkGetVerificationPayloadGetVerificationPayloadValue(in *GetVerificationPayload, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.RunID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "run_id", false))
+		}
+	}
+	return nil
+}
+
 // checkPreviewArchitecturePayloadValue checks text and cycles before conversion.
 func checkPreviewArchitecturePayloadValue(in *PreviewArchitecturePayload) error {
 	if in == nil {
@@ -8469,6 +11265,240 @@ func checkUICompositionItemValue(in *UICompositionItem) error {
 	active := make(map[any]bool)
 	if err := checkChangeCardResultUICompositionItemValue(in, "$", active); err != nil {
 		return err
+	}
+	return nil
+}
+
+// checkVerificationCheckValue checks text and cycles before conversion.
+func checkVerificationCheckValue(in *VerificationCheck) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkBuilderVerificationReportVerificationCheckValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationCompletedValue checks text and cycles before conversion.
+func checkVerificationCompletedValue(in *VerificationCompleted) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkVerificationCompletedVerificationCompletedValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationCompletedVerificationCompletedValue checks one generated value on the active path.
+func checkVerificationCompletedVerificationCompletedValue(in *VerificationCompleted, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.SuiteID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "suite_id", false))
+		}
+		if !utf8.ValidString(string(in.Environment)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "environment", false))
+		}
+		if err := checkBuilderVerificationReportBuilderVerificationReportValue(in.Report, generatedJSONChildPath(field, "report", false), active); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkVerificationCountsValue checks text and cycles before conversion.
+func checkVerificationCountsValue(in *VerificationCounts) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkBuilderVerificationReportVerificationCountsValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationNotCompletedValue checks text and cycles before conversion.
+func checkVerificationNotCompletedValue(in *VerificationNotCompleted) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkVerificationNotCompletedVerificationNotCompletedValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationNotCompletedVerificationNotCompletedValue checks one generated value on the active path.
+func checkVerificationNotCompletedVerificationNotCompletedValue(in *VerificationNotCompleted, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.Kind)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "kind", false))
+		}
+		if !utf8.ValidString(string(in.Stage)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "stage", false))
+		}
+		if !utf8.ValidString(string(in.Summary)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "summary", false))
+		}
+	}
+	return nil
+}
+
+// checkVerificationRunningValue checks text and cycles before conversion.
+func checkVerificationRunningValue(in *VerificationRunning) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkVerificationRunningVerificationRunningValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationRunningVerificationRunningValue checks one generated value on the active path.
+func checkVerificationRunningVerificationRunningValue(in *VerificationRunning, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.StartedAt)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "started_at", false))
+		}
+	}
+	return nil
+}
+
+// checkVerificationScenarioValue checks text and cycles before conversion.
+func checkVerificationScenarioValue(in *VerificationScenario) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkBuilderVerificationReportVerificationScenarioValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationStatusResultValue checks text and cycles before conversion.
+func checkVerificationStatusResultValue(in *VerificationStatusResult) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkVerificationStatusResultVerificationStatusResultValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerificationStatusResultVerificationStatusResultValue checks one generated value on the active path.
+func checkVerificationStatusResultVerificationStatusResultValue(in *VerificationStatusResult, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.RunID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "run_id", false))
+		}
+		if !utf8.ValidString(string(in.ChangeID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
+		}
+		if !utf8.ValidString(string(in.RequestRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
+		}
+		if !utf8.ValidString(string(in.CandidateCommit)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "candidate_commit", false))
+		}
+		if !utf8.ValidString(string(in.SuiteCommit)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "suite_commit", false))
+		}
+		if branch1, ok := in.State.AsRunning(); ok {
+			_ = branch1
+			if err := checkVerificationRunningVerificationRunningValue(branch1, generatedJSONChildPath(generatedJSONChildPath(field, "state", false), "value", false), active); err != nil {
+				return err
+			}
+		}
+		if branch1, ok := in.State.AsCompleted(); ok {
+			_ = branch1
+			if err := checkVerificationCompletedVerificationCompletedValue(branch1, generatedJSONChildPath(generatedJSONChildPath(field, "state", false), "value", false), active); err != nil {
+				return err
+			}
+		}
+		if branch1, ok := in.State.AsNotCompleted(); ok {
+			_ = branch1
+			if err := checkVerificationNotCompletedVerificationNotCompletedValue(branch1, generatedJSONChildPath(generatedJSONChildPath(field, "state", false), "value", false), active); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// checkVerifyChangePayloadValue checks text and cycles before conversion.
+func checkVerifyChangePayloadValue(in *VerifyChangePayload) error {
+	if in == nil {
+		return fmt.Errorf("missing root value")
+	}
+	active := make(map[any]bool)
+	if err := checkVerifyChangePayloadVerifyChangePayloadValue(in, "$", active); err != nil {
+		return err
+	}
+	return nil
+}
+
+// checkVerifyChangePayloadVerifyChangePayloadValue checks one generated value on the active path.
+func checkVerifyChangePayloadVerifyChangePayloadValue(in *VerifyChangePayload, field string, active map[any]bool) error {
+	if in == nil {
+		return nil
+	}
+	if active[in] {
+		return fmt.Errorf("%s: cyclic Go value", field)
+	}
+	active[in] = true
+	defer delete(active, in)
+	if in != nil {
+		if !utf8.ValidString(string(in.ChangeID)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "change_id", false))
+		}
+		if !utf8.ValidString(string(in.RequestRevision)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "request_revision", false))
+		}
+		if !utf8.ValidString(string(in.CandidateCommit)) {
+			return fmt.Errorf("%s: invalid UTF-8", generatedJSONChildPath(field, "candidate_commit", false))
+		}
 	}
 	return nil
 }

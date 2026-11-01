@@ -44,6 +44,16 @@ func DraftOverrideSurlaPath() string {
 	return "/sandbox/draft"
 }
 
+// VerifyChangeSurlaPath returns the URL path to the surla service verify_change HTTP endpoint.
+func VerifyChangeSurlaPath(changeID string) string {
+	return fmt.Sprintf("/changes/%v/verifications", changeID)
+}
+
+// GetVerificationSurlaPath returns the URL path to the surla service get_verification HTTP endpoint.
+func GetVerificationSurlaPath(runID string) string {
+	return fmt.Sprintf("/verifications/%v", runID)
+}
+
 // ApproveMergeSurlaPath returns the URL path to the surla service approve_merge HTTP endpoint.
 func ApproveMergeSurlaPath() string {
 	return "/changes/approve"

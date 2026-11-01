@@ -8,6 +8,9 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
+
 	surla "github.com/goadesign/surla/gen/surla"
 	goa "goa.design/goa/v3/pkg"
 )
@@ -58,6 +61,16 @@ type DraftOverrideRequestBody struct {
 	PromptID *string `form:"prompt_id,omitempty" json:"prompt_id,omitempty" xml:"prompt_id,omitempty"`
 	// Updated prompt template text or rule expression.
 	NewContent *string `form:"new_content,omitempty" json:"new_content,omitempty" xml:"new_content,omitempty"`
+}
+
+// VerifyChangeRequestBody is the type of the "surla" service "verify_change"
+// endpoint HTTP request body.
+type VerifyChangeRequestBody struct {
+	// Current request_revision of the confirmed Change Card.
+	RequestRevision *string `form:"request_revision,omitempty" json:"request_revision,omitempty" xml:"request_revision,omitempty"`
+	// Full commit ID of the candidate to build and verify (40 or 64 lowercase hex
+	// characters).
+	CandidateCommit *string `form:"candidate_commit,omitempty" json:"candidate_commit,omitempty" xml:"candidate_commit,omitempty"`
 }
 
 // ApproveMergeRequestBody is the type of the "surla" service "approve_merge"
@@ -226,6 +239,40 @@ type DraftOverrideResponseBody struct {
 	PromptVersion *string `form:"prompt_version,omitempty" json:"prompt_version,omitempty" xml:"prompt_version,omitempty"`
 	// Operator-facing status explanation.
 	Message string `form:"message" json:"message" xml:"message"`
+}
+
+// VerifyChangeResponseBody is the type of the "surla" service "verify_change"
+// endpoint HTTP response body.
+type VerifyChangeResponseBody struct {
+	// Verification run identifier; get_verification takes it.
+	RunID string `form:"run_id" json:"run_id" xml:"run_id"`
+	// Change Card the run verifies.
+	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Change Card revision the run verifies.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Candidate commit the run builds and verifies.
+	CandidateCommit string `form:"candidate_commit" json:"candidate_commit" xml:"candidate_commit"`
+	// Evaluator suite commit the operator configured for the run.
+	SuiteCommit string `form:"suite_commit" json:"suite_commit" xml:"suite_commit"`
+	// Exactly one of running, completed or not_completed.
+	State StateResponseBody `form:"state" json:"state" xml:"state"`
+}
+
+// GetVerificationResponseBody is the type of the "surla" service
+// "get_verification" endpoint HTTP response body.
+type GetVerificationResponseBody struct {
+	// Verification run identifier; get_verification takes it.
+	RunID string `form:"run_id" json:"run_id" xml:"run_id"`
+	// Change Card the run verifies.
+	ChangeID string `form:"change_id" json:"change_id" xml:"change_id"`
+	// Change Card revision the run verifies.
+	RequestRevision string `form:"request_revision" json:"request_revision" xml:"request_revision"`
+	// Candidate commit the run builds and verifies.
+	CandidateCommit string `form:"candidate_commit" json:"candidate_commit" xml:"candidate_commit"`
+	// Evaluator suite commit the operator configured for the run.
+	SuiteCommit string `form:"suite_commit" json:"suite_commit" xml:"suite_commit"`
+	// Exactly one of running, completed or not_completed.
+	State StateResponseBody `form:"state" json:"state" xml:"state"`
 }
 
 // ApproveMergeResponseBody is the type of the "surla" service "approve_merge"
@@ -477,6 +524,92 @@ type SwarmRoleItemResponseBody struct {
 	AccessMode string `form:"access_mode" json:"access_mode" xml:"access_mode"`
 }
 
+// VerificationRunningResponseBody is used to define fields on response body
+// types.
+type VerificationRunningResponseBody struct {
+	// When the run was accepted.
+	StartedAt string `form:"started_at" json:"started_at" xml:"started_at"`
+}
+
+// VerificationCompletedResponseBody is used to define fields on response body
+// types.
+type VerificationCompletedResponseBody struct {
+	// Evaluator suite the report was produced by.
+	SuiteID string `form:"suite_id" json:"suite_id" xml:"suite_id"`
+	// Dependency profile the suite ran the candidate with, such as sim.
+	Environment string `form:"environment" json:"environment" xml:"environment"`
+	// The builder view of the report.
+	Report *BuilderVerificationReportResponseBody `form:"report" json:"report" xml:"report"`
+}
+
+// BuilderVerificationReportResponseBody is used to define fields on response
+// body types.
+type BuilderVerificationReportResponseBody struct {
+	// SHA-256 digest of the full report the evaluator saved; approve_merge and
+	// surla approve take this digest.
+	ReportDigest string `form:"report_digest" json:"report_digest" xml:"report_digest"`
+	// Every declared scenario, counted by outcome.
+	Counts *VerificationCountsResponseBody `form:"counts" json:"counts" xml:"counts"`
+	// The verdict: true only when every declared scenario passed and the suite ran
+	// cleanly.
+	Passed bool `form:"passed" json:"passed" xml:"passed"`
+	// Whether the evaluator suite itself failed or ended abnormally.
+	SuiteFailed bool `form:"suite_failed" json:"suite_failed" xml:"suite_failed"`
+	// Every declared scenario in declaration order.
+	Scenarios []*VerificationScenarioResponseBody `form:"scenarios" json:"scenarios" xml:"scenarios"`
+}
+
+// VerificationCountsResponseBody is used to define fields on response body
+// types.
+type VerificationCountsResponseBody struct {
+	// Scenarios the suite declares.
+	Required int `form:"required" json:"required" xml:"required"`
+	// Scenarios that passed.
+	Passed int `form:"passed" json:"passed" xml:"passed"`
+	// Scenarios whose checks failed.
+	Failed int `form:"failed" json:"failed" xml:"failed"`
+	// Declared scenarios the suite did not report.
+	NotRun int `form:"not_run" json:"not_run" xml:"not_run"`
+	// Scenarios that could not be evaluated.
+	HarnessError int `form:"harness_error" json:"harness_error" xml:"harness_error"`
+}
+
+// VerificationScenarioResponseBody is used to define fields on response body
+// types.
+type VerificationScenarioResponseBody struct {
+	// Scenario name for a repair scenario, or holdout-<n> for a holdout.
+	ID string `form:"id" json:"id" xml:"id"`
+	// How the scenario ended.
+	Outcome string `form:"outcome" json:"outcome" xml:"outcome"`
+	// The repair scenario's checks; empty for holdouts.
+	Checks []*VerificationCheckResponseBody `form:"checks,omitempty" json:"checks,omitempty" xml:"checks,omitempty"`
+	// The repair scenario's environment error; empty for holdouts.
+	Error *string `form:"error,omitempty" json:"error,omitempty" xml:"error,omitempty"`
+}
+
+// VerificationCheckResponseBody is used to define fields on response body
+// types.
+type VerificationCheckResponseBody struct {
+	// Check name.
+	Name string `form:"name" json:"name" xml:"name"`
+	// Whether the check passed.
+	Passed bool `form:"passed" json:"passed" xml:"passed"`
+	// Why the check failed; empty when it passed.
+	Diagnostic *string `form:"diagnostic,omitempty" json:"diagnostic,omitempty" xml:"diagnostic,omitempty"`
+}
+
+// VerificationNotCompletedResponseBody is used to define fields on response
+// body types.
+type VerificationNotCompletedResponseBody struct {
+	// execution_failed when a step failed; interrupted when the run's process
+	// ended before it finished.
+	Kind string `form:"kind" json:"kind" xml:"kind"`
+	// Where the run stopped.
+	Stage string `form:"stage" json:"stage" xml:"stage"`
+	// Builder-safe description of what stopped the run; never command output.
+	Summary string `form:"summary" json:"summary" xml:"summary"`
+}
+
 // ExampleItemRequestBody is used to define fields on request body types.
 type ExampleItemRequestBody struct {
 	// Code-assigned stable example identifier.
@@ -506,6 +639,205 @@ type BuilderScopeItemRequestBody struct {
 	Paths []string `form:"paths,omitempty" json:"paths,omitempty" xml:"paths,omitempty"`
 	// Optional preference selecting a server-configured authenticated profile ID.
 	PreferredProfileID *string `form:"preferred_profile_id,omitempty" json:"preferred_profile_id,omitempty" xml:"preferred_profile_id,omitempty"`
+}
+
+// StateResponseBody holds exactly one of its branch values.
+type StateResponseBody struct {
+	kind         StateResponseBodyKind
+	running      *VerificationRunningResponseBody
+	completed    *VerificationCompletedResponseBody
+	notCompleted *VerificationNotCompletedResponseBody
+}
+
+// StateResponseBodyKind records which StateResponseBody branch is selected.
+type StateResponseBodyKind string
+
+const (
+	// StateResponseBodyKindRunning identifies the running branch.
+	StateResponseBodyKindRunning StateResponseBodyKind = "running"
+	// StateResponseBodyKindCompleted identifies the completed branch.
+	StateResponseBodyKindCompleted StateResponseBodyKind = "completed"
+	// StateResponseBodyKindNotCompleted identifies the not_completed branch.
+	StateResponseBodyKindNotCompleted StateResponseBodyKind = "not_completed"
+)
+
+// Kind returns the selected branch.
+func (u StateResponseBody) Kind() StateResponseBodyKind {
+	return u.kind
+}
+
+// NewStateResponseBodyRunning constructs StateResponseBody with the running branch set.
+func NewStateResponseBodyRunning(v *VerificationRunningResponseBody) StateResponseBody {
+	return StateResponseBody{
+		kind:    StateResponseBodyKindRunning,
+		running: v,
+	}
+}
+
+// AsRunning returns the value when the running branch is selected.
+func (u StateResponseBody) AsRunning() (_ *VerificationRunningResponseBody, ok bool) {
+	if u.kind != StateResponseBodyKindRunning {
+		return
+	}
+	return u.running, true
+}
+
+// SetRunning selects the running branch and stores v.
+func (u *StateResponseBody) SetRunning(v *VerificationRunningResponseBody) {
+	*u = StateResponseBody{
+		kind:    StateResponseBodyKindRunning,
+		running: v,
+	}
+}
+
+// NewStateResponseBodyCompleted constructs StateResponseBody with the completed branch set.
+func NewStateResponseBodyCompleted(v *VerificationCompletedResponseBody) StateResponseBody {
+	return StateResponseBody{
+		kind:      StateResponseBodyKindCompleted,
+		completed: v,
+	}
+}
+
+// AsCompleted returns the value when the completed branch is selected.
+func (u StateResponseBody) AsCompleted() (_ *VerificationCompletedResponseBody, ok bool) {
+	if u.kind != StateResponseBodyKindCompleted {
+		return
+	}
+	return u.completed, true
+}
+
+// SetCompleted selects the completed branch and stores v.
+func (u *StateResponseBody) SetCompleted(v *VerificationCompletedResponseBody) {
+	*u = StateResponseBody{
+		kind:      StateResponseBodyKindCompleted,
+		completed: v,
+	}
+}
+
+// NewStateResponseBodyNotCompleted constructs StateResponseBody with the not_completed branch set.
+func NewStateResponseBodyNotCompleted(v *VerificationNotCompletedResponseBody) StateResponseBody {
+	return StateResponseBody{
+		kind:         StateResponseBodyKindNotCompleted,
+		notCompleted: v,
+	}
+}
+
+// AsNotCompleted returns the value when the not_completed branch is selected.
+func (u StateResponseBody) AsNotCompleted() (_ *VerificationNotCompletedResponseBody, ok bool) {
+	if u.kind != StateResponseBodyKindNotCompleted {
+		return
+	}
+	return u.notCompleted, true
+}
+
+// SetNotCompleted selects the not_completed branch and stores v.
+func (u *StateResponseBody) SetNotCompleted(v *VerificationNotCompletedResponseBody) {
+	*u = StateResponseBody{
+		kind:         StateResponseBodyKindNotCompleted,
+		notCompleted: v,
+	}
+}
+
+// Validate ensures exactly one valid branch is selected.
+func (u StateResponseBody) Validate() error {
+	_, err := u.Value()
+	return err
+}
+
+// Value returns the selected branch value, or the same selection error as Validate.
+// Go templates can read this method directly; an invalid selection stops execution.
+func (u StateResponseBody) Value() (any, error) {
+	switch u.kind {
+	case "":
+		return nil, goa.InvalidEnumValueError("type", "", []any{
+			string(StateResponseBodyKindRunning),
+			string(StateResponseBodyKindCompleted),
+			string(StateResponseBodyKindNotCompleted),
+		})
+	case StateResponseBodyKindRunning:
+		if u.running == nil {
+			return nil, goa.MissingFieldError("value", "StateResponseBody")
+		}
+		return u.running, nil
+	case StateResponseBodyKindCompleted:
+		if u.completed == nil {
+			return nil, goa.MissingFieldError("value", "StateResponseBody")
+		}
+		return u.completed, nil
+	case StateResponseBodyKindNotCompleted:
+		if u.notCompleted == nil {
+			return nil, goa.MissingFieldError("value", "StateResponseBody")
+		}
+		return u.notCompleted, nil
+	default:
+		return nil, goa.InvalidEnumValueError("type", u.kind, []any{
+			string(StateResponseBodyKindRunning),
+			string(StateResponseBodyKindCompleted),
+			string(StateResponseBodyKindNotCompleted),
+		})
+	}
+}
+
+// MarshalJSON marshals the union into the canonical {type,value} JSON shape.
+func (u StateResponseBody) MarshalJSON() ([]byte, error) {
+	value, err := u.Value()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(struct {
+		Type  string `json:"type"`
+		Value any    `json:"value"`
+	}{
+		Type:  string(u.kind),
+		Value: value,
+	})
+}
+
+// UnmarshalJSON unmarshals the union from the canonical {type,value} JSON shape.
+func (u *StateResponseBody) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type  string          `json:"type"`
+		Value json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if len(raw.Value) == 0 {
+		return goa.MissingFieldError("value", "StateResponseBody")
+	}
+	if bytes.Equal(bytes.TrimSpace(raw.Value), []byte("null")) {
+		return goa.InvalidFieldTypeError("value", nil, "non-null JSON value")
+	}
+	switch raw.Type {
+	case string(StateResponseBodyKindRunning):
+		var v *VerificationRunningResponseBody
+		if err := json.Unmarshal(raw.Value, &v); err != nil {
+			return err
+		}
+		u.SetRunning(v)
+	case string(StateResponseBodyKindCompleted):
+		var v *VerificationCompletedResponseBody
+		if err := json.Unmarshal(raw.Value, &v); err != nil {
+			return err
+		}
+		u.SetCompleted(v)
+	case string(StateResponseBodyKindNotCompleted):
+		var v *VerificationNotCompletedResponseBody
+		if err := json.Unmarshal(raw.Value, &v); err != nil {
+			return err
+		}
+		u.SetNotCompleted(v)
+	default:
+		if raw.Type == "" {
+			return goa.MissingFieldError("type", "StateResponseBody")
+		}
+		return goa.InvalidEnumValueError("type", raw.Type, []any{
+			string(StateResponseBodyKindRunning),
+			string(StateResponseBodyKindCompleted),
+			string(StateResponseBodyKindNotCompleted),
+		})
+	}
+	return nil
 }
 
 // NewProposeChangeResponseBody builds the HTTP response body from the result
@@ -758,6 +1090,94 @@ func NewDraftOverrideResponseBody(res *surla.DraftOverrideResult) *DraftOverride
 	return body
 }
 
+// NewVerifyChangeResponseBody builds the HTTP response body from the result of
+// the "verify_change" endpoint of the "surla" service.
+func NewVerifyChangeResponseBody(res *surla.VerificationStatusResult) *VerifyChangeResponseBody {
+	body := &VerifyChangeResponseBody{
+		RunID:           res.RunID,
+		ChangeID:        res.ChangeID,
+		RequestRevision: res.RequestRevision,
+		CandidateCommit: res.CandidateCommit,
+		SuiteCommit:     res.SuiteCommit,
+	}
+	if res.State.Kind() != "" {
+		switch string(res.State.Kind()) {
+		case "running":
+			actual, _ := res.State.AsRunning()
+			var obj *VerificationRunningResponseBody
+			if actual != nil {
+				obj = marshalSurlaVerificationRunningToVerificationRunningResponseBody(actual)
+			}
+			u := body.State
+			u.SetRunning((*VerificationRunningResponseBody)(obj))
+			body.State = u
+		case "completed":
+			actual, _ := res.State.AsCompleted()
+			var obj *VerificationCompletedResponseBody
+			if actual != nil {
+				obj = marshalSurlaVerificationCompletedToVerificationCompletedResponseBody(actual)
+			}
+			u := body.State
+			u.SetCompleted((*VerificationCompletedResponseBody)(obj))
+			body.State = u
+		case "not_completed":
+			actual, _ := res.State.AsNotCompleted()
+			var obj *VerificationNotCompletedResponseBody
+			if actual != nil {
+				obj = marshalSurlaVerificationNotCompletedToVerificationNotCompletedResponseBody(actual)
+			}
+			u := body.State
+			u.SetNotCompleted((*VerificationNotCompletedResponseBody)(obj))
+			body.State = u
+		}
+	}
+	return body
+}
+
+// NewGetVerificationResponseBody builds the HTTP response body from the result
+// of the "get_verification" endpoint of the "surla" service.
+func NewGetVerificationResponseBody(res *surla.VerificationStatusResult) *GetVerificationResponseBody {
+	body := &GetVerificationResponseBody{
+		RunID:           res.RunID,
+		ChangeID:        res.ChangeID,
+		RequestRevision: res.RequestRevision,
+		CandidateCommit: res.CandidateCommit,
+		SuiteCommit:     res.SuiteCommit,
+	}
+	if res.State.Kind() != "" {
+		switch string(res.State.Kind()) {
+		case "running":
+			actual, _ := res.State.AsRunning()
+			var obj *VerificationRunningResponseBody
+			if actual != nil {
+				obj = marshalSurlaVerificationRunningToVerificationRunningResponseBody(actual)
+			}
+			u := body.State
+			u.SetRunning((*VerificationRunningResponseBody)(obj))
+			body.State = u
+		case "completed":
+			actual, _ := res.State.AsCompleted()
+			var obj *VerificationCompletedResponseBody
+			if actual != nil {
+				obj = marshalSurlaVerificationCompletedToVerificationCompletedResponseBody(actual)
+			}
+			u := body.State
+			u.SetCompleted((*VerificationCompletedResponseBody)(obj))
+			body.State = u
+		case "not_completed":
+			actual, _ := res.State.AsNotCompleted()
+			var obj *VerificationNotCompletedResponseBody
+			if actual != nil {
+				obj = marshalSurlaVerificationNotCompletedToVerificationNotCompletedResponseBody(actual)
+			}
+			u := body.State
+			u.SetNotCompleted((*VerificationNotCompletedResponseBody)(obj))
+			body.State = u
+		}
+	}
+	return body
+}
+
 // NewApproveMergeResponseBody builds the HTTP response body from the result of
 // the "approve_merge" endpoint of the "surla" service.
 func NewApproveMergeResponseBody(res *surla.ChangeCardResult) *ApproveMergeResponseBody {
@@ -937,6 +1357,26 @@ func NewDraftOverridePayload(body *DraftOverrideRequestBody) *surla.DraftOverrid
 	return v
 }
 
+// NewVerifyChangePayload builds a surla service verify_change endpoint payload.
+func NewVerifyChangePayload(body *VerifyChangeRequestBody, changeID string) *surla.VerifyChangePayload {
+	v := &surla.VerifyChangePayload{
+		RequestRevision: *body.RequestRevision,
+		CandidateCommit: *body.CandidateCommit,
+	}
+	v.ChangeID = changeID
+
+	return v
+}
+
+// NewGetVerificationPayload builds a surla service get_verification endpoint
+// payload.
+func NewGetVerificationPayload(runID string) *surla.GetVerificationPayload {
+	v := &surla.GetVerificationPayload{}
+	v.RunID = runID
+
+	return v
+}
+
 // NewApproveMergePayload builds a surla service approve_merge endpoint payload.
 func NewApproveMergePayload(body *ApproveMergeRequestBody) *surla.ApproveMergePayload {
 	v := &surla.ApproveMergePayload{
@@ -1035,6 +1475,21 @@ func ValidateDraftOverrideRequestBody(body *DraftOverrideRequestBody) (err error
 		if !(*body.TargetKind == "prompt_template" || *body.TargetKind == "compiled_rule") {
 			err = goa.MergeErrors(err, goa.InvalidEnumValueError("body.target_kind", *body.TargetKind, []any{"prompt_template", "compiled_rule"}))
 		}
+	}
+	return
+}
+
+// ValidateVerifyChangeRequestBody runs the validations defined on
+// VerifyChangeRequestBody
+func ValidateVerifyChangeRequestBody(body *VerifyChangeRequestBody) (err error) {
+	if body.RequestRevision == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("request_revision", "body"))
+	}
+	if body.CandidateCommit == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("candidate_commit", "body"))
+	}
+	if body.CandidateCommit != nil {
+		err = goa.MergeErrors(err, goa.ValidatePattern("body.candidate_commit", *body.CandidateCommit, "^([0-9a-f]{40}|[0-9a-f]{64})$"))
 	}
 	return
 }

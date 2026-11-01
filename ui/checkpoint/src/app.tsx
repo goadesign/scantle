@@ -14,6 +14,7 @@ import {
   ToolInputPartialView,
 } from "./components/c4-graph";
 import { CP1EditorView } from "./components/cp1-editor";
+import { VerificationView } from "./components/cp4-verification";
 import { Alert, Card } from "./components/shadcn";
 import { isDraftDirty, PreservedDraft } from "./context/cp1-draft";
 import {
@@ -22,11 +23,13 @@ import {
   DiffResult,
   DraftOverrideResult,
   ExampleItem,
+  VerificationStatusResult,
   isArchitecturePreviewResult,
   isChangeCardResult,
   isDiffResult,
   isDraftOverrideResult,
   isPlainObject,
+  isVerificationStatusResult,
 } from "./types";
 
 // Initialization has its own request ID; editor calls start after it.
@@ -36,6 +39,8 @@ const PROTOCOL_VERSION = "2026-01-26";
 
 // PendingRPC consumes the host response associated with one request ID.
 interface PendingRPC {
+  // params is the exact call sent to the host, retained only until its reply.
+  params: { name: string; arguments: Record<string, unknown> };
   // onResult validates the tool payload before an editor callback uses it.
   onResult: (payload: unknown) => void;
   // onError reports the failed request and completes its local lifetime.
@@ -61,6 +66,7 @@ type ActiveResultState =
   | { kind: "cp2-architecture-preview"; preview: ArchitecturePreviewResult }
   | { kind: "cp2-diff"; diff: DiffResult }
   | { kind: "cp3-draft-override"; draft: DraftOverrideResult }
+  | { kind: "cp4-verification"; run: VerificationStatusResult; requestError: string | null }
   | { kind: "cp1-incoming-card"; card: ChangeCardResult }
   | { kind: "partial-input"; partialArgs: Record<string, unknown> }
   | { kind: "error"; message: string }
@@ -173,7 +179,7 @@ export function bootstrapCheckpointApp() {
   let nextRequestId = 2;
   const pendingRequests: Record<string, PendingRPC> = {};
   // editorRequest completes after the current card request updates the view.
-  // It also supplies the editor's busy state; no second boolean is retained.
+  // CP3 waits for it; independent verification reads do not block editing.
   let editorRequest: Promise<void> | null = null;
   let activeEditor: ActiveEditorState | null = null;
   let activeResult: ActiveResultState | null = null;
@@ -218,6 +224,7 @@ export function bootstrapCheckpointApp() {
     delete resultRegionEl.dataset.requestRevision;
     delete resultRegionEl.dataset.designDigest;
     delete resultRegionEl.dataset.hasChanges;
+    delete resultRegionEl.dataset.runId;
   }
 
   // syncEditorRegion renders saved values and drafts together, with editing
@@ -306,6 +313,24 @@ export function bootstrapCheckpointApp() {
       });
       return;
     }
+    if (res.kind === "cp4-verification") {
+      resultRegionEl.dataset.runId = res.run.run_id;
+      resultRegionEl.dataset.changeId = res.run.change_id;
+      resultRegionEl.dataset.requestRevision = res.run.request_revision;
+      flushSync(() => {
+        resultRoot.render(
+          <VerificationView
+            run={res.run}
+            displayedCardRevision={activeEditor?.card.change_id === res.run.change_id
+              ? activeEditor.card.request_revision : null}
+            checking={hasPendingVerification(res.run.run_id)}
+            requestError={res.requestError}
+            onCheckStatus={handleCheckVerificationStatus}
+          />
+        );
+      });
+      return;
+    }
     if (res.kind === "cp1-incoming-card") {
       resultRegionEl.dataset.changeId = res.card.change_id;
       resultRegionEl.dataset.requestRevision = res.card.request_revision;
@@ -363,9 +388,57 @@ export function bootstrapCheckpointApp() {
     }
   }
 
-  // callEditorTool owns one editor request through its host response and view
-  // update. The completion promise lets a prompt-update notification wait for
-  // that request without retaining a second busy flag or a refresh queue.
+  // callHostTool correlates one request and validates its response once. Its
+  // caller receives the completion before dispatch, so the caller can own its
+  // waiting state without a second protocol path or an unrelated busy flag.
+  function callHostTool<T>(
+    toolName: string,
+    args: Record<string, unknown>,
+    validateFn: (payload: unknown) => payload is T,
+    onSuccess: (payload: T) => void,
+    onError: (message: string) => void,
+    onStart: (completion: Promise<void>) => void
+  ) {
+    if (!window.parent || window.parent === window) {
+      onError("Cannot invoke " + toolName + ": no MCP Apps host frame is attached.");
+      syncResultRegion();
+      return;
+    }
+    const reqId = nextRequestId++;
+    const params = { name: toolName, arguments: args };
+    const completion = new Promise<void>((complete) => {
+      pendingRequests[String(reqId)] = {
+        params,
+        onResult: (payload) => {
+          if (validateFn(payload)) {
+            onSuccess(payload);
+          } else {
+            onError("Tool response is missing a valid structured checkpoint payload.");
+          }
+          syncResultRegion();
+          complete();
+        },
+        onError: (message) => {
+          onError(message);
+          syncResultRegion();
+          complete();
+        },
+      };
+    });
+    onStart(completion);
+    window.parent.postMessage(
+      {
+        jsonrpc: "2.0",
+        id: reqId,
+        method: "tools/call",
+        params,
+      },
+      "*"
+    );
+  }
+
+  // callEditorTool owns CP1's editable form through its request. Only card
+  // requests disable that form or supply the completion CP3 needs to await.
   function callEditorTool<T>(
     toolName: string,
     args: Record<string, unknown>,
@@ -373,38 +446,81 @@ export function bootstrapCheckpointApp() {
     onSuccess: (payload: T) => void,
     onError: (message: string) => void
   ) {
-    if (!window.parent || window.parent === window) {
-      onError("Cannot invoke " + toolName + ": no MCP Apps host frame is attached.");
+    callHostTool(
+      toolName,
+      args,
+      validateFn,
+      (payload) => {
+        editorRequest = null;
+        onSuccess(payload);
+      },
+      (message) => {
+        editorRequest = null;
+        onError(message);
+      },
+      (completion) => {
+        editorRequest = completion;
+        syncEditorRegion();
+      }
+    );
+  }
+
+  // hasPendingVerification derives a button's waiting state from the original
+  // calls already awaiting a host reply, without a second map or status flag.
+  function hasPendingVerification(runID: string): boolean {
+    return Object.values(pendingRequests).some((request) =>
+      request.params.name === "get_verification" &&
+      request.params.arguments.run_id === runID
+    );
+  }
+
+  // displayVerification keeps the terminal result already observed for this
+  // run. Its owner writes that result once and never reuses the run ID, so an
+  // older notification or status reply cannot put it back into progress.
+  // Another run can always be displayed without retaining a result history.
+  function displayVerification(run: VerificationStatusResult) {
+    const displayed = activeResult?.kind === "cp4-verification" ? activeResult.run : null;
+    const shown = displayed?.run_id === run.run_id && displayed.state.type !== "running"
+      ? displayed : run;
+    activeResult = { kind: "cp4-verification", run: shown, requestError: null };
+    statusEl.textContent = "Showing the saved verification result.";
+  }
+
+  // handleCheckVerificationStatus reads the displayed run and never starts a
+  // new verification. A late reply belongs only to that run, even if another
+  // checkpoint or a different run arrived while the host was processing it.
+  function handleCheckVerificationStatus() {
+    if (
+      activeResult?.kind !== "cp4-verification" ||
+      hasPendingVerification(activeResult.run.run_id)
+    ) {
       return;
     }
-    const reqId = nextRequestId++;
-    editorRequest = new Promise<void>((complete) => {
-      pendingRequests[String(reqId)] = {
-        onResult: (payload) => {
-          editorRequest = null;
-          if (validateFn(payload)) {
-            onSuccess(payload);
-          } else {
-            onError("Tool response is missing a valid structured checkpoint payload.");
-          }
-          complete();
-        },
-        onError: (message) => {
-          editorRequest = null;
-          onError(message);
-          complete();
-        },
-      };
-    });
-    syncEditorRegion();
-    window.parent.postMessage(
-      {
-        jsonrpc: "2.0",
-        id: reqId,
-        method: "tools/call",
-        params: { name: toolName, arguments: args },
+    const runID = activeResult.run.run_id;
+    activeResult = { ...activeResult, requestError: null };
+    callHostTool(
+      "get_verification",
+      { run_id: runID },
+      isVerificationStatusResult,
+      (run) => {
+        if (activeResult?.kind !== "cp4-verification" || activeResult.run.run_id !== runID) {
+          return;
+        }
+        if (run.run_id !== runID) {
+          activeResult = { ...activeResult, requestError: "The host returned a different verification run." };
+          statusEl.textContent = "Could not check verification status; the last result is preserved.";
+          return;
+        }
+        displayVerification(run);
       },
-      "*"
+      (message) => {
+        if (activeResult?.kind !== "cp4-verification" || activeResult.run.run_id !== runID) {
+          return;
+        }
+        activeResult = { ...activeResult, requestError: message };
+        statusEl.textContent = "Could not check verification status; the last result is preserved.";
+      },
+      syncResultRegion
     );
   }
 
@@ -512,6 +628,7 @@ export function bootstrapCheckpointApp() {
     if (activeResult && activeResult.kind !== "cp1-incoming-card") {
       activeEditor = null;
       syncEditorRegion();
+      syncResultRegion();
       rootEl.dataset.state = activeResult.kind;
       return;
     }
@@ -602,9 +719,14 @@ export function bootstrapCheckpointApp() {
     statusEl.textContent = "Checkpoint tool call cancelled";
   }
 
-  // renderError displays an invalid checkpoint or failed tool result while
-  // retaining any draft or editor request that still belongs to the user.
+  // renderError displays an uncorrelated notification failure without
+  // attributing it to a pending status read or replacing its saved run.
+  // Other checkpoints retain their existing draft and error behavior.
   function renderError(message: string) {
+    if (activeResult?.kind === "cp4-verification") {
+      statusEl.textContent = "Could not display the new checkpoint result: " + message;
+      return;
+    }
     if (!shouldRetainEditor()) {
       activeEditor = null;
       syncEditorRegion();
@@ -632,6 +754,16 @@ export function bootstrapCheckpointApp() {
       return;
     }
     const payload = params.structuredContent;
+    if (isVerificationStatusResult(payload)) {
+      if (!shouldRetainEditor()) {
+        activeEditor = null;
+        syncEditorRegion();
+      }
+      displayVerification(payload);
+      syncResultRegion();
+      rootEl.dataset.state = "cp4-verification";
+      return;
+    }
     if (isArchitecturePreviewResult(payload)) {
       if (!shouldRetainEditor()) {
         activeEditor = null;
@@ -759,7 +891,7 @@ export function bootstrapCheckpointApp() {
           renderError("Malformed ui/notifications/tool-input-partial notification.");
           return;
         }
-        if (shouldRetainEditor()) {
+        if (shouldRetainEditor() || activeResult?.kind === "cp4-verification") {
           return;
         }
         const partialArgs =
@@ -781,7 +913,7 @@ export function bootstrapCheckpointApp() {
           renderError("Malformed ui/notifications/tool-input notification.");
           return;
         }
-        if (shouldRetainEditor()) {
+        if (shouldRetainEditor() || activeResult?.kind === "cp4-verification") {
           return;
         }
         renderWaiting("Preparing checkpoint view...");
@@ -800,6 +932,10 @@ export function bootstrapCheckpointApp() {
           statusEl.textContent = cancelReason
             ? "Host reported tool cancellation (" + cancelReason + "); CP1 draft preserved."
             : "Host reported tool cancellation; CP1 draft preserved.";
+          return;
+        }
+        if (activeResult?.kind === "cp4-verification") {
+          statusEl.textContent = "The host canceled a tool call; the saved verification result is still shown.";
           return;
         }
         renderCancelled(cancelReason);

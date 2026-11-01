@@ -162,6 +162,9 @@ type (
 		// PromotionTarget supplies CP5 verification reports and current
 		// promotion inputs. Without it approve_merge fails.
 		PromotionTarget PromotionTarget
+		// Verification is the operator's CP4 configuration. Without it
+		// verify_change and get_verification fail.
+		Verification *VerificationConfig
 	}
 
 	// storedChangeCard holds a versioned Change Card alongside its authenticated
@@ -225,6 +228,8 @@ type (
 		// promotionTarget supplies CP5 reports and current promotion inputs;
 		// nil when the host bound none.
 		promotionTarget PromotionTarget
+		// verification is the operator's CP4 configuration, or nil.
+		verification *VerificationConfig
 	}
 )
 
@@ -381,6 +386,7 @@ func New(opts Options) *ControlPlane {
 		targetUpdater:   opts.TargetUpdater,
 		swarmProfiles:   opts.SwarmProfiles,
 		promotionTarget: opts.PromotionTarget,
+		verification:    opts.Verification,
 	}
 }
 

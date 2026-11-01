@@ -51,6 +51,10 @@ type serveConfig struct {
 	modelName string
 	// swarmProfilesPath is the path of a JSON array of swarm.ProviderProfile.
 	swarmProfilesPath string
+	// verificationPath is the path of the operator's CP4 verification
+	// configuration (see loadVerificationConfig); empty disables
+	// verify_change and get_verification.
+	verificationPath string
 }
 
 // binaryFlags collects repeated `-binary name=pkg` flags for `surla verify`
@@ -161,6 +165,8 @@ func dispatch(sub string, args []string, stdout io.Writer) error {
 		return runVerify(args)
 	case "approve":
 		return runApprove(args, stdout)
+	case "verify-run":
+		return runVerifyRun(args)
 	default:
 		return fmt.Errorf("unknown command %q; run \"surla help\" to list the commands", sub)
 	}
@@ -178,6 +184,7 @@ func runServe(args []string) (err error) {
 	fs.StringVar(&cfg.provider, "model-provider", "", "CP1 model provider: anthropic or openai (key from ANTHROPIC_API_KEY or OPENAI_API_KEY)")
 	fs.StringVar(&cfg.modelName, "model-name", "", "CP1 model name for -model-provider")
 	fs.StringVar(&cfg.swarmProfilesPath, "swarm-profiles", "", "JSON file listing the coding-agent provider profiles used for CP2 swarm plans")
+	fs.StringVar(&cfg.verificationPath, "verification-config", "", "JSON file with the CP4 candidate, evaluator suite, runs and reports configuration used by verify_change")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -390,27 +397,6 @@ func runDiff(args []string) error {
 	return enc.Encode(res)
 }
 
-// runVerify builds the candidate commit in the OS sandbox, runs the evaluator
-// suite commit against it with verify.Run, and writes the JSON report to
-// stdout: the full report, or its builder view with -builder-view. verify.Run
-// also writes the full report to -report-dir. A report that did not pass is
-// still printed, and the command then fails so the exit status is 1. When
-// verify.Run itself fails, nothing is printed and its error is returned.
-// SIGINT and SIGTERM cancel the run.
-func runVerify(args []string) error {
-	plan, builderView, err := parseVerifyFlags(args)
-	if err != nil {
-		return err
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	report, err := verify.Run(ctx, plan)
-	if err != nil {
-		return err
-	}
-	return writeVerifyReport(os.Stdout, report, builderView)
-}
-
 // writeVerifyReport writes report to w as indented JSON, or its builder view
 // when builderView is set, and then returns an error when the report did not
 // pass so `surla verify` exits 1 after printing it.
@@ -554,12 +540,12 @@ func (b binaryFlags) Set(v string) error {
 	return nil
 }
 
-// parseVerifyFlags turns `surla verify` arguments into a verify.Plan and
-// reports whether the builder view was requested. -candidate-module and
+// parseVerifyFlags turns `surla verify` arguments into a verify.Plan, the
+// run's time limit, and whether the builder view was requested. -candidate-module and
 // -suite-module default to ".", the repository root; every other plan field is
 // required and must be given explicitly. Commit IDs and repositories are
 // checked by verify.Run.
-func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
+func parseVerifyFlags(args []string) (verify.Plan, time.Duration, bool, error) {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	binaries := binaryFlags{}
 	var p verify.Plan
@@ -572,14 +558,15 @@ func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 	fs.StringVar(&p.SuiteModule, "suite-module", ".", "suite Go module directory inside -suite-repo")
 	fs.StringVar(&p.SuiteCommand, "suite-command", "", "suite command package inside -suite-module")
 	fs.StringVar(&p.RequestRevision, "request-revision", "", "request_revision of the confirmed change being verified")
-	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds and evidence; keep it away from builders")
+	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds (candidate-bin/<name>) and evidence; it must be missing or empty and is kept after the run; keep it away from builders")
 	fs.StringVar(&p.ReportDir, "report-dir", "", "directory that receives the full report as <digest>.json")
+	timeout := fs.Duration("timeout", 0, "how long the run may take before it is stopped; 0, the default, means no limit")
 	builderView := fs.Bool("builder-view", false, "print the builder view, which hides holdout scenario details, instead of the full report")
 	if err := fs.Parse(args); err != nil {
-		return verify.Plan{}, false, err
+		return verify.Plan{}, 0, false, err
 	}
 	if fs.NArg() > 0 {
-		return verify.Plan{}, false, fmt.Errorf("unexpected arguments %q", fs.Args())
+		return verify.Plan{}, 0, false, fmt.Errorf("unexpected arguments %q", fs.Args())
 	}
 	required := []struct {
 		flag  string
@@ -604,10 +591,10 @@ func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 		missing = append(missing, "-binary")
 	}
 	if len(missing) > 0 {
-		return verify.Plan{}, false, fmt.Errorf("verify requires %s", strings.Join(missing, ", "))
+		return verify.Plan{}, 0, false, fmt.Errorf("verify requires %s", strings.Join(missing, ", "))
 	}
 	p.Binaries = binaries
-	return p, *builderView, nil
+	return p, *timeout, *builderView, nil
 }
 
 // isSHA256Hex reports whether s is a lowercase hex SHA-256 digest.
@@ -694,11 +681,15 @@ func serveOptions(cfg serveConfig, getenv func(string) string) (controlplane.Opt
 	if err != nil {
 		return controlplane.Options{}, nil, err
 	}
+	verification, err := loadVerificationConfig(cfg.verificationPath)
+	if err != nil {
+		return controlplane.Options{}, nil, err
+	}
 	analyzer, closeModel, err := newCP1Analyzer(cfg, getenv)
 	if err != nil {
 		return controlplane.Options{}, nil, err
 	}
-	return controlplane.Options{Analyzer: analyzer, SwarmProfiles: profiles}, closeModel, nil
+	return controlplane.Options{Analyzer: analyzer, SwarmProfiles: profiles, Verification: verification}, closeModel, nil
 }
 
 // newCP1Analyzer returns the CP1 analyzer selected by cfg: a model gateway

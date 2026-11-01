@@ -252,7 +252,7 @@ func TestBuildDeniesReadsOutsideTheModule(t *testing.T) {
 			err := Build(t.Context(), BuildSpec{
 				SourceDir: mod, ModuleDir: mod, Package: ".", Out: filepath.Join(t.TempDir(), "probe"),
 				GOROOT: goroot, ModCache: modCache, WorkDir: t.TempDir(), LogFile: filepath.Join(logs, "build.log"),
-			})
+			}, (*exec.Cmd).Run)
 			log, _ := os.ReadFile(filepath.Join(logs, "build.log"))
 			if !c.wantErr {
 				require.NoError(t, err, string(log))
@@ -311,7 +311,7 @@ func TestBuildReadsOnlyItsSourceDir(t *testing.T) {
 		err := Build(t.Context(), BuildSpec{
 			SourceDir: sourceDir, ModuleDir: moduleDir, Package: ".", Out: filepath.Join(t.TempDir(), "app"),
 			GOROOT: goroot, ModCache: modCache, WorkDir: t.TempDir(), LogFile: filepath.Join(logs, "build.log"),
-		})
+		}, (*exec.Cmd).Run)
 		log, _ := os.ReadFile(filepath.Join(logs, "build.log"))
 		return string(log), err
 	}

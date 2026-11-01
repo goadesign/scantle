@@ -239,6 +239,84 @@ func DecodeDraftOverrideRequest(mux goahttp.Muxer, decoder func(*http.Request) g
 	}
 }
 
+// EncodeVerifyChangeResponse returns an encoder for responses returned by the
+// surla verify_change endpoint.
+func EncodeVerifyChangeResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*surla.VerificationStatusResult)
+		enc := encoder(ctx, w)
+		body := NewVerifyChangeResponseBody(res)
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
+// DecodeVerifyChangeRequest returns a decoder for requests sent to the surla
+// verify_change endpoint.
+func DecodeVerifyChangeRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*surla.VerifyChangePayload, error) {
+	return func(r *http.Request) (*surla.VerifyChangePayload, error) {
+		var payload *surla.VerifyChangePayload
+		var (
+			body VerifyChangeRequestBody
+			err  error
+		)
+		err = decoder(r).Decode(&body)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return payload, goa.MissingPayloadError()
+			}
+			var gerr *goa.ServiceError
+			if errors.As(err, &gerr) {
+				return payload, gerr
+			}
+			return payload, goa.DecodePayloadError(err.Error())
+		}
+		err = ValidateVerifyChangeRequestBody(&body)
+		if err != nil {
+			return payload, err
+		}
+
+		var (
+			changeID string
+
+			params = mux.Vars(r)
+		)
+		changeID = params["change_id"]
+		payload = NewVerifyChangePayload(&body, changeID)
+
+		return payload, nil
+	}
+}
+
+// EncodeGetVerificationResponse returns an encoder for responses returned by
+// the surla get_verification endpoint.
+func EncodeGetVerificationResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
+	return func(ctx context.Context, w http.ResponseWriter, v any) error {
+		res, _ := v.(*surla.VerificationStatusResult)
+		enc := encoder(ctx, w)
+		body := NewGetVerificationResponseBody(res)
+		w.WriteHeader(http.StatusOK)
+		return enc.Encode(body)
+	}
+}
+
+// DecodeGetVerificationRequest returns a decoder for requests sent to the
+// surla get_verification endpoint.
+func DecodeGetVerificationRequest(mux goahttp.Muxer, decoder func(*http.Request) goahttp.Decoder) func(*http.Request) (*surla.GetVerificationPayload, error) {
+	return func(r *http.Request) (*surla.GetVerificationPayload, error) {
+		var payload *surla.GetVerificationPayload
+		var (
+			runID string
+
+			params = mux.Vars(r)
+		)
+		runID = params["run_id"]
+		payload = NewGetVerificationPayload(runID)
+
+		return payload, nil
+	}
+}
+
 // EncodeApproveMergeResponse returns an encoder for responses returned by the
 // surla approve_merge endpoint.
 func EncodeApproveMergeResponse(encoder func(context.Context, http.ResponseWriter) goahttp.Encoder) func(context.Context, http.ResponseWriter, any) error {
@@ -587,6 +665,124 @@ func marshalSurlaSwarmRoleItemToSwarmRoleItemResponseBody(v *surla.SwarmRoleItem
 		}
 	} else {
 		res.OwnedPaths = []string{}
+	}
+
+	return res
+}
+
+// marshalSurlaVerificationRunningToVerificationRunningResponseBody builds a
+// value of type *VerificationRunningResponseBody from a value of type
+// *surla.VerificationRunning.
+func marshalSurlaVerificationRunningToVerificationRunningResponseBody(v *surla.VerificationRunning) *VerificationRunningResponseBody {
+	res := &VerificationRunningResponseBody{
+		StartedAt: v.StartedAt,
+	}
+
+	return res
+}
+
+// marshalSurlaVerificationCompletedToVerificationCompletedResponseBody builds
+// a value of type *VerificationCompletedResponseBody from a value of type
+// *surla.VerificationCompleted.
+func marshalSurlaVerificationCompletedToVerificationCompletedResponseBody(v *surla.VerificationCompleted) *VerificationCompletedResponseBody {
+	res := &VerificationCompletedResponseBody{
+		SuiteID:     v.SuiteID,
+		Environment: v.Environment,
+	}
+	if v.Report != nil {
+		res.Report = marshalSurlaBuilderVerificationReportToBuilderVerificationReportResponseBody(v.Report)
+	}
+
+	return res
+}
+
+// marshalSurlaBuilderVerificationReportToBuilderVerificationReportResponseBody
+// builds a value of type *BuilderVerificationReportResponseBody from a value
+// of type *surla.BuilderVerificationReport.
+func marshalSurlaBuilderVerificationReportToBuilderVerificationReportResponseBody(v *surla.BuilderVerificationReport) *BuilderVerificationReportResponseBody {
+	res := &BuilderVerificationReportResponseBody{
+		ReportDigest: v.ReportDigest,
+		Passed:       v.Passed,
+		SuiteFailed:  v.SuiteFailed,
+	}
+	if v.Counts != nil {
+		res.Counts = marshalSurlaVerificationCountsToVerificationCountsResponseBody(v.Counts)
+	}
+	if v.Scenarios != nil {
+		res.Scenarios = make([]*VerificationScenarioResponseBody, len(v.Scenarios))
+		for i, val := range v.Scenarios {
+			if val == nil {
+				res.Scenarios[i] = nil
+				continue
+			}
+			res.Scenarios[i] = marshalSurlaVerificationScenarioToVerificationScenarioResponseBody(val)
+		}
+	} else {
+		res.Scenarios = []*VerificationScenarioResponseBody{}
+	}
+
+	return res
+}
+
+// marshalSurlaVerificationCountsToVerificationCountsResponseBody builds a
+// value of type *VerificationCountsResponseBody from a value of type
+// *surla.VerificationCounts.
+func marshalSurlaVerificationCountsToVerificationCountsResponseBody(v *surla.VerificationCounts) *VerificationCountsResponseBody {
+	res := &VerificationCountsResponseBody{
+		Required:     v.Required,
+		Passed:       v.Passed,
+		Failed:       v.Failed,
+		NotRun:       v.NotRun,
+		HarnessError: v.HarnessError,
+	}
+
+	return res
+}
+
+// marshalSurlaVerificationScenarioToVerificationScenarioResponseBody builds a
+// value of type *VerificationScenarioResponseBody from a value of type
+// *surla.VerificationScenario.
+func marshalSurlaVerificationScenarioToVerificationScenarioResponseBody(v *surla.VerificationScenario) *VerificationScenarioResponseBody {
+	res := &VerificationScenarioResponseBody{
+		ID:      v.ID,
+		Outcome: v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*VerificationCheckResponseBody, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = marshalSurlaVerificationCheckToVerificationCheckResponseBody(val)
+		}
+	}
+
+	return res
+}
+
+// marshalSurlaVerificationCheckToVerificationCheckResponseBody builds a value
+// of type *VerificationCheckResponseBody from a value of type
+// *surla.VerificationCheck.
+func marshalSurlaVerificationCheckToVerificationCheckResponseBody(v *surla.VerificationCheck) *VerificationCheckResponseBody {
+	res := &VerificationCheckResponseBody{
+		Name:       v.Name,
+		Passed:     v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+
+// marshalSurlaVerificationNotCompletedToVerificationNotCompletedResponseBody
+// builds a value of type *VerificationNotCompletedResponseBody from a value of
+// type *surla.VerificationNotCompleted.
+func marshalSurlaVerificationNotCompletedToVerificationNotCompletedResponseBody(v *surla.VerificationNotCompleted) *VerificationNotCompletedResponseBody {
+	res := &VerificationNotCompletedResponseBody{
+		Kind:    v.Kind,
+		Stage:   v.Stage,
+		Summary: v.Summary,
 	}
 
 	return res

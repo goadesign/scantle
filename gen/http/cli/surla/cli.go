@@ -23,7 +23,7 @@ import (
 //	command (subcommand1|subcommand2|...)
 func UsageCommands() []string {
 	return []string{
-		"surla (checkpoint-ui|golden-path|propose-change|confirm-intent|get-change|preview-architecture|draft-override|approve-merge|diff)",
+		"surla (checkpoint-ui|golden-path|propose-change|confirm-intent|get-change|preview-architecture|draft-override|verify-change|get-verification|approve-merge|diff)",
 	}
 }
 
@@ -83,6 +83,13 @@ func ParseEndpoint(
 		surlaDraftOverrideFlags    = flag.NewFlagSet("draft-override", flag.ExitOnError)
 		surlaDraftOverrideBodyFlag = new(cliStringFlag)
 
+		surlaVerifyChangeFlags        = flag.NewFlagSet("verify-change", flag.ExitOnError)
+		surlaVerifyChangeBodyFlag     = new(cliStringFlag)
+		surlaVerifyChangeChangeIDFlag = new(cliStringFlag)
+
+		surlaGetVerificationFlags     = flag.NewFlagSet("get-verification", flag.ExitOnError)
+		surlaGetVerificationRunIDFlag = new(cliStringFlag)
+
 		surlaApproveMergeFlags    = flag.NewFlagSet("approve-merge", flag.ExitOnError)
 		surlaApproveMergeBodyFlag = new(cliStringFlag)
 
@@ -94,6 +101,9 @@ func ParseEndpoint(
 	surlaGetChangeFlags.Var(surlaGetChangeChangeIDFlag, "change-id", "Change identifier.")
 	surlaPreviewArchitectureFlags.Var(surlaPreviewArchitectureBodyFlag, "body", "")
 	surlaDraftOverrideFlags.Var(surlaDraftOverrideBodyFlag, "body", "")
+	surlaVerifyChangeFlags.Var(surlaVerifyChangeBodyFlag, "body", "")
+	surlaVerifyChangeFlags.Var(surlaVerifyChangeChangeIDFlag, "change-id", "Confirmed Change Card identifier.")
+	surlaGetVerificationFlags.Var(surlaGetVerificationRunIDFlag, "run-id", "Verification run identifier returned by verify_change.")
 	surlaApproveMergeFlags.Var(surlaApproveMergeBodyFlag, "body", "")
 	surlaDiffFlags.Var(surlaDiffBodyFlag, "body", "")
 
@@ -105,6 +115,8 @@ func ParseEndpoint(
 	surlaGetChangeFlags.Usage = surlaGetChangeUsage
 	surlaPreviewArchitectureFlags.Usage = surlaPreviewArchitectureUsage
 	surlaDraftOverrideFlags.Usage = surlaDraftOverrideUsage
+	surlaVerifyChangeFlags.Usage = surlaVerifyChangeUsage
+	surlaGetVerificationFlags.Usage = surlaGetVerificationUsage
 	surlaApproveMergeFlags.Usage = surlaApproveMergeUsage
 	surlaDiffFlags.Usage = surlaDiffUsage
 
@@ -163,6 +175,12 @@ func ParseEndpoint(
 			case "draft-override":
 				epf = surlaDraftOverrideFlags
 
+			case "verify-change":
+				epf = surlaVerifyChangeFlags
+
+			case "get-verification":
+				epf = surlaGetVerificationFlags
+
 			case "approve-merge":
 				epf = surlaApproveMergeFlags
 
@@ -213,6 +231,12 @@ func ParseEndpoint(
 			case "draft-override":
 				endpoint = c.DraftOverride()
 				data, err = surlac.BuildDraftOverridePayload(surlaDraftOverrideBodyFlag.value)
+			case "verify-change":
+				endpoint = c.VerifyChange()
+				data, err = surlac.BuildVerifyChangePayload(surlaVerifyChangeBodyFlag.value, surlaVerifyChangeChangeIDFlag.value)
+			case "get-verification":
+				endpoint = c.GetVerification()
+				data, err = surlac.BuildGetVerificationPayload(surlaGetVerificationRunIDFlag.value)
 			case "approve-merge":
 				endpoint = c.ApproveMerge()
 				data, err = surlac.BuildApproveMergePayload(surlaApproveMergeBodyFlag.value)
@@ -241,6 +265,8 @@ func surlaUsage() {
 	fmt.Fprintln(os.Stderr, `    get-change: Return the current Change Card, including its request_revision, to its owner, for example after confirm_intent refused an edit made against an older revision. Reading never confirms or changes the card. A recorded approval is included only while it still matches the promotion target's current suite, environment and binary digests; the call fails when the card has an approval and the target cannot report them.`)
 	fmt.Fprintln(os.Stderr, `    preview-architecture: Extract and validate the Checkpoint 2 C4 container topology, tool contracts, Goa-AI guardrails, and proposed Chorus swarm roster from a candidate Goa design bound to a confirmed Change Card.`)
 	fmt.Fprintln(os.Stderr, `    draft-override: Apply a Fast Draft Mode prompt override on the bound target or reject a compiled-rule prompt hack.`)
+	fmt.Fprintln(os.Stderr, `    verify-change: Start Checkpoint 4 verification of a candidate commit for the owner's confirmed Change Card revision and return its run_id at once. The server builds the commit in Surla's sandbox and runs the evaluator suite the operator configured, in a separate process that keeps running when the caller disconnects or the server restarts; get_verification reads its state. Only the builder view of the report is ever returned. A server started without verification configured rejects every call.`)
+	fmt.Fprintln(os.Stderr, `    get-verification: Return the current state of a verification run to the owner who started it: running, completed with the builder view of its report, or not completed with where it stopped. A run keeps the Change Card revision it was started for.`)
 	fmt.Fprintln(os.Stderr, `    approve-merge: Record Checkpoint 5 approval for the owner's confirmed Change Card revision. The control plane loads the verification report by digest and the expected suite, environment and candidate binary digests from its promotion target, re-derives the report from its evidence with verify.Approve, and records the approval on the card. A report that did not pass or describes different inputs is rejected. Nothing is merged or deployed. The promotion target is provided by the program that embeds the control plane; a control plane without one, such as standalone surla serve, rejects every call.`)
 	fmt.Fprintln(os.Stderr, `    diff: Compare evaluated Goa designs and go.mod directives without emitting a blanket compatibility verdict.`)
 	fmt.Fprintln(os.Stderr)
@@ -367,6 +393,44 @@ func surlaDraftOverrideUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "surla draft-override --body '{\n      \"new_content\": \"Dolores explicabo.\",\n      \"prompt_id\": \"Quia ea soluta.\",\n      \"target_kind\": \"prompt_template\"\n   }'")
+}
+
+func surlaVerifyChangeUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] surla verify-change", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprint(os.Stderr, " -change-id STRING")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Start Checkpoint 4 verification of a candidate commit for the owner's confirmed Change Card revision and return its run_id at once. The server builds the commit in Surla's sandbox and runs the evaluator suite the operator configured, in a separate process that keeps running when the caller disconnects or the server restarts; get_verification reads its state. Only the builder view of the report is ever returned. A server started without verification configured rejects every call.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+	fmt.Fprintln(os.Stderr, `    -change-id STRING: Confirmed Change Card identifier.`)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "surla verify-change --body '{\n      \"candidate_commit\": \"4efffd1df01a87d1242013e87a6a177ab079e433\",\n      \"request_revision\": \"Temporibus soluta.\"\n   }' --change-id \"Exercitationem provident.\"")
+}
+
+func surlaGetVerificationUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] surla get-verification", os.Args[0])
+	fmt.Fprint(os.Stderr, " -run-id STRING")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Return the current state of a verification run to the owner who started it: running, completed with the builder view of its report, or not completed with where it stopped. A run keeps the Change Card revision it was started for.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -run-id STRING: Verification run identifier returned by verify_change.`)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "surla get-verification --run-id \"Sapiente quae quis reiciendis autem consectetur et.\"")
 }
 
 func surlaApproveMergeUsage() {

@@ -110,6 +110,50 @@ paths:
                                 ui_composition:
                                     composed_for_revision: Est et sit voluptatibus quibusdam quisquam.
                                     program: Numquam provident excepturi et deleniti vel sed.
+    /changes/{change_id}/verifications:
+        post:
+            tags:
+                - surla
+            summary: verify_change surla
+            description: Start Checkpoint 4 verification of a candidate commit for the owner's confirmed Change Card revision and return its run_id at once. The server builds the commit in Surla's sandbox and runs the evaluator suite the operator configured, in a separate process that keeps running when the caller disconnects or the server restarts; get_verification reads its state. Only the builder view of the report is ever returned. A server started without verification configured rejects every call.
+            operationId: surla#verify_change
+            parameters:
+                - name: change_id
+                  in: path
+                  description: Confirmed Change Card identifier.
+                  required: true
+                  schema:
+                    type: string
+                    description: Confirmed Change Card identifier.
+                    example: Exercitationem provident.
+                  example: Exercitationem provident.
+            requestBody:
+                description: Request body for verify_change.
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/VerifyChangePayload'
+                        example:
+                            candidate_commit: 4efffd1df01a87d1242013e87a6a177ab079e433
+                            request_revision: Temporibus soluta.
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/VerificationStatusResult'
+                            example:
+                                candidate_commit: Molestiae totam nam nobis quidem reprehenderit quae.
+                                change_id: Sunt ut sit omnis nobis.
+                                request_revision: Enim et.
+                                run_id: Quas natus.
+                                state:
+                                    type: running
+                                    value:
+                                        started_at: "1984-04-01T02:58:45Z"
+                                suite_commit: Nesciunt dolor in ea.
     /changes/approve:
         post:
             tags:
@@ -708,6 +752,100 @@ paths:
                                 type: string
                                 example: Commodi et adipisci ipsa sit.
                             example: Commodi et adipisci ipsa sit.
+    /verifications/{run_id}:
+        get:
+            tags:
+                - surla
+            summary: get_verification surla
+            description: 'Return the current state of a verification run to the owner who started it: running, completed with the builder view of its report, or not completed with where it stopped. A run keeps the Change Card revision it was started for.'
+            operationId: surla#get_verification
+            parameters:
+                - name: run_id
+                  in: path
+                  description: Verification run identifier returned by verify_change.
+                  required: true
+                  schema:
+                    type: string
+                    description: Verification run identifier returned by verify_change.
+                    example: Sapiente quae quis reiciendis autem consectetur et.
+                  example: Sapiente quae quis reiciendis autem consectetur et.
+            responses:
+                "200":
+                    description: OK response.
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/VerificationStatusResult'
+                            example:
+                                candidate_commit: Dicta reprehenderit.
+                                change_id: Dolor optio et non.
+                                request_revision: Maxime mollitia exercitationem ab voluptatem qui facilis.
+                                run_id: Aperiam hic iure repellendus laborum temporibus id.
+                                state:
+                                    type: completed
+                                    value:
+                                        environment: Non fuga.
+                                        report:
+                                            counts:
+                                                failed: 3609575290093886988
+                                                harness_error: 3839550226689301973
+                                                not_run: 9211899176780709078
+                                                passed: 7576242881612066164
+                                                required: 8747759020562929756
+                                            passed: true
+                                            report_digest: Omnis nulla cum minima reiciendis sed nihil.
+                                            scenarios:
+                                                - checks:
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                  error: A voluptates.
+                                                  id: Nihil dolore alias.
+                                                  outcome: not_run
+                                                - checks:
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                  error: A voluptates.
+                                                  id: Nihil dolore alias.
+                                                  outcome: not_run
+                                                - checks:
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                                                      name: Et asperiores.
+                                                      passed: true
+                                                  error: A voluptates.
+                                                  id: Nihil dolore alias.
+                                                  outcome: not_run
+                                            suite_failed: false
+                                        suite_id: Dolorum sed sunt sed.
+                                suite_commit: Laboriosam architecto minus itaque deleniti.
 components:
     schemas:
         AgentPolicyItem:
@@ -1250,6 +1388,143 @@ components:
             required:
                 - name
                 - paths
+        BuilderVerificationReport:
+            type: object
+            properties:
+                counts:
+                    $ref: '#/components/schemas/VerificationCounts'
+                passed:
+                    type: boolean
+                    description: 'The verdict: true only when every declared scenario passed and the suite ran cleanly.'
+                    example: true
+                report_digest:
+                    type: string
+                    description: SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.
+                    example: Omnis nulla cum minima reiciendis sed nihil.
+                scenarios:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/VerificationScenario'
+                    description: Every declared scenario in declaration order.
+                    example:
+                        - checks:
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                          error: A voluptates.
+                          id: Nihil dolore alias.
+                          outcome: not_run
+                        - checks:
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                          error: A voluptates.
+                          id: Nihil dolore alias.
+                          outcome: not_run
+                        - checks:
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                          error: A voluptates.
+                          id: Nihil dolore alias.
+                          outcome: not_run
+                suite_failed:
+                    type: boolean
+                    description: Whether the evaluator suite itself failed or ended abnormally.
+                    example: false
+            description: 'The builder view of a Checkpoint 4 verification report: counts, verdict and repair scenario checks. Holdout details, evidence and logs stay with the evaluator.'
+            example:
+                counts:
+                    failed: 3609575290093886988
+                    harness_error: 3839550226689301973
+                    not_run: 9211899176780709078
+                    passed: 7576242881612066164
+                    required: 8747759020562929756
+                passed: true
+                report_digest: Omnis nulla cum minima reiciendis sed nihil.
+                scenarios:
+                    - checks:
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                      error: A voluptates.
+                      id: Nihil dolore alias.
+                      outcome: not_run
+                    - checks:
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                      error: A voluptates.
+                      id: Nihil dolore alias.
+                      outcome: not_run
+                    - checks:
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                      error: A voluptates.
+                      id: Nihil dolore alias.
+                      outcome: not_run
+                suite_failed: false
+            required:
+                - report_digest
+                - counts
+                - passed
+                - suite_failed
+                - scenarios
         C4ContainerItem:
             type: object
             properties:
@@ -2236,6 +2511,357 @@ components:
             required:
                 - program
                 - composed_for_revision
+        VerificationCheck:
+            type: object
+            properties:
+                diagnostic:
+                    type: string
+                    description: Why the check failed; empty when it passed.
+                    example: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                name:
+                    type: string
+                    description: Check name.
+                    example: Et asperiores.
+                passed:
+                    type: boolean
+                    description: Whether the check passed.
+                    example: true
+            description: One deterministic check of a repair scenario.
+            example:
+                diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                name: Et asperiores.
+                passed: true
+            required:
+                - name
+                - passed
+        VerificationCompleted:
+            type: object
+            properties:
+                environment:
+                    type: string
+                    description: Dependency profile the suite ran the candidate with, such as sim.
+                    example: Non fuga.
+                report:
+                    $ref: '#/components/schemas/BuilderVerificationReport'
+                suite_id:
+                    type: string
+                    description: Evaluator suite the report was produced by.
+                    example: Dolorum sed sunt sed.
+            description: The run produced a verification report. Its verdict is report.passed.
+            example:
+                environment: Non fuga.
+                report:
+                    counts:
+                        failed: 3609575290093886988
+                        harness_error: 3839550226689301973
+                        not_run: 9211899176780709078
+                        passed: 7576242881612066164
+                        required: 8747759020562929756
+                    passed: true
+                    report_digest: Omnis nulla cum minima reiciendis sed nihil.
+                    scenarios:
+                        - checks:
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                          error: A voluptates.
+                          id: Nihil dolore alias.
+                          outcome: not_run
+                        - checks:
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                          error: A voluptates.
+                          id: Nihil dolore alias.
+                          outcome: not_run
+                        - checks:
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                            - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                              name: Et asperiores.
+                              passed: true
+                          error: A voluptates.
+                          id: Nihil dolore alias.
+                          outcome: not_run
+                    suite_failed: false
+                suite_id: Dolorum sed sunt sed.
+            required:
+                - suite_id
+                - environment
+                - report
+        VerificationCounts:
+            type: object
+            properties:
+                failed:
+                    type: integer
+                    description: Scenarios whose checks failed.
+                    example: 3609575290093886988
+                    format: int64
+                harness_error:
+                    type: integer
+                    description: Scenarios that could not be evaluated.
+                    example: 3839550226689301973
+                    format: int64
+                not_run:
+                    type: integer
+                    description: Declared scenarios the suite did not report.
+                    example: 9211899176780709078
+                    format: int64
+                passed:
+                    type: integer
+                    description: Scenarios that passed.
+                    example: 7576242881612066164
+                    format: int64
+                required:
+                    type: integer
+                    description: Scenarios the suite declares.
+                    example: 8747759020562929756
+                    format: int64
+            description: Every declared scenario, counted by outcome.
+            example:
+                failed: 3609575290093886988
+                harness_error: 3839550226689301973
+                not_run: 9211899176780709078
+                passed: 7576242881612066164
+                required: 8747759020562929756
+            required:
+                - required
+                - passed
+                - failed
+                - not_run
+                - harness_error
+        VerificationNotCompleted:
+            type: object
+            properties:
+                kind:
+                    type: string
+                    description: execution_failed when a step failed; interrupted when the run's process ended before it finished.
+                    example: interrupted
+                    enum:
+                        - execution_failed
+                        - interrupted
+                stage:
+                    type: string
+                    description: Where the run stopped.
+                    example: suite
+                    enum:
+                        - checkout
+                        - build
+                        - describe
+                        - suite
+                        - report
+                        - supervise
+                summary:
+                    type: string
+                    description: Builder-safe description of what stopped the run; never command output.
+                    example: Est quisquam eos quis.
+            description: 'The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.'
+            example:
+                kind: interrupted
+                stage: suite
+                summary: Est quisquam eos quis.
+            required:
+                - kind
+                - stage
+                - summary
+        VerificationRunning:
+            type: object
+            properties:
+                started_at:
+                    type: string
+                    description: When the run was accepted.
+                    example: "1984-04-01T02:58:45Z"
+                    format: date-time
+            description: The run is still building or evaluating the candidate.
+            example:
+                started_at: "1984-04-01T02:58:45Z"
+            required:
+                - started_at
+        VerificationScenario:
+            type: object
+            properties:
+                checks:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/VerificationCheck'
+                    description: The repair scenario's checks; empty for holdouts.
+                    example:
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                        - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                          name: Et asperiores.
+                          passed: true
+                error:
+                    type: string
+                    description: The repair scenario's environment error; empty for holdouts.
+                    example: A voluptates.
+                id:
+                    type: string
+                    description: Scenario name for a repair scenario, or holdout-<n> for a holdout.
+                    example: Nihil dolore alias.
+                outcome:
+                    type: string
+                    description: How the scenario ended.
+                    example: not_run
+                    enum:
+                        - passed
+                        - failed
+                        - not_run
+                        - harness_error
+            description: One declared scenario as builders see it. Repair scenarios carry their name, checks and environment error; holdout scenarios appear only as holdout-<n> with their outcome.
+            example:
+                checks:
+                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                      name: Et asperiores.
+                      passed: true
+                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                      name: Et asperiores.
+                      passed: true
+                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                      name: Et asperiores.
+                      passed: true
+                    - diagnostic: Adipisci suscipit aperiam nihil corrupti accusantium illo.
+                      name: Et asperiores.
+                      passed: true
+                error: A voluptates.
+                id: Nihil dolore alias.
+                outcome: not_run
+            required:
+                - id
+                - outcome
+        VerificationStatusResult:
+            type: object
+            properties:
+                candidate_commit:
+                    type: string
+                    description: Candidate commit the run builds and verifies.
+                    example: Molestiae totam nam nobis quidem reprehenderit quae.
+                change_id:
+                    type: string
+                    description: Change Card the run verifies.
+                    example: Sunt ut sit omnis nobis.
+                request_revision:
+                    type: string
+                    description: Change Card revision the run verifies.
+                    example: Enim et.
+                run_id:
+                    type: string
+                    description: Verification run identifier; get_verification takes it.
+                    example: Quas natus.
+                state:
+                    type: object
+                    description: Exactly one of running, completed or not_completed.
+                    example:
+                        type: running
+                        value:
+                            started_at: "1984-04-01T02:58:45Z"
+                    anyOf:
+                        - type: object
+                          properties:
+                            type:
+                                type: string
+                                enum:
+                                    - running
+                            value:
+                                $ref: '#/components/schemas/VerificationRunning'
+                          required:
+                            - type
+                            - value
+                        - type: object
+                          properties:
+                            type:
+                                type: string
+                                enum:
+                                    - completed
+                            value:
+                                $ref: '#/components/schemas/VerificationCompleted'
+                          required:
+                            - type
+                            - value
+                        - type: object
+                          properties:
+                            type:
+                                type: string
+                                enum:
+                                    - not_completed
+                            value:
+                                $ref: '#/components/schemas/VerificationNotCompleted'
+                          required:
+                            - type
+                            - value
+                suite_commit:
+                    type: string
+                    description: Evaluator suite commit the operator configured for the run.
+                    example: Nesciunt dolor in ea.
+            description: One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.
+            example:
+                candidate_commit: Molestiae totam nam nobis quidem reprehenderit quae.
+                change_id: Sunt ut sit omnis nobis.
+                request_revision: Enim et.
+                run_id: Quas natus.
+                state:
+                    type: running
+                    value:
+                        started_at: "1984-04-01T02:58:45Z"
+                suite_commit: Nesciunt dolor in ea.
+            required:
+                - run_id
+                - change_id
+                - request_revision
+                - candidate_commit
+                - suite_commit
+                - state
+        VerifyChangePayload:
+            type: object
+            properties:
+                candidate_commit:
+                    type: string
+                    description: Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).
+                    example: 4efffd1df01a87d1242013e87a6a177ab079e433
+                    pattern: ^([0-9a-f]{40}|[0-9a-f]{64})$
+                request_revision:
+                    type: string
+                    description: Current request_revision of the confirmed Change Card.
+                    example: Temporibus soluta.
+            description: Request body for verify_change.
+            example:
+                candidate_commit: 4efffd1df01a87d1242013e87a6a177ab079e433
+                request_revision: Temporibus soluta.
+            required:
+                - request_revision
+                - candidate_commit
 tags:
     - name: surla
       description: Surla MCP software factory control plane.

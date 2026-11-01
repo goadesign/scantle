@@ -102,6 +102,22 @@ func GetChangeResultCodec() tools.JSONCodec[*GetChangeResult] {
 	}
 }
 
+// GetVerificationPayloadCodec returns a fresh codec for *GetVerificationPayload.
+func GetVerificationPayloadCodec() tools.JSONCodec[*GetVerificationPayload] {
+	return tools.JSONCodec[*GetVerificationPayload]{
+		ToJSON:   MarshalGetVerificationPayload,
+		FromJSON: UnmarshalGetVerificationPayload,
+	}
+}
+
+// GetVerificationResultCodec returns a fresh codec for *GetVerificationResult.
+func GetVerificationResultCodec() tools.JSONCodec[*GetVerificationResult] {
+	return tools.JSONCodec[*GetVerificationResult]{
+		ToJSON:   MarshalGetVerificationResult,
+		FromJSON: UnmarshalGetVerificationResult,
+	}
+}
+
 // PreviewArchitecturePayloadCodec returns a fresh codec for *PreviewArchitecturePayload.
 func PreviewArchitecturePayloadCodec() tools.JSONCodec[*PreviewArchitecturePayload] {
 	return tools.JSONCodec[*PreviewArchitecturePayload]{
@@ -131,6 +147,22 @@ func ProposeChangeResultCodec() tools.JSONCodec[*ProposeChangeResult] {
 	return tools.JSONCodec[*ProposeChangeResult]{
 		ToJSON:   MarshalProposeChangeResult,
 		FromJSON: UnmarshalProposeChangeResult,
+	}
+}
+
+// VerifyChangePayloadCodec returns a fresh codec for *VerifyChangePayload.
+func VerifyChangePayloadCodec() tools.JSONCodec[*VerifyChangePayload] {
+	return tools.JSONCodec[*VerifyChangePayload]{
+		ToJSON:   MarshalVerifyChangePayload,
+		FromJSON: UnmarshalVerifyChangePayload,
+	}
+}
+
+// VerifyChangeResultCodec returns a fresh codec for *VerifyChangeResult.
+func VerifyChangeResultCodec() tools.JSONCodec[*VerifyChangeResult] {
+	return tools.JSONCodec[*VerifyChangeResult]{
+		ToJSON:   MarshalVerifyChangeResult,
+		FromJSON: UnmarshalVerifyChangeResult,
 	}
 }
 
@@ -265,6 +297,32 @@ var (
 			return UnmarshalGetChangeResult(data)
 		},
 	}
+	// getVerificationPayloadCodec provides an untyped codec for *GetVerificationPayload.
+	getVerificationPayloadCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*GetVerificationPayload); ok {
+				return MarshalGetVerificationPayload(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *GetVerificationPayload: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalGetVerificationPayload(data)
+		},
+	}
+	// getVerificationResultCodec provides an untyped codec for *GetVerificationResult.
+	getVerificationResultCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*GetVerificationResult); ok {
+				return MarshalGetVerificationResult(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *GetVerificationResult: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalGetVerificationResult(data)
+		},
+	}
 	// previewArchitecturePayloadCodec provides an untyped codec for *PreviewArchitecturePayload.
 	previewArchitecturePayloadCodec = tools.JSONCodec[any]{
 		ToJSON: func(v any) ([]byte, error) {
@@ -315,6 +373,32 @@ var (
 		},
 		FromJSON: func(data []byte) (any, error) {
 			return UnmarshalProposeChangeResult(data)
+		},
+	}
+	// verifyChangePayloadCodec provides an untyped codec for *VerifyChangePayload.
+	verifyChangePayloadCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*VerifyChangePayload); ok {
+				return MarshalVerifyChangePayload(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *VerifyChangePayload: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalVerifyChangePayload(data)
+		},
+	}
+	// verifyChangeResultCodec provides an untyped codec for *VerifyChangeResult.
+	verifyChangeResultCodec = tools.JSONCodec[any]{
+		ToJSON: func(v any) ([]byte, error) {
+			// Prefer typed marshal when the value matches the expected type.
+			if typed, ok := v.(*VerifyChangeResult); ok {
+				return MarshalVerifyChangeResult(typed)
+			}
+			return nil, fmt.Errorf("invalid value type for *VerifyChangeResult: %T", v)
+		},
+		FromJSON: func(data []byte) (any, error) {
+			return UnmarshalVerifyChangeResult(data)
 		},
 	}
 )
@@ -1113,6 +1197,381 @@ var getChangeResultFields = []tools.FieldMetadata{
 		Description: "Number of declared evaluator scenarios, every one of which passed.",
 	},
 }
+var getVerificationPayloadFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "Identifies a verification run returned by verify_change.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("run_id")},
+		JSONType:    "string",
+		Description: "Verification run identifier returned by verify_change.",
+	},
+}
+var getVerificationResultFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("run_id")},
+		JSONType:    "string",
+		Description: "Verification run identifier; get_verification takes it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Change Card the run verifies.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "Change Card revision the run verifies.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Candidate commit the run builds and verifies.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("suite_commit")},
+		JSONType:    "string",
+		Description: "Evaluator suite commit the operator configured for the run.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state")},
+		JSONType:    "object",
+		Description: "Exactly one of running, completed or not_completed.",
+	},
+	{
+		Path:     []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+		JSONType: "string",
+		DiscriminatorValues: []string{
+			"running",
+			"completed",
+			"not_completed",
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
+		JSONType:    "object",
+		Description: "The run is still building or evaluating the candidate.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "running",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("started_at")},
+		JSONType:    "string",
+		Description: "When the run was accepted.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "running",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
+		JSONType:    "object",
+		Description: "The run produced a verification report. Its verdict is report.passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("suite_id")},
+		JSONType:    "string",
+		Description: "Evaluator suite the report was produced by.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("environment")},
+		JSONType:    "string",
+		Description: "Dependency profile the suite ran the candidate with, such as sim.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report")},
+		JSONType:    "object",
+		Description: "The builder view of the report.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts")},
+		JSONType:    "object",
+		Description: "Every declared scenario, counted by outcome.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("required")},
+		JSONType:    "integer",
+		Description: "Scenarios the suite declares.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("passed")},
+		JSONType:    "integer",
+		Description: "Scenarios that passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("failed")},
+		JSONType:    "integer",
+		Description: "Scenarios whose checks failed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("not_run")},
+		JSONType:    "integer",
+		Description: "Declared scenarios the suite did not report.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("harness_error")},
+		JSONType:    "integer",
+		Description: "Scenarios that could not be evaluated.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("passed")},
+		JSONType:    "boolean",
+		Description: "The verdict: true only when every declared scenario passed and the suite ran cleanly.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("suite_failed")},
+		JSONType:    "boolean",
+		Description: "Whether the evaluator suite itself failed or ended abnormally.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios")},
+		JSONType:    "array",
+		Description: "Every declared scenario in declaration order.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Every declared scenario in declaration order.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Scenario name for a repair scenario, or holdout-<n> for a holdout.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("outcome")},
+		JSONType:    "string",
+		Description: "How the scenario ended.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks")},
+		JSONType:    "array",
+		Description: "The repair scenario's checks; empty for holdouts.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "The repair scenario's checks; empty for holdouts.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}, tools.FixedField("name")},
+		JSONType:    "string",
+		Description: "Check name.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}, tools.FixedField("passed")},
+		JSONType:    "boolean",
+		Description: "Whether the check passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}, tools.FixedField("diagnostic")},
+		JSONType:    "string",
+		Description: "Why the check failed; empty when it passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("error")},
+		JSONType:    "string",
+		Description: "The repair scenario's environment error; empty for holdouts.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
+		JSONType:    "object",
+		Description: "The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("kind")},
+		JSONType:    "string",
+		Description: "execution_failed when a step failed; interrupted when the run's process ended before it finished.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("stage")},
+		JSONType:    "string",
+		Description: "Where the run stopped.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("summary")},
+		JSONType:    "string",
+		Description: "Builder-safe description of what stopped the run; never command output.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+}
 var previewArchitecturePayloadFields = []tools.FieldMetadata{
 	{
 		JSONType:    "object",
@@ -1727,6 +2186,391 @@ var proposeChangeResultFields = []tools.FieldMetadata{
 		Description: "Number of declared evaluator scenarios, every one of which passed.",
 	},
 }
+var verifyChangePayloadFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Confirmed Change Card identifier.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "Current request_revision of the confirmed Change Card.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).",
+	},
+}
+var verifyChangeResultFields = []tools.FieldMetadata{
+	{
+		JSONType:    "object",
+		Description: "One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("run_id")},
+		JSONType:    "string",
+		Description: "Verification run identifier; get_verification takes it.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("change_id")},
+		JSONType:    "string",
+		Description: "Change Card the run verifies.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("request_revision")},
+		JSONType:    "string",
+		Description: "Change Card revision the run verifies.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("candidate_commit")},
+		JSONType:    "string",
+		Description: "Candidate commit the run builds and verifies.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("suite_commit")},
+		JSONType:    "string",
+		Description: "Evaluator suite commit the operator configured for the run.",
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state")},
+		JSONType:    "object",
+		Description: "Exactly one of running, completed or not_completed.",
+	},
+	{
+		Path:     []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+		JSONType: "string",
+		DiscriminatorValues: []string{
+			"running",
+			"completed",
+			"not_completed",
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
+		JSONType:    "object",
+		Description: "The run is still building or evaluating the candidate.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "running",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("started_at")},
+		JSONType:    "string",
+		Description: "When the run was accepted.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "running",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
+		JSONType:    "object",
+		Description: "The run produced a verification report. Its verdict is report.passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("suite_id")},
+		JSONType:    "string",
+		Description: "Evaluator suite the report was produced by.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("environment")},
+		JSONType:    "string",
+		Description: "Dependency profile the suite ran the candidate with, such as sim.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report")},
+		JSONType:    "object",
+		Description: "The builder view of the report.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("report_digest")},
+		JSONType:    "string",
+		Description: "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts")},
+		JSONType:    "object",
+		Description: "Every declared scenario, counted by outcome.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("required")},
+		JSONType:    "integer",
+		Description: "Scenarios the suite declares.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("passed")},
+		JSONType:    "integer",
+		Description: "Scenarios that passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("failed")},
+		JSONType:    "integer",
+		Description: "Scenarios whose checks failed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("not_run")},
+		JSONType:    "integer",
+		Description: "Declared scenarios the suite did not report.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("counts"), tools.FixedField("harness_error")},
+		JSONType:    "integer",
+		Description: "Scenarios that could not be evaluated.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("passed")},
+		JSONType:    "boolean",
+		Description: "The verdict: true only when every declared scenario passed and the suite ran cleanly.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("suite_failed")},
+		JSONType:    "boolean",
+		Description: "Whether the evaluator suite itself failed or ended abnormally.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios")},
+		JSONType:    "array",
+		Description: "Every declared scenario in declaration order.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "Every declared scenario in declaration order.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("id")},
+		JSONType:    "string",
+		Description: "Scenario name for a repair scenario, or holdout-<n> for a holdout.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("outcome")},
+		JSONType:    "string",
+		Description: "How the scenario ended.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks")},
+		JSONType:    "array",
+		Description: "The repair scenario's checks; empty for holdouts.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}},
+		JSONType:    "object",
+		Description: "The repair scenario's checks; empty for holdouts.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}, tools.FixedField("name")},
+		JSONType:    "string",
+		Description: "Check name.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}, tools.FixedField("passed")},
+		JSONType:    "boolean",
+		Description: "Whether the check passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("checks"), tools.DynamicField{}, tools.FixedField("diagnostic")},
+		JSONType:    "string",
+		Description: "Why the check failed; empty when it passed.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("report"), tools.FixedField("scenarios"), tools.DynamicField{}, tools.FixedField("error")},
+		JSONType:    "string",
+		Description: "The repair scenario's environment error; empty for holdouts.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
+		JSONType:    "object",
+		Description: "The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("kind")},
+		JSONType:    "string",
+		Description: "execution_failed when a step failed; interrupted when the run's process ended before it finished.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("stage")},
+		JSONType:    "string",
+		Description: "Where the run stopped.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+	{
+		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value"), tools.FixedField("summary")},
+		JSONType:    "string",
+		Description: "Builder-safe description of what stopped the run; never command output.",
+		Branches: []tools.UnionBranch{
+			tools.TaggedUnionBranch{
+				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
+				Value:         "not_completed",
+			},
+		},
+	},
+}
 
 // newValidationError converts a goa.ServiceError (possibly merged) into a
 // tools.ValidationError with structured FieldIssue entries. It trims any leading
@@ -1929,6 +2773,40 @@ func enrichGetChangeResultValidationError(err error) error {
 	}
 	return tools.NewValidationError(ve.Error(), issues, m)
 }
+func enrichGetVerificationPayloadValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(getVerificationPayloadFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
+func enrichGetVerificationResultValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(getVerificationResultFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
 func enrichPreviewArchitecturePayloadValidationError(err error) error {
 	var ve *tools.ValidationError
 	if !errors.As(err, &ve) {
@@ -1992,6 +2870,40 @@ func enrichProposeChangeResultValidationError(err error) error {
 	m := make(map[string]string)
 	for _, is := range issues {
 		if field, ok := tools.LookupFieldMetadata(proposeChangeResultFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
+func enrichVerifyChangePayloadValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(verifyChangePayloadFields, is.Field); ok && field.Description != "" {
+			m[is.Field] = field.Description
+		}
+	}
+	return tools.NewValidationError(ve.Error(), issues, m)
+}
+func enrichVerifyChangeResultValidationError(err error) error {
+	var ve *tools.ValidationError
+	if !errors.As(err, &ve) {
+		return err
+	}
+	issues := ve.Issues()
+	if len(issues) == 0 {
+		return err
+	}
+	m := make(map[string]string)
+	for _, is := range issues {
+		if field, ok := tools.LookupFieldMetadata(verifyChangeResultFields, is.Field); ok && field.Description != "" {
 			m[is.Field] = field.Description
 		}
 	}
@@ -2307,6 +3219,68 @@ func invalidGetChangeResultFieldTypeError(err error) error {
 		nil,
 	)
 }
+func invalidGetVerificationPayloadFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "GetVerificationPayloadTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(getVerificationPayloadFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
+func invalidGetVerificationResultFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "GetVerificationResultTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(getVerificationResultFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
 func invalidPreviewArchitecturePayloadFieldTypeError(err error) error {
 	var typeErr *json.UnmarshalTypeError
 	if !errors.As(err, &typeErr) {
@@ -2411,6 +3385,68 @@ func invalidProposeChangeResultFieldTypeError(err error) error {
 		field = "$payload"
 	}
 	metadata, ok := tools.LookupFieldMetadata(proposeChangeResultFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
+func invalidVerifyChangePayloadFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "VerifyChangePayloadTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(verifyChangePayloadFields, field)
+	if !ok || metadata.JSONType == "" {
+		return err
+	}
+	actual := generatedUnmarshalJSONType(typeErr.Value)
+	if actual == "" {
+		return err
+	}
+	return tools.NewValidationError(
+		err.Error(),
+		[]*tools.FieldIssue{
+			{
+				Field:            field,
+				Constraint:       "invalid_field_type",
+				ExpectedJSONType: metadata.JSONType,
+				ActualJSONType:   actual,
+			},
+		},
+		nil,
+	)
+}
+func invalidVerifyChangeResultFieldTypeError(err error) error {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) {
+		return err
+	}
+	field := typeErr.Field
+	field = strings.TrimPrefix(field, "VerifyChangeResultTransport.")
+	if field == "" {
+		field = "$payload"
+	}
+	metadata, ok := tools.LookupFieldMetadata(verifyChangeResultFields, field)
 	if !ok || metadata.JSONType == "" {
 		return err
 	}
@@ -3158,6 +4194,154 @@ func UnmarshalGetChangeResult(data []byte) (*GetChangeResult, error) {
 	return out, nil
 }
 
+// MarshalGetVerificationPayload serializes *GetVerificationPayload into JSON.
+func MarshalGetVerificationPayload(v *GetVerificationPayload) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("getVerificationPayload is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.GetVerificationPayloadTransport
+	out = &toolhttp.GetVerificationPayloadTransport{
+		RunID: &in.RunID,
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalGetVerificationPayload deserializes JSON into *GetVerificationPayload.
+func UnmarshalGetVerificationPayload(data []byte) (*GetVerificationPayload, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("getVerificationPayload JSON is empty")
+	}
+	var tv toolhttp.GetVerificationPayloadTransport
+	if err := validateGetVerificationPayloadJSON(data); err != nil {
+		return nil, invalidGetVerificationPayloadFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidGetVerificationPayloadFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateGetVerificationPayloadTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichGetVerificationPayloadValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *GetVerificationPayload
+	out = &GetVerificationPayload{
+		RunID: *in.RunID,
+	}
+	return out, nil
+}
+
+// MarshalGetVerificationResult serializes *GetVerificationResult into JSON.
+func MarshalGetVerificationResult(v *GetVerificationResult) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("getVerificationResult is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.GetVerificationResultTransport
+	out = &toolhttp.GetVerificationResultTransport{
+		RunID:           &in.RunID,
+		ChangeID:        &in.ChangeID,
+		RequestRevision: &in.RequestRevision,
+		CandidateCommit: &in.CandidateCommit,
+		SuiteCommit:     &in.SuiteCommit,
+	}
+	var stateValue toolhttp.State
+	switch string(in.State.Kind()) {
+	case "running":
+		actual, _ := in.State.AsRunning()
+		var obj *toolhttp.VerificationRunningTransport
+		if actual != nil {
+			obj = encodeVerificationRunningToVerificationRunningTransport(actual)
+		}
+		u := stateValue
+		u.SetRunning((*toolhttp.VerificationRunningTransport)(obj))
+		stateValue = u
+	case "completed":
+		actual, _ := in.State.AsCompleted()
+		var obj *toolhttp.VerificationCompletedTransport
+		if actual != nil {
+			obj = encodeVerificationCompletedToVerificationCompletedTransport(actual)
+		}
+		u := stateValue
+		u.SetCompleted((*toolhttp.VerificationCompletedTransport)(obj))
+		stateValue = u
+	case "not_completed":
+		actual, _ := in.State.AsNotCompleted()
+		var obj *toolhttp.VerificationNotCompletedTransport
+		if actual != nil {
+			obj = encodeVerificationNotCompletedToVerificationNotCompletedTransport(actual)
+		}
+		u := stateValue
+		u.SetNotCompleted((*toolhttp.VerificationNotCompletedTransport)(obj))
+		stateValue = u
+	}
+	out.State = &stateValue
+	return json.Marshal(out)
+}
+
+// UnmarshalGetVerificationResult deserializes JSON into *GetVerificationResult.
+func UnmarshalGetVerificationResult(data []byte) (*GetVerificationResult, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("getVerificationResult JSON is empty")
+	}
+	var tv toolhttp.GetVerificationResultTransport
+	if err := validateVerifyChangeResultJSON(data); err != nil {
+		return nil, invalidGetVerificationResultFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidGetVerificationResultFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateGetVerificationResultTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichGetVerificationResultValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *GetVerificationResult
+	out = &GetVerificationResult{
+		RunID:           *in.RunID,
+		ChangeID:        *in.ChangeID,
+		RequestRevision: *in.RequestRevision,
+		CandidateCommit: *in.CandidateCommit,
+		SuiteCommit:     *in.SuiteCommit,
+	}
+	switch string(in.State.Kind()) {
+	case "running":
+		actual, _ := in.State.AsRunning()
+		var obj *VerificationRunning
+		if actual != nil {
+			obj = decodeVerificationRunningTransportToVerificationRunning(actual)
+		}
+		u := out.State
+		u.SetRunning((*VerificationRunning)(obj))
+		out.State = u
+	case "completed":
+		actual, _ := in.State.AsCompleted()
+		var obj *VerificationCompleted
+		if actual != nil {
+			obj = decodeVerificationCompletedTransportToVerificationCompleted(actual)
+		}
+		u := out.State
+		u.SetCompleted((*VerificationCompleted)(obj))
+		out.State = u
+	case "not_completed":
+		actual, _ := in.State.AsNotCompleted()
+		var obj *VerificationNotCompleted
+		if actual != nil {
+			obj = decodeVerificationNotCompletedTransportToVerificationNotCompleted(actual)
+		}
+		u := out.State
+		u.SetNotCompleted((*VerificationNotCompleted)(obj))
+		out.State = u
+	}
+	return out, nil
+}
+
 // MarshalPreviewArchitecturePayload serializes *PreviewArchitecturePayload into JSON.
 func MarshalPreviewArchitecturePayload(v *PreviewArchitecturePayload) ([]byte, error) {
 	if v == nil {
@@ -3502,6 +4686,158 @@ func UnmarshalProposeChangeResult(data []byte) (*ProposeChangeResult, error) {
 	return out, nil
 }
 
+// MarshalVerifyChangePayload serializes *VerifyChangePayload into JSON.
+func MarshalVerifyChangePayload(v *VerifyChangePayload) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("verifyChangePayload is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.VerifyChangePayloadTransport
+	out = &toolhttp.VerifyChangePayloadTransport{
+		ChangeID:        &in.ChangeID,
+		RequestRevision: &in.RequestRevision,
+		CandidateCommit: &in.CandidateCommit,
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalVerifyChangePayload deserializes JSON into *VerifyChangePayload.
+func UnmarshalVerifyChangePayload(data []byte) (*VerifyChangePayload, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("verifyChangePayload JSON is empty")
+	}
+	var tv toolhttp.VerifyChangePayloadTransport
+	if err := validateVerifyChangePayloadJSON(data); err != nil {
+		return nil, invalidVerifyChangePayloadFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidVerifyChangePayloadFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateVerifyChangePayloadTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichVerifyChangePayloadValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *VerifyChangePayload
+	out = &VerifyChangePayload{
+		ChangeID:        *in.ChangeID,
+		RequestRevision: *in.RequestRevision,
+		CandidateCommit: *in.CandidateCommit,
+	}
+	return out, nil
+}
+
+// MarshalVerifyChangeResult serializes *VerifyChangeResult into JSON.
+func MarshalVerifyChangeResult(v *VerifyChangeResult) ([]byte, error) {
+	if v == nil {
+		return nil, fmt.Errorf("verifyChangeResult is nil")
+	}
+	in := v
+	_ = in
+	var out *toolhttp.VerifyChangeResultTransport
+	out = &toolhttp.VerifyChangeResultTransport{
+		RunID:           &in.RunID,
+		ChangeID:        &in.ChangeID,
+		RequestRevision: &in.RequestRevision,
+		CandidateCommit: &in.CandidateCommit,
+		SuiteCommit:     &in.SuiteCommit,
+	}
+	var stateValue toolhttp.State
+	switch string(in.State.Kind()) {
+	case "running":
+		actual, _ := in.State.AsRunning()
+		var obj *toolhttp.VerificationRunningTransport
+		if actual != nil {
+			obj = encodeVerificationRunningToVerificationRunningTransport(actual)
+		}
+		u := stateValue
+		u.SetRunning((*toolhttp.VerificationRunningTransport)(obj))
+		stateValue = u
+	case "completed":
+		actual, _ := in.State.AsCompleted()
+		var obj *toolhttp.VerificationCompletedTransport
+		if actual != nil {
+			obj = encodeVerificationCompletedToVerificationCompletedTransport(actual)
+		}
+		u := stateValue
+		u.SetCompleted((*toolhttp.VerificationCompletedTransport)(obj))
+		stateValue = u
+	case "not_completed":
+		actual, _ := in.State.AsNotCompleted()
+		var obj *toolhttp.VerificationNotCompletedTransport
+		if actual != nil {
+			obj = encodeVerificationNotCompletedToVerificationNotCompletedTransport(actual)
+		}
+		u := stateValue
+		u.SetNotCompleted((*toolhttp.VerificationNotCompletedTransport)(obj))
+		stateValue = u
+	}
+	out.State = &stateValue
+	return json.Marshal(out)
+}
+
+// UnmarshalVerifyChangeResult deserializes JSON into *VerifyChangeResult.
+func UnmarshalVerifyChangeResult(data []byte) (*VerifyChangeResult, error) {
+	if len(data) == 0 {
+		return nil, fmt.Errorf("verifyChangeResult JSON is empty")
+	}
+	var tv toolhttp.VerifyChangeResultTransport
+	if err := validateVerifyChangeResultJSON(data); err != nil {
+		return nil, invalidVerifyChangeResultFieldTypeError(err)
+	}
+	if err := json.Unmarshal(data, &tv); err != nil {
+		return nil, invalidVerifyChangeResultFieldTypeError(err)
+	}
+	if err := toolhttp.ValidateVerifyChangeResultTransport(&tv); err != nil {
+		err = newValidationError(err)
+		err = enrichVerifyChangeResultValidationError(err)
+		return nil, err
+	}
+	in := &tv
+	_ = in
+	var out *VerifyChangeResult
+	out = &VerifyChangeResult{
+		RunID:           *in.RunID,
+		ChangeID:        *in.ChangeID,
+		RequestRevision: *in.RequestRevision,
+		CandidateCommit: *in.CandidateCommit,
+		SuiteCommit:     *in.SuiteCommit,
+	}
+	switch string(in.State.Kind()) {
+	case "running":
+		actual, _ := in.State.AsRunning()
+		var obj *VerificationRunning
+		if actual != nil {
+			obj = decodeVerificationRunningTransportToVerificationRunning(actual)
+		}
+		u := out.State
+		u.SetRunning((*VerificationRunning)(obj))
+		out.State = u
+	case "completed":
+		actual, _ := in.State.AsCompleted()
+		var obj *VerificationCompleted
+		if actual != nil {
+			obj = decodeVerificationCompletedTransportToVerificationCompleted(actual)
+		}
+		u := out.State
+		u.SetCompleted((*VerificationCompleted)(obj))
+		out.State = u
+	case "not_completed":
+		actual, _ := in.State.AsNotCompleted()
+		var obj *VerificationNotCompleted
+		if actual != nil {
+			obj = decodeVerificationNotCompletedTransportToVerificationNotCompleted(actual)
+		}
+		u := out.State
+		u.SetNotCompleted((*VerificationNotCompleted)(obj))
+		out.State = u
+	}
+	return out, nil
+}
+
 // validateProposeChangePayloadJSON parses one JSON document and checks the exact value
 // shapes known from this generated Goa type.
 func validateProposeChangePayloadJSON(data []byte) error {
@@ -3580,6 +4916,36 @@ func validateDraftOverrideResultJSON(data []byte) error {
 		return err
 	}
 	return validateDraftOverrideResultJSONValue("", root, "")
+}
+
+// validateVerifyChangePayloadJSON parses one JSON document and checks the exact value
+// shapes known from this generated Goa type.
+func validateVerifyChangePayloadJSON(data []byte) error {
+	root, err := readStrictToolJSON(data)
+	if err != nil {
+		return err
+	}
+	return validateVerifyChangePayloadJSONValue("", root, "")
+}
+
+// validateVerifyChangeResultJSON parses one JSON document and checks the exact value
+// shapes known from this generated Goa type.
+func validateVerifyChangeResultJSON(data []byte) error {
+	root, err := readStrictToolJSON(data)
+	if err != nil {
+		return err
+	}
+	return validateVerifyChangeResultJSONValue("", root, "")
+}
+
+// validateGetVerificationPayloadJSON parses one JSON document and checks the exact value
+// shapes known from this generated Goa type.
+func validateGetVerificationPayloadJSON(data []byte) error {
+	root, err := readStrictToolJSON(data)
+	if err != nil {
+		return err
+	}
+	return validateGetVerificationPayloadJSONValue("", root, "")
 }
 
 // validateApproveMergePayloadJSON parses one JSON document and checks the exact value
@@ -5514,6 +6880,645 @@ func validateDraftOverrideResultJSONValue(path string, value any, description st
 	return nil
 }
 
+// validateVerifyChangePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangePayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "candidate_commit":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Confirmed Change Card identifier.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Current request_revision of the confirmed Change Card.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"candidate_commit",
+				"change_id",
+				"request_revision",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "candidate_commit":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Candidate commit the run builds and verifies.",
+			); err != nil {
+				return err
+			}
+		case "change_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Change Card the run verifies.",
+			); err != nil {
+				return err
+			}
+		case "request_revision":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Change Card revision the run verifies.",
+			); err != nil {
+				return err
+			}
+		case "run_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Verification run identifier; get_verification takes it.",
+			); err != nil {
+				return err
+			}
+		case "state":
+			if err := validateVerifyChangeResultRootStateJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Exactly one of running, completed or not_completed.",
+			); err != nil {
+				return err
+			}
+		case "suite_commit":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite commit the operator configured for the run.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"candidate_commit",
+				"change_id",
+				"request_revision",
+				"run_id",
+				"state",
+				"suite_commit",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultRootStateJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultRootStateJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	for key := range typed {
+		if key != "type" && key != "value" {
+			return unknownJSONFieldError(path, key, []string{"type", "value"})
+		}
+	}
+	rawDiscriminator, discriminatorPresent := typed["type"]
+	discriminator, ok := rawDiscriminator.(string)
+	if !ok {
+		return invalidJSONUnionDiscriminator(generatedJSONChildPath(path, "type", false), rawDiscriminator, discriminatorPresent, []string{"running", "completed", "not_completed"})
+	}
+	branch, exists := typed["value"]
+	if !exists {
+		return missingJSONField(generatedJSONChildPath(path, "value", false))
+	}
+	switch discriminator {
+	case "running":
+		return validateVerifyChangeResultVerificationRunningTransportJSONValue(generatedJSONChildPath(path, "value", false), branch, "")
+	case "completed":
+		return validateVerifyChangeResultVerificationCompletedTransportJSONValue(generatedJSONChildPath(path, "value", false), branch, "")
+	case "not_completed":
+		return validateVerifyChangeResultVerificationNotCompletedTransportJSONValue(generatedJSONChildPath(path, "value", false), branch, "")
+	default:
+		return invalidJSONUnionDiscriminator(generatedJSONChildPath(path, "type", false), discriminator, true, []string{"running", "completed", "not_completed"})
+	}
+}
+
+// validateVerifyChangeResultVerificationRunningTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationRunningTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "started_at":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "When the run was accepted.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"started_at",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultVerificationCompletedTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationCompletedTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "environment":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Dependency profile the suite ran the candidate with, such as sim.",
+			); err != nil {
+				return err
+			}
+		case "report":
+			if err := validateVerifyChangeResultBuilderVerificationReportTransportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The builder view of the report.",
+			); err != nil {
+				return err
+			}
+		case "suite_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Evaluator suite the report was produced by.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"environment",
+				"report",
+				"suite_id",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultBuilderVerificationReportTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultBuilderVerificationReportTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "counts":
+			if err := validateVerifyChangeResultVerificationCountsTransportJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Every declared scenario, counted by outcome.",
+			); err != nil {
+				return err
+			}
+		case "passed":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The verdict: true only when every declared scenario passed and the suite ran cleanly.",
+			); err != nil {
+				return err
+			}
+		case "report_digest":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.",
+			); err != nil {
+				return err
+			}
+		case "scenarios":
+			if err := validateVerifyChangeResultBuilderVerificationReportTransportScenariosJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Every declared scenario in declaration order.",
+			); err != nil {
+				return err
+			}
+		case "suite_failed":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Whether the evaluator suite itself failed or ended abnormally.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"counts",
+				"passed",
+				"report_digest",
+				"scenarios",
+				"suite_failed",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultVerificationCountsTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationCountsTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "failed":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios whose checks failed.",
+			); err != nil {
+				return err
+			}
+		case "harness_error":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios that could not be evaluated.",
+			); err != nil {
+				return err
+			}
+		case "not_run":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Declared scenarios the suite did not report.",
+			); err != nil {
+				return err
+			}
+		case "passed":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios that passed.",
+			); err != nil {
+				return err
+			}
+		case "required":
+			if err := validateIntJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenarios the suite declares.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"failed",
+				"harness_error",
+				"not_run",
+				"passed",
+				"required",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultBuilderVerificationReportTransportScenariosJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultBuilderVerificationReportTransportScenariosJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validateVerifyChangeResultVerificationScenarioTransportJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultVerificationScenarioTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationScenarioTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "checks":
+			if err := validateVerifyChangeResultVerificationScenarioTransportChecksJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The repair scenario's checks; empty for holdouts.",
+			); err != nil {
+				return err
+			}
+		case "error":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "The repair scenario's environment error; empty for holdouts.",
+			); err != nil {
+				return err
+			}
+		case "id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Scenario name for a repair scenario, or holdout-<n> for a holdout.",
+			); err != nil {
+				return err
+			}
+		case "outcome":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "How the scenario ended.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"checks",
+				"error",
+				"id",
+				"outcome",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultVerificationScenarioTransportChecksJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationScenarioTransportChecksJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "array", "null", description)
+	}
+	typed, ok := value.([]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "array", decodedJSONType(value), description)
+	}
+	for index, item := range typed {
+		if err := validateVerifyChangeResultVerificationCheckTransportJSONValue(
+			generatedJSONChildPath(path, strconv.Itoa(index), true),
+			item, description,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultVerificationCheckTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationCheckTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "diagnostic":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Why the check failed; empty when it passed.",
+			); err != nil {
+				return err
+			}
+		case "name":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Check name.",
+			); err != nil {
+				return err
+			}
+		case "passed":
+			if err := validateBooleanJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Whether the check passed.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"diagnostic",
+				"name",
+				"passed",
+			})
+		}
+	}
+	return nil
+}
+
+// validateVerifyChangeResultVerificationNotCompletedTransportJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateVerifyChangeResultVerificationNotCompletedTransportJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "kind":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "execution_failed when a step failed; interrupted when the run's process ended before it finished.",
+			); err != nil {
+				return err
+			}
+		case "stage":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Where the run stopped.",
+			); err != nil {
+				return err
+			}
+		case "summary":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Builder-safe description of what stopped the run; never command output.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"kind",
+				"stage",
+				"summary",
+			})
+		}
+	}
+	return nil
+}
+
+// validateGetVerificationPayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
+func validateGetVerificationPayloadJSONValue(path string, value any, description string) error {
+	field := path
+	if field == "" {
+		field = "$payload"
+	}
+	if value == nil {
+		return invalidGeneratedFieldTypeError(field, "object", "null", description)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		return invalidGeneratedFieldTypeError(field, "object", decodedJSONType(value), description)
+	}
+	keys := make([]string, 0, len(typed))
+	for key := range typed {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		switch key {
+		case "run_id":
+			if err := validateStringJSONValue(
+				generatedJSONChildPath(path, key, false),
+				typed[key], "Verification run identifier returned by verify_change.",
+			); err != nil {
+				return err
+			}
+		default:
+			return unknownJSONFieldError(path, key, []string{
+				"run_id",
+			})
+		}
+	}
+	return nil
+}
+
 // validateApproveMergePayloadJSONValue checks one value whose JSON shape is fixed by the generated Goa type.
 func validateApproveMergePayloadJSONValue(path string, value any, description string) error {
 	field := path
@@ -5781,6 +7786,36 @@ func invalidGeneratedFieldTypeError(field, expected, actual, description string)
 	)
 }
 
+// invalidJSONUnionDiscriminator reports an absent, non-string or undeclared
+// branch selector at its actual JSON path, so callers can correct that field.
+func invalidJSONUnionDiscriminator(field string, got any, present bool, allowed []string) error {
+	constraint := "invalid_enum_value"
+	if !present {
+		constraint = "missing_field"
+	} else if _, ok := got.(string); !ok {
+		return invalidGeneratedFieldTypeError(field, "string", decodedJSONType(got), "")
+	}
+	return tools.NewValidationError(
+		fmt.Sprintf("field %q must select a declared union branch", field),
+		[]*tools.FieldIssue{
+			{Field: field, Constraint: constraint, Allowed: allowed},
+		},
+		nil,
+	)
+}
+
+// missingJSONField reports an absent required JSON property at its generated
+// path, so callers receive the same field contract for every union mapping.
+func missingJSONField(field string) error {
+	return tools.NewValidationError(
+		fmt.Sprintf("field %q is required", field),
+		[]*tools.FieldIssue{
+			{Field: field, Constraint: "missing_field"},
+		},
+		nil,
+	)
+}
+
 func unknownJSONFieldError(path, field string, allowed []string) error {
 	issueField := generatedJSONChildPath(path, field, false)
 	return tools.NewValidationError(
@@ -5915,6 +7950,170 @@ func encodeDesignSnapshotToDesignSnapshotTransport(v *DesignSnapshot) *toolhttp.
 		tk := key
 		tv := val
 		res.Files[tk] = tv
+	}
+
+	return res
+}
+func decodeVerificationRunningTransportToVerificationRunning(v *toolhttp.VerificationRunningTransport) *VerificationRunning {
+	res := &VerificationRunning{
+		StartedAt: *v.StartedAt,
+	}
+
+	return res
+}
+func decodeVerificationCompletedTransportToVerificationCompleted(v *toolhttp.VerificationCompletedTransport) *VerificationCompleted {
+	res := &VerificationCompleted{
+		SuiteID:     *v.SuiteID,
+		Environment: *v.Environment,
+	}
+	res.Report = decodeBuilderVerificationReportTransportToBuilderVerificationReport(v.Report)
+
+	return res
+}
+func decodeBuilderVerificationReportTransportToBuilderVerificationReport(v *toolhttp.BuilderVerificationReportTransport) *BuilderVerificationReport {
+	res := &BuilderVerificationReport{
+		ReportDigest: *v.ReportDigest,
+		Passed:       *v.Passed,
+		SuiteFailed:  *v.SuiteFailed,
+	}
+	res.Counts = decodeVerificationCountsTransportToVerificationCounts(v.Counts)
+	res.Scenarios = make([]*VerificationScenario, len(v.Scenarios))
+	for i, val := range v.Scenarios {
+		if val == nil {
+			res.Scenarios[i] = nil
+			continue
+		}
+		res.Scenarios[i] = decodeVerificationScenarioTransportToVerificationScenario(val)
+	}
+
+	return res
+}
+func decodeVerificationCountsTransportToVerificationCounts(v *toolhttp.VerificationCountsTransport) *VerificationCounts {
+	res := &VerificationCounts{
+		Required:     *v.Required,
+		Passed:       *v.Passed,
+		Failed:       *v.Failed,
+		NotRun:       *v.NotRun,
+		HarnessError: *v.HarnessError,
+	}
+
+	return res
+}
+func decodeVerificationScenarioTransportToVerificationScenario(v *toolhttp.VerificationScenarioTransport) *VerificationScenario {
+	res := &VerificationScenario{
+		ID:      *v.ID,
+		Outcome: *v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*VerificationCheck, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = decodeVerificationCheckTransportToVerificationCheck(val)
+		}
+	}
+
+	return res
+}
+func decodeVerificationCheckTransportToVerificationCheck(v *toolhttp.VerificationCheckTransport) *VerificationCheck {
+	res := &VerificationCheck{
+		Name:       *v.Name,
+		Passed:     *v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+func decodeVerificationNotCompletedTransportToVerificationNotCompleted(v *toolhttp.VerificationNotCompletedTransport) *VerificationNotCompleted {
+	res := &VerificationNotCompleted{
+		Kind:    *v.Kind,
+		Stage:   *v.Stage,
+		Summary: *v.Summary,
+	}
+
+	return res
+}
+func encodeVerificationRunningToVerificationRunningTransport(v *VerificationRunning) *toolhttp.VerificationRunningTransport {
+	res := &toolhttp.VerificationRunningTransport{
+		StartedAt: &v.StartedAt,
+	}
+
+	return res
+}
+func encodeVerificationCompletedToVerificationCompletedTransport(v *VerificationCompleted) *toolhttp.VerificationCompletedTransport {
+	res := &toolhttp.VerificationCompletedTransport{
+		SuiteID:     &v.SuiteID,
+		Environment: &v.Environment,
+	}
+	res.Report = encodeBuilderVerificationReportToBuilderVerificationReportTransport(v.Report)
+
+	return res
+}
+func encodeBuilderVerificationReportToBuilderVerificationReportTransport(v *BuilderVerificationReport) *toolhttp.BuilderVerificationReportTransport {
+	res := &toolhttp.BuilderVerificationReportTransport{
+		ReportDigest: &v.ReportDigest,
+		Passed:       &v.Passed,
+		SuiteFailed:  &v.SuiteFailed,
+	}
+	res.Counts = encodeVerificationCountsToVerificationCountsTransport(v.Counts)
+	res.Scenarios = make([]*toolhttp.VerificationScenarioTransport, len(v.Scenarios))
+	for i, val := range v.Scenarios {
+		if val == nil {
+			res.Scenarios[i] = nil
+			continue
+		}
+		res.Scenarios[i] = encodeVerificationScenarioToVerificationScenarioTransport(val)
+	}
+
+	return res
+}
+func encodeVerificationCountsToVerificationCountsTransport(v *VerificationCounts) *toolhttp.VerificationCountsTransport {
+	res := &toolhttp.VerificationCountsTransport{
+		Required:     &v.Required,
+		Passed:       &v.Passed,
+		Failed:       &v.Failed,
+		NotRun:       &v.NotRun,
+		HarnessError: &v.HarnessError,
+	}
+
+	return res
+}
+func encodeVerificationScenarioToVerificationScenarioTransport(v *VerificationScenario) *toolhttp.VerificationScenarioTransport {
+	res := &toolhttp.VerificationScenarioTransport{
+		ID:      &v.ID,
+		Outcome: &v.Outcome,
+		Error:   v.Error,
+	}
+	if v.Checks != nil {
+		res.Checks = make([]*toolhttp.VerificationCheckTransport, len(v.Checks))
+		for i, val := range v.Checks {
+			if val == nil {
+				res.Checks[i] = nil
+				continue
+			}
+			res.Checks[i] = encodeVerificationCheckToVerificationCheckTransport(val)
+		}
+	}
+
+	return res
+}
+func encodeVerificationCheckToVerificationCheckTransport(v *VerificationCheck) *toolhttp.VerificationCheckTransport {
+	res := &toolhttp.VerificationCheckTransport{
+		Name:       &v.Name,
+		Passed:     &v.Passed,
+		Diagnostic: v.Diagnostic,
+	}
+
+	return res
+}
+func encodeVerificationNotCompletedToVerificationNotCompletedTransport(v *VerificationNotCompleted) *toolhttp.VerificationNotCompletedTransport {
+	res := &toolhttp.VerificationNotCompletedTransport{
+		Kind:    &v.Kind,
+		Stage:   &v.Stage,
+		Summary: &v.Summary,
 	}
 
 	return res

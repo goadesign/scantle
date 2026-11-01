@@ -16,6 +16,7 @@ import (
 
 	genmcpadapter "github.com/goadesign/surla/gen/mcp_surla"
 	gensurla "github.com/goadesign/surla/gen/surla"
+	gensurlatools "github.com/goadesign/surla/gen/surla/toolsets/surla"
 )
 
 // approvalRefreshHost runs isolated jsdom guests with a parent host that records
@@ -205,16 +206,26 @@ func approvalRefreshCards(t *testing.T) (json.RawMessage, json.RawMessage) {
 	wire, ok := result.Outcome.AsComplete()
 	require.True(t, ok)
 	approved := json.RawMessage(wire.StructuredContent)
-	example := *card.Examples[0]
-	example.ExpectedOutcome = "Saved edited outcome"
-	confirm, err := json.Marshal(map[string]any{
-		"change_id": card.ChangeID, "request_revision": card.RequestRevision,
-		"answers": map[string]string{}, "examples": []*gensurla.ExampleItem{&example},
+	example := card.Examples[0]
+	confirm, err := gensurlatools.MarshalConfirmIntentPayload(&gensurlatools.ConfirmIntentPayload{
+		ChangeID: card.ChangeID, RequestRevision: card.RequestRevision,
+		Answers: map[string]string{},
+		Examples: []*gensurlatools.ExampleItem{{
+			ID: example.ID, Scenario: example.Scenario, InputSummary: example.InputSummary,
+			ExpectedOutcome: "Saved edited outcome", VerificationKind: example.VerificationKind,
+		}},
 	})
 	require.NoError(t, err)
 	result, err = adapter.ToolsCall(ctx, &genmcpadapter.ToolsCallPayload{Name: "confirm_intent", Arguments: confirm})
 	require.NoError(t, err)
 	wire, ok = result.Outcome.AsComplete()
 	require.True(t, ok)
+	content, err := json.Marshal(wire.Content)
+	require.NoError(t, err)
+	require.False(t, wire.IsError != nil && *wire.IsError, "confirmation failed: %s", content)
+	require.NotEmpty(t, wire.StructuredContent, "confirmation returned no structured card: %s", content)
+	savedCard, err := gensurlatools.UnmarshalConfirmIntentResult(wire.StructuredContent)
+	require.NoError(t, err)
+	require.NotEqual(t, card.RequestRevision, savedCard.RequestRevision, "saved edits must advance the card revision")
 	return approved, json.RawMessage(wire.StructuredContent)
 }

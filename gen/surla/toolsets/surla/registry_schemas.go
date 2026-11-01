@@ -33,7 +33,9 @@ func ToolSchemas() []*genregistry.ToolSchema {
 		declarations.schema146(),
 		declarations.schema163(),
 		declarations.schema208(),
-		declarations.schema305(),
+		declarations.schema253(),
+		declarations.schema350(),
+		declarations.schema399(),
 	}
 } // schema1 constructs one generated schema declaration.
 func (declarations registryDeclarations) schema1() *genregistry.ToolSchema {
@@ -3085,56 +3087,46 @@ func (registryDeclarations) field207() *genregistry.ToolFieldMetadata {
 
 // schema208 constructs one generated schema declaration.
 func (declarations registryDeclarations) schema208() *genregistry.ToolSchema {
-	registryText1 := "Preview Checkpoint 2 C4 container topology, Goa-AI guardrails, and proposed Chorus swarm roster for a confirmed Change Card."
+	registryText1 := "Read the state of a CP4 verification run started by verify_change."
 	return &genregistry.ToolSchema{
-		Name:                   "surla.preview_architecture",
+		Name:                   "surla.get_verification",
 		Description:            &registryText1,
-		PayloadSchema:          []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
-		ExecutionPayloadSchema: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
-		ResultSchema:           []byte("{\"$defs\":{\"AgentPolicyItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.\",\"properties\":{\"agent_id\":{\"description\":\"Scoped agent container identifier.\",\"type\":\"string\"},\"cache_after_system\":{\"description\":\"True when prompt caching places a checkpoint after system prompts.\",\"type\":\"boolean\"},\"cache_after_tools\":{\"description\":\"True when prompt caching places a checkpoint after tool definitions.\",\"type\":\"boolean\"},\"compress_at_turns\":{\"description\":\"Turn threshold for history compression.\",\"format\":\"int64\",\"type\":\"integer\"},\"keep_recent_turns\":{\"description\":\"Recent turns retained uncompressed.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_execution_seconds\":{\"description\":\"Per-run execution time budget in seconds.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_recovery_turns\":{\"description\":\"Maximum consecutive recovery turns after validation failure.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_tool_calls\":{\"description\":\"Per-run retrieval tool-call budget.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"agent_id\",\"max_execution_seconds\",\"max_tool_calls\",\"max_recovery_turns\",\"compress_at_turns\",\"keep_recent_turns\",\"cache_after_system\",\"cache_after_tools\"],\"title\":\"AgentPolicyItem\",\"type\":\"object\"},\"C4ContainerItem\":{\"additionalProperties\":false,\"description\":\"Architecture element declared by the target Goa, Goa-AI, or Model design.\",\"properties\":{\"description\":{\"description\":\"Summary of the container's responsibility.\",\"type\":\"string\"},\"id\":{\"description\":\"Stable container identifier.\",\"type\":\"string\"},\"kind\":{\"description\":\"Declared service, agent, toolset, person, system, container, or component.\",\"enum\":[\"service\",\"agent\",\"toolset\",\"person\",\"system\",\"container\",\"component\"],\"type\":\"string\"},\"name\":{\"description\":\"Human-readable container name.\",\"type\":\"string\"}},\"required\":[\"id\",\"name\",\"kind\",\"description\"],\"title\":\"C4ContainerItem\",\"type\":\"object\"},\"C4EdgeItem\":{\"additionalProperties\":false,\"description\":\"Directed contract relationship between two C4 containers.\",\"properties\":{\"from_id\":{\"description\":\"Source container ID.\",\"type\":\"string\"},\"protocol\":{\"description\":\"Contract or transport relationship.\",\"type\":\"string\"},\"to_id\":{\"description\":\"Target container ID.\",\"type\":\"string\"}},\"required\":[\"from_id\",\"to_id\",\"protocol\"],\"title\":\"C4EdgeItem\",\"type\":\"object\"},\"SwarmPlanItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.\",\"properties\":{\"assignments\":{\"description\":\"Deterministic role assignments when status is configured.\",\"items\":{\"$ref\":\"#/$defs/SwarmRoleItem\"},\"type\":\"array\"},\"cross_family_eval\":{\"description\":\"True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"cross_family_review\":{\"description\":\"True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"manifest\":{\"description\":\"Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.\",\"type\":\"string\"},\"missing_roles\":{\"description\":\"Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"single_family\":{\"description\":\"True when status is configured and all assigned roles share one model family.\",\"type\":\"boolean\"},\"status\":{\"description\":\"Roster configuration status.\",\"enum\":[\"configured\",\"unconfigured\",\"missing_capability\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of the proposed swarm roster and model-family posture.\",\"type\":\"string\"}},\"required\":[\"status\",\"assignments\",\"cross_family_review\",\"cross_family_eval\",\"single_family\",\"summary\"],\"title\":\"SwarmPlanItem\",\"type\":\"object\"},\"SwarmRoleItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.\",\"properties\":{\"access_mode\":{\"description\":\"Workspace access boundary required of the job runner.\",\"enum\":[\"read_only_after_cp2\",\"read_write_worktree\",\"isolated_eval_workspace\",\"read_only_review\"],\"type\":\"string\"},\"family\":{\"description\":\"Canonical model family identifier.\",\"type\":\"string\"},\"handle\":{\"description\":\"Deterministic Chorus agent handle (without leading '@', at most 32 characters).\",\"type\":\"string\"},\"model\":{\"description\":\"Assigned model identifier.\",\"type\":\"string\"},\"owned_paths\":{\"description\":\"Repository or workspace path globs owned by this role.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"profile_id\":{\"description\":\"Assigned server-configured provider profile ID.\",\"type\":\"string\"},\"provider\":{\"description\":\"Assigned coding-agent provider name.\",\"type\":\"string\"},\"role\":{\"description\":\"Assigned swarm role kind.\",\"enum\":[\"architect\",\"builder\",\"eval_author\",\"reviewer\"],\"type\":\"string\"},\"scope_name\":{\"description\":\"Human-readable scope label for this assignment.\",\"type\":\"string\"}},\"required\":[\"handle\",\"role\",\"scope_name\",\"profile_id\",\"provider\",\"model\",\"family\",\"owned_paths\",\"access_mode\"],\"title\":\"SwarmRoleItem\",\"type\":\"object\"},\"ToolContractItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.\",\"properties\":{\"args_schema\":{\"description\":\"Generated provider model input before consumer binding.\",\"type\":\"string\"},\"bounded_result\":{\"description\":\"True when the tool declares a BoundedResult cursor/truncation contract.\",\"type\":\"boolean\"},\"description\":{\"description\":\"Tool description.\",\"type\":\"string\"},\"id\":{\"description\":\"Consumer agent ID followed by the compiler's tool ID (\\u003cagent_id\\u003e/\\u003ctool_id\\u003e).\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed runtime or provider fields omitted from the provider model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"input_binding\":{\"$ref\":\"#/$defs/ToolInputBindingItem\",\"description\":\"Compiled consumer input choices, when binding is declared.\"},\"name\":{\"description\":\"Tool name.\",\"type\":\"string\"},\"requires_confirmation\":{\"description\":\"True when the tool declares a design-time Confirmation gate.\",\"type\":\"boolean\"},\"requires_ui\":{\"description\":\"True when the tool requires a UI-capable runtime.\",\"type\":\"boolean\"},\"return_schema\":{\"description\":\"Generated model-visible result schema; empty when the tool declares no result.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated provider text-only input, when supported.\",\"type\":\"string\"},\"toolset\":{\"description\":\"Compiler-selected toolset registration route.\",\"type\":\"string\"}},\"required\":[\"id\",\"toolset\",\"name\",\"description\",\"args_schema\",\"return_schema\",\"injected_fields\",\"requires_ui\",\"requires_confirmation\",\"bounded_result\"],\"title\":\"ToolContractItem\",\"type\":\"object\"},\"ToolInputBindingItem\":{\"additionalProperties\":false,\"description\":\"Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.\",\"properties\":{\"args_schema\":{\"description\":\"Generated ordinary bound model input.\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed fields supplied outside the ordinary bound model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"lookup_args_schema\":{\"description\":\"Generated lookup-key input, when declared; application lookup values are not inspected.\",\"type\":\"string\"},\"lookup_text_only_args_schema\":{\"description\":\"Generated text-only lookup-key input, when supported.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated ordinary text-only input, when supported.\",\"type\":\"string\"}},\"required\":[\"args_schema\",\"injected_fields\"],\"title\":\"ToolInputBindingItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.\",\"properties\":{\"agent_policies\":{\"description\":\"Evaluated Goa-AI runtime policies per declared agent.\",\"items\":{\"$ref\":\"#/$defs/AgentPolicyItem\"},\"type\":\"array\"},\"banner\":{\"description\":\"Plain-English summary of topology and guardrails.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Bound Change Card identifier.\",\"type\":\"string\"},\"containers\":{\"description\":\"Derived C4 containers.\",\"items\":{\"$ref\":\"#/$defs/C4ContainerItem\"},\"type\":\"array\"},\"design_digest\":{\"description\":\"SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).\",\"type\":\"string\"},\"edges\":{\"description\":\"Validated directed edges between declared containers.\",\"items\":{\"$ref\":\"#/$defs/C4EdgeItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Bound CP1 request_revision digest.\",\"type\":\"string\"},\"swarm\":{\"$ref\":\"#/$defs/SwarmPlanItem\",\"description\":\"Proposed Chorus multi-agent role assignments and model-family routing.\"},\"system_name\":{\"description\":\"API or primary service name declared in the design.\",\"type\":\"string\"},\"tools\":{\"description\":\"Evaluated Goa-AI tool contracts.\",\"items\":{\"$ref\":\"#/$defs/ToolContractItem\"},\"type\":\"array\"}},\"required\":[\"change_id\",\"request_revision\",\"design_digest\",\"system_name\",\"containers\",\"edges\",\"agent_policies\",\"tools\",\"swarm\",\"banner\"],\"type\":\"object\"}"),
+		PayloadSchema:          []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies a verification run returned by verify_change.\",\"properties\":{\"run_id\":{\"description\":\"Verification run identifier returned by verify_change.\",\"type\":\"string\"}},\"required\":[\"run_id\"],\"type\":\"object\"}"),
+		ExecutionPayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies a verification run returned by verify_change.\",\"properties\":{\"run_id\":{\"description\":\"Verification run identifier returned by verify_change.\",\"type\":\"string\"}},\"required\":[\"run_id\"],\"type\":\"object\"}"),
+		ResultSchema:           []byte("{\"$defs\":{\"BuilderVerificationReport\":{\"additionalProperties\":false,\"description\":\"The builder view of a Checkpoint 4 verification report: counts, verdict and repair scenario checks. Holdout details, evidence and logs stay with the evaluator.\",\"properties\":{\"counts\":{\"$ref\":\"#/$defs/VerificationCounts\",\"description\":\"Every declared scenario, counted by outcome.\"},\"passed\":{\"description\":\"The verdict: true only when every declared scenario passed and the suite ran cleanly.\",\"type\":\"boolean\"},\"report_digest\":{\"description\":\"SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.\",\"type\":\"string\"},\"scenarios\":{\"description\":\"Every declared scenario in declaration order.\",\"items\":{\"$ref\":\"#/$defs/VerificationScenario\"},\"type\":\"array\"},\"suite_failed\":{\"description\":\"Whether the evaluator suite itself failed or ended abnormally.\",\"type\":\"boolean\"}},\"required\":[\"report_digest\",\"counts\",\"passed\",\"suite_failed\",\"scenarios\"],\"title\":\"BuilderVerificationReport\",\"type\":\"object\"},\"VerificationCheck\":{\"additionalProperties\":false,\"description\":\"One deterministic check of a repair scenario.\",\"properties\":{\"diagnostic\":{\"description\":\"Why the check failed; empty when it passed.\",\"type\":\"string\"},\"name\":{\"description\":\"Check name.\",\"type\":\"string\"},\"passed\":{\"description\":\"Whether the check passed.\",\"type\":\"boolean\"}},\"required\":[\"name\",\"passed\"],\"title\":\"VerificationCheck\",\"type\":\"object\"},\"VerificationCompleted\":{\"additionalProperties\":false,\"description\":\"The run produced a verification report. Its verdict is report.passed.\",\"properties\":{\"environment\":{\"description\":\"Dependency profile the suite ran the candidate with, such as sim.\",\"type\":\"string\"},\"report\":{\"$ref\":\"#/$defs/BuilderVerificationReport\",\"description\":\"The builder view of the report.\"},\"suite_id\":{\"description\":\"Evaluator suite the report was produced by.\",\"type\":\"string\"}},\"required\":[\"suite_id\",\"environment\",\"report\"],\"title\":\"VerificationCompleted\",\"type\":\"object\"},\"VerificationCounts\":{\"additionalProperties\":false,\"description\":\"Every declared scenario, counted by outcome.\",\"properties\":{\"failed\":{\"description\":\"Scenarios whose checks failed.\",\"format\":\"int64\",\"type\":\"integer\"},\"harness_error\":{\"description\":\"Scenarios that could not be evaluated.\",\"format\":\"int64\",\"type\":\"integer\"},\"not_run\":{\"description\":\"Declared scenarios the suite did not report.\",\"format\":\"int64\",\"type\":\"integer\"},\"passed\":{\"description\":\"Scenarios that passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"required\":{\"description\":\"Scenarios the suite declares.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"required\",\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"title\":\"VerificationCounts\",\"type\":\"object\"},\"VerificationNotCompleted\":{\"additionalProperties\":false,\"description\":\"The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.\",\"properties\":{\"kind\":{\"description\":\"execution_failed when a step failed; interrupted when the run's process ended before it finished.\",\"enum\":[\"execution_failed\",\"interrupted\"],\"type\":\"string\"},\"stage\":{\"description\":\"Where the run stopped.\",\"enum\":[\"checkout\",\"build\",\"describe\",\"suite\",\"report\",\"supervise\"],\"type\":\"string\"},\"summary\":{\"description\":\"Builder-safe description of what stopped the run; never command output.\",\"type\":\"string\"}},\"required\":[\"kind\",\"stage\",\"summary\"],\"title\":\"VerificationNotCompleted\",\"type\":\"object\"},\"VerificationRunning\":{\"additionalProperties\":false,\"description\":\"The run is still building or evaluating the candidate.\",\"properties\":{\"started_at\":{\"description\":\"When the run was accepted.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"started_at\"],\"title\":\"VerificationRunning\",\"type\":\"object\"},\"VerificationScenario\":{\"additionalProperties\":false,\"description\":\"One declared scenario as builders see it. Repair scenarios carry their name, checks and environment error; holdout scenarios appear only as holdout-\\u003cn\\u003e with their outcome.\",\"properties\":{\"checks\":{\"description\":\"The repair scenario's checks; empty for holdouts.\",\"items\":{\"$ref\":\"#/$defs/VerificationCheck\"},\"type\":\"array\"},\"error\":{\"description\":\"The repair scenario's environment error; empty for holdouts.\",\"type\":\"string\"},\"id\":{\"description\":\"Scenario name for a repair scenario, or holdout-\\u003cn\\u003e for a holdout.\",\"type\":\"string\"},\"outcome\":{\"description\":\"How the scenario ended.\",\"enum\":[\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"type\":\"string\"}},\"required\":[\"id\",\"outcome\"],\"title\":\"VerificationScenario\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.\",\"properties\":{\"candidate_commit\":{\"description\":\"Candidate commit the run builds and verifies.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Change Card the run verifies.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Change Card revision the run verifies.\",\"type\":\"string\"},\"run_id\":{\"description\":\"Verification run identifier; get_verification takes it.\",\"type\":\"string\"},\"state\":{\"description\":\"Exactly one of running, completed or not_completed.\",\"oneOf\":[{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"running\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationRunning\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"not_completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationNotCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"}],\"type\":\"object\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the operator configured for the run.\",\"type\":\"string\"}},\"required\":[\"run_id\",\"change_id\",\"request_revision\",\"candidate_commit\",\"suite_commit\",\"state\"],\"type\":\"object\"}"),
 		ConsumerContract: &genregistry.ConsumerContract{
 			Kind:  "service",
-			Title: "Preview Architecture",
+			Title: "Get Verification",
 			Search: &genregistry.ToolSearchDocument{
-				Length: 24,
-				Terms:  map[string]int{"2": 1, "a": 1, "ai": 1, "and": 1, "architecture": 2, "c4": 1, "card": 1, "change": 1, "checkpoint": 1, "chorus": 1, "confirmed": 1, "container": 1, "for": 1, "goa": 1, "guardrails": 1, "preview": 3, "proposed": 1, "roster": 1, "surla": 1, "swarm": 1, "topology": 1},
+				Length: 17,
+				Terms:  map[string]int{"a": 1, "by": 1, "change": 1, "cp4": 1, "get": 2, "of": 1, "read": 1, "run": 1, "started": 1, "state": 1, "surla": 1, "the": 1, "verification": 3, "verify": 1},
 			},
 			RequiresUI: false,
 			TextOnly: &genregistry.TextOnlyToolContract{
-				ExecutionSchema: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
-				Description:     "Preview Checkpoint 2 C4 container topology, Goa-AI guardrails, and proposed Chorus swarm roster for a confirmed Change Card.",
+				ExecutionSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies a verification run returned by verify_change.\",\"properties\":{\"run_id\":{\"description\":\"Verification run identifier returned by verify_change.\",\"type\":\"string\"}},\"required\":[\"run_id\"],\"type\":\"object\"}"),
+				Description:     "Read the state of a CP4 verification run started by verify_change.",
 				Search: &genregistry.ToolSearchDocument{
-					Length: 24,
-					Terms:  map[string]int{"2": 1, "a": 1, "ai": 1, "and": 1, "architecture": 2, "c4": 1, "card": 1, "change": 1, "checkpoint": 1, "chorus": 1, "confirmed": 1, "container": 1, "for": 1, "goa": 1, "guardrails": 1, "preview": 3, "proposed": 1, "roster": 1, "surla": 1, "swarm": 1, "topology": 1},
+					Length: 17,
+					Terms:  map[string]int{"a": 1, "by": 1, "change": 1, "cp4": 1, "get": 2, "of": 1, "read": 1, "run": 1, "started": 1, "state": 1, "surla": 1, "the": 1, "verification": 3, "verify": 1},
 				},
-				PayloadSchema: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
-				Payload:       declarations.metadata292(),
+				PayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies a verification run returned by verify_change.\",\"properties\":{\"run_id\":{\"description\":\"Verification run identifier returned by verify_change.\",\"type\":\"string\"}},\"required\":[\"run_id\"],\"type\":\"object\"}"),
+				Payload:       declarations.metadata250(),
 			},
 			Payload: declarations.metadata209(),
-			Result:  declarations.metadata222(),
+			Result:  declarations.metadata212(),
 		},
 	}
 }
 
 // metadata209 constructs one generated metadata declaration.
 func (declarations registryDeclarations) metadata209() *genregistry.ToolTypeMetadata {
-	registryText1 := "PreviewArchitecturePayload"
+	registryText1 := "GetVerificationPayload"
 	return &genregistry.ToolTypeMetadata{
 		Name:                     &registryText1,
-		SchemaWithoutRootExample: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies a verification run returned by verify_change.\",\"properties\":{\"run_id\":{\"description\":\"Verification run identifier returned by verify_change.\",\"type\":\"string\"}},\"required\":[\"run_id\"],\"type\":\"object\"}"),
 		Fields: []*genregistry.ToolFieldMetadata{
 			declarations.field210(),
 			declarations.field211(),
-			declarations.field212(),
-			declarations.field213(),
-			declarations.field214(),
-			declarations.field215(),
-			declarations.field216(),
-			declarations.field217(),
-			declarations.field218(),
-			declarations.field219(),
-			declarations.field220(),
-			declarations.field221(),
 		},
 	}
 }
@@ -3142,7 +3134,7 @@ func (declarations registryDeclarations) metadata209() *genregistry.ToolTypeMeta
 // field210 constructs one generated field declaration.
 func (registryDeclarations) field210() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
-	registryText2 := "Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card."
+	registryText2 := "Identifies a verification run returned by verify_change."
 	return &genregistry.ToolFieldMetadata{
 		JSONType:    &registryText1,
 		Description: &registryText2,
@@ -3152,166 +3144,33 @@ func (registryDeclarations) field210() *genregistry.ToolFieldMetadata {
 // field211 constructs one generated field declaration.
 func (registryDeclarations) field211() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
-	registryText2 := "Confirmed Change Card identifier."
+	registryText2 := "Verification run identifier returned by verify_change."
 	return &genregistry.ToolFieldMetadata{
 		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+			{Segment: genregistry.NewToolFieldSegmentField("run_id")},
 		},
 		JSONType:    &registryText1,
 		Description: &registryText2,
 	}
 }
 
-// field212 constructs one generated field declaration.
-func (registryDeclarations) field212() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Expected CP1 request_revision digest."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field213 constructs one generated field declaration.
-func (registryDeclarations) field213() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Candidate module whose Goa and Goa-AI design is evaluated."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field214 constructs one generated field declaration.
-func (registryDeclarations) field214() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design")},
-			{Segment: genregistry.NewToolFieldSegmentField("files")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field215 constructs one generated field declaration.
-func (registryDeclarations) field215() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design")},
-			{Segment: genregistry.NewToolFieldSegmentField("files")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field216 constructs one generated field declaration.
-func (registryDeclarations) field216() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field217 constructs one generated field declaration.
-func (registryDeclarations) field217() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field218 constructs one generated field declaration.
-func (registryDeclarations) field218() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Human-readable builder scope name (for example, orders or api)."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("name")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field219 constructs one generated field declaration.
-func (registryDeclarations) field219() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Repository-relative path globs owned by this builder."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("paths")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field220 constructs one generated field declaration.
-func (registryDeclarations) field220() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Repository-relative path globs owned by this builder."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("paths")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field221 constructs one generated field declaration.
-func (registryDeclarations) field221() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Optional preference selecting a server-configured authenticated profile ID."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("preferred_profile_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// metadata222 constructs one generated metadata declaration.
-func (declarations registryDeclarations) metadata222() *genregistry.ToolTypeMetadata {
-	registryText1 := "PreviewArchitectureResult"
+// metadata212 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata212() *genregistry.ToolTypeMetadata {
+	registryText1 := "GetVerificationResult"
 	return &genregistry.ToolTypeMetadata{
 		Name:                     &registryText1,
-		SchemaWithoutRootExample: []byte("{\"$defs\":{\"AgentPolicyItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.\",\"properties\":{\"agent_id\":{\"description\":\"Scoped agent container identifier.\",\"type\":\"string\"},\"cache_after_system\":{\"description\":\"True when prompt caching places a checkpoint after system prompts.\",\"type\":\"boolean\"},\"cache_after_tools\":{\"description\":\"True when prompt caching places a checkpoint after tool definitions.\",\"type\":\"boolean\"},\"compress_at_turns\":{\"description\":\"Turn threshold for history compression.\",\"format\":\"int64\",\"type\":\"integer\"},\"keep_recent_turns\":{\"description\":\"Recent turns retained uncompressed.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_execution_seconds\":{\"description\":\"Per-run execution time budget in seconds.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_recovery_turns\":{\"description\":\"Maximum consecutive recovery turns after validation failure.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_tool_calls\":{\"description\":\"Per-run retrieval tool-call budget.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"agent_id\",\"max_execution_seconds\",\"max_tool_calls\",\"max_recovery_turns\",\"compress_at_turns\",\"keep_recent_turns\",\"cache_after_system\",\"cache_after_tools\"],\"title\":\"AgentPolicyItem\",\"type\":\"object\"},\"C4ContainerItem\":{\"additionalProperties\":false,\"description\":\"Architecture element declared by the target Goa, Goa-AI, or Model design.\",\"properties\":{\"description\":{\"description\":\"Summary of the container's responsibility.\",\"type\":\"string\"},\"id\":{\"description\":\"Stable container identifier.\",\"type\":\"string\"},\"kind\":{\"description\":\"Declared service, agent, toolset, person, system, container, or component.\",\"enum\":[\"service\",\"agent\",\"toolset\",\"person\",\"system\",\"container\",\"component\"],\"type\":\"string\"},\"name\":{\"description\":\"Human-readable container name.\",\"type\":\"string\"}},\"required\":[\"id\",\"name\",\"kind\",\"description\"],\"title\":\"C4ContainerItem\",\"type\":\"object\"},\"C4EdgeItem\":{\"additionalProperties\":false,\"description\":\"Directed contract relationship between two C4 containers.\",\"properties\":{\"from_id\":{\"description\":\"Source container ID.\",\"type\":\"string\"},\"protocol\":{\"description\":\"Contract or transport relationship.\",\"type\":\"string\"},\"to_id\":{\"description\":\"Target container ID.\",\"type\":\"string\"}},\"required\":[\"from_id\",\"to_id\",\"protocol\"],\"title\":\"C4EdgeItem\",\"type\":\"object\"},\"SwarmPlanItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.\",\"properties\":{\"assignments\":{\"description\":\"Deterministic role assignments when status is configured.\",\"items\":{\"$ref\":\"#/$defs/SwarmRoleItem\"},\"type\":\"array\"},\"cross_family_eval\":{\"description\":\"True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"cross_family_review\":{\"description\":\"True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"manifest\":{\"description\":\"Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.\",\"type\":\"string\"},\"missing_roles\":{\"description\":\"Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"single_family\":{\"description\":\"True when status is configured and all assigned roles share one model family.\",\"type\":\"boolean\"},\"status\":{\"description\":\"Roster configuration status.\",\"enum\":[\"configured\",\"unconfigured\",\"missing_capability\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of the proposed swarm roster and model-family posture.\",\"type\":\"string\"}},\"required\":[\"status\",\"assignments\",\"cross_family_review\",\"cross_family_eval\",\"single_family\",\"summary\"],\"title\":\"SwarmPlanItem\",\"type\":\"object\"},\"SwarmRoleItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.\",\"properties\":{\"access_mode\":{\"description\":\"Workspace access boundary required of the job runner.\",\"enum\":[\"read_only_after_cp2\",\"read_write_worktree\",\"isolated_eval_workspace\",\"read_only_review\"],\"type\":\"string\"},\"family\":{\"description\":\"Canonical model family identifier.\",\"type\":\"string\"},\"handle\":{\"description\":\"Deterministic Chorus agent handle (without leading '@', at most 32 characters).\",\"type\":\"string\"},\"model\":{\"description\":\"Assigned model identifier.\",\"type\":\"string\"},\"owned_paths\":{\"description\":\"Repository or workspace path globs owned by this role.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"profile_id\":{\"description\":\"Assigned server-configured provider profile ID.\",\"type\":\"string\"},\"provider\":{\"description\":\"Assigned coding-agent provider name.\",\"type\":\"string\"},\"role\":{\"description\":\"Assigned swarm role kind.\",\"enum\":[\"architect\",\"builder\",\"eval_author\",\"reviewer\"],\"type\":\"string\"},\"scope_name\":{\"description\":\"Human-readable scope label for this assignment.\",\"type\":\"string\"}},\"required\":[\"handle\",\"role\",\"scope_name\",\"profile_id\",\"provider\",\"model\",\"family\",\"owned_paths\",\"access_mode\"],\"title\":\"SwarmRoleItem\",\"type\":\"object\"},\"ToolContractItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.\",\"properties\":{\"args_schema\":{\"description\":\"Generated provider model input before consumer binding.\",\"type\":\"string\"},\"bounded_result\":{\"description\":\"True when the tool declares a BoundedResult cursor/truncation contract.\",\"type\":\"boolean\"},\"description\":{\"description\":\"Tool description.\",\"type\":\"string\"},\"id\":{\"description\":\"Consumer agent ID followed by the compiler's tool ID (\\u003cagent_id\\u003e/\\u003ctool_id\\u003e).\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed runtime or provider fields omitted from the provider model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"input_binding\":{\"$ref\":\"#/$defs/ToolInputBindingItem\",\"description\":\"Compiled consumer input choices, when binding is declared.\"},\"name\":{\"description\":\"Tool name.\",\"type\":\"string\"},\"requires_confirmation\":{\"description\":\"True when the tool declares a design-time Confirmation gate.\",\"type\":\"boolean\"},\"requires_ui\":{\"description\":\"True when the tool requires a UI-capable runtime.\",\"type\":\"boolean\"},\"return_schema\":{\"description\":\"Generated model-visible result schema; empty when the tool declares no result.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated provider text-only input, when supported.\",\"type\":\"string\"},\"toolset\":{\"description\":\"Compiler-selected toolset registration route.\",\"type\":\"string\"}},\"required\":[\"id\",\"toolset\",\"name\",\"description\",\"args_schema\",\"return_schema\",\"injected_fields\",\"requires_ui\",\"requires_confirmation\",\"bounded_result\"],\"title\":\"ToolContractItem\",\"type\":\"object\"},\"ToolInputBindingItem\":{\"additionalProperties\":false,\"description\":\"Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.\",\"properties\":{\"args_schema\":{\"description\":\"Generated ordinary bound model input.\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed fields supplied outside the ordinary bound model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"lookup_args_schema\":{\"description\":\"Generated lookup-key input, when declared; application lookup values are not inspected.\",\"type\":\"string\"},\"lookup_text_only_args_schema\":{\"description\":\"Generated text-only lookup-key input, when supported.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated ordinary text-only input, when supported.\",\"type\":\"string\"}},\"required\":[\"args_schema\",\"injected_fields\"],\"title\":\"ToolInputBindingItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.\",\"properties\":{\"agent_policies\":{\"description\":\"Evaluated Goa-AI runtime policies per declared agent.\",\"items\":{\"$ref\":\"#/$defs/AgentPolicyItem\"},\"type\":\"array\"},\"banner\":{\"description\":\"Plain-English summary of topology and guardrails.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Bound Change Card identifier.\",\"type\":\"string\"},\"containers\":{\"description\":\"Derived C4 containers.\",\"items\":{\"$ref\":\"#/$defs/C4ContainerItem\"},\"type\":\"array\"},\"design_digest\":{\"description\":\"SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).\",\"type\":\"string\"},\"edges\":{\"description\":\"Validated directed edges between declared containers.\",\"items\":{\"$ref\":\"#/$defs/C4EdgeItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Bound CP1 request_revision digest.\",\"type\":\"string\"},\"swarm\":{\"$ref\":\"#/$defs/SwarmPlanItem\",\"description\":\"Proposed Chorus multi-agent role assignments and model-family routing.\"},\"system_name\":{\"description\":\"API or primary service name declared in the design.\",\"type\":\"string\"},\"tools\":{\"description\":\"Evaluated Goa-AI tool contracts.\",\"items\":{\"$ref\":\"#/$defs/ToolContractItem\"},\"type\":\"array\"}},\"required\":[\"change_id\",\"request_revision\",\"design_digest\",\"system_name\",\"containers\",\"edges\",\"agent_policies\",\"tools\",\"swarm\",\"banner\"],\"type\":\"object\"}"),
+		SchemaWithoutRootExample: []byte("{\"$defs\":{\"BuilderVerificationReport\":{\"additionalProperties\":false,\"description\":\"The builder view of a Checkpoint 4 verification report: counts, verdict and repair scenario checks. Holdout details, evidence and logs stay with the evaluator.\",\"properties\":{\"counts\":{\"$ref\":\"#/$defs/VerificationCounts\",\"description\":\"Every declared scenario, counted by outcome.\"},\"passed\":{\"description\":\"The verdict: true only when every declared scenario passed and the suite ran cleanly.\",\"type\":\"boolean\"},\"report_digest\":{\"description\":\"SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.\",\"type\":\"string\"},\"scenarios\":{\"description\":\"Every declared scenario in declaration order.\",\"items\":{\"$ref\":\"#/$defs/VerificationScenario\"},\"type\":\"array\"},\"suite_failed\":{\"description\":\"Whether the evaluator suite itself failed or ended abnormally.\",\"type\":\"boolean\"}},\"required\":[\"report_digest\",\"counts\",\"passed\",\"suite_failed\",\"scenarios\"],\"title\":\"BuilderVerificationReport\",\"type\":\"object\"},\"VerificationCheck\":{\"additionalProperties\":false,\"description\":\"One deterministic check of a repair scenario.\",\"properties\":{\"diagnostic\":{\"description\":\"Why the check failed; empty when it passed.\",\"type\":\"string\"},\"name\":{\"description\":\"Check name.\",\"type\":\"string\"},\"passed\":{\"description\":\"Whether the check passed.\",\"type\":\"boolean\"}},\"required\":[\"name\",\"passed\"],\"title\":\"VerificationCheck\",\"type\":\"object\"},\"VerificationCompleted\":{\"additionalProperties\":false,\"description\":\"The run produced a verification report. Its verdict is report.passed.\",\"properties\":{\"environment\":{\"description\":\"Dependency profile the suite ran the candidate with, such as sim.\",\"type\":\"string\"},\"report\":{\"$ref\":\"#/$defs/BuilderVerificationReport\",\"description\":\"The builder view of the report.\"},\"suite_id\":{\"description\":\"Evaluator suite the report was produced by.\",\"type\":\"string\"}},\"required\":[\"suite_id\",\"environment\",\"report\"],\"title\":\"VerificationCompleted\",\"type\":\"object\"},\"VerificationCounts\":{\"additionalProperties\":false,\"description\":\"Every declared scenario, counted by outcome.\",\"properties\":{\"failed\":{\"description\":\"Scenarios whose checks failed.\",\"format\":\"int64\",\"type\":\"integer\"},\"harness_error\":{\"description\":\"Scenarios that could not be evaluated.\",\"format\":\"int64\",\"type\":\"integer\"},\"not_run\":{\"description\":\"Declared scenarios the suite did not report.\",\"format\":\"int64\",\"type\":\"integer\"},\"passed\":{\"description\":\"Scenarios that passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"required\":{\"description\":\"Scenarios the suite declares.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"required\",\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"title\":\"VerificationCounts\",\"type\":\"object\"},\"VerificationNotCompleted\":{\"additionalProperties\":false,\"description\":\"The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.\",\"properties\":{\"kind\":{\"description\":\"execution_failed when a step failed; interrupted when the run's process ended before it finished.\",\"enum\":[\"execution_failed\",\"interrupted\"],\"type\":\"string\"},\"stage\":{\"description\":\"Where the run stopped.\",\"enum\":[\"checkout\",\"build\",\"describe\",\"suite\",\"report\",\"supervise\"],\"type\":\"string\"},\"summary\":{\"description\":\"Builder-safe description of what stopped the run; never command output.\",\"type\":\"string\"}},\"required\":[\"kind\",\"stage\",\"summary\"],\"title\":\"VerificationNotCompleted\",\"type\":\"object\"},\"VerificationRunning\":{\"additionalProperties\":false,\"description\":\"The run is still building or evaluating the candidate.\",\"properties\":{\"started_at\":{\"description\":\"When the run was accepted.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"started_at\"],\"title\":\"VerificationRunning\",\"type\":\"object\"},\"VerificationScenario\":{\"additionalProperties\":false,\"description\":\"One declared scenario as builders see it. Repair scenarios carry their name, checks and environment error; holdout scenarios appear only as holdout-\\u003cn\\u003e with their outcome.\",\"properties\":{\"checks\":{\"description\":\"The repair scenario's checks; empty for holdouts.\",\"items\":{\"$ref\":\"#/$defs/VerificationCheck\"},\"type\":\"array\"},\"error\":{\"description\":\"The repair scenario's environment error; empty for holdouts.\",\"type\":\"string\"},\"id\":{\"description\":\"Scenario name for a repair scenario, or holdout-\\u003cn\\u003e for a holdout.\",\"type\":\"string\"},\"outcome\":{\"description\":\"How the scenario ended.\",\"enum\":[\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"type\":\"string\"}},\"required\":[\"id\",\"outcome\"],\"title\":\"VerificationScenario\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.\",\"properties\":{\"candidate_commit\":{\"description\":\"Candidate commit the run builds and verifies.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Change Card the run verifies.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Change Card revision the run verifies.\",\"type\":\"string\"},\"run_id\":{\"description\":\"Verification run identifier; get_verification takes it.\",\"type\":\"string\"},\"state\":{\"description\":\"Exactly one of running, completed or not_completed.\",\"oneOf\":[{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"running\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationRunning\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"not_completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationNotCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"}],\"type\":\"object\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the operator configured for the run.\",\"type\":\"string\"}},\"required\":[\"run_id\",\"change_id\",\"request_revision\",\"candidate_commit\",\"suite_commit\",\"state\"],\"type\":\"object\"}"),
 		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field213(),
+			declarations.field214(),
+			declarations.field215(),
+			declarations.field216(),
+			declarations.field217(),
+			declarations.field218(),
+			declarations.field219(),
+			declarations.field220(),
+			declarations.field221(),
+			declarations.field222(),
 			declarations.field223(),
 			declarations.field224(),
 			declarations.field225(),
@@ -3339,11 +3198,812 @@ func (declarations registryDeclarations) metadata222() *genregistry.ToolTypeMeta
 			declarations.field247(),
 			declarations.field248(),
 			declarations.field249(),
-			declarations.field250(),
+		},
+	}
+}
+
+// field213 constructs one generated field declaration.
+func (registryDeclarations) field213() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field214 constructs one generated field declaration.
+func (registryDeclarations) field214() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Verification run identifier; get_verification takes it."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("run_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field215 constructs one generated field declaration.
+func (registryDeclarations) field215() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Change Card the run verifies."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field216 constructs one generated field declaration.
+func (registryDeclarations) field216() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Change Card revision the run verifies."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field217 constructs one generated field declaration.
+func (registryDeclarations) field217() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Candidate commit the run builds and verifies."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("candidate_commit")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field218 constructs one generated field declaration.
+func (registryDeclarations) field218() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Evaluator suite commit the operator configured for the run."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("suite_commit")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field219 constructs one generated field declaration.
+func (registryDeclarations) field219() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Exactly one of running, completed or not_completed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field220 constructs one generated field declaration.
+func (registryDeclarations) field220() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("type")},
+		},
+		JSONType:            &registryText1,
+		DiscriminatorValues: []string{"running", "completed", "not_completed"},
+	}
+}
+
+// field221 constructs one generated field declaration.
+func (registryDeclarations) field221() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The run is still building or evaluating the candidate."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "running"}),
+			},
+		},
+	}
+}
+
+// field222 constructs one generated field declaration.
+func (registryDeclarations) field222() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "When the run was accepted."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("started_at")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "running"}),
+			},
+		},
+	}
+}
+
+// field223 constructs one generated field declaration.
+func (registryDeclarations) field223() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The run produced a verification report. Its verdict is report.passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field224 constructs one generated field declaration.
+func (registryDeclarations) field224() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Evaluator suite the report was produced by."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("suite_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field225 constructs one generated field declaration.
+func (registryDeclarations) field225() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Dependency profile the suite ran the candidate with, such as sim."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("environment")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field226 constructs one generated field declaration.
+func (registryDeclarations) field226() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The builder view of the report."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field227 constructs one generated field declaration.
+func (registryDeclarations) field227() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("report_digest")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field228 constructs one generated field declaration.
+func (registryDeclarations) field228() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Every declared scenario, counted by outcome."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field229 constructs one generated field declaration.
+func (registryDeclarations) field229() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios the suite declares."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("required")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field230 constructs one generated field declaration.
+func (registryDeclarations) field230() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios that passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("passed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field231 constructs one generated field declaration.
+func (registryDeclarations) field231() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios whose checks failed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("failed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field232 constructs one generated field declaration.
+func (registryDeclarations) field232() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Declared scenarios the suite did not report."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("not_run")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field233 constructs one generated field declaration.
+func (registryDeclarations) field233() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios that could not be evaluated."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("harness_error")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field234 constructs one generated field declaration.
+func (registryDeclarations) field234() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "The verdict: true only when every declared scenario passed and the suite ran cleanly."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("passed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field235 constructs one generated field declaration.
+func (registryDeclarations) field235() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "Whether the evaluator suite itself failed or ended abnormally."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("suite_failed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field236 constructs one generated field declaration.
+func (registryDeclarations) field236() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Every declared scenario in declaration order."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field237 constructs one generated field declaration.
+func (registryDeclarations) field237() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Every declared scenario in declaration order."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field238 constructs one generated field declaration.
+func (registryDeclarations) field238() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Scenario name for a repair scenario, or holdout-<n> for a holdout."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field239 constructs one generated field declaration.
+func (registryDeclarations) field239() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "How the scenario ended."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("outcome")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field240 constructs one generated field declaration.
+func (registryDeclarations) field240() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "The repair scenario's checks; empty for holdouts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field241 constructs one generated field declaration.
+func (registryDeclarations) field241() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The repair scenario's checks; empty for holdouts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field242 constructs one generated field declaration.
+func (registryDeclarations) field242() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Check name."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field243 constructs one generated field declaration.
+func (registryDeclarations) field243() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "Whether the check passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("passed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field244 constructs one generated field declaration.
+func (registryDeclarations) field244() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Why the check failed; empty when it passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("diagnostic")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field245 constructs one generated field declaration.
+func (registryDeclarations) field245() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "The repair scenario's environment error; empty for holdouts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("error")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field246 constructs one generated field declaration.
+func (registryDeclarations) field246() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// field247 constructs one generated field declaration.
+func (registryDeclarations) field247() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "execution_failed when a step failed; interrupted when the run's process ended before it finished."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("kind")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// field248 constructs one generated field declaration.
+func (registryDeclarations) field248() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Where the run stopped."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("stage")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// field249 constructs one generated field declaration.
+func (registryDeclarations) field249() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Builder-safe description of what stopped the run; never command output."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("summary")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// metadata250 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata250() *genregistry.ToolTypeMetadata {
+	registryText1 := "GetVerificationPayload"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Identifies a verification run returned by verify_change.\",\"properties\":{\"run_id\":{\"description\":\"Verification run identifier returned by verify_change.\",\"type\":\"string\"}},\"required\":[\"run_id\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
 			declarations.field251(),
 			declarations.field252(),
-			declarations.field253(),
-			declarations.field254(),
+		},
+	}
+}
+
+// field251 constructs one generated field declaration.
+func (registryDeclarations) field251() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Identifies a verification run returned by verify_change."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field252 constructs one generated field declaration.
+func (registryDeclarations) field252() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Verification run identifier returned by verify_change."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("run_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// schema253 constructs one generated schema declaration.
+func (declarations registryDeclarations) schema253() *genregistry.ToolSchema {
+	registryText1 := "Preview Checkpoint 2 C4 container topology, Goa-AI guardrails, and proposed Chorus swarm roster for a confirmed Change Card."
+	return &genregistry.ToolSchema{
+		Name:                   "surla.preview_architecture",
+		Description:            &registryText1,
+		PayloadSchema:          []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+		ExecutionPayloadSchema: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+		ResultSchema:           []byte("{\"$defs\":{\"AgentPolicyItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.\",\"properties\":{\"agent_id\":{\"description\":\"Scoped agent container identifier.\",\"type\":\"string\"},\"cache_after_system\":{\"description\":\"True when prompt caching places a checkpoint after system prompts.\",\"type\":\"boolean\"},\"cache_after_tools\":{\"description\":\"True when prompt caching places a checkpoint after tool definitions.\",\"type\":\"boolean\"},\"compress_at_turns\":{\"description\":\"Turn threshold for history compression.\",\"format\":\"int64\",\"type\":\"integer\"},\"keep_recent_turns\":{\"description\":\"Recent turns retained uncompressed.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_execution_seconds\":{\"description\":\"Per-run execution time budget in seconds.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_recovery_turns\":{\"description\":\"Maximum consecutive recovery turns after validation failure.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_tool_calls\":{\"description\":\"Per-run retrieval tool-call budget.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"agent_id\",\"max_execution_seconds\",\"max_tool_calls\",\"max_recovery_turns\",\"compress_at_turns\",\"keep_recent_turns\",\"cache_after_system\",\"cache_after_tools\"],\"title\":\"AgentPolicyItem\",\"type\":\"object\"},\"C4ContainerItem\":{\"additionalProperties\":false,\"description\":\"Architecture element declared by the target Goa, Goa-AI, or Model design.\",\"properties\":{\"description\":{\"description\":\"Summary of the container's responsibility.\",\"type\":\"string\"},\"id\":{\"description\":\"Stable container identifier.\",\"type\":\"string\"},\"kind\":{\"description\":\"Declared service, agent, toolset, person, system, container, or component.\",\"enum\":[\"service\",\"agent\",\"toolset\",\"person\",\"system\",\"container\",\"component\"],\"type\":\"string\"},\"name\":{\"description\":\"Human-readable container name.\",\"type\":\"string\"}},\"required\":[\"id\",\"name\",\"kind\",\"description\"],\"title\":\"C4ContainerItem\",\"type\":\"object\"},\"C4EdgeItem\":{\"additionalProperties\":false,\"description\":\"Directed contract relationship between two C4 containers.\",\"properties\":{\"from_id\":{\"description\":\"Source container ID.\",\"type\":\"string\"},\"protocol\":{\"description\":\"Contract or transport relationship.\",\"type\":\"string\"},\"to_id\":{\"description\":\"Target container ID.\",\"type\":\"string\"}},\"required\":[\"from_id\",\"to_id\",\"protocol\"],\"title\":\"C4EdgeItem\",\"type\":\"object\"},\"SwarmPlanItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.\",\"properties\":{\"assignments\":{\"description\":\"Deterministic role assignments when status is configured.\",\"items\":{\"$ref\":\"#/$defs/SwarmRoleItem\"},\"type\":\"array\"},\"cross_family_eval\":{\"description\":\"True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"cross_family_review\":{\"description\":\"True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"manifest\":{\"description\":\"Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.\",\"type\":\"string\"},\"missing_roles\":{\"description\":\"Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"single_family\":{\"description\":\"True when status is configured and all assigned roles share one model family.\",\"type\":\"boolean\"},\"status\":{\"description\":\"Roster configuration status.\",\"enum\":[\"configured\",\"unconfigured\",\"missing_capability\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of the proposed swarm roster and model-family posture.\",\"type\":\"string\"}},\"required\":[\"status\",\"assignments\",\"cross_family_review\",\"cross_family_eval\",\"single_family\",\"summary\"],\"title\":\"SwarmPlanItem\",\"type\":\"object\"},\"SwarmRoleItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.\",\"properties\":{\"access_mode\":{\"description\":\"Workspace access boundary required of the job runner.\",\"enum\":[\"read_only_after_cp2\",\"read_write_worktree\",\"isolated_eval_workspace\",\"read_only_review\"],\"type\":\"string\"},\"family\":{\"description\":\"Canonical model family identifier.\",\"type\":\"string\"},\"handle\":{\"description\":\"Deterministic Chorus agent handle (without leading '@', at most 32 characters).\",\"type\":\"string\"},\"model\":{\"description\":\"Assigned model identifier.\",\"type\":\"string\"},\"owned_paths\":{\"description\":\"Repository or workspace path globs owned by this role.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"profile_id\":{\"description\":\"Assigned server-configured provider profile ID.\",\"type\":\"string\"},\"provider\":{\"description\":\"Assigned coding-agent provider name.\",\"type\":\"string\"},\"role\":{\"description\":\"Assigned swarm role kind.\",\"enum\":[\"architect\",\"builder\",\"eval_author\",\"reviewer\"],\"type\":\"string\"},\"scope_name\":{\"description\":\"Human-readable scope label for this assignment.\",\"type\":\"string\"}},\"required\":[\"handle\",\"role\",\"scope_name\",\"profile_id\",\"provider\",\"model\",\"family\",\"owned_paths\",\"access_mode\"],\"title\":\"SwarmRoleItem\",\"type\":\"object\"},\"ToolContractItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.\",\"properties\":{\"args_schema\":{\"description\":\"Generated provider model input before consumer binding.\",\"type\":\"string\"},\"bounded_result\":{\"description\":\"True when the tool declares a BoundedResult cursor/truncation contract.\",\"type\":\"boolean\"},\"description\":{\"description\":\"Tool description.\",\"type\":\"string\"},\"id\":{\"description\":\"Consumer agent ID followed by the compiler's tool ID (\\u003cagent_id\\u003e/\\u003ctool_id\\u003e).\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed runtime or provider fields omitted from the provider model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"input_binding\":{\"$ref\":\"#/$defs/ToolInputBindingItem\",\"description\":\"Compiled consumer input choices, when binding is declared.\"},\"name\":{\"description\":\"Tool name.\",\"type\":\"string\"},\"requires_confirmation\":{\"description\":\"True when the tool declares a design-time Confirmation gate.\",\"type\":\"boolean\"},\"requires_ui\":{\"description\":\"True when the tool requires a UI-capable runtime.\",\"type\":\"boolean\"},\"return_schema\":{\"description\":\"Generated model-visible result schema; empty when the tool declares no result.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated provider text-only input, when supported.\",\"type\":\"string\"},\"toolset\":{\"description\":\"Compiler-selected toolset registration route.\",\"type\":\"string\"}},\"required\":[\"id\",\"toolset\",\"name\",\"description\",\"args_schema\",\"return_schema\",\"injected_fields\",\"requires_ui\",\"requires_confirmation\",\"bounded_result\"],\"title\":\"ToolContractItem\",\"type\":\"object\"},\"ToolInputBindingItem\":{\"additionalProperties\":false,\"description\":\"Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.\",\"properties\":{\"args_schema\":{\"description\":\"Generated ordinary bound model input.\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed fields supplied outside the ordinary bound model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"lookup_args_schema\":{\"description\":\"Generated lookup-key input, when declared; application lookup values are not inspected.\",\"type\":\"string\"},\"lookup_text_only_args_schema\":{\"description\":\"Generated text-only lookup-key input, when supported.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated ordinary text-only input, when supported.\",\"type\":\"string\"}},\"required\":[\"args_schema\",\"injected_fields\"],\"title\":\"ToolInputBindingItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.\",\"properties\":{\"agent_policies\":{\"description\":\"Evaluated Goa-AI runtime policies per declared agent.\",\"items\":{\"$ref\":\"#/$defs/AgentPolicyItem\"},\"type\":\"array\"},\"banner\":{\"description\":\"Plain-English summary of topology and guardrails.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Bound Change Card identifier.\",\"type\":\"string\"},\"containers\":{\"description\":\"Derived C4 containers.\",\"items\":{\"$ref\":\"#/$defs/C4ContainerItem\"},\"type\":\"array\"},\"design_digest\":{\"description\":\"SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).\",\"type\":\"string\"},\"edges\":{\"description\":\"Validated directed edges between declared containers.\",\"items\":{\"$ref\":\"#/$defs/C4EdgeItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Bound CP1 request_revision digest.\",\"type\":\"string\"},\"swarm\":{\"$ref\":\"#/$defs/SwarmPlanItem\",\"description\":\"Proposed Chorus multi-agent role assignments and model-family routing.\"},\"system_name\":{\"description\":\"API or primary service name declared in the design.\",\"type\":\"string\"},\"tools\":{\"description\":\"Evaluated Goa-AI tool contracts.\",\"items\":{\"$ref\":\"#/$defs/ToolContractItem\"},\"type\":\"array\"}},\"required\":[\"change_id\",\"request_revision\",\"design_digest\",\"system_name\",\"containers\",\"edges\",\"agent_policies\",\"tools\",\"swarm\",\"banner\"],\"type\":\"object\"}"),
+		ConsumerContract: &genregistry.ConsumerContract{
+			Kind:  "service",
+			Title: "Preview Architecture",
+			Search: &genregistry.ToolSearchDocument{
+				Length: 24,
+				Terms:  map[string]int{"2": 1, "a": 1, "ai": 1, "and": 1, "architecture": 2, "c4": 1, "card": 1, "change": 1, "checkpoint": 1, "chorus": 1, "confirmed": 1, "container": 1, "for": 1, "goa": 1, "guardrails": 1, "preview": 3, "proposed": 1, "roster": 1, "surla": 1, "swarm": 1, "topology": 1},
+			},
+			RequiresUI: false,
+			TextOnly: &genregistry.TextOnlyToolContract{
+				ExecutionSchema: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+				Description:     "Preview Checkpoint 2 C4 container topology, Goa-AI guardrails, and proposed Chorus swarm roster for a confirmed Change Card.",
+				Search: &genregistry.ToolSearchDocument{
+					Length: 24,
+					Terms:  map[string]int{"2": 1, "a": 1, "ai": 1, "and": 1, "architecture": 2, "c4": 1, "card": 1, "change": 1, "checkpoint": 1, "chorus": 1, "confirmed": 1, "container": 1, "for": 1, "goa": 1, "guardrails": 1, "preview": 3, "proposed": 1, "roster": 1, "surla": 1, "swarm": 1, "topology": 1},
+				},
+				PayloadSchema: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+				Payload:       declarations.metadata337(),
+			},
+			Payload: declarations.metadata254(),
+			Result:  declarations.metadata267(),
+		},
+	}
+}
+
+// metadata254 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata254() *genregistry.ToolTypeMetadata {
+	registryText1 := "PreviewArchitecturePayload"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
 			declarations.field255(),
 			declarations.field256(),
 			declarations.field257(),
@@ -3356,7 +4016,183 @@ func (declarations registryDeclarations) metadata222() *genregistry.ToolTypeMeta
 			declarations.field264(),
 			declarations.field265(),
 			declarations.field266(),
-			declarations.field267(),
+		},
+	}
+}
+
+// field255 constructs one generated field declaration.
+func (registryDeclarations) field255() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field256 constructs one generated field declaration.
+func (registryDeclarations) field256() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Confirmed Change Card identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field257 constructs one generated field declaration.
+func (registryDeclarations) field257() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Expected CP1 request_revision digest."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field258 constructs one generated field declaration.
+func (registryDeclarations) field258() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Candidate module whose Goa and Goa-AI design is evaluated."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field259 constructs one generated field declaration.
+func (registryDeclarations) field259() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design")},
+			{Segment: genregistry.NewToolFieldSegmentField("files")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field260 constructs one generated field declaration.
+func (registryDeclarations) field260() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design")},
+			{Segment: genregistry.NewToolFieldSegmentField("files")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field261 constructs one generated field declaration.
+func (registryDeclarations) field261() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field262 constructs one generated field declaration.
+func (registryDeclarations) field262() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field263 constructs one generated field declaration.
+func (registryDeclarations) field263() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Human-readable builder scope name (for example, orders or api)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field264 constructs one generated field declaration.
+func (registryDeclarations) field264() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Repository-relative path globs owned by this builder."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("paths")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field265 constructs one generated field declaration.
+func (registryDeclarations) field265() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Repository-relative path globs owned by this builder."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("paths")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field266 constructs one generated field declaration.
+func (registryDeclarations) field266() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Optional preference selecting a server-configured authenticated profile ID."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("preferred_profile_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// metadata267 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata267() *genregistry.ToolTypeMetadata {
+	registryText1 := "PreviewArchitectureResult"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$defs\":{\"AgentPolicyItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI cost, safety, history, and cache policy for a single agent.\",\"properties\":{\"agent_id\":{\"description\":\"Scoped agent container identifier.\",\"type\":\"string\"},\"cache_after_system\":{\"description\":\"True when prompt caching places a checkpoint after system prompts.\",\"type\":\"boolean\"},\"cache_after_tools\":{\"description\":\"True when prompt caching places a checkpoint after tool definitions.\",\"type\":\"boolean\"},\"compress_at_turns\":{\"description\":\"Turn threshold for history compression.\",\"format\":\"int64\",\"type\":\"integer\"},\"keep_recent_turns\":{\"description\":\"Recent turns retained uncompressed.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_execution_seconds\":{\"description\":\"Per-run execution time budget in seconds.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_recovery_turns\":{\"description\":\"Maximum consecutive recovery turns after validation failure.\",\"format\":\"int64\",\"type\":\"integer\"},\"max_tool_calls\":{\"description\":\"Per-run retrieval tool-call budget.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"agent_id\",\"max_execution_seconds\",\"max_tool_calls\",\"max_recovery_turns\",\"compress_at_turns\",\"keep_recent_turns\",\"cache_after_system\",\"cache_after_tools\"],\"title\":\"AgentPolicyItem\",\"type\":\"object\"},\"C4ContainerItem\":{\"additionalProperties\":false,\"description\":\"Architecture element declared by the target Goa, Goa-AI, or Model design.\",\"properties\":{\"description\":{\"description\":\"Summary of the container's responsibility.\",\"type\":\"string\"},\"id\":{\"description\":\"Stable container identifier.\",\"type\":\"string\"},\"kind\":{\"description\":\"Declared service, agent, toolset, person, system, container, or component.\",\"enum\":[\"service\",\"agent\",\"toolset\",\"person\",\"system\",\"container\",\"component\"],\"type\":\"string\"},\"name\":{\"description\":\"Human-readable container name.\",\"type\":\"string\"}},\"required\":[\"id\",\"name\",\"kind\",\"description\"],\"title\":\"C4ContainerItem\",\"type\":\"object\"},\"C4EdgeItem\":{\"additionalProperties\":false,\"description\":\"Directed contract relationship between two C4 containers.\",\"properties\":{\"from_id\":{\"description\":\"Source container ID.\",\"type\":\"string\"},\"protocol\":{\"description\":\"Contract or transport relationship.\",\"type\":\"string\"},\"to_id\":{\"description\":\"Target container ID.\",\"type\":\"string\"}},\"required\":[\"from_id\",\"to_id\",\"protocol\"],\"title\":\"C4EdgeItem\",\"type\":\"object\"},\"SwarmPlanItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus role assignments and model-family diversity facts surfaced at Checkpoint 2. Role and model assignments do not prove launch or replace process/workspace isolation.\",\"properties\":{\"assignments\":{\"description\":\"Deterministic role assignments when status is configured.\",\"items\":{\"$ref\":\"#/$defs/SwarmRoleItem\"},\"type\":\"array\"},\"cross_family_eval\":{\"description\":\"True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"cross_family_review\":{\"description\":\"True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family.\",\"type\":\"boolean\"},\"manifest\":{\"description\":\"Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus.\",\"type\":\"string\"},\"missing_roles\":{\"description\":\"Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"single_family\":{\"description\":\"True when status is configured and all assigned roles share one model family.\",\"type\":\"boolean\"},\"status\":{\"description\":\"Roster configuration status.\",\"enum\":[\"configured\",\"unconfigured\",\"missing_capability\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of the proposed swarm roster and model-family posture.\",\"type\":\"string\"}},\"required\":[\"status\",\"assignments\",\"cross_family_review\",\"cross_family_eval\",\"single_family\",\"summary\"],\"title\":\"SwarmPlanItem\",\"type\":\"object\"},\"SwarmRoleItem\":{\"additionalProperties\":false,\"description\":\"Proposed Chorus agent role assignment derived from server-owned provider profiles and explicit workspace scopes.\",\"properties\":{\"access_mode\":{\"description\":\"Workspace access boundary required of the job runner.\",\"enum\":[\"read_only_after_cp2\",\"read_write_worktree\",\"isolated_eval_workspace\",\"read_only_review\"],\"type\":\"string\"},\"family\":{\"description\":\"Canonical model family identifier.\",\"type\":\"string\"},\"handle\":{\"description\":\"Deterministic Chorus agent handle (without leading '@', at most 32 characters).\",\"type\":\"string\"},\"model\":{\"description\":\"Assigned model identifier.\",\"type\":\"string\"},\"owned_paths\":{\"description\":\"Repository or workspace path globs owned by this role.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"profile_id\":{\"description\":\"Assigned server-configured provider profile ID.\",\"type\":\"string\"},\"provider\":{\"description\":\"Assigned coding-agent provider name.\",\"type\":\"string\"},\"role\":{\"description\":\"Assigned swarm role kind.\",\"enum\":[\"architect\",\"builder\",\"eval_author\",\"reviewer\"],\"type\":\"string\"},\"scope_name\":{\"description\":\"Human-readable scope label for this assignment.\",\"type\":\"string\"}},\"required\":[\"handle\",\"role\",\"scope_name\",\"profile_id\",\"provider\",\"model\",\"family\",\"owned_paths\",\"access_mode\"],\"title\":\"SwarmRoleItem\",\"type\":\"object\"},\"ToolContractItem\":{\"additionalProperties\":false,\"description\":\"Evaluated Goa-AI tool contract summary surfaced at Checkpoint 2.\",\"properties\":{\"args_schema\":{\"description\":\"Generated provider model input before consumer binding.\",\"type\":\"string\"},\"bounded_result\":{\"description\":\"True when the tool declares a BoundedResult cursor/truncation contract.\",\"type\":\"boolean\"},\"description\":{\"description\":\"Tool description.\",\"type\":\"string\"},\"id\":{\"description\":\"Consumer agent ID followed by the compiler's tool ID (\\u003cagent_id\\u003e/\\u003ctool_id\\u003e).\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed runtime or provider fields omitted from the provider model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"input_binding\":{\"$ref\":\"#/$defs/ToolInputBindingItem\",\"description\":\"Compiled consumer input choices, when binding is declared.\"},\"name\":{\"description\":\"Tool name.\",\"type\":\"string\"},\"requires_confirmation\":{\"description\":\"True when the tool declares a design-time Confirmation gate.\",\"type\":\"boolean\"},\"requires_ui\":{\"description\":\"True when the tool requires a UI-capable runtime.\",\"type\":\"boolean\"},\"return_schema\":{\"description\":\"Generated model-visible result schema; empty when the tool declares no result.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated provider text-only input, when supported.\",\"type\":\"string\"},\"toolset\":{\"description\":\"Compiler-selected toolset registration route.\",\"type\":\"string\"}},\"required\":[\"id\",\"toolset\",\"name\",\"description\",\"args_schema\",\"return_schema\",\"injected_fields\",\"requires_ui\",\"requires_confirmation\",\"bounded_result\"],\"title\":\"ToolContractItem\",\"type\":\"object\"},\"ToolInputBindingItem\":{\"additionalProperties\":false,\"description\":\"Compiled consumer input contracts declared for one selected tool. The application installs a binder and supplies values at runtime; compilation does not prove that wiring.\",\"properties\":{\"args_schema\":{\"description\":\"Generated ordinary bound model input.\",\"type\":\"string\"},\"injected_fields\":{\"description\":\"Compiler-listed fields supplied outside the ordinary bound model input.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"lookup_args_schema\":{\"description\":\"Generated lookup-key input, when declared; application lookup values are not inspected.\",\"type\":\"string\"},\"lookup_text_only_args_schema\":{\"description\":\"Generated text-only lookup-key input, when supported.\",\"type\":\"string\"},\"text_only_args_schema\":{\"description\":\"Generated ordinary text-only input, when supported.\",\"type\":\"string\"}},\"required\":[\"args_schema\",\"injected_fields\"],\"title\":\"ToolInputBindingItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design.\",\"properties\":{\"agent_policies\":{\"description\":\"Evaluated Goa-AI runtime policies per declared agent.\",\"items\":{\"$ref\":\"#/$defs/AgentPolicyItem\"},\"type\":\"array\"},\"banner\":{\"description\":\"Plain-English summary of topology and guardrails.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Bound Change Card identifier.\",\"type\":\"string\"},\"containers\":{\"description\":\"Derived C4 containers.\",\"items\":{\"$ref\":\"#/$defs/C4ContainerItem\"},\"type\":\"array\"},\"design_digest\":{\"description\":\"SHA-256 digest of the evaluated design snapshot (sorted path and content pairs).\",\"type\":\"string\"},\"edges\":{\"description\":\"Validated directed edges between declared containers.\",\"items\":{\"$ref\":\"#/$defs/C4EdgeItem\"},\"type\":\"array\"},\"request_revision\":{\"description\":\"Bound CP1 request_revision digest.\",\"type\":\"string\"},\"swarm\":{\"$ref\":\"#/$defs/SwarmPlanItem\",\"description\":\"Proposed Chorus multi-agent role assignments and model-family routing.\"},\"system_name\":{\"description\":\"API or primary service name declared in the design.\",\"type\":\"string\"},\"tools\":{\"description\":\"Evaluated Goa-AI tool contracts.\",\"items\":{\"$ref\":\"#/$defs/ToolContractItem\"},\"type\":\"array\"}},\"required\":[\"change_id\",\"request_revision\",\"design_digest\",\"system_name\",\"containers\",\"edges\",\"agent_policies\",\"tools\",\"swarm\",\"banner\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
 			declarations.field268(),
 			declarations.field269(),
 			declarations.field270(),
@@ -3381,1034 +4217,7 @@ func (declarations registryDeclarations) metadata222() *genregistry.ToolTypeMeta
 			declarations.field289(),
 			declarations.field290(),
 			declarations.field291(),
-		},
-	}
-}
-
-// field223 constructs one generated field declaration.
-func (registryDeclarations) field223() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design."
-	return &genregistry.ToolFieldMetadata{
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field224 constructs one generated field declaration.
-func (registryDeclarations) field224() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Bound Change Card identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field225 constructs one generated field declaration.
-func (registryDeclarations) field225() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Bound CP1 request_revision digest."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field226 constructs one generated field declaration.
-func (registryDeclarations) field226() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs)."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design_digest")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field227 constructs one generated field declaration.
-func (registryDeclarations) field227() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "API or primary service name declared in the design."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("system_name")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field228 constructs one generated field declaration.
-func (registryDeclarations) field228() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Derived C4 containers."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("containers")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field229 constructs one generated field declaration.
-func (registryDeclarations) field229() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Derived C4 containers."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("containers")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field230 constructs one generated field declaration.
-func (registryDeclarations) field230() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Stable container identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("containers")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field231 constructs one generated field declaration.
-func (registryDeclarations) field231() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Human-readable container name."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("containers")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("name")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field232 constructs one generated field declaration.
-func (registryDeclarations) field232() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Declared service, agent, toolset, person, system, container, or component."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("containers")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("kind")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field233 constructs one generated field declaration.
-func (registryDeclarations) field233() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Summary of the container's responsibility."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("containers")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("description")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field234 constructs one generated field declaration.
-func (registryDeclarations) field234() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Validated directed edges between declared containers."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("edges")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field235 constructs one generated field declaration.
-func (registryDeclarations) field235() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Validated directed edges between declared containers."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("edges")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field236 constructs one generated field declaration.
-func (registryDeclarations) field236() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Source container ID."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("edges")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("from_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field237 constructs one generated field declaration.
-func (registryDeclarations) field237() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Target container ID."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("edges")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("to_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field238 constructs one generated field declaration.
-func (registryDeclarations) field238() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Contract or transport relationship."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("edges")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("protocol")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field239 constructs one generated field declaration.
-func (registryDeclarations) field239() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Evaluated Goa-AI runtime policies per declared agent."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field240 constructs one generated field declaration.
-func (registryDeclarations) field240() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Evaluated Goa-AI runtime policies per declared agent."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field241 constructs one generated field declaration.
-func (registryDeclarations) field241() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Scoped agent container identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("agent_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field242 constructs one generated field declaration.
-func (registryDeclarations) field242() *genregistry.ToolFieldMetadata {
-	registryText1 := "integer"
-	registryText2 := "Per-run execution time budget in seconds."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("max_execution_seconds")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field243 constructs one generated field declaration.
-func (registryDeclarations) field243() *genregistry.ToolFieldMetadata {
-	registryText1 := "integer"
-	registryText2 := "Per-run retrieval tool-call budget."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("max_tool_calls")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field244 constructs one generated field declaration.
-func (registryDeclarations) field244() *genregistry.ToolFieldMetadata {
-	registryText1 := "integer"
-	registryText2 := "Maximum consecutive recovery turns after validation failure."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("max_recovery_turns")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field245 constructs one generated field declaration.
-func (registryDeclarations) field245() *genregistry.ToolFieldMetadata {
-	registryText1 := "integer"
-	registryText2 := "Turn threshold for history compression."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("compress_at_turns")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field246 constructs one generated field declaration.
-func (registryDeclarations) field246() *genregistry.ToolFieldMetadata {
-	registryText1 := "integer"
-	registryText2 := "Recent turns retained uncompressed."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("keep_recent_turns")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field247 constructs one generated field declaration.
-func (registryDeclarations) field247() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True when prompt caching places a checkpoint after system prompts."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("cache_after_system")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field248 constructs one generated field declaration.
-func (registryDeclarations) field248() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True when prompt caching places a checkpoint after tool definitions."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("cache_after_tools")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field249 constructs one generated field declaration.
-func (registryDeclarations) field249() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Evaluated Goa-AI tool contracts."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field250 constructs one generated field declaration.
-func (registryDeclarations) field250() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Evaluated Goa-AI tool contracts."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field251 constructs one generated field declaration.
-func (registryDeclarations) field251() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>)."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field252 constructs one generated field declaration.
-func (registryDeclarations) field252() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Compiler-selected toolset registration route."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("toolset")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field253 constructs one generated field declaration.
-func (registryDeclarations) field253() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Tool name."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("name")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field254 constructs one generated field declaration.
-func (registryDeclarations) field254() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Tool description."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("description")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field255 constructs one generated field declaration.
-func (registryDeclarations) field255() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated provider model input before consumer binding."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("args_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field256 constructs one generated field declaration.
-func (registryDeclarations) field256() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated provider text-only input, when supported."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("text_only_args_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field257 constructs one generated field declaration.
-func (registryDeclarations) field257() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Compiled consumer input choices, when binding is declared."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field258 constructs one generated field declaration.
-func (registryDeclarations) field258() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated ordinary bound model input."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-			{Segment: genregistry.NewToolFieldSegmentField("args_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field259 constructs one generated field declaration.
-func (registryDeclarations) field259() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated ordinary text-only input, when supported."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-			{Segment: genregistry.NewToolFieldSegmentField("text_only_args_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field260 constructs one generated field declaration.
-func (registryDeclarations) field260() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated lookup-key input, when declared; application lookup values are not inspected."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-			{Segment: genregistry.NewToolFieldSegmentField("lookup_args_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field261 constructs one generated field declaration.
-func (registryDeclarations) field261() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated text-only lookup-key input, when supported."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-			{Segment: genregistry.NewToolFieldSegmentField("lookup_text_only_args_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field262 constructs one generated field declaration.
-func (registryDeclarations) field262() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Compiler-listed fields supplied outside the ordinary bound model input."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field263 constructs one generated field declaration.
-func (registryDeclarations) field263() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Compiler-listed fields supplied outside the ordinary bound model input."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
-			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field264 constructs one generated field declaration.
-func (registryDeclarations) field264() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Generated model-visible result schema; empty when the tool declares no result."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("return_schema")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field265 constructs one generated field declaration.
-func (registryDeclarations) field265() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Compiler-listed runtime or provider fields omitted from the provider model input."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field266 constructs one generated field declaration.
-func (registryDeclarations) field266() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Compiler-listed runtime or provider fields omitted from the provider model input."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field267 constructs one generated field declaration.
-func (registryDeclarations) field267() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True when the tool requires a UI-capable runtime."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("requires_ui")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field268 constructs one generated field declaration.
-func (registryDeclarations) field268() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True when the tool declares a design-time Confirmation gate."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("requires_confirmation")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field269 constructs one generated field declaration.
-func (registryDeclarations) field269() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True when the tool declares a BoundedResult cursor/truncation contract."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("tools")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("bounded_result")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field270 constructs one generated field declaration.
-func (registryDeclarations) field270() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Proposed Chorus multi-agent role assignments and model-family routing."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field271 constructs one generated field declaration.
-func (registryDeclarations) field271() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Roster configuration status."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("status")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field272 constructs one generated field declaration.
-func (registryDeclarations) field272() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Deterministic role assignments when status is configured."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field273 constructs one generated field declaration.
-func (registryDeclarations) field273() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Deterministic role assignments when status is configured."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field274 constructs one generated field declaration.
-func (registryDeclarations) field274() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Deterministic Chorus agent handle (without leading '@', at most 32 characters)."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("handle")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field275 constructs one generated field declaration.
-func (registryDeclarations) field275() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Assigned swarm role kind."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("role")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field276 constructs one generated field declaration.
-func (registryDeclarations) field276() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Human-readable scope label for this assignment."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("scope_name")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field277 constructs one generated field declaration.
-func (registryDeclarations) field277() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Assigned server-configured provider profile ID."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("profile_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field278 constructs one generated field declaration.
-func (registryDeclarations) field278() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Assigned coding-agent provider name."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("provider")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field279 constructs one generated field declaration.
-func (registryDeclarations) field279() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Assigned model identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("model")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field280 constructs one generated field declaration.
-func (registryDeclarations) field280() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Canonical model family identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("family")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field281 constructs one generated field declaration.
-func (registryDeclarations) field281() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Repository or workspace path globs owned by this role."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("owned_paths")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field282 constructs one generated field declaration.
-func (registryDeclarations) field282() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Repository or workspace path globs owned by this role."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("owned_paths")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field283 constructs one generated field declaration.
-func (registryDeclarations) field283() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Workspace access boundary required of the job runner."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("access_mode")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field284 constructs one generated field declaration.
-func (registryDeclarations) field284() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("cross_family_review")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field285 constructs one generated field declaration.
-func (registryDeclarations) field285() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("cross_family_eval")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field286 constructs one generated field declaration.
-func (registryDeclarations) field286() *genregistry.ToolFieldMetadata {
-	registryText1 := "boolean"
-	registryText2 := "True when status is configured and all assigned roles share one model family."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("single_family")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field287 constructs one generated field declaration.
-func (registryDeclarations) field287() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("missing_roles")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field288 constructs one generated field declaration.
-func (registryDeclarations) field288() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("missing_roles")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field289 constructs one generated field declaration.
-func (registryDeclarations) field289() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Plain-English summary of the proposed swarm roster and model-family posture."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("summary")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field290 constructs one generated field declaration.
-func (registryDeclarations) field290() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
-			{Segment: genregistry.NewToolFieldSegmentField("manifest")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field291 constructs one generated field declaration.
-func (registryDeclarations) field291() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Plain-English summary of topology and guardrails."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("banner")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// metadata292 constructs one generated metadata declaration.
-func (declarations registryDeclarations) metadata292() *genregistry.ToolTypeMetadata {
-	registryText1 := "PreviewArchitecturePayload"
-	return &genregistry.ToolTypeMetadata{
-		Name:                     &registryText1,
-		SchemaWithoutRootExample: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
-		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field292(),
 			declarations.field293(),
 			declarations.field294(),
 			declarations.field295(),
@@ -4421,280 +4230,13 @@ func (declarations registryDeclarations) metadata292() *genregistry.ToolTypeMeta
 			declarations.field302(),
 			declarations.field303(),
 			declarations.field304(),
-		},
-	}
-}
-
-// field293 constructs one generated field declaration.
-func (registryDeclarations) field293() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card."
-	return &genregistry.ToolFieldMetadata{
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field294 constructs one generated field declaration.
-func (registryDeclarations) field294() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Confirmed Change Card identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field295 constructs one generated field declaration.
-func (registryDeclarations) field295() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Expected CP1 request_revision digest."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field296 constructs one generated field declaration.
-func (registryDeclarations) field296() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Candidate module whose Goa and Goa-AI design is evaluated."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field297 constructs one generated field declaration.
-func (registryDeclarations) field297() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design")},
-			{Segment: genregistry.NewToolFieldSegmentField("files")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field298 constructs one generated field declaration.
-func (registryDeclarations) field298() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design")},
-			{Segment: genregistry.NewToolFieldSegmentField("files")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field299 constructs one generated field declaration.
-func (registryDeclarations) field299() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field300 constructs one generated field declaration.
-func (registryDeclarations) field300() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field301 constructs one generated field declaration.
-func (registryDeclarations) field301() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Human-readable builder scope name (for example, orders or api)."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("name")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field302 constructs one generated field declaration.
-func (registryDeclarations) field302() *genregistry.ToolFieldMetadata {
-	registryText1 := "array"
-	registryText2 := "Repository-relative path globs owned by this builder."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("paths")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field303 constructs one generated field declaration.
-func (registryDeclarations) field303() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Repository-relative path globs owned by this builder."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("paths")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field304 constructs one generated field declaration.
-func (registryDeclarations) field304() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Optional preference selecting a server-configured authenticated profile ID."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("builders")},
-			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
-			{Segment: genregistry.NewToolFieldSegmentField("preferred_profile_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// schema305 constructs one generated schema declaration.
-func (declarations registryDeclarations) schema305() *genregistry.ToolSchema {
-	registryText1 := "Propose a feature change and generate a Checkpoint 1 Change Card."
-	return &genregistry.ToolSchema{
-		Name:                   "surla.propose_change",
-		Description:            &registryText1,
-		PayloadSchema:          []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
-		ExecutionPayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
-		ResultSchema:           []byte("{\"$defs\":{\"AmbiguityQuestion\":{\"additionalProperties\":false,\"description\":\"Domain ambiguity surfaced with concrete examples at Checkpoint 1.\",\"properties\":{\"id\":{\"description\":\"Stable question identifier.\",\"type\":\"string\"},\"options\":{\"description\":\"Concrete resolution choices.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"question\":{\"description\":\"Plain-English question for the operator.\",\"type\":\"string\"}},\"required\":[\"id\",\"question\",\"options\"],\"title\":\"AmbiguityQuestion\",\"type\":\"object\"},\"ApprovalItem\":{\"additionalProperties\":false,\"description\":\"Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted: the exact candidate commit, suite, environment and binary digests it checked. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision. get_change and confirm_intent return it only while the promotion target's current suite, environment and binary digests still equal the ones it records, so a returned approval was current when that response was made, not afterwards.\",\"properties\":{\"approved_by\":{\"description\":\"Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.\",\"type\":\"string\"},\"artifacts\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.\",\"type\":\"object\"},\"candidate_commit\":{\"description\":\"Candidate commit the report was checked against.\",\"type\":\"string\"},\"environment\":{\"description\":\"Dependency profile the promotion target requires, such as sim.\",\"type\":\"string\"},\"report_digest\":{\"description\":\"SHA-256 digest of the approved CP4 verification report.\",\"type\":\"string\"},\"scenario_count\":{\"description\":\"Number of declared evaluator scenarios, every one of which passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the promotion target requires.\",\"type\":\"string\"},\"suite_id\":{\"description\":\"Evaluator suite the promotion target requires.\",\"type\":\"string\"}},\"required\":[\"approved_by\",\"report_digest\",\"candidate_commit\",\"suite_id\",\"suite_commit\",\"environment\",\"artifacts\",\"scenario_count\"],\"title\":\"ApprovalItem\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"},\"UICompositionItem\":{\"additionalProperties\":false,\"description\":\"Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.\",\"properties\":{\"composed_for_revision\":{\"description\":\"request_revision of the Change Card this program was composed for.\",\"type\":\"string\"},\"program\":{\"description\":\"OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.\",\"type\":\"string\"}},\"required\":[\"program\",\"composed_for_revision\"],\"title\":\"UICompositionItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"approval\":{\"$ref\":\"#/$defs/ApprovalItem\",\"description\":\"Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"},\"ui_composition\":{\"$ref\":\"#/$defs/UICompositionItem\",\"description\":\"Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"type\":\"object\"}"),
-		ConsumerContract: &genregistry.ConsumerContract{
-			Kind:  "service",
-			Title: "Propose Change",
-			Search: &genregistry.ToolSearchDocument{
-				Length: 16,
-				Terms:  map[string]int{"1": 1, "a": 2, "and": 1, "card": 1, "change": 4, "checkpoint": 1, "feature": 1, "generate": 1, "propose": 3, "surla": 1},
-			},
-			RequiresUI: false,
-			TextOnly: &genregistry.TextOnlyToolContract{
-				ExecutionSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
-				Description:     "Propose a feature change and generate a Checkpoint 1 Change Card.",
-				Search: &genregistry.ToolSearchDocument{
-					Length: 16,
-					Terms:  map[string]int{"1": 1, "a": 2, "and": 1, "card": 1, "change": 4, "checkpoint": 1, "feature": 1, "generate": 1, "propose": 3, "surla": 1},
-				},
-				PayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
-				Payload:       declarations.metadata349(),
-			},
-			Payload: declarations.metadata306(),
-			Result:  declarations.metadata311(),
-		},
-	}
-}
-
-// metadata306 constructs one generated metadata declaration.
-func (declarations registryDeclarations) metadata306() *genregistry.ToolTypeMetadata {
-	registryText1 := "ProposeChangePayload"
-	return &genregistry.ToolTypeMetadata{
-		Name:                     &registryText1,
-		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
-		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field305(),
+			declarations.field306(),
 			declarations.field307(),
 			declarations.field308(),
 			declarations.field309(),
 			declarations.field310(),
-		},
-	}
-}
-
-// field307 constructs one generated field declaration.
-func (registryDeclarations) field307() *genregistry.ToolFieldMetadata {
-	registryText1 := "object"
-	registryText2 := "Operator feature request submitted for Checkpoint 1 ambiguity and example analysis."
-	return &genregistry.ToolFieldMetadata{
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field308 constructs one generated field declaration.
-func (registryDeclarations) field308() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Unique change identifier."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field309 constructs one generated field declaration.
-func (registryDeclarations) field309() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Operator feature request."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("prompt")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// field310 constructs one generated field declaration.
-func (registryDeclarations) field310() *genregistry.ToolFieldMetadata {
-	registryText1 := "string"
-	registryText2 := "Current target Goa design source inspected by the CP1 model."
-	return &genregistry.ToolFieldMetadata{
-		Path: []*genregistry.ToolFieldPathSegment{
-			{Segment: genregistry.NewToolFieldSegmentField("design_source")},
-		},
-		JSONType:    &registryText1,
-		Description: &registryText2,
-	}
-}
-
-// metadata311 constructs one generated metadata declaration.
-func (declarations registryDeclarations) metadata311() *genregistry.ToolTypeMetadata {
-	registryText1 := "ProposeChangeResult"
-	return &genregistry.ToolTypeMetadata{
-		Name:                     &registryText1,
-		SchemaWithoutRootExample: []byte("{\"$defs\":{\"AmbiguityQuestion\":{\"additionalProperties\":false,\"description\":\"Domain ambiguity surfaced with concrete examples at Checkpoint 1.\",\"properties\":{\"id\":{\"description\":\"Stable question identifier.\",\"type\":\"string\"},\"options\":{\"description\":\"Concrete resolution choices.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"question\":{\"description\":\"Plain-English question for the operator.\",\"type\":\"string\"}},\"required\":[\"id\",\"question\",\"options\"],\"title\":\"AmbiguityQuestion\",\"type\":\"object\"},\"ApprovalItem\":{\"additionalProperties\":false,\"description\":\"Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted: the exact candidate commit, suite, environment and binary digests it checked. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision. get_change and confirm_intent return it only while the promotion target's current suite, environment and binary digests still equal the ones it records, so a returned approval was current when that response was made, not afterwards.\",\"properties\":{\"approved_by\":{\"description\":\"Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.\",\"type\":\"string\"},\"artifacts\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.\",\"type\":\"object\"},\"candidate_commit\":{\"description\":\"Candidate commit the report was checked against.\",\"type\":\"string\"},\"environment\":{\"description\":\"Dependency profile the promotion target requires, such as sim.\",\"type\":\"string\"},\"report_digest\":{\"description\":\"SHA-256 digest of the approved CP4 verification report.\",\"type\":\"string\"},\"scenario_count\":{\"description\":\"Number of declared evaluator scenarios, every one of which passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the promotion target requires.\",\"type\":\"string\"},\"suite_id\":{\"description\":\"Evaluator suite the promotion target requires.\",\"type\":\"string\"}},\"required\":[\"approved_by\",\"report_digest\",\"candidate_commit\",\"suite_id\",\"suite_commit\",\"environment\",\"artifacts\",\"scenario_count\"],\"title\":\"ApprovalItem\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"},\"UICompositionItem\":{\"additionalProperties\":false,\"description\":\"Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.\",\"properties\":{\"composed_for_revision\":{\"description\":\"request_revision of the Change Card this program was composed for.\",\"type\":\"string\"},\"program\":{\"description\":\"OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.\",\"type\":\"string\"}},\"required\":[\"program\",\"composed_for_revision\"],\"title\":\"UICompositionItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"approval\":{\"$ref\":\"#/$defs/ApprovalItem\",\"description\":\"Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"},\"ui_composition\":{\"$ref\":\"#/$defs/UICompositionItem\",\"description\":\"Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"type\":\"object\"}"),
-		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field311(),
 			declarations.field312(),
 			declarations.field313(),
 			declarations.field314(),
@@ -4720,7 +4262,1034 @@ func (declarations registryDeclarations) metadata311() *genregistry.ToolTypeMeta
 			declarations.field334(),
 			declarations.field335(),
 			declarations.field336(),
-			declarations.field337(),
+		},
+	}
+}
+
+// field268 constructs one generated field declaration.
+func (registryDeclarations) field268() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Checkpoint 2 C4 container topology, tool contracts, per-agent Goa-AI guardrails, and proposed Chorus swarm roster derived from the evaluated candidate design."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field269 constructs one generated field declaration.
+func (registryDeclarations) field269() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Bound Change Card identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field270 constructs one generated field declaration.
+func (registryDeclarations) field270() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Bound CP1 request_revision digest."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field271 constructs one generated field declaration.
+func (registryDeclarations) field271() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "SHA-256 digest of the evaluated design snapshot (sorted path and content pairs)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design_digest")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field272 constructs one generated field declaration.
+func (registryDeclarations) field272() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "API or primary service name declared in the design."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("system_name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field273 constructs one generated field declaration.
+func (registryDeclarations) field273() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Derived C4 containers."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("containers")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field274 constructs one generated field declaration.
+func (registryDeclarations) field274() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Derived C4 containers."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("containers")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field275 constructs one generated field declaration.
+func (registryDeclarations) field275() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Stable container identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("containers")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field276 constructs one generated field declaration.
+func (registryDeclarations) field276() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Human-readable container name."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("containers")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field277 constructs one generated field declaration.
+func (registryDeclarations) field277() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Declared service, agent, toolset, person, system, container, or component."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("containers")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("kind")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field278 constructs one generated field declaration.
+func (registryDeclarations) field278() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Summary of the container's responsibility."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("containers")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("description")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field279 constructs one generated field declaration.
+func (registryDeclarations) field279() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Validated directed edges between declared containers."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("edges")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field280 constructs one generated field declaration.
+func (registryDeclarations) field280() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Validated directed edges between declared containers."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("edges")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field281 constructs one generated field declaration.
+func (registryDeclarations) field281() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Source container ID."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("edges")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("from_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field282 constructs one generated field declaration.
+func (registryDeclarations) field282() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Target container ID."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("edges")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("to_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field283 constructs one generated field declaration.
+func (registryDeclarations) field283() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Contract or transport relationship."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("edges")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("protocol")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field284 constructs one generated field declaration.
+func (registryDeclarations) field284() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Evaluated Goa-AI runtime policies per declared agent."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field285 constructs one generated field declaration.
+func (registryDeclarations) field285() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Evaluated Goa-AI runtime policies per declared agent."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field286 constructs one generated field declaration.
+func (registryDeclarations) field286() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Scoped agent container identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("agent_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field287 constructs one generated field declaration.
+func (registryDeclarations) field287() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Per-run execution time budget in seconds."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("max_execution_seconds")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field288 constructs one generated field declaration.
+func (registryDeclarations) field288() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Per-run retrieval tool-call budget."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("max_tool_calls")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field289 constructs one generated field declaration.
+func (registryDeclarations) field289() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Maximum consecutive recovery turns after validation failure."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("max_recovery_turns")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field290 constructs one generated field declaration.
+func (registryDeclarations) field290() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Turn threshold for history compression."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("compress_at_turns")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field291 constructs one generated field declaration.
+func (registryDeclarations) field291() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Recent turns retained uncompressed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("keep_recent_turns")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field292 constructs one generated field declaration.
+func (registryDeclarations) field292() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True when prompt caching places a checkpoint after system prompts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("cache_after_system")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field293 constructs one generated field declaration.
+func (registryDeclarations) field293() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True when prompt caching places a checkpoint after tool definitions."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("agent_policies")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("cache_after_tools")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field294 constructs one generated field declaration.
+func (registryDeclarations) field294() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Evaluated Goa-AI tool contracts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field295 constructs one generated field declaration.
+func (registryDeclarations) field295() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Evaluated Goa-AI tool contracts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field296 constructs one generated field declaration.
+func (registryDeclarations) field296() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Consumer agent ID followed by the compiler's tool ID (<agent_id>/<tool_id>)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field297 constructs one generated field declaration.
+func (registryDeclarations) field297() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Compiler-selected toolset registration route."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("toolset")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field298 constructs one generated field declaration.
+func (registryDeclarations) field298() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Tool name."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field299 constructs one generated field declaration.
+func (registryDeclarations) field299() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Tool description."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("description")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field300 constructs one generated field declaration.
+func (registryDeclarations) field300() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated provider model input before consumer binding."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("args_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field301 constructs one generated field declaration.
+func (registryDeclarations) field301() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated provider text-only input, when supported."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("text_only_args_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field302 constructs one generated field declaration.
+func (registryDeclarations) field302() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Compiled consumer input choices, when binding is declared."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field303 constructs one generated field declaration.
+func (registryDeclarations) field303() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated ordinary bound model input."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+			{Segment: genregistry.NewToolFieldSegmentField("args_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field304 constructs one generated field declaration.
+func (registryDeclarations) field304() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated ordinary text-only input, when supported."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+			{Segment: genregistry.NewToolFieldSegmentField("text_only_args_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field305 constructs one generated field declaration.
+func (registryDeclarations) field305() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated lookup-key input, when declared; application lookup values are not inspected."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+			{Segment: genregistry.NewToolFieldSegmentField("lookup_args_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field306 constructs one generated field declaration.
+func (registryDeclarations) field306() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated text-only lookup-key input, when supported."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+			{Segment: genregistry.NewToolFieldSegmentField("lookup_text_only_args_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field307 constructs one generated field declaration.
+func (registryDeclarations) field307() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Compiler-listed fields supplied outside the ordinary bound model input."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field308 constructs one generated field declaration.
+func (registryDeclarations) field308() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Compiler-listed fields supplied outside the ordinary bound model input."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("input_binding")},
+			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field309 constructs one generated field declaration.
+func (registryDeclarations) field309() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Generated model-visible result schema; empty when the tool declares no result."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("return_schema")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field310 constructs one generated field declaration.
+func (registryDeclarations) field310() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Compiler-listed runtime or provider fields omitted from the provider model input."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field311 constructs one generated field declaration.
+func (registryDeclarations) field311() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Compiler-listed runtime or provider fields omitted from the provider model input."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("injected_fields")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field312 constructs one generated field declaration.
+func (registryDeclarations) field312() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True when the tool requires a UI-capable runtime."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("requires_ui")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field313 constructs one generated field declaration.
+func (registryDeclarations) field313() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True when the tool declares a design-time Confirmation gate."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("requires_confirmation")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field314 constructs one generated field declaration.
+func (registryDeclarations) field314() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True when the tool declares a BoundedResult cursor/truncation contract."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("tools")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("bounded_result")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field315 constructs one generated field declaration.
+func (registryDeclarations) field315() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Proposed Chorus multi-agent role assignments and model-family routing."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field316 constructs one generated field declaration.
+func (registryDeclarations) field316() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Roster configuration status."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("status")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field317 constructs one generated field declaration.
+func (registryDeclarations) field317() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Deterministic role assignments when status is configured."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field318 constructs one generated field declaration.
+func (registryDeclarations) field318() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Deterministic role assignments when status is configured."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field319 constructs one generated field declaration.
+func (registryDeclarations) field319() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Deterministic Chorus agent handle (without leading '@', at most 32 characters)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("handle")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field320 constructs one generated field declaration.
+func (registryDeclarations) field320() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Assigned swarm role kind."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("role")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field321 constructs one generated field declaration.
+func (registryDeclarations) field321() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Human-readable scope label for this assignment."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("scope_name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field322 constructs one generated field declaration.
+func (registryDeclarations) field322() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Assigned server-configured provider profile ID."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("profile_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field323 constructs one generated field declaration.
+func (registryDeclarations) field323() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Assigned coding-agent provider name."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("provider")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field324 constructs one generated field declaration.
+func (registryDeclarations) field324() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Assigned model identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("model")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field325 constructs one generated field declaration.
+func (registryDeclarations) field325() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Canonical model family identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("family")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field326 constructs one generated field declaration.
+func (registryDeclarations) field326() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Repository or workspace path globs owned by this role."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("owned_paths")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field327 constructs one generated field declaration.
+func (registryDeclarations) field327() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Repository or workspace path globs owned by this role."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("owned_paths")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field328 constructs one generated field declaration.
+func (registryDeclarations) field328() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Workspace access boundary required of the job runner."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("assignments")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("access_mode")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field329 constructs one generated field declaration.
+func (registryDeclarations) field329() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True if and only if status is configured and the reviewer model family is disjoint from every assigned builder model family."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("cross_family_review")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field330 constructs one generated field declaration.
+func (registryDeclarations) field330() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True if and only if status is configured and the eval_author model family is disjoint from every assigned builder model family."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("cross_family_eval")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field331 constructs one generated field declaration.
+func (registryDeclarations) field331() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "True when status is configured and all assigned roles share one model family."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("single_family")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field332 constructs one generated field declaration.
+func (registryDeclarations) field332() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("missing_roles")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field333 constructs one generated field declaration.
+func (registryDeclarations) field333() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Required roles lacking an authenticated capable profile when status is unconfigured or missing_capability."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("missing_roles")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field334 constructs one generated field declaration.
+func (registryDeclarations) field334() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Plain-English summary of the proposed swarm roster and model-family posture."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("summary")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field335 constructs one generated field declaration.
+func (registryDeclarations) field335() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Formatted Chorus collaboration manifest text when status is configured; does not claim publication until sent via Chorus."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("swarm")},
+			{Segment: genregistry.NewToolFieldSegmentField("manifest")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field336 constructs one generated field declaration.
+func (registryDeclarations) field336() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Plain-English summary of topology and guardrails."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("banner")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// metadata337 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata337() *genregistry.ToolTypeMetadata {
+	registryText1 := "PreviewArchitecturePayload"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$defs\":{\"BuilderScopeItem\":{\"additionalProperties\":false,\"description\":\"Explicit repository path ownership slice for a builder agent role.\",\"properties\":{\"name\":{\"description\":\"Human-readable builder scope name (for example, orders or api).\",\"type\":\"string\"},\"paths\":{\"description\":\"Repository-relative path globs owned by this builder.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"preferred_profile_id\":{\"description\":\"Optional preference selecting a server-configured authenticated profile ID.\",\"type\":\"string\"}},\"required\":[\"name\",\"paths\"],\"title\":\"BuilderScopeItem\",\"type\":\"object\"},\"DesignSnapshot\":{\"additionalProperties\":false,\"description\":\"Exact files of one Go module containing a Goa/Goa-AI design package at design/. Paths are clean, relative to the module root, and name only .go, go.mod and go.sum files; go.mod, go.sum and at least one design/*.go file are required. The evaluator stages exactly these bytes, resolves dependencies only from go.mod and go.sum, and never reads host paths.\",\"properties\":{\"files\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"File contents keyed by module-relative path, such as design/design.go or go.mod.\",\"type\":\"object\"}},\"required\":[\"files\"],\"title\":\"DesignSnapshot\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card.\",\"properties\":{\"builders\":{\"description\":\"Optional explicit builder path scopes for proposing the Chorus build roster.\",\"items\":{\"$ref\":\"#/$defs/BuilderScopeItem\"},\"type\":\"array\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"design\":{\"$ref\":\"#/$defs/DesignSnapshot\",\"description\":\"Candidate module whose Goa and Goa-AI design is evaluated.\"},\"request_revision\":{\"description\":\"Expected CP1 request_revision digest.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"design\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
 			declarations.field338(),
 			declarations.field339(),
 			declarations.field340(),
@@ -4732,12 +5301,324 @@ func (declarations registryDeclarations) metadata311() *genregistry.ToolTypeMeta
 			declarations.field346(),
 			declarations.field347(),
 			declarations.field348(),
+			declarations.field349(),
 		},
 	}
 }
 
-// field312 constructs one generated field declaration.
-func (registryDeclarations) field312() *genregistry.ToolFieldMetadata {
+// field338 constructs one generated field declaration.
+func (registryDeclarations) field338() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Request to derive the Checkpoint 2 C4 topology, guardrails, and proposed swarm roster from a candidate Goa design bound to a confirmed Change Card."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field339 constructs one generated field declaration.
+func (registryDeclarations) field339() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Confirmed Change Card identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field340 constructs one generated field declaration.
+func (registryDeclarations) field340() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Expected CP1 request_revision digest."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field341 constructs one generated field declaration.
+func (registryDeclarations) field341() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Candidate module whose Goa and Goa-AI design is evaluated."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field342 constructs one generated field declaration.
+func (registryDeclarations) field342() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design")},
+			{Segment: genregistry.NewToolFieldSegmentField("files")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field343 constructs one generated field declaration.
+func (registryDeclarations) field343() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "File contents keyed by module-relative path, such as design/design.go or go.mod."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design")},
+			{Segment: genregistry.NewToolFieldSegmentField("files")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field344 constructs one generated field declaration.
+func (registryDeclarations) field344() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field345 constructs one generated field declaration.
+func (registryDeclarations) field345() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Optional explicit builder path scopes for proposing the Chorus build roster."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field346 constructs one generated field declaration.
+func (registryDeclarations) field346() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Human-readable builder scope name (for example, orders or api)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field347 constructs one generated field declaration.
+func (registryDeclarations) field347() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Repository-relative path globs owned by this builder."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("paths")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field348 constructs one generated field declaration.
+func (registryDeclarations) field348() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Repository-relative path globs owned by this builder."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("paths")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field349 constructs one generated field declaration.
+func (registryDeclarations) field349() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Optional preference selecting a server-configured authenticated profile ID."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("builders")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("preferred_profile_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// schema350 constructs one generated schema declaration.
+func (declarations registryDeclarations) schema350() *genregistry.ToolSchema {
+	registryText1 := "Propose a feature change and generate a Checkpoint 1 Change Card."
+	return &genregistry.ToolSchema{
+		Name:                   "surla.propose_change",
+		Description:            &registryText1,
+		PayloadSchema:          []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
+		ExecutionPayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
+		ResultSchema:           []byte("{\"$defs\":{\"AmbiguityQuestion\":{\"additionalProperties\":false,\"description\":\"Domain ambiguity surfaced with concrete examples at Checkpoint 1.\",\"properties\":{\"id\":{\"description\":\"Stable question identifier.\",\"type\":\"string\"},\"options\":{\"description\":\"Concrete resolution choices.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"question\":{\"description\":\"Plain-English question for the operator.\",\"type\":\"string\"}},\"required\":[\"id\",\"question\",\"options\"],\"title\":\"AmbiguityQuestion\",\"type\":\"object\"},\"ApprovalItem\":{\"additionalProperties\":false,\"description\":\"Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted: the exact candidate commit, suite, environment and binary digests it checked. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision. get_change and confirm_intent return it only while the promotion target's current suite, environment and binary digests still equal the ones it records, so a returned approval was current when that response was made, not afterwards.\",\"properties\":{\"approved_by\":{\"description\":\"Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.\",\"type\":\"string\"},\"artifacts\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.\",\"type\":\"object\"},\"candidate_commit\":{\"description\":\"Candidate commit the report was checked against.\",\"type\":\"string\"},\"environment\":{\"description\":\"Dependency profile the promotion target requires, such as sim.\",\"type\":\"string\"},\"report_digest\":{\"description\":\"SHA-256 digest of the approved CP4 verification report.\",\"type\":\"string\"},\"scenario_count\":{\"description\":\"Number of declared evaluator scenarios, every one of which passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the promotion target requires.\",\"type\":\"string\"},\"suite_id\":{\"description\":\"Evaluator suite the promotion target requires.\",\"type\":\"string\"}},\"required\":[\"approved_by\",\"report_digest\",\"candidate_commit\",\"suite_id\",\"suite_commit\",\"environment\",\"artifacts\",\"scenario_count\"],\"title\":\"ApprovalItem\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"},\"UICompositionItem\":{\"additionalProperties\":false,\"description\":\"Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.\",\"properties\":{\"composed_for_revision\":{\"description\":\"request_revision of the Change Card this program was composed for.\",\"type\":\"string\"},\"program\":{\"description\":\"OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.\",\"type\":\"string\"}},\"required\":[\"program\",\"composed_for_revision\"],\"title\":\"UICompositionItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"approval\":{\"$ref\":\"#/$defs/ApprovalItem\",\"description\":\"Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"},\"ui_composition\":{\"$ref\":\"#/$defs/UICompositionItem\",\"description\":\"Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"type\":\"object\"}"),
+		ConsumerContract: &genregistry.ConsumerContract{
+			Kind:  "service",
+			Title: "Propose Change",
+			Search: &genregistry.ToolSearchDocument{
+				Length: 16,
+				Terms:  map[string]int{"1": 1, "a": 2, "and": 1, "card": 1, "change": 4, "checkpoint": 1, "feature": 1, "generate": 1, "propose": 3, "surla": 1},
+			},
+			RequiresUI: false,
+			TextOnly: &genregistry.TextOnlyToolContract{
+				ExecutionSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
+				Description:     "Propose a feature change and generate a Checkpoint 1 Change Card.",
+				Search: &genregistry.ToolSearchDocument{
+					Length: 16,
+					Terms:  map[string]int{"1": 1, "a": 2, "and": 1, "card": 1, "change": 4, "checkpoint": 1, "feature": 1, "generate": 1, "propose": 3, "surla": 1},
+				},
+				PayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
+				Payload:       declarations.metadata394(),
+			},
+			Payload: declarations.metadata351(),
+			Result:  declarations.metadata356(),
+		},
+	}
+}
+
+// metadata351 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata351() *genregistry.ToolTypeMetadata {
+	registryText1 := "ProposeChangePayload"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field352(),
+			declarations.field353(),
+			declarations.field354(),
+			declarations.field355(),
+		},
+	}
+}
+
+// field352 constructs one generated field declaration.
+func (registryDeclarations) field352() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Operator feature request submitted for Checkpoint 1 ambiguity and example analysis."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field353 constructs one generated field declaration.
+func (registryDeclarations) field353() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Unique change identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field354 constructs one generated field declaration.
+func (registryDeclarations) field354() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Operator feature request."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("prompt")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field355 constructs one generated field declaration.
+func (registryDeclarations) field355() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Current target Goa design source inspected by the CP1 model."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("design_source")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// metadata356 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata356() *genregistry.ToolTypeMetadata {
+	registryText1 := "ProposeChangeResult"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$defs\":{\"AmbiguityQuestion\":{\"additionalProperties\":false,\"description\":\"Domain ambiguity surfaced with concrete examples at Checkpoint 1.\",\"properties\":{\"id\":{\"description\":\"Stable question identifier.\",\"type\":\"string\"},\"options\":{\"description\":\"Concrete resolution choices.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"question\":{\"description\":\"Plain-English question for the operator.\",\"type\":\"string\"}},\"required\":[\"id\",\"question\",\"options\"],\"title\":\"AmbiguityQuestion\",\"type\":\"object\"},\"ApprovalItem\":{\"additionalProperties\":false,\"description\":\"Checkpoint 5 approval recorded by approve_merge after the evaluator-written verification report passed and matched the change being promoted: the exact candidate commit, suite, environment and binary digests it checked. It is held only in the running control plane's memory, merges and deploys nothing, is replaced by the next successful approve_merge for the same revision, and is dropped when confirm_intent mints a new request_revision. get_change and confirm_intent return it only while the promotion target's current suite, environment and binary digests still equal the ones it records, so a returned approval was current when that response was made, not afterwards.\",\"properties\":{\"approved_by\":{\"description\":\"Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call.\",\"type\":\"string\"},\"artifacts\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name.\",\"type\":\"object\"},\"candidate_commit\":{\"description\":\"Candidate commit the report was checked against.\",\"type\":\"string\"},\"environment\":{\"description\":\"Dependency profile the promotion target requires, such as sim.\",\"type\":\"string\"},\"report_digest\":{\"description\":\"SHA-256 digest of the approved CP4 verification report.\",\"type\":\"string\"},\"scenario_count\":{\"description\":\"Number of declared evaluator scenarios, every one of which passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the promotion target requires.\",\"type\":\"string\"},\"suite_id\":{\"description\":\"Evaluator suite the promotion target requires.\",\"type\":\"string\"}},\"required\":[\"approved_by\",\"report_digest\",\"candidate_commit\",\"suite_id\",\"suite_commit\",\"environment\",\"artifacts\",\"scenario_count\"],\"title\":\"ApprovalItem\",\"type\":\"object\"},\"ExampleItem\":{\"additionalProperties\":false,\"description\":\"Concrete input and expected outcome confirmed at Checkpoint 1.\",\"properties\":{\"expected_outcome\":{\"description\":\"Expected side effect and response behavior.\",\"type\":\"string\"},\"id\":{\"description\":\"Code-assigned stable example identifier.\",\"type\":\"string\"},\"input_summary\":{\"description\":\"Representative user request and domain fixture state.\",\"type\":\"string\"},\"scenario\":{\"description\":\"Plain-English scenario description.\",\"type\":\"string\"},\"verification_kind\":{\"description\":\"Evaluator check classification (deterministic or model_judged).\",\"enum\":[\"deterministic\",\"model_judged\"],\"type\":\"string\"}},\"required\":[\"id\",\"scenario\",\"input_summary\",\"expected_outcome\",\"verification_kind\"],\"title\":\"ExampleItem\",\"type\":\"object\"},\"UICompositionItem\":{\"additionalProperties\":false,\"description\":\"Model-authored OpenUI Lang decision view for exactly one Change Card revision. It is presentation only: it is never hashed into request_revision, confirm_intent never reads it, and it describes the card only while composed_for_revision equals the card's request_revision.\",\"properties\":{\"composed_for_revision\":{\"description\":\"request_revision of the Change Card this program was composed for.\",\"type\":\"string\"},\"program\":{\"description\":\"OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition.\",\"type\":\"string\"}},\"required\":[\"program\",\"composed_for_revision\"],\"title\":\"UICompositionItem\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata.\",\"properties\":{\"ambiguities\":{\"description\":\"Domain questions surfaced at CP1, retained for audit after confirmation.\",\"items\":{\"$ref\":\"#/$defs/AmbiguityQuestion\"},\"type\":\"array\"},\"answers\":{\"additionalProperties\":{\"type\":\"string\"},\"description\":\"Confirmed resolution per ambiguity question ID.\",\"type\":\"object\"},\"approval\":{\"$ref\":\"#/$defs/ApprovalItem\",\"description\":\"Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision.\"},\"change_id\":{\"description\":\"Change identifier.\",\"type\":\"string\"},\"confirmed_by\":{\"description\":\"Authenticated principal that confirmed the Change Card.\",\"type\":\"string\"},\"examples\":{\"description\":\"Concrete examples mapped to evaluator checks.\",\"items\":{\"$ref\":\"#/$defs/ExampleItem\"},\"type\":\"array\"},\"preserved_behaviors\":{\"description\":\"Existing contract invariants preserved by this change.\",\"items\":{\"type\":\"string\"},\"type\":\"array\"},\"prompt\":{\"description\":\"Original operator feature request.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"SHA-256 digest of the canonical versioned Change Card.\",\"type\":\"string\"},\"status\":{\"description\":\"Checkpoint status (needs_confirmation or confirmed).\",\"enum\":[\"needs_confirmation\",\"confirmed\"],\"type\":\"string\"},\"summary\":{\"description\":\"Plain-English summary of requested behavior.\",\"type\":\"string\"},\"ui_composition\":{\"$ref\":\"#/$defs/UICompositionItem\",\"description\":\"Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it.\"}},\"required\":[\"change_id\",\"status\",\"prompt\",\"summary\",\"examples\",\"preserved_behaviors\",\"request_revision\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field357(),
+			declarations.field358(),
+			declarations.field359(),
+			declarations.field360(),
+			declarations.field361(),
+			declarations.field362(),
+			declarations.field363(),
+			declarations.field364(),
+			declarations.field365(),
+			declarations.field366(),
+			declarations.field367(),
+			declarations.field368(),
+			declarations.field369(),
+			declarations.field370(),
+			declarations.field371(),
+			declarations.field372(),
+			declarations.field373(),
+			declarations.field374(),
+			declarations.field375(),
+			declarations.field376(),
+			declarations.field377(),
+			declarations.field378(),
+			declarations.field379(),
+			declarations.field380(),
+			declarations.field381(),
+			declarations.field382(),
+			declarations.field383(),
+			declarations.field384(),
+			declarations.field385(),
+			declarations.field386(),
+			declarations.field387(),
+			declarations.field388(),
+			declarations.field389(),
+			declarations.field390(),
+			declarations.field391(),
+			declarations.field392(),
+			declarations.field393(),
+		},
+	}
+}
+
+// field357 constructs one generated field declaration.
+func (registryDeclarations) field357() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Checkpoint 1 Change Card containing examples, preserved behaviors, and audit metadata."
 	return &genregistry.ToolFieldMetadata{
@@ -4746,8 +5627,8 @@ func (registryDeclarations) field312() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field313 constructs one generated field declaration.
-func (registryDeclarations) field313() *genregistry.ToolFieldMetadata {
+// field358 constructs one generated field declaration.
+func (registryDeclarations) field358() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Change identifier."
 	return &genregistry.ToolFieldMetadata{
@@ -4759,8 +5640,8 @@ func (registryDeclarations) field313() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field314 constructs one generated field declaration.
-func (registryDeclarations) field314() *genregistry.ToolFieldMetadata {
+// field359 constructs one generated field declaration.
+func (registryDeclarations) field359() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Checkpoint status (needs_confirmation or confirmed)."
 	return &genregistry.ToolFieldMetadata{
@@ -4772,8 +5653,8 @@ func (registryDeclarations) field314() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field315 constructs one generated field declaration.
-func (registryDeclarations) field315() *genregistry.ToolFieldMetadata {
+// field360 constructs one generated field declaration.
+func (registryDeclarations) field360() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Original operator feature request."
 	return &genregistry.ToolFieldMetadata{
@@ -4785,8 +5666,8 @@ func (registryDeclarations) field315() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field316 constructs one generated field declaration.
-func (registryDeclarations) field316() *genregistry.ToolFieldMetadata {
+// field361 constructs one generated field declaration.
+func (registryDeclarations) field361() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Plain-English summary of requested behavior."
 	return &genregistry.ToolFieldMetadata{
@@ -4798,8 +5679,8 @@ func (registryDeclarations) field316() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field317 constructs one generated field declaration.
-func (registryDeclarations) field317() *genregistry.ToolFieldMetadata {
+// field362 constructs one generated field declaration.
+func (registryDeclarations) field362() *genregistry.ToolFieldMetadata {
 	registryText1 := "array"
 	registryText2 := "Domain questions surfaced at CP1, retained for audit after confirmation."
 	return &genregistry.ToolFieldMetadata{
@@ -4811,8 +5692,8 @@ func (registryDeclarations) field317() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field318 constructs one generated field declaration.
-func (registryDeclarations) field318() *genregistry.ToolFieldMetadata {
+// field363 constructs one generated field declaration.
+func (registryDeclarations) field363() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Domain questions surfaced at CP1, retained for audit after confirmation."
 	return &genregistry.ToolFieldMetadata{
@@ -4825,8 +5706,8 @@ func (registryDeclarations) field318() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field319 constructs one generated field declaration.
-func (registryDeclarations) field319() *genregistry.ToolFieldMetadata {
+// field364 constructs one generated field declaration.
+func (registryDeclarations) field364() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Stable question identifier."
 	return &genregistry.ToolFieldMetadata{
@@ -4840,8 +5721,8 @@ func (registryDeclarations) field319() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field320 constructs one generated field declaration.
-func (registryDeclarations) field320() *genregistry.ToolFieldMetadata {
+// field365 constructs one generated field declaration.
+func (registryDeclarations) field365() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Plain-English question for the operator."
 	return &genregistry.ToolFieldMetadata{
@@ -4855,8 +5736,8 @@ func (registryDeclarations) field320() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field321 constructs one generated field declaration.
-func (registryDeclarations) field321() *genregistry.ToolFieldMetadata {
+// field366 constructs one generated field declaration.
+func (registryDeclarations) field366() *genregistry.ToolFieldMetadata {
 	registryText1 := "array"
 	registryText2 := "Concrete resolution choices."
 	return &genregistry.ToolFieldMetadata{
@@ -4870,8 +5751,8 @@ func (registryDeclarations) field321() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field322 constructs one generated field declaration.
-func (registryDeclarations) field322() *genregistry.ToolFieldMetadata {
+// field367 constructs one generated field declaration.
+func (registryDeclarations) field367() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Concrete resolution choices."
 	return &genregistry.ToolFieldMetadata{
@@ -4886,8 +5767,8 @@ func (registryDeclarations) field322() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field323 constructs one generated field declaration.
-func (registryDeclarations) field323() *genregistry.ToolFieldMetadata {
+// field368 constructs one generated field declaration.
+func (registryDeclarations) field368() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Confirmed resolution per ambiguity question ID."
 	return &genregistry.ToolFieldMetadata{
@@ -4899,8 +5780,8 @@ func (registryDeclarations) field323() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field324 constructs one generated field declaration.
-func (registryDeclarations) field324() *genregistry.ToolFieldMetadata {
+// field369 constructs one generated field declaration.
+func (registryDeclarations) field369() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Confirmed resolution per ambiguity question ID."
 	return &genregistry.ToolFieldMetadata{
@@ -4913,8 +5794,8 @@ func (registryDeclarations) field324() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field325 constructs one generated field declaration.
-func (registryDeclarations) field325() *genregistry.ToolFieldMetadata {
+// field370 constructs one generated field declaration.
+func (registryDeclarations) field370() *genregistry.ToolFieldMetadata {
 	registryText1 := "array"
 	registryText2 := "Concrete examples mapped to evaluator checks."
 	return &genregistry.ToolFieldMetadata{
@@ -4926,8 +5807,8 @@ func (registryDeclarations) field325() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field326 constructs one generated field declaration.
-func (registryDeclarations) field326() *genregistry.ToolFieldMetadata {
+// field371 constructs one generated field declaration.
+func (registryDeclarations) field371() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Concrete examples mapped to evaluator checks."
 	return &genregistry.ToolFieldMetadata{
@@ -4940,8 +5821,8 @@ func (registryDeclarations) field326() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field327 constructs one generated field declaration.
-func (registryDeclarations) field327() *genregistry.ToolFieldMetadata {
+// field372 constructs one generated field declaration.
+func (registryDeclarations) field372() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Code-assigned stable example identifier."
 	return &genregistry.ToolFieldMetadata{
@@ -4955,8 +5836,8 @@ func (registryDeclarations) field327() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field328 constructs one generated field declaration.
-func (registryDeclarations) field328() *genregistry.ToolFieldMetadata {
+// field373 constructs one generated field declaration.
+func (registryDeclarations) field373() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Plain-English scenario description."
 	return &genregistry.ToolFieldMetadata{
@@ -4970,8 +5851,8 @@ func (registryDeclarations) field328() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field329 constructs one generated field declaration.
-func (registryDeclarations) field329() *genregistry.ToolFieldMetadata {
+// field374 constructs one generated field declaration.
+func (registryDeclarations) field374() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Representative user request and domain fixture state."
 	return &genregistry.ToolFieldMetadata{
@@ -4985,8 +5866,8 @@ func (registryDeclarations) field329() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field330 constructs one generated field declaration.
-func (registryDeclarations) field330() *genregistry.ToolFieldMetadata {
+// field375 constructs one generated field declaration.
+func (registryDeclarations) field375() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Expected side effect and response behavior."
 	return &genregistry.ToolFieldMetadata{
@@ -5000,8 +5881,8 @@ func (registryDeclarations) field330() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field331 constructs one generated field declaration.
-func (registryDeclarations) field331() *genregistry.ToolFieldMetadata {
+// field376 constructs one generated field declaration.
+func (registryDeclarations) field376() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Evaluator check classification (deterministic or model_judged)."
 	return &genregistry.ToolFieldMetadata{
@@ -5015,8 +5896,8 @@ func (registryDeclarations) field331() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field332 constructs one generated field declaration.
-func (registryDeclarations) field332() *genregistry.ToolFieldMetadata {
+// field377 constructs one generated field declaration.
+func (registryDeclarations) field377() *genregistry.ToolFieldMetadata {
 	registryText1 := "array"
 	registryText2 := "Existing contract invariants preserved by this change."
 	return &genregistry.ToolFieldMetadata{
@@ -5028,8 +5909,8 @@ func (registryDeclarations) field332() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field333 constructs one generated field declaration.
-func (registryDeclarations) field333() *genregistry.ToolFieldMetadata {
+// field378 constructs one generated field declaration.
+func (registryDeclarations) field378() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Existing contract invariants preserved by this change."
 	return &genregistry.ToolFieldMetadata{
@@ -5042,8 +5923,8 @@ func (registryDeclarations) field333() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field334 constructs one generated field declaration.
-func (registryDeclarations) field334() *genregistry.ToolFieldMetadata {
+// field379 constructs one generated field declaration.
+func (registryDeclarations) field379() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Authenticated principal that confirmed the Change Card."
 	return &genregistry.ToolFieldMetadata{
@@ -5055,8 +5936,8 @@ func (registryDeclarations) field334() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field335 constructs one generated field declaration.
-func (registryDeclarations) field335() *genregistry.ToolFieldMetadata {
+// field380 constructs one generated field declaration.
+func (registryDeclarations) field380() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "SHA-256 digest of the canonical versioned Change Card."
 	return &genregistry.ToolFieldMetadata{
@@ -5068,8 +5949,8 @@ func (registryDeclarations) field335() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field336 constructs one generated field declaration.
-func (registryDeclarations) field336() *genregistry.ToolFieldMetadata {
+// field381 constructs one generated field declaration.
+func (registryDeclarations) field381() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Decision view the CP1 model composed for this revision, when it produced one. A confirm_intent that changes answers or examples returns the new revision without it."
 	return &genregistry.ToolFieldMetadata{
@@ -5081,8 +5962,8 @@ func (registryDeclarations) field336() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field337 constructs one generated field declaration.
-func (registryDeclarations) field337() *genregistry.ToolFieldMetadata {
+// field382 constructs one generated field declaration.
+func (registryDeclarations) field382() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "OpenUI Lang program composed by the CP1 model from the Surla decision component catalog, exactly as the model returned it. The server does not check it; the checkpoint viewer validates it and shows its error state, with the rest of the card still usable, when the program is not a valid composition."
 	return &genregistry.ToolFieldMetadata{
@@ -5095,8 +5976,8 @@ func (registryDeclarations) field337() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field338 constructs one generated field declaration.
-func (registryDeclarations) field338() *genregistry.ToolFieldMetadata {
+// field383 constructs one generated field declaration.
+func (registryDeclarations) field383() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "request_revision of the Change Card this program was composed for."
 	return &genregistry.ToolFieldMetadata{
@@ -5109,8 +5990,8 @@ func (registryDeclarations) field338() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field339 constructs one generated field declaration.
-func (registryDeclarations) field339() *genregistry.ToolFieldMetadata {
+// field384 constructs one generated field declaration.
+func (registryDeclarations) field384() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Checkpoint 5 approval of this revision, present only while it matches the promotion target's current inputs. It is absent before approve_merge succeeds and whenever the target's suite, environment or binary digests have changed since; it comes back if they match again. It is never hashed into request_revision."
 	return &genregistry.ToolFieldMetadata{
@@ -5122,8 +6003,8 @@ func (registryDeclarations) field339() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field340 constructs one generated field declaration.
-func (registryDeclarations) field340() *genregistry.ToolFieldMetadata {
+// field385 constructs one generated field declaration.
+func (registryDeclarations) field385() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Authenticated bearer principal that owns the card and called approve_merge. Bearer authentication does not prove that a human, rather than a coding agent, made the call."
 	return &genregistry.ToolFieldMetadata{
@@ -5136,8 +6017,8 @@ func (registryDeclarations) field340() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field341 constructs one generated field declaration.
-func (registryDeclarations) field341() *genregistry.ToolFieldMetadata {
+// field386 constructs one generated field declaration.
+func (registryDeclarations) field386() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "SHA-256 digest of the approved CP4 verification report."
 	return &genregistry.ToolFieldMetadata{
@@ -5150,8 +6031,8 @@ func (registryDeclarations) field341() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field342 constructs one generated field declaration.
-func (registryDeclarations) field342() *genregistry.ToolFieldMetadata {
+// field387 constructs one generated field declaration.
+func (registryDeclarations) field387() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Candidate commit the report was checked against."
 	return &genregistry.ToolFieldMetadata{
@@ -5164,8 +6045,8 @@ func (registryDeclarations) field342() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field343 constructs one generated field declaration.
-func (registryDeclarations) field343() *genregistry.ToolFieldMetadata {
+// field388 constructs one generated field declaration.
+func (registryDeclarations) field388() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Evaluator suite the promotion target requires."
 	return &genregistry.ToolFieldMetadata{
@@ -5178,8 +6059,8 @@ func (registryDeclarations) field343() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field344 constructs one generated field declaration.
-func (registryDeclarations) field344() *genregistry.ToolFieldMetadata {
+// field389 constructs one generated field declaration.
+func (registryDeclarations) field389() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Evaluator suite commit the promotion target requires."
 	return &genregistry.ToolFieldMetadata{
@@ -5192,8 +6073,8 @@ func (registryDeclarations) field344() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field345 constructs one generated field declaration.
-func (registryDeclarations) field345() *genregistry.ToolFieldMetadata {
+// field390 constructs one generated field declaration.
+func (registryDeclarations) field390() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Dependency profile the promotion target requires, such as sim."
 	return &genregistry.ToolFieldMetadata{
@@ -5206,8 +6087,8 @@ func (registryDeclarations) field345() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field346 constructs one generated field declaration.
-func (registryDeclarations) field346() *genregistry.ToolFieldMetadata {
+// field391 constructs one generated field declaration.
+func (registryDeclarations) field391() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name."
 	return &genregistry.ToolFieldMetadata{
@@ -5220,8 +6101,8 @@ func (registryDeclarations) field346() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field347 constructs one generated field declaration.
-func (registryDeclarations) field347() *genregistry.ToolFieldMetadata {
+// field392 constructs one generated field declaration.
+func (registryDeclarations) field392() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "SHA-256 digest of each candidate binary the promotion target measured, keyed by binary name."
 	return &genregistry.ToolFieldMetadata{
@@ -5235,8 +6116,8 @@ func (registryDeclarations) field347() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field348 constructs one generated field declaration.
-func (registryDeclarations) field348() *genregistry.ToolFieldMetadata {
+// field393 constructs one generated field declaration.
+func (registryDeclarations) field393() *genregistry.ToolFieldMetadata {
 	registryText1 := "integer"
 	registryText2 := "Number of declared evaluator scenarios, every one of which passed."
 	return &genregistry.ToolFieldMetadata{
@@ -5249,23 +6130,23 @@ func (registryDeclarations) field348() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// metadata349 constructs one generated metadata declaration.
-func (declarations registryDeclarations) metadata349() *genregistry.ToolTypeMetadata {
+// metadata394 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata394() *genregistry.ToolTypeMetadata {
 	registryText1 := "ProposeChangePayload"
 	return &genregistry.ToolTypeMetadata{
 		Name:                     &registryText1,
 		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Operator feature request submitted for Checkpoint 1 ambiguity and example analysis.\",\"properties\":{\"change_id\":{\"description\":\"Unique change identifier.\",\"type\":\"string\"},\"design_source\":{\"description\":\"Current target Goa design source inspected by the CP1 model.\",\"type\":\"string\"},\"prompt\":{\"description\":\"Operator feature request.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"prompt\"],\"type\":\"object\"}"),
 		Fields: []*genregistry.ToolFieldMetadata{
-			declarations.field350(),
-			declarations.field351(),
-			declarations.field352(),
-			declarations.field353(),
+			declarations.field395(),
+			declarations.field396(),
+			declarations.field397(),
+			declarations.field398(),
 		},
 	}
 }
 
-// field350 constructs one generated field declaration.
-func (registryDeclarations) field350() *genregistry.ToolFieldMetadata {
+// field395 constructs one generated field declaration.
+func (registryDeclarations) field395() *genregistry.ToolFieldMetadata {
 	registryText1 := "object"
 	registryText2 := "Operator feature request submitted for Checkpoint 1 ambiguity and example analysis."
 	return &genregistry.ToolFieldMetadata{
@@ -5274,8 +6155,8 @@ func (registryDeclarations) field350() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field351 constructs one generated field declaration.
-func (registryDeclarations) field351() *genregistry.ToolFieldMetadata {
+// field396 constructs one generated field declaration.
+func (registryDeclarations) field396() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Unique change identifier."
 	return &genregistry.ToolFieldMetadata{
@@ -5287,8 +6168,8 @@ func (registryDeclarations) field351() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field352 constructs one generated field declaration.
-func (registryDeclarations) field352() *genregistry.ToolFieldMetadata {
+// field397 constructs one generated field declaration.
+func (registryDeclarations) field397() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Operator feature request."
 	return &genregistry.ToolFieldMetadata{
@@ -5300,13 +6181,948 @@ func (registryDeclarations) field352() *genregistry.ToolFieldMetadata {
 	}
 }
 
-// field353 constructs one generated field declaration.
-func (registryDeclarations) field353() *genregistry.ToolFieldMetadata {
+// field398 constructs one generated field declaration.
+func (registryDeclarations) field398() *genregistry.ToolFieldMetadata {
 	registryText1 := "string"
 	registryText2 := "Current target Goa design source inspected by the CP1 model."
 	return &genregistry.ToolFieldMetadata{
 		Path: []*genregistry.ToolFieldPathSegment{
 			{Segment: genregistry.NewToolFieldSegmentField("design_source")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// schema399 constructs one generated schema declaration.
+func (declarations registryDeclarations) schema399() *genregistry.ToolSchema {
+	registryText1 := "Start CP4 verification of a candidate commit for the confirmed Change Card revision; returns a run_id to read with get_verification."
+	return &genregistry.ToolSchema{
+		Name:                   "surla.verify_change",
+		Description:            &registryText1,
+		PayloadSchema:          []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.\",\"properties\":{\"candidate_commit\":{\"description\":\"Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).\",\"pattern\":\"^([0-9a-f]{40}|[0-9a-f]{64})$\",\"type\":\"string\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Current request_revision of the confirmed Change Card.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"candidate_commit\"],\"type\":\"object\"}"),
+		ExecutionPayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.\",\"properties\":{\"candidate_commit\":{\"description\":\"Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).\",\"pattern\":\"^([0-9a-f]{40}|[0-9a-f]{64})$\",\"type\":\"string\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Current request_revision of the confirmed Change Card.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"candidate_commit\"],\"type\":\"object\"}"),
+		ResultSchema:           []byte("{\"$defs\":{\"BuilderVerificationReport\":{\"additionalProperties\":false,\"description\":\"The builder view of a Checkpoint 4 verification report: counts, verdict and repair scenario checks. Holdout details, evidence and logs stay with the evaluator.\",\"properties\":{\"counts\":{\"$ref\":\"#/$defs/VerificationCounts\",\"description\":\"Every declared scenario, counted by outcome.\"},\"passed\":{\"description\":\"The verdict: true only when every declared scenario passed and the suite ran cleanly.\",\"type\":\"boolean\"},\"report_digest\":{\"description\":\"SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.\",\"type\":\"string\"},\"scenarios\":{\"description\":\"Every declared scenario in declaration order.\",\"items\":{\"$ref\":\"#/$defs/VerificationScenario\"},\"type\":\"array\"},\"suite_failed\":{\"description\":\"Whether the evaluator suite itself failed or ended abnormally.\",\"type\":\"boolean\"}},\"required\":[\"report_digest\",\"counts\",\"passed\",\"suite_failed\",\"scenarios\"],\"title\":\"BuilderVerificationReport\",\"type\":\"object\"},\"VerificationCheck\":{\"additionalProperties\":false,\"description\":\"One deterministic check of a repair scenario.\",\"properties\":{\"diagnostic\":{\"description\":\"Why the check failed; empty when it passed.\",\"type\":\"string\"},\"name\":{\"description\":\"Check name.\",\"type\":\"string\"},\"passed\":{\"description\":\"Whether the check passed.\",\"type\":\"boolean\"}},\"required\":[\"name\",\"passed\"],\"title\":\"VerificationCheck\",\"type\":\"object\"},\"VerificationCompleted\":{\"additionalProperties\":false,\"description\":\"The run produced a verification report. Its verdict is report.passed.\",\"properties\":{\"environment\":{\"description\":\"Dependency profile the suite ran the candidate with, such as sim.\",\"type\":\"string\"},\"report\":{\"$ref\":\"#/$defs/BuilderVerificationReport\",\"description\":\"The builder view of the report.\"},\"suite_id\":{\"description\":\"Evaluator suite the report was produced by.\",\"type\":\"string\"}},\"required\":[\"suite_id\",\"environment\",\"report\"],\"title\":\"VerificationCompleted\",\"type\":\"object\"},\"VerificationCounts\":{\"additionalProperties\":false,\"description\":\"Every declared scenario, counted by outcome.\",\"properties\":{\"failed\":{\"description\":\"Scenarios whose checks failed.\",\"format\":\"int64\",\"type\":\"integer\"},\"harness_error\":{\"description\":\"Scenarios that could not be evaluated.\",\"format\":\"int64\",\"type\":\"integer\"},\"not_run\":{\"description\":\"Declared scenarios the suite did not report.\",\"format\":\"int64\",\"type\":\"integer\"},\"passed\":{\"description\":\"Scenarios that passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"required\":{\"description\":\"Scenarios the suite declares.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"required\",\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"title\":\"VerificationCounts\",\"type\":\"object\"},\"VerificationNotCompleted\":{\"additionalProperties\":false,\"description\":\"The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.\",\"properties\":{\"kind\":{\"description\":\"execution_failed when a step failed; interrupted when the run's process ended before it finished.\",\"enum\":[\"execution_failed\",\"interrupted\"],\"type\":\"string\"},\"stage\":{\"description\":\"Where the run stopped.\",\"enum\":[\"checkout\",\"build\",\"describe\",\"suite\",\"report\",\"supervise\"],\"type\":\"string\"},\"summary\":{\"description\":\"Builder-safe description of what stopped the run; never command output.\",\"type\":\"string\"}},\"required\":[\"kind\",\"stage\",\"summary\"],\"title\":\"VerificationNotCompleted\",\"type\":\"object\"},\"VerificationRunning\":{\"additionalProperties\":false,\"description\":\"The run is still building or evaluating the candidate.\",\"properties\":{\"started_at\":{\"description\":\"When the run was accepted.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"started_at\"],\"title\":\"VerificationRunning\",\"type\":\"object\"},\"VerificationScenario\":{\"additionalProperties\":false,\"description\":\"One declared scenario as builders see it. Repair scenarios carry their name, checks and environment error; holdout scenarios appear only as holdout-\\u003cn\\u003e with their outcome.\",\"properties\":{\"checks\":{\"description\":\"The repair scenario's checks; empty for holdouts.\",\"items\":{\"$ref\":\"#/$defs/VerificationCheck\"},\"type\":\"array\"},\"error\":{\"description\":\"The repair scenario's environment error; empty for holdouts.\",\"type\":\"string\"},\"id\":{\"description\":\"Scenario name for a repair scenario, or holdout-\\u003cn\\u003e for a holdout.\",\"type\":\"string\"},\"outcome\":{\"description\":\"How the scenario ended.\",\"enum\":[\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"type\":\"string\"}},\"required\":[\"id\",\"outcome\"],\"title\":\"VerificationScenario\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.\",\"properties\":{\"candidate_commit\":{\"description\":\"Candidate commit the run builds and verifies.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Change Card the run verifies.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Change Card revision the run verifies.\",\"type\":\"string\"},\"run_id\":{\"description\":\"Verification run identifier; get_verification takes it.\",\"type\":\"string\"},\"state\":{\"description\":\"Exactly one of running, completed or not_completed.\",\"oneOf\":[{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"running\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationRunning\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"not_completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationNotCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"}],\"type\":\"object\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the operator configured for the run.\",\"type\":\"string\"}},\"required\":[\"run_id\",\"change_id\",\"request_revision\",\"candidate_commit\",\"suite_commit\",\"state\"],\"type\":\"object\"}"),
+		ConsumerContract: &genregistry.ConsumerContract{
+			Kind:  "service",
+			Title: "Verify Change",
+			Search: &genregistry.ToolSearchDocument{
+				Length: 27,
+				Terms:  map[string]int{"a": 2, "candidate": 1, "card": 1, "change": 3, "commit": 1, "confirmed": 1, "cp4": 1, "for": 1, "get": 1, "id": 1, "of": 1, "read": 1, "returns": 1, "revision": 1, "run": 1, "start": 1, "surla": 1, "the": 1, "to": 1, "verification": 2, "verify": 2, "with": 1},
+			},
+			RequiresUI: false,
+			TextOnly: &genregistry.TextOnlyToolContract{
+				ExecutionSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.\",\"properties\":{\"candidate_commit\":{\"description\":\"Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).\",\"pattern\":\"^([0-9a-f]{40}|[0-9a-f]{64})$\",\"type\":\"string\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Current request_revision of the confirmed Change Card.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"candidate_commit\"],\"type\":\"object\"}"),
+				Description:     "Start CP4 verification of a candidate commit for the confirmed Change Card revision; returns a run_id to read with get_verification.",
+				Search: &genregistry.ToolSearchDocument{
+					Length: 27,
+					Terms:  map[string]int{"a": 2, "candidate": 1, "card": 1, "change": 3, "commit": 1, "confirmed": 1, "cp4": 1, "for": 1, "get": 1, "id": 1, "of": 1, "read": 1, "returns": 1, "revision": 1, "run": 1, "start": 1, "surla": 1, "the": 1, "to": 1, "verification": 2, "verify": 2, "with": 1},
+				},
+				PayloadSchema: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.\",\"properties\":{\"candidate_commit\":{\"description\":\"Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).\",\"pattern\":\"^([0-9a-f]{40}|[0-9a-f]{64})$\",\"type\":\"string\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Current request_revision of the confirmed Change Card.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"candidate_commit\"],\"type\":\"object\"}"),
+				Payload:       declarations.metadata443(),
+			},
+			Payload: declarations.metadata400(),
+			Result:  declarations.metadata405(),
+		},
+	}
+}
+
+// metadata400 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata400() *genregistry.ToolTypeMetadata {
+	registryText1 := "VerifyChangePayload"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.\",\"properties\":{\"candidate_commit\":{\"description\":\"Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).\",\"pattern\":\"^([0-9a-f]{40}|[0-9a-f]{64})$\",\"type\":\"string\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Current request_revision of the confirmed Change Card.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"candidate_commit\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field401(),
+			declarations.field402(),
+			declarations.field403(),
+			declarations.field404(),
+		},
+	}
+}
+
+// field401 constructs one generated field declaration.
+func (registryDeclarations) field401() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field402 constructs one generated field declaration.
+func (registryDeclarations) field402() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Confirmed Change Card identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field403 constructs one generated field declaration.
+func (registryDeclarations) field403() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Current request_revision of the confirmed Change Card."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field404 constructs one generated field declaration.
+func (registryDeclarations) field404() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("candidate_commit")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// metadata405 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata405() *genregistry.ToolTypeMetadata {
+	registryText1 := "VerifyChangeResult"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$defs\":{\"BuilderVerificationReport\":{\"additionalProperties\":false,\"description\":\"The builder view of a Checkpoint 4 verification report: counts, verdict and repair scenario checks. Holdout details, evidence and logs stay with the evaluator.\",\"properties\":{\"counts\":{\"$ref\":\"#/$defs/VerificationCounts\",\"description\":\"Every declared scenario, counted by outcome.\"},\"passed\":{\"description\":\"The verdict: true only when every declared scenario passed and the suite ran cleanly.\",\"type\":\"boolean\"},\"report_digest\":{\"description\":\"SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest.\",\"type\":\"string\"},\"scenarios\":{\"description\":\"Every declared scenario in declaration order.\",\"items\":{\"$ref\":\"#/$defs/VerificationScenario\"},\"type\":\"array\"},\"suite_failed\":{\"description\":\"Whether the evaluator suite itself failed or ended abnormally.\",\"type\":\"boolean\"}},\"required\":[\"report_digest\",\"counts\",\"passed\",\"suite_failed\",\"scenarios\"],\"title\":\"BuilderVerificationReport\",\"type\":\"object\"},\"VerificationCheck\":{\"additionalProperties\":false,\"description\":\"One deterministic check of a repair scenario.\",\"properties\":{\"diagnostic\":{\"description\":\"Why the check failed; empty when it passed.\",\"type\":\"string\"},\"name\":{\"description\":\"Check name.\",\"type\":\"string\"},\"passed\":{\"description\":\"Whether the check passed.\",\"type\":\"boolean\"}},\"required\":[\"name\",\"passed\"],\"title\":\"VerificationCheck\",\"type\":\"object\"},\"VerificationCompleted\":{\"additionalProperties\":false,\"description\":\"The run produced a verification report. Its verdict is report.passed.\",\"properties\":{\"environment\":{\"description\":\"Dependency profile the suite ran the candidate with, such as sim.\",\"type\":\"string\"},\"report\":{\"$ref\":\"#/$defs/BuilderVerificationReport\",\"description\":\"The builder view of the report.\"},\"suite_id\":{\"description\":\"Evaluator suite the report was produced by.\",\"type\":\"string\"}},\"required\":[\"suite_id\",\"environment\",\"report\"],\"title\":\"VerificationCompleted\",\"type\":\"object\"},\"VerificationCounts\":{\"additionalProperties\":false,\"description\":\"Every declared scenario, counted by outcome.\",\"properties\":{\"failed\":{\"description\":\"Scenarios whose checks failed.\",\"format\":\"int64\",\"type\":\"integer\"},\"harness_error\":{\"description\":\"Scenarios that could not be evaluated.\",\"format\":\"int64\",\"type\":\"integer\"},\"not_run\":{\"description\":\"Declared scenarios the suite did not report.\",\"format\":\"int64\",\"type\":\"integer\"},\"passed\":{\"description\":\"Scenarios that passed.\",\"format\":\"int64\",\"type\":\"integer\"},\"required\":{\"description\":\"Scenarios the suite declares.\",\"format\":\"int64\",\"type\":\"integer\"}},\"required\":[\"required\",\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"title\":\"VerificationCounts\",\"type\":\"object\"},\"VerificationNotCompleted\":{\"additionalProperties\":false,\"description\":\"The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.\",\"properties\":{\"kind\":{\"description\":\"execution_failed when a step failed; interrupted when the run's process ended before it finished.\",\"enum\":[\"execution_failed\",\"interrupted\"],\"type\":\"string\"},\"stage\":{\"description\":\"Where the run stopped.\",\"enum\":[\"checkout\",\"build\",\"describe\",\"suite\",\"report\",\"supervise\"],\"type\":\"string\"},\"summary\":{\"description\":\"Builder-safe description of what stopped the run; never command output.\",\"type\":\"string\"}},\"required\":[\"kind\",\"stage\",\"summary\"],\"title\":\"VerificationNotCompleted\",\"type\":\"object\"},\"VerificationRunning\":{\"additionalProperties\":false,\"description\":\"The run is still building or evaluating the candidate.\",\"properties\":{\"started_at\":{\"description\":\"When the run was accepted.\",\"format\":\"date-time\",\"type\":\"string\"}},\"required\":[\"started_at\"],\"title\":\"VerificationRunning\",\"type\":\"object\"},\"VerificationScenario\":{\"additionalProperties\":false,\"description\":\"One declared scenario as builders see it. Repair scenarios carry their name, checks and environment error; holdout scenarios appear only as holdout-\\u003cn\\u003e with their outcome.\",\"properties\":{\"checks\":{\"description\":\"The repair scenario's checks; empty for holdouts.\",\"items\":{\"$ref\":\"#/$defs/VerificationCheck\"},\"type\":\"array\"},\"error\":{\"description\":\"The repair scenario's environment error; empty for holdouts.\",\"type\":\"string\"},\"id\":{\"description\":\"Scenario name for a repair scenario, or holdout-\\u003cn\\u003e for a holdout.\",\"type\":\"string\"},\"outcome\":{\"description\":\"How the scenario ended.\",\"enum\":[\"passed\",\"failed\",\"not_run\",\"harness_error\"],\"type\":\"string\"}},\"required\":[\"id\",\"outcome\"],\"title\":\"VerificationScenario\",\"type\":\"object\"}},\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it.\",\"properties\":{\"candidate_commit\":{\"description\":\"Candidate commit the run builds and verifies.\",\"type\":\"string\"},\"change_id\":{\"description\":\"Change Card the run verifies.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Change Card revision the run verifies.\",\"type\":\"string\"},\"run_id\":{\"description\":\"Verification run identifier; get_verification takes it.\",\"type\":\"string\"},\"state\":{\"description\":\"Exactly one of running, completed or not_completed.\",\"oneOf\":[{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"running\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationRunning\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"},{\"additionalProperties\":false,\"properties\":{\"type\":{\"enum\":[\"not_completed\"],\"type\":\"string\"},\"value\":{\"$ref\":\"#/$defs/VerificationNotCompleted\"}},\"required\":[\"type\",\"value\"],\"type\":\"object\"}],\"type\":\"object\"},\"suite_commit\":{\"description\":\"Evaluator suite commit the operator configured for the run.\",\"type\":\"string\"}},\"required\":[\"run_id\",\"change_id\",\"request_revision\",\"candidate_commit\",\"suite_commit\",\"state\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field406(),
+			declarations.field407(),
+			declarations.field408(),
+			declarations.field409(),
+			declarations.field410(),
+			declarations.field411(),
+			declarations.field412(),
+			declarations.field413(),
+			declarations.field414(),
+			declarations.field415(),
+			declarations.field416(),
+			declarations.field417(),
+			declarations.field418(),
+			declarations.field419(),
+			declarations.field420(),
+			declarations.field421(),
+			declarations.field422(),
+			declarations.field423(),
+			declarations.field424(),
+			declarations.field425(),
+			declarations.field426(),
+			declarations.field427(),
+			declarations.field428(),
+			declarations.field429(),
+			declarations.field430(),
+			declarations.field431(),
+			declarations.field432(),
+			declarations.field433(),
+			declarations.field434(),
+			declarations.field435(),
+			declarations.field436(),
+			declarations.field437(),
+			declarations.field438(),
+			declarations.field439(),
+			declarations.field440(),
+			declarations.field441(),
+			declarations.field442(),
+		},
+	}
+}
+
+// field406 constructs one generated field declaration.
+func (registryDeclarations) field406() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "One Checkpoint 4 verification run of a candidate commit for a confirmed Change Card revision, and its current state. The run keeps the revision it was started for, so a later confirm_intent does not change it."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field407 constructs one generated field declaration.
+func (registryDeclarations) field407() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Verification run identifier; get_verification takes it."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("run_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field408 constructs one generated field declaration.
+func (registryDeclarations) field408() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Change Card the run verifies."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field409 constructs one generated field declaration.
+func (registryDeclarations) field409() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Change Card revision the run verifies."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field410 constructs one generated field declaration.
+func (registryDeclarations) field410() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Candidate commit the run builds and verifies."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("candidate_commit")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field411 constructs one generated field declaration.
+func (registryDeclarations) field411() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Evaluator suite commit the operator configured for the run."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("suite_commit")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field412 constructs one generated field declaration.
+func (registryDeclarations) field412() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Exactly one of running, completed or not_completed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field413 constructs one generated field declaration.
+func (registryDeclarations) field413() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("type")},
+		},
+		JSONType:            &registryText1,
+		DiscriminatorValues: []string{"running", "completed", "not_completed"},
+	}
+}
+
+// field414 constructs one generated field declaration.
+func (registryDeclarations) field414() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The run is still building or evaluating the candidate."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "running"}),
+			},
+		},
+	}
+}
+
+// field415 constructs one generated field declaration.
+func (registryDeclarations) field415() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "When the run was accepted."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("started_at")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "running"}),
+			},
+		},
+	}
+}
+
+// field416 constructs one generated field declaration.
+func (registryDeclarations) field416() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The run produced a verification report. Its verdict is report.passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field417 constructs one generated field declaration.
+func (registryDeclarations) field417() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Evaluator suite the report was produced by."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("suite_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field418 constructs one generated field declaration.
+func (registryDeclarations) field418() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Dependency profile the suite ran the candidate with, such as sim."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("environment")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field419 constructs one generated field declaration.
+func (registryDeclarations) field419() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The builder view of the report."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field420 constructs one generated field declaration.
+func (registryDeclarations) field420() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "SHA-256 digest of the full report the evaluator saved; approve_merge and surla approve take this digest."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("report_digest")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field421 constructs one generated field declaration.
+func (registryDeclarations) field421() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Every declared scenario, counted by outcome."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field422 constructs one generated field declaration.
+func (registryDeclarations) field422() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios the suite declares."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("required")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field423 constructs one generated field declaration.
+func (registryDeclarations) field423() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios that passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("passed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field424 constructs one generated field declaration.
+func (registryDeclarations) field424() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios whose checks failed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("failed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field425 constructs one generated field declaration.
+func (registryDeclarations) field425() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Declared scenarios the suite did not report."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("not_run")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field426 constructs one generated field declaration.
+func (registryDeclarations) field426() *genregistry.ToolFieldMetadata {
+	registryText1 := "integer"
+	registryText2 := "Scenarios that could not be evaluated."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("counts")},
+			{Segment: genregistry.NewToolFieldSegmentField("harness_error")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field427 constructs one generated field declaration.
+func (registryDeclarations) field427() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "The verdict: true only when every declared scenario passed and the suite ran cleanly."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("passed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field428 constructs one generated field declaration.
+func (registryDeclarations) field428() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "Whether the evaluator suite itself failed or ended abnormally."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("suite_failed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field429 constructs one generated field declaration.
+func (registryDeclarations) field429() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "Every declared scenario in declaration order."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field430 constructs one generated field declaration.
+func (registryDeclarations) field430() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Every declared scenario in declaration order."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field431 constructs one generated field declaration.
+func (registryDeclarations) field431() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Scenario name for a repair scenario, or holdout-<n> for a holdout."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field432 constructs one generated field declaration.
+func (registryDeclarations) field432() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "How the scenario ended."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("outcome")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field433 constructs one generated field declaration.
+func (registryDeclarations) field433() *genregistry.ToolFieldMetadata {
+	registryText1 := "array"
+	registryText2 := "The repair scenario's checks; empty for holdouts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field434 constructs one generated field declaration.
+func (registryDeclarations) field434() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The repair scenario's checks; empty for holdouts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field435 constructs one generated field declaration.
+func (registryDeclarations) field435() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Check name."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("name")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field436 constructs one generated field declaration.
+func (registryDeclarations) field436() *genregistry.ToolFieldMetadata {
+	registryText1 := "boolean"
+	registryText2 := "Whether the check passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("passed")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field437 constructs one generated field declaration.
+func (registryDeclarations) field437() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Why the check failed; empty when it passed."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("checks")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("diagnostic")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field438 constructs one generated field declaration.
+func (registryDeclarations) field438() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "The repair scenario's environment error; empty for holdouts."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("report")},
+			{Segment: genregistry.NewToolFieldSegmentField("scenarios")},
+			{Segment: genregistry.NewToolFieldSegmentElement(&genregistry.ToolCollectionElement{})},
+			{Segment: genregistry.NewToolFieldSegmentField("error")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "completed"}),
+			},
+		},
+	}
+}
+
+// field439 constructs one generated field declaration.
+func (registryDeclarations) field439() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// field440 constructs one generated field declaration.
+func (registryDeclarations) field440() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "execution_failed when a step failed; interrupted when the run's process ended before it finished."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("kind")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// field441 constructs one generated field declaration.
+func (registryDeclarations) field441() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Where the run stopped."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("stage")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// field442 constructs one generated field declaration.
+func (registryDeclarations) field442() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Builder-safe description of what stopped the run; never command output."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("state")},
+			{Segment: genregistry.NewToolFieldSegmentField("value")},
+			{Segment: genregistry.NewToolFieldSegmentField("summary")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+		Branches: []*genregistry.ToolUnionBranch{
+			{
+				Selection: genregistry.NewToolUnionSelectionTagged(&genregistry.ToolTaggedUnionBranch{Discriminator: []*genregistry.ToolFieldPathSegment{{Segment: genregistry.NewToolFieldSegmentField("state")}, {Segment: genregistry.NewToolFieldSegmentField("type")}}, Value: "not_completed"}),
+			},
+		},
+	}
+}
+
+// metadata443 constructs one generated metadata declaration.
+func (declarations registryDeclarations) metadata443() *genregistry.ToolTypeMetadata {
+	registryText1 := "VerifyChangePayload"
+	return &genregistry.ToolTypeMetadata{
+		Name:                     &registryText1,
+		SchemaWithoutRootExample: []byte("{\"$schema\":\"https://json-schema.org/draft/2020-12/schema\",\"additionalProperties\":false,\"description\":\"Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller.\",\"properties\":{\"candidate_commit\":{\"description\":\"Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters).\",\"pattern\":\"^([0-9a-f]{40}|[0-9a-f]{64})$\",\"type\":\"string\"},\"change_id\":{\"description\":\"Confirmed Change Card identifier.\",\"type\":\"string\"},\"request_revision\":{\"description\":\"Current request_revision of the confirmed Change Card.\",\"type\":\"string\"}},\"required\":[\"change_id\",\"request_revision\",\"candidate_commit\"],\"type\":\"object\"}"),
+		Fields: []*genregistry.ToolFieldMetadata{
+			declarations.field444(),
+			declarations.field445(),
+			declarations.field446(),
+			declarations.field447(),
+		},
+	}
+}
+
+// field444 constructs one generated field declaration.
+func (registryDeclarations) field444() *genregistry.ToolFieldMetadata {
+	registryText1 := "object"
+	registryText2 := "Names the confirmed Change Card revision and the candidate commit to verify. What is built and which evaluator suite runs come from the operator's configuration of surla serve, never from the caller."
+	return &genregistry.ToolFieldMetadata{
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field445 constructs one generated field declaration.
+func (registryDeclarations) field445() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Confirmed Change Card identifier."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("change_id")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field446 constructs one generated field declaration.
+func (registryDeclarations) field446() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Current request_revision of the confirmed Change Card."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("request_revision")},
+		},
+		JSONType:    &registryText1,
+		Description: &registryText2,
+	}
+}
+
+// field447 constructs one generated field declaration.
+func (registryDeclarations) field447() *genregistry.ToolFieldMetadata {
+	registryText1 := "string"
+	registryText2 := "Full commit ID of the candidate to build and verify (40 or 64 lowercase hex characters)."
+	return &genregistry.ToolFieldMetadata{
+		Path: []*genregistry.ToolFieldPathSegment{
+			{Segment: genregistry.NewToolFieldSegmentField("candidate_commit")},
 		},
 		JSONType:    &registryText1,
 		Description: &registryText2,
