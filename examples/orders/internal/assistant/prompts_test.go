@@ -89,6 +89,10 @@ func TestOverridePromptChangesTheNextModelRequest(t *testing.T) {
 	assert.Equal(t, systemPrompt, systemText(t, third))
 }
 
+// TestOverrideRejectsWithoutChangingThePrompt verifies that Prompts.Override
+// validates both the prompt ID and the template execution against the planner's
+// functions and nil data before saving, leaving the active prompt unchanged
+// when validation fails.
 func TestOverrideRejectsWithoutChangingThePrompt(t *testing.T) {
 	cases := []struct {
 		name     string

@@ -153,18 +153,6 @@ func (s *Service) OverridePrompt(ctx context.Context, p *genorders.OverridePromp
 	return &genorders.PromptVersion{PromptID: p.PromptID, Version: version}, nil
 }
 
-// loadRun loads a run and maps a missing run to the not_found error.
-func (s *Service) loadRun(ctx context.Context, runID string) (RunState, error) {
-	run, err := s.conversations.Status(ctx, runID)
-	if errors.Is(err, ErrRunNotFound) {
-		return RunState{}, genorders.MakeNotFound(fmt.Errorf("run %s not found", runID))
-	}
-	if err != nil {
-		return RunState{}, fmt.Errorf("load run %s: %w", runID, err)
-	}
-	return run, nil
-}
-
 // runView converts a run state into the API's run view.
 func runView(r RunState) *genorders.RunView {
 	v := &genorders.RunView{RunID: r.RunID, Status: r.Status}
@@ -176,4 +164,16 @@ func runView(r RunState) *genorders.RunView {
 		v.ApprovalPrompt = &r.ApprovalPrompt
 	}
 	return v
+}
+
+// loadRun loads a run and maps a missing run to the not_found error.
+func (s *Service) loadRun(ctx context.Context, runID string) (RunState, error) {
+	run, err := s.conversations.Status(ctx, runID)
+	if errors.Is(err, ErrRunNotFound) {
+		return RunState{}, genorders.MakeNotFound(fmt.Errorf("run %s not found", runID))
+	}
+	if err != nil {
+		return RunState{}, fmt.Errorf("load run %s: %w", runID, err)
+	}
+	return run, nil
 }

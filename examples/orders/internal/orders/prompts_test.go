@@ -24,6 +24,10 @@ type fakePrompts struct {
 	set []string
 }
 
+// TestOverridePromptOverHTTP verifies that PUT /prompts/{prompt_id} requires
+// the prompts:manage scope, rejects unknown prompt IDs with 404 unknown_prompt
+// and unrenderable templates with 422 invalid_prompt without mutating the
+// store, and returns the accepted version on success.
 func TestOverridePromptOverHTTP(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -65,13 +69,6 @@ func TestOverridePromptOverHTTP(t *testing.T) {
 	}
 }
 
-// handler serves svc's HTTP API the way cmd/orders mounts it.
-func handler(svc *Service) http.Handler {
-	mux := goahttp.NewMuxer()
-	genordersserver.Mount(mux, genordersserver.New(genorders.NewEndpoints(svc), mux, goahttp.RequestDecoder, goahttp.ResponseEncoder, nil, nil))
-	return mux
-}
-
 // Override accepts templates for the prompt "known" other than "bad".
 func (f *fakePrompts) Override(_ context.Context, promptID, template string) (string, error) {
 	if promptID != "known" {
@@ -82,4 +79,11 @@ func (f *fakePrompts) Override(_ context.Context, promptID, template string) (st
 	}
 	f.set = append(f.set, template)
 	return "version-of-" + template, nil
+}
+
+// handler serves svc's HTTP API the way cmd/orders mounts it.
+func handler(svc *Service) http.Handler {
+	mux := goahttp.NewMuxer()
+	genordersserver.Mount(mux, genordersserver.New(genorders.NewEndpoints(svc), mux, goahttp.RequestDecoder, goahttp.ResponseEncoder, nil, nil))
+	return mux
 }
