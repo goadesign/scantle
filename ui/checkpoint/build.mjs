@@ -30,6 +30,7 @@ const SUPPORTED_SCHEMA_KEYS = new Set([
   "items",
   "properties",
   "$defs",
+  "oneOf",
 ]);
 
 const IGNORED_ANNOTATION_KEYS = new Set([
@@ -59,7 +60,10 @@ function compactSchema(node, schemaPath = "$") {
   }
   for (const key of Object.keys(node)) {
     if (key === "format") {
-      if (node.type !== "integer" || node.format !== "int64") {
+      if (
+        !(node.type === "integer" && node.format === "int64") &&
+        !(node.type === "string" && node.format === "date-time")
+      ) {
         throw new Error(
           `Unsupported JSON Schema format ${JSON.stringify(node.format)} on type ${JSON.stringify(
             node.type
@@ -94,6 +98,17 @@ function compactSchema(node, schemaPath = "$") {
       throw new Error(`Unsupported non-string enum at ${schemaPath}`);
     }
     out.enum = node.enum;
+  }
+  if (node.format === "date-time") {
+    out.format = node.format;
+  }
+  if (node.oneOf !== undefined) {
+    if (!Array.isArray(node.oneOf) || node.oneOf.length === 0) {
+      throw new Error(`Invalid oneOf array at ${schemaPath}`);
+    }
+    out.oneOf = node.oneOf.map((branch, index) =>
+      compactSchema(branch, `${schemaPath}.oneOf[${index}]`)
+    );
   }
   if (node.required !== undefined) {
     if (!Array.isArray(node.required) || !node.required.every((v) => typeof v === "string")) {
@@ -154,6 +169,9 @@ try {
 // tsTypeForProperty converts a JSON Schema property node into its TypeScript
 // type expression.
 function tsTypeForProperty(prop) {
+  if (Array.isArray(prop.oneOf)) {
+    return `(${prop.oneOf.map(tsTypeForProperty).join(" | ")})`;
+  }
   if (typeof prop.$ref === "string") {
     return prop.$ref.replace(/^#\/\$defs\//, "");
   }
@@ -173,6 +191,13 @@ function tsTypeForProperty(prop) {
     return prop.items ? `${tsTypeForProperty(prop.items)}[]` : "unknown[]";
   }
   if (prop.type === "object") {
+    if (prop.properties) {
+      const required = new Set(prop.required || []);
+      const fields = Object.entries(prop.properties).map(([name, value]) =>
+        `${JSON.stringify(name)}${required.has(name) ? "" : "?"}: ${tsTypeForProperty(value)}`
+      );
+      return `{ ${fields.join("; ")} }`;
+    }
     if (prop.additionalProperties && typeof prop.additionalProperties === "object") {
       return `Record<string, ${tsTypeForProperty(prop.additionalProperties)}>`;
     }
@@ -239,6 +264,12 @@ function generateTypesModule() {
       "ChangeCardResult tool schemas (propose_change, confirm_intent, get_change, approve_merge) diverged"
     );
   }
+  if (
+    JSON.stringify(rawByTool["surla.verify_change"]) !==
+    JSON.stringify(rawByTool["surla.get_verification"])
+  ) {
+    throw new Error("VerificationStatusResult tool schemas diverged");
+  }
 
   const rootSchemas = {
     ChangeCardResult: compactSchema(
@@ -253,6 +284,10 @@ function generateTypesModule() {
     DraftOverrideResult: compactSchema(
       rawByTool["surla.draft_override"],
       "DraftOverrideResult"
+    ),
+    VerificationStatusResult: compactSchema(
+      rawByTool["surla.get_verification"],
+      "VerificationStatusResult"
     ),
   };
 
@@ -273,12 +308,16 @@ function generateTypesModule() {
 // Package types declares the generated MCP tool result interfaces and
 // JSON-Schema-driven runtime validators for Surla Checkpoint Studio.
 
+import { z } from "zod";
+
 ${interfaceBlocks.join("\n\n")}
 
 interface JSONSchemaNode {
   type?: string;
   $ref?: string;
   enum?: string[];
+  format?: "date-time";
+  oneOf?: JSONSchemaNode[];
   required?: string[];
   additionalProperties?: boolean | JSONSchemaNode;
   items?: JSONSchemaNode;
@@ -292,6 +331,13 @@ const GENERATED_RESULT_SCHEMAS: Record<string, JSONSchemaNode> = ${JSON.stringif
     2
   )};
 
+// dateTimeSchema checks the RFC3339 date/time values produced by Goa, including
+// calendar dates and explicit seconds and timezone. Date.parse also checks
+// numeric timezone offsets before the value is accepted.
+const dateTimeSchema = z.string().datetime({ offset: true }).regex(
+  /T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/
+);
+
 // isPlainObject reports whether v is a non-null, non-array JavaScript object.
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v);
@@ -304,6 +350,17 @@ function matchesJSONSchema(
   schema: JSONSchemaNode,
   defs: Record<string, JSONSchemaNode>
 ): boolean {
+  if (schema.oneOf) {
+    let matches = 0;
+    for (const branch of schema.oneOf) {
+      if (matchesJSONSchema(value, branch, defs)) {
+        matches++;
+      }
+    }
+    if (matches !== 1) {
+      return false;
+    }
+  }
   if (typeof schema.$ref === "string") {
     const defName = schema.$ref.replace(/^#\\/\\$defs\\//, "");
     const target = defs[defName];
@@ -311,6 +368,12 @@ function matchesJSONSchema(
   }
   if (schema.type === "string") {
     if (typeof value !== "string") {
+      return false;
+    }
+    if (
+      schema.format === "date-time" &&
+      (!dateTimeSchema.safeParse(value).success || !Number.isFinite(Date.parse(value)))
+    ) {
       return false;
     }
     return !Array.isArray(schema.enum) || schema.enum.includes(value);
@@ -364,7 +427,7 @@ function matchesJSONSchema(
     }
     return true;
   }
-  return false;
+  return Boolean(schema.oneOf);
 }
 
 function validateGeneratedRoot(name: string, value: unknown): boolean {
@@ -390,6 +453,11 @@ export function isDiffResult(p: unknown): p is DiffResult {
 // isDraftOverrideResult validates that a payload conforms to the generated DraftOverrideResult schema.
 export function isDraftOverrideResult(p: unknown): p is DraftOverrideResult {
   return validateGeneratedRoot("DraftOverrideResult", p);
+}
+
+// isVerificationStatusResult validates the generated CP4 state and report.
+export function isVerificationStatusResult(p: unknown): p is VerificationStatusResult {
+  return validateGeneratedRoot("VerificationStatusResult", p);
 }
 `;
 }
@@ -451,7 +519,7 @@ ${stylesCss}
   <main id="surla-checkpoint-root" data-profile="mcp-app" data-state="waiting">
     <header>
       <h1>Surla Checkpoint Studio</h1>
-      <p>Review and confirm domain decisions, concrete examples, architecture previews, and prompt updates for your change.</p>
+      <p>Review and confirm domain decisions, concrete examples, architecture previews, prompt updates, and verification results for your change.</p>
       <details class="surla-details">
         <summary>Details</summary>
         <p><small>Submitting Checkpoint 1 edits dispatches <code>confirm_intent</code> through the MCP Apps host; server authentication and <code>request_revision</code> checks remain authoritative.</small></p>
