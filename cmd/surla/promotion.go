@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/goadesign/surla/internal/controlplane"
 	"github.com/goadesign/surla/internal/verify"
@@ -60,8 +61,13 @@ type (
 // opens that directory once and reads every binary through it, so the
 // digests come from one directory even if the operator publishes a
 // replacement meanwhile; a later replacement makes this answer stale, as any
-// answer can become. A missing or unreadable binary fails the call.
+// answer can become. candidateCommit must be a full commit ID, since it names
+// a directory here; it comes from approve_merge's payload or from a saved
+// approval. A missing, unreadable or non-regular binary fails the call.
 func (t *releaseTarget) CurrentInputs(_ context.Context, candidateCommit string) (controlplane.PromotionInputs, error) {
+	if !verify.IsCommitID(candidateCommit) {
+		return controlplane.PromotionInputs{}, fmt.Errorf("candidate commit %q is not a full commit ID", candidateCommit)
+	}
 	dir := filepath.Join(t.cfg.ReleaseDir, candidateCommit)
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -96,8 +102,9 @@ func (t *releaseTarget) LoadReport(_ context.Context, digest string) (verify.Rep
 
 // loadPromotionConfig reads and validates -promotion-config. An empty path
 // means approve_merge stays unavailable; any missing field, unknown field,
-// trailing data, or binary name that is not a single distinct file name
-// stops startup.
+// trailing data, suite_commit that is not a full commit ID, or binary name
+// that is not a distinct artifact name stops startup. Relative directories
+// are resolved against the working directory once, here.
 func loadPromotionConfig(path string) (controlplane.PromotionTarget, error) {
 	if path == "" {
 		return nil, nil
@@ -130,21 +137,43 @@ func loadPromotionConfig(path string) (controlplane.PromotionTarget, error) {
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("-promotion-config %s is missing %s", path, strings.Join(missing, ", "))
 	}
+	if !verify.IsCommitID(f.SuiteCommit) {
+		return nil, fmt.Errorf("-promotion-config %s: suite_commit %q must be a full commit ID (40 or 64 lowercase hex characters)", path, f.SuiteCommit)
+	}
 	seen := make(map[string]bool, len(f.Binaries))
 	for _, name := range f.Binaries {
-		if name == "" || name == "." || name == ".." || strings.ContainsRune(name, filepath.Separator) || seen[name] {
-			return nil, fmt.Errorf("-promotion-config %s: binary %q must be a distinct file name", path, name)
+		if err := verify.ValidateArtifactName(name); err != nil {
+			return nil, fmt.Errorf("-promotion-config %s: %w", path, err)
+		}
+		if seen[name] {
+			return nil, fmt.Errorf("-promotion-config %s: binary %q is listed twice", path, name)
 		}
 		seen[name] = true
+	}
+	for _, dir := range []*string{&f.ReportDir, &f.ReleaseDir} {
+		abs, err := filepath.Abs(*dir)
+		if err != nil {
+			return nil, fmt.Errorf("-promotion-config %s: %w", path, err)
+		}
+		*dir = abs
 	}
 	return &releaseTarget{cfg: f}, nil
 }
 
-// hashFile returns the hex SHA-256 digest of name inside root.
+// hashFile returns the hex SHA-256 digest of the regular file name inside
+// root. It opens without blocking and checks the opened file, so a FIFO or
+// device staged under a binary's name fails instead of blocking the call.
 func hashFile(root *os.Root, name string) (string, error) {
-	f, err := root.Open(name)
+	f, err := root.OpenFile(name, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return "", err
+	}
+	info, err := f.Stat()
+	if err == nil && !info.Mode().IsRegular() {
+		err = fmt.Errorf("%s is not a regular file", name)
+	}
+	if err != nil {
+		return "", errors.Join(err, f.Close())
 	}
 	h := sha256.New()
 	_, err = io.Copy(h, f)

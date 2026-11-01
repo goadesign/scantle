@@ -1,3 +1,6 @@
+// This file tests the staged-release promotion target behind
+// `surla serve -promotion-config`.
+
 package main
 
 import (
@@ -7,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	gensurla "github.com/goadesign/surla/gen/surla"
 	"github.com/goadesign/surla/internal/controlplane"
@@ -37,9 +42,18 @@ func TestLoadPromotionConfig(t *testing.T) {
 		{"missing fields", `{"report_dir":"/r","binaries":[]}`, "is missing release_dir, suite_id, suite_commit, environment, binaries"},
 		{"unknown field", strings.TrimSuffix(valid, "}") + `,"extra":1}`, "unknown field"},
 		{"trailing data", valid + "{}", "data after the configuration"},
-		{"binary with a path", strings.Replace(valid, `"orders-worker"`, `"bin/orders-worker"`, 1), "must be a distinct file name"},
-		{"parent directory", strings.Replace(valid, `"orders-worker"`, `".."`, 1), "must be a distinct file name"},
-		{"repeated binary", strings.Replace(valid, `"orders-worker"`, `"orders"`, 1), "must be a distinct file name"},
+		{"64-digit suite commit", strings.Replace(valid, suiteCommit, strings.Repeat("b", 64), 1), ""},
+		{"binary with a path", strings.Replace(valid, `"orders-worker"`, `"bin/orders-worker"`, 1), "must not contain /"},
+		{"parent directory", strings.Replace(valid, `"orders-worker"`, `".."`, 1), "is not a valid artifact name"},
+		{"repeated binary", strings.Replace(valid, `"orders-worker"`, `"orders"`, 1), "is listed twice"},
+	}
+	for _, bad := range []string{strings.Repeat("b", 39), strings.Repeat("b", 41), strings.Repeat("b", 63),
+		strings.Repeat("b", 65), strings.Repeat("g", 40), strings.Repeat("B", 40), "garbage"} {
+		cases = append(cases, struct {
+			name    string
+			content string
+			wantErr string
+		}{"suite commit " + bad, strings.Replace(valid, suiteCommit, bad, 1), "must be a full commit ID"})
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -89,7 +103,39 @@ func TestReleaseTargetMeasuresStagedBinaries(t *testing.T) {
 	require.NoError(t, os.WriteFile(outside, []byte("worker v1"), 0o600))
 	require.NoError(t, os.Symlink(outside, filepath.Join(release, escaping, "orders-worker")))
 	_, err = target.CurrentInputs(context.Background(), escaping)
-	assert.ErrorContains(t, err, "read release binary orders-worker", "a link out of the release directory is not followed")
+	assert.ErrorContains(t, err, "path escapes from parent", "a link out of the release directory is not followed")
+
+	long := strings.Repeat("a", 64)
+	publish(t, release, long, map[string]string{"orders": "api v1", "orders-worker": "worker v1"})
+	_, err = target.CurrentInputs(context.Background(), long)
+	assert.NoError(t, err, "a SHA-256 commit ID names a release directory too")
+
+	for _, bad := range []string{"../" + commit, commit + "/..", strings.Repeat("c", 39), strings.ToUpper(commit)} {
+		_, err = target.CurrentInputs(context.Background(), bad)
+		assert.ErrorContains(t, err, "is not a full commit ID", bad)
+	}
+}
+
+// TestReleaseTargetRefusesNonRegularFiles stages a FIFO under a binary's
+// name and checks that CurrentInputs fails promptly instead of blocking on it.
+func TestReleaseTargetRefusesNonRegularFiles(t *testing.T) {
+	commit := strings.Repeat("c", 40)
+	release := t.TempDir()
+	target := newReleaseTarget(t, release, t.TempDir())
+	publish(t, release, commit, map[string]string{"orders": "api v1"})
+	require.NoError(t, syscall.Mkfifo(filepath.Join(release, commit, "orders-worker"), 0o600))
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := target.CurrentInputs(context.Background(), commit)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorContains(t, err, "orders-worker is not a regular file")
+	case <-time.After(10 * time.Second):
+		t.Fatal("CurrentInputs blocked on a FIFO")
+	}
 }
 
 // TestApproveMergeChecksTheStagedRelease approves a confirmed card against a
@@ -163,8 +209,9 @@ func newReleaseTarget(t *testing.T, release, reports string) controlplane.Promot
 }
 
 // publish writes files into a new directory and renames it to
-// <release>/<commit>, replacing any earlier one, the way an operator
-// publishes a release.
+// <release>/<commit>, the way an operator publishes a release: an earlier
+// directory for that commit is first renamed aside, complete, never changed
+// in place.
 func publish(t *testing.T, release, commit string, files map[string]string) {
 	t.Helper()
 	staged, err := os.MkdirTemp(release, "staging-")
@@ -173,7 +220,11 @@ func publish(t *testing.T, release, commit string, files map[string]string) {
 		require.NoError(t, os.WriteFile(filepath.Join(staged, name), []byte(content), 0o700))
 	}
 	dst := filepath.Join(release, commit)
-	require.NoError(t, os.RemoveAll(dst))
+	if _, err := os.Stat(dst); err == nil {
+		retired, err := os.MkdirTemp(release, "retired-")
+		require.NoError(t, err)
+		require.NoError(t, os.Rename(dst, filepath.Join(retired, commit)))
+	}
 	require.NoError(t, os.Rename(staged, dst))
 }
 
