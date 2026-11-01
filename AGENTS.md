@@ -29,9 +29,12 @@ comments, tests, fixtures, docs, commits, branches, issues, or pull requests.
    unverified. If a test fails or a step was skipped, say so.
 6. **Run tools non-interactively and bounded.** Close standard input and set
    `CI=true` for package runners and CLIs (`node`, `npx`, `gh`), so a hidden
-   prompt never blocks a command. Wait on long work with tools that stop on
-   failure (`gh pr checks --watch --fail-fast`, `gh run watch --exit-status`),
-   never with an open-ended polling loop.
+   prompt never blocks a command. Give every wait on long work an explicit
+   wall-clock deadline, and stop on success, failure, an unexpected state, or
+   the deadline, whichever comes first. Watchers such as
+   `gh pr checks --watch --fail-fast` and `gh run watch --exit-status` stop
+   on failure but not on a stalled or queued job, so run them under that
+   deadline too.
 
 Example of the plain-English standard used in every reply, comment, doc, and
 pull request (state the input, what happens, and what the caller sees before
@@ -233,7 +236,8 @@ for a first-time user, applying Google's UX principles:
 - Keep your primary checkout clean on `origin/main`, and do each task on a
   branch from `origin/main` in a separate clone, for example
   `git clone --reference <primary-checkout> <remote> <task-clone>`. Never run
-  two agents in the same working tree.
+  two write-enabled agents, or concurrent Git commands that change state, in
+  the same working tree; read-only reviewers may inspect it.
 - Stage explicit paths only (never `git add .` or `git add -u`). Check
   `git diff --stat origin/main...HEAD` before pushing or opening a pull
   request. Never force-push.
