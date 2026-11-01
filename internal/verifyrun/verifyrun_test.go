@@ -83,7 +83,17 @@ func fakeRun(ctx context.Context, plan verify.Plan) (verify.Report, error) {
 			return verify.Report{}, err
 		}
 		<-ctx.Done()
-		return verify.Report{}, errors.Join(ctx.Err(), os.RemoveAll(store))
+		if err := os.RemoveAll(store); err != nil {
+			return verify.Report{}, err
+		}
+		return verify.Report{}, &verify.StageError{Stage: verify.StageSuite, Summary: "The evaluator suite ended without a report.", Err: ctx.Err()}
+	case "stop-with-report":
+		// Like a suite that saves a partial report when it is stopped.
+		if err := os.WriteFile(filepath.Join(filepath.Dir(plan.WorkDir), "pids"), []byte(fmt.Sprintf("%d %d", os.Getpid(), os.Getpid())), 0o600); err != nil {
+			return verify.Report{}, err
+		}
+		<-ctx.Done()
+		return saveReport(plan, false)
 	}
 	return verify.Report{}, errors.New("no fake mode")
 }
@@ -254,6 +264,20 @@ func TestCanceledRunStopsGracefullyAndLeavesNoProcesses(t *testing.T) {
 	_, state, err := Read(root, runID)
 	require.NoError(t, err)
 	assert.Equal(t, interrupted(summaryCanceled), state.Result)
+}
+
+func TestRunStoppedWhileItsSuiteReportsIsInterruptedNotFailed(t *testing.T) {
+	t.Setenv(fakeTimeoutEnv, "2s")
+	root, runID, _ := start(t, "stop-with-report")
+	hangingPIDs(t, root, runID)
+	require.NoError(t, Wait(root, runID))
+	_, state, err := Read(root, runID)
+	require.NoError(t, err)
+	assert.Equal(t, interrupted(summaryTimedOut), state.Result,
+		"a partial report from a stopped suite would read as failed scenarios")
+	log, err := os.ReadFile(filepath.Join(root, runID, "supervisor.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(log), "partial report", "the operator can still find the partial report")
 }
 
 func TestRunPastItsTimeoutIsStopped(t *testing.T) {

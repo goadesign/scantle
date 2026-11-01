@@ -157,6 +157,9 @@ const (
 	summarySupervisorDied = "The process supervising the verification ended before it finished."
 	summaryCanceled       = "The verification was canceled."
 	summaryTimedOut       = "The verification did not finish within its time limit."
+	// summaryUnreadableRequest describes a run whose saved request could not
+	// be read, so nothing was started.
+	summaryUnreadableRequest = "The verification request could not be read."
 )
 
 var (
@@ -232,8 +235,10 @@ func Start(root string, req Request, command []string) (int, error) {
 // Timeout ends it: either way the executor gets SIGTERM and stopGrace to stop
 // its suite before the whole group is killed. When the executor ends, the
 // group is killed and emptied before result.json is written: the executor's
-// own result when it reported one (a report is kept even if it arrives as the
-// run is being stopped), and otherwise an interrupted outcome that says why.
+// own result when it reported one, and otherwise an interrupted outcome. A
+// run the supervisor stopped is always interrupted with the reason, canceled
+// or timed out: a report the suite saved while stopping is partial and would
+// read as failed scenarios, so its digest goes only to the supervisor log.
 // A run whose report passed has its work directory removed; any other run
 // keeps it as evidence. command is the argument list that runs this program.
 func Supervise(dir string, command []string) error {
@@ -246,7 +251,7 @@ func Supervise(dir string, command []string) error {
 
 	req, err := readRequest(dir)
 	if err != nil {
-		return errors.Join(err, writeJSON(dir, resultFile, interrupted(summaryExecutorDied)))
+		return errors.Join(err, writeJSON(dir, resultFile, interrupted(summaryUnreadableRequest)))
 	}
 	control, keep, err := os.Pipe()
 	if err != nil {
@@ -291,9 +296,10 @@ func Supervise(dir string, command []string) error {
 	}
 	select {
 	case reason := <-stopped:
-		if result.Kind != ResultReport {
-			result = interrupted(reason)
+		if result.Kind == ResultReport {
+			fmt.Fprintf(os.Stderr, "run stopped (%s); partial report %s kept for the operator\n", reason, result.ReportDigest)
 		}
+		result = interrupted(reason)
 	default:
 	}
 	if err := writeJSON(dir, resultFile, result); err != nil {
@@ -312,8 +318,8 @@ func Supervise(dir string, command []string) error {
 // Execute runs as `surla verify-run execute <dir>`, the leader of the run's
 // process group. It watches the control pipe on descriptor 3 and kills its
 // whole group when the supervisor dies; otherwise it runs the plan saved in
-// request.json with run, canceling it on SIGTERM, and writes the run's Result
-// as JSON to out. The full
+// request.json with run, canceling it on SIGTERM, and writes the run's
+// Result as JSON to out. The full
 // error of a failed step goes to errLog, which stays with the evaluator.
 func Execute(dir string, run func(context.Context, verify.Plan) (verify.Report, error), out, errLog io.Writer) error {
 	syscall.CloseOnExec(passedFD)
@@ -538,6 +544,13 @@ func stopOnRequest(pgid int, timeout time.Duration, signals <-chan os.Signal, ex
 		stopped <- summaryCanceled
 	case <-deadline.C:
 		stopped <- summaryTimedOut
+	}
+	select {
+	case <-exited:
+		// The executor exited as the stop was decided; its PID may already
+		// belong to another process.
+		return
+	default:
 	}
 	if err := syscall.Kill(pgid, syscall.SIGTERM); err != nil && !errors.Is(err, syscall.ESRCH) {
 		fmt.Fprintf(os.Stderr, "stop verification: signal executor %d: %v\n", pgid, err)
