@@ -203,7 +203,7 @@ func RunCommand(ctx context.Context, dir, logPath string, args ...string) error 
 	cmd.Stdout, cmd.Stderr = log, log
 	runErr, stopErr := procgroup.Run(cmd, syscall.SIGTERM, stopGrace, stopTimeout)
 	if stopErr != nil {
-		return errors.Join(&stuckError{err: stopErr}, log.Close())
+		return errors.Join(&stuckError{err: stopErr}, runErr, log.Close())
 	}
 	return errors.Join(runErr, log.Close())
 }
