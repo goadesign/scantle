@@ -31,7 +31,10 @@ the most important problems, and what to fix first.>
 
 | Milestone | Outcome | Elapsed time | Hints (level) | Errors | SEQ (1–7) |
 | --- | --- | --- | --- | --- | --- |
-| <milestone> | Completed / Completed with help / Failed / Not reached / Not supported on this machine | <mm:ss> | <n (levels)> | <n> | <score> |
+| <milestone> (attempt N) | Completed / Completed with help / Failed / Not reached / Not valid (after a scope leak) / Not supported on this machine | <mm:ss> | <n (levels)> | <n> | <score> |
+
+<With more than one attempt, give each milestone one row per attempt that
+reached it, so a reader sees what changed after each fix.>
 
 <One paragraph on overall effectiveness, efficiency, and ease, with totals.>
 

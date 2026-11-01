@@ -40,7 +40,8 @@ You are taking part in a usability study of a developer tool called
   the clone apart from its README, and `github.com/goadesign/surla` in the Go
   module cache. It may read other libraries it needs to write code.
 - Run long-running processes, such as servers, in the background. Report
-  their PIDs and ports.
+  their PIDs and ports, and the path of any folder you create outside
+  `work/`.
 
 ## How to work
 

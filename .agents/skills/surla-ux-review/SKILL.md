@@ -50,8 +50,10 @@ participant's folder and, apart from it, the tester's folder:
   surla/       # git clone of github.com/goadesign/surla at the commit under test
   work/        # empty; the participant builds its product here
 ~/surla-ux-reports/<id>/
-  docs/        # copies of README.md, PROPOSAL.md, PRESS_RELEASE.md, docs/
-               # (with img/), and examples/*/README.md from that commit
+  docs/        # README.md, PROPOSAL.md, PRESS_RELEASE.md, docs/ (with img/),
+               # and examples/*/README.md from that commit, copied at their
+               # repository-relative paths so the READMEs do not overwrite
+               # each other
   observations.md   # the tester's notes, which it writes
   attempt-1/transcript.md   # you append every relayed message here
   report.md    # the final report
@@ -64,7 +66,7 @@ list, not the folder layout, is what keeps the tester's notes and Surla's
 source out of its view.
 
 **Facts to record.** Before starting the subagents, write these at the top of
-`transcript.md`:
+`attempt-1/transcript.md`:
 
 - the Surla commit, the date, and the OS;
 - the `-surla-version` that the README tells `surla init` to use. A scaffolded
@@ -175,15 +177,20 @@ participant cannot get past it however well it uses Surla.
    happened to hit.
 3. If the fix is in code that a scaffolded project downloads, the participant
    would still get the old version through the README's `-surla-version`.
-   Push the fix. Then add a follow-up commit that points `-surla-version` at
-   the fix commit, the way main updates `examples/orders` after a release.
+   Push the fix. Then add a follow-up commit that sets `-surla-version` to the
+   fix commit's Go pseudo-version (`v0.0.0-<yyyymmddhhmmss>-<12-char-sha>`,
+   as `go list -m github.com/goadesign/surla@<sha>` prints it). This is the
+   same way main updates `examples/orders` after a release.
 4. Restart from scratch:
    1. Stop the participant's processes.
    2. Replace `surla/` with a clone at the newest commit of the fix,
       including any `-surla-version` follow-up.
    3. Copy the user docs from that commit into the tester's `docs/` again, so
       the tester judges the participant against the docs it is reading.
-   4. Clear `work/` and start `attempt-<N+1>/transcript.md` with the newly
+   4. Clear `work/`, and remove any folder outside it that the participant
+      reported creating for its project, such as `/tmp/shop` from the
+      README's `surla init -dir` example. `surla init` refuses a folder that
+      already exists. Then start `attempt-<N+1>/transcript.md` with the newly
       recorded facts.
    5. Start a **fresh** participant. One that remembers the failed attempt
       would skip the steps that confused it.
