@@ -104,9 +104,12 @@ model only for mechanical read-only status checks that return raw evidence.
 ## 3. Ownership and state
 
 - **One owner per durable state.** Replicas of one service may share its
-  private storage. Two different components never read or write the same
-  files, tables, or keys. In Surla, `internal/controlplane` owns Change Card
-  files, and `internal/verifyrun` owns verification run directories.
+  private storage, and two distinct services never read or write the same
+  files, tables, or keys. One package owns each on-disk format and the only
+  code that reads or writes it: `internal/controlplane` owns Change Card
+  files, and `internal/verifyrun` owns verification run directories, which
+  `surla serve` and the `surla verify-run` processes it starts share through
+  that package.
 - **Ask the owner.** Get a running service's facts through its API, not by
   copying them into configuration. A host that embeds the control plane binds
   `TargetUpdater` or `PromotionTarget`; Surla never fabricates the facts those
@@ -129,9 +132,12 @@ model only for mechanical read-only status checks that return raw evidence.
   a result returns an ID another call needs, name that field.
 - **Never repair model output with heuristics.** Validate model output where
   it enters code and reject what violates the contract.
-- **Bound work before reading.** Limit time ranges, rows, and bytes before
-  an expensive read. A bounded result states what it covers and whether more
-  remains.
+- **Bound work at the resource it protects.** A limit names the exact
+  resource and lifetime it guards: goa-ai `BoundedResult` pages bound one
+  model-visible tool result, and an operator's verification `timeout` bounds
+  one CP4 run. Apply a limit before the expensive read, never by fetching
+  everything and truncating; a bounded result states what it covers and
+  whether more remains.
 - **Keep holdouts hidden.** Builder-facing output goes through
   `Report.ForBuilders()`; never expose holdout scenario names, checks, or
   logs to a coding agent.
@@ -159,13 +165,15 @@ model only for mechanical read-only status checks that return raw evidence.
 
 ### Goa and generated code
 
-- Never edit generated files by hand: `gen/`,
+- Never edit generated files by hand: `gen/`, `ui/checkpoint/src/types.ts`,
   `internal/controlplane/checkpoint.html`, and
-  `internal/goldenpath/decision_catalog.md`. After changing `design/`, run
-  `goa gen github.com/goadesign/surla/design`, then
-  `CI=true node ui/checkpoint/build.mjs --check </dev/null`. The examples
-  under `examples/` are separate Go modules with their own `design/` and
-  `gen/`.
+  `internal/goldenpath/decision_catalog.md`.
+- After changing `design/`, run `goa gen github.com/goadesign/surla/design`.
+  After changing `design/` or `ui/checkpoint/src/`, rebuild with
+  `CI=true node ui/checkpoint/build.mjs </dev/null`; check that nothing is
+  stale with `CI=true node ui/checkpoint/build.mjs --check </dev/null`.
+- The examples under `examples/` are separate Go modules with their own
+  `design/` and `gen/`; run `goa gen` from each module for its design.
 - Service and method descriptions explain the domain role, the flow that
   calls the method, and what it returns.
 - Return expected absence as a value; reserve `not_found` for a required
@@ -184,12 +192,14 @@ spans to quiet an alert; fix the alert instead.
 - When a contract changes, update every affected test and fixture end to
   end. Never rewrite an assertion just to match new output.
 - Tests write only inside `t.TempDir()`, never into the source tree.
-- Run the smallest test set that exercises the change. At integration
-  points, run:
+- Run the smallest test set that exercises the change. Before merging a
+  change to a module, run its suite:
   - `go test -race ./...`
   - `go test -race -tags e2e ./internal/verify`
-  - `(cd examples/orders && go test -race ./...)`
-  - `(cd examples/orders-eval && go test -race -tags e2e ./acceptance)`
+  - `(cd examples/orders && go test -race ./...)` when `examples/orders`
+    changed
+  - `(cd examples/orders-eval && go test -race -tags e2e ./acceptance)` when
+    `examples/orders` or `examples/orders-eval` changed
 
 ### TypeScript (`ui/checkpoint/`)
 
@@ -206,8 +216,9 @@ for a first-time user, applying Google's UX principles:
 
 ## 6. Documentation and pull requests
 
-- When behavior changes, update `README.md`, `docs/HOW_IT_WORKS.md`,
-  `docs/REFERENCE.md`, and the affected `examples/*/README.md` together.
+- When behavior changes, update every doc that describes it in the same
+  change: `README.md`, `docs/HOW_IT_WORKS.md`, `docs/REFERENCE.md`,
+  `docs/ARCHITECTURE_PLAYBOOK.md`, or the affected `examples/*/README.md`.
 - Write docs in active voice using Google technical writing style. Name the
   exact actor, command, and file at each step. Describe the current state;
   never write changelogs, rollout diaries, or completed migration phases into
@@ -219,10 +230,10 @@ for a first-time user, applying Google's UX principles:
 
 ## 7. Git safety
 
-- Keep the primary checkout clean on `origin/main`. Do each task in its own
-  clone under `~/src`, made with
-  `git clone --reference ~/src/surla <remote> ~/src/surla-<task>`, on a
-  branch from `origin/main`.
+- Keep your primary checkout clean on `origin/main`, and do each task on a
+  branch from `origin/main` in a separate clone, for example
+  `git clone --reference <primary-checkout> <remote> <task-clone>`. Never run
+  two agents in the same working tree.
 - Stage explicit paths only (never `git add .` or `git add -u`). Check
   `git diff --stat origin/main...HEAD` before pushing or opening a pull
   request. Never force-push.
