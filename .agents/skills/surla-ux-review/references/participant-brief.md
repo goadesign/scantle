@@ -31,7 +31,8 @@ You are taking part in a usability study of a developer tool called
   real first-time user works from the README and the tool, and that is what
   this study measures. Documents the README links to are not available. If
   you want one, say so in your report, because that is useful evidence.
-- Run Surla itself the way the README shows.
+- Run Surla itself the way the README shows, including `surla init`, which
+  sets up your starter project.
 - Do not compile, generate code from, or run your product's code yourself,
   for example with `goa gen`, `go build`, `go run`, or `go test` in your
   project. Your product's code runs only through Surla's commands, such as

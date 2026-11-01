@@ -35,8 +35,8 @@ Otherwise use the defaults:
 
 **Where to start.** Run this skill from a folder with no Surla `AGENTS.md` in
 it or above it. Some coding-agent harnesses load the working directory's
-`AGENTS.md` into every subagent, and Surla's describes its internals. The skill lives in Surla's
-`.agents/skills/surla-ux-review/`. To start it from elsewhere, link that
+`AGENTS.md` into every subagent, and Surla's describes its internals. The
+skill lives in Surla's `.agents/skills/surla-ux-review/`. To start it from elsewhere, link that
 folder into your personal skills folder once:
 
 - `~/.agents/skills/`, read by Codex and Gemini CLI;
@@ -86,10 +86,11 @@ source out of its view.
   verification builds and runs the code under test inside its own macOS
   `sandbox-exec` sandbox (`verify/candidate`), which usually cannot start
   inside the agent's sandbox. Give the participant the host access you are
-  authorized to give. Trusted Surla commands run as the docs show, but the
-  product's own code is never compiled, generated from, or run outside
-  Surla's sandbox. That includes `goa gen` on its design, which runs that
-  design code. If the documented workflow needs a step Surla cannot run in
+  authorized to give. Trusted Surla commands run as the docs show, including
+  `surla init`, which generates code from Surla's own unmodified starter
+  templates. The product's own code is never compiled, generated from, or run
+  outside Surla's sandbox. That includes `goa gen` on its design, which runs
+  that design code. If the documented workflow needs a step Surla cannot run in
   its sandbox, the study reports it as a missing capability. If the access
   Surla needs is not available, that is an
   environment limitation: the tester marks the milestones it blocks as not
