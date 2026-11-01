@@ -269,6 +269,25 @@ func draftPayload(t *testing.T, kind, text string) json.RawMessage {
 	return args
 }
 
+// TestHostServesTheCurrentCheckpointViewer reads the checkpoint viewer the
+// host serves and checks it is the build from the pinned Surla version, which
+// describes a saved approval and keeps its digests in expandable details.
+func TestHostServesTheCurrentCheckpointViewer(t *testing.T) {
+	target := newTarget(t)
+	host := newHost(t, target.server.URL, targetToken(t, "prompts:manage"))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, host.URL+"/ui/checkpoint", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer test-mcp-token")
+	response, err := host.Client().Do(req)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	var html string
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&html))
+	assert.Contains(t, html, "surla-cp5-approval-details")
+	assert.NotContains(t, html, "In-memory approval recorded")
+}
+
 // callTool checks the complete JSON-RPC response before decoding the MCP
 // tool result; a transport failure cannot look like an expected tool refusal.
 func callTool(t *testing.T, host *httptest.Server, name string, args json.RawMessage) toolReply {
