@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"time"
 
 	gensurla "github.com/goadesign/surla/gen/surla"
@@ -24,7 +25,8 @@ type VerificationConfig struct {
 	// Plan is the operator's part of every run's verify.Plan: CandidateRepo,
 	// CandidateModule, Binaries, SuiteRepo, SuiteCommit, SuiteModule,
 	// SuiteCommand and ReportDir. CandidateCommit, RequestRevision and
-	// WorkDir are set per run and must be empty here.
+	// WorkDir are set per run and must be empty here. RunsDir grows by one
+	// directory per run, kept as evidence; the operator prunes it.
 	Plan verify.Plan
 	// Command is the argument list that runs this surla executable; runs
 	// start `<Command> verify-run supervise <dir>`.
@@ -65,11 +67,15 @@ func (c *ControlPlane) VerifyChange(ctx context.Context, p *gensurla.VerifyChang
 	case record.card.RequestRevision != p.RequestRevision:
 		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
 	}
+	runID := verifyrun.NewRunID()
 	plan := c.verification.Plan
 	plan.CandidateCommit = p.CandidateCommit
 	plan.RequestRevision = p.RequestRevision
+	// The work directory lives inside the run's own directory, which only
+	// the evaluator can read; it is kept as the run's evidence.
+	plan.WorkDir = filepath.Join(c.verification.RunsDir, runID, "work")
 	req := verifyrun.Request{
-		RunID:      verifyrun.NewRunID(),
+		RunID:      runID,
 		Owner:      principal.ID,
 		ChangeID:   p.ChangeID,
 		AcceptedAt: time.Now().UTC(),

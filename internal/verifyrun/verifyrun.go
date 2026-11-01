@@ -7,7 +7,12 @@
 //	                              candidate commit and the full verify.Plan
 //	<root>/<run_id>/lock          held exclusively by the run's supervisor
 //	<root>/<run_id>/result.json   terminal outcome, written by the supervisor
-//	<root>/<run_id>/work/         verify.Run's work directory
+//	<root>/<run_id>/*.log         supervisor and executor output
+//
+// The run's work directory, where verify.Run clones, builds and keeps
+// evidence, is chosen by the caller in the plan and is never removed: the
+// caller owns it, and its built binaries and evidence stay readable after
+// the run.
 //
 // Start, called by the API, takes the lock before it writes request.json and
 // hands the locked file to `surla verify-run supervise <dir>`, a new session
@@ -117,7 +122,8 @@ const (
 	FailureInterrupted FailureKind = "interrupted"
 
 	// StageSupervise is the stage of a run interrupted outside verify.Run:
-	// its executor or supervisor ended, or it was canceled.
+	// its executor or supervisor ended, it was canceled or timed out, or its
+	// request could not be read.
 	StageSupervise = "supervise"
 
 	// StateRunning is a run still in progress.
@@ -132,7 +138,6 @@ const (
 	requestFile = "request.json"
 	lockFile    = "lock"
 	resultFile  = "result.json"
-	workDir     = "work"
 
 	// passedFD is the descriptor a supervisor and an executor receive from
 	// their parent: the locked run file and the control pipe respectively.
@@ -151,7 +156,8 @@ const (
 	// maxExecutorOutput bounds the executor's result line.
 	maxExecutorOutput = 64 << 10
 
-	// summaryExecutorDied, summarySupervisorDied and summaryCanceled
+	// summaryExecutorDied, summarySupervisorDied, summaryCanceled and
+	// summaryTimedOut
 	// describe interrupted runs.
 	summaryExecutorDied   = "The verification process ended before it finished."
 	summarySupervisorDied = "The process supervising the verification ended before it finished."
@@ -181,14 +187,17 @@ func NewRunID() string {
 // Start accepts req under root and starts its supervisor, then returns the
 // supervisor's PID without waiting for the run. command is the argument list
 // that runs this program, such as the path of the surla executable; Start
-// appends "verify-run supervise <dir>". The run directory must not exist.
-// req.Plan.WorkDir is set to the run's work directory.
+// appends "verify-run supervise <dir>". The run directory must not exist, and
+// req.Plan.WorkDir must name the run's work directory.
 func Start(root string, req Request, command []string) (int, error) {
 	if !runIDPattern.MatchString(req.RunID) {
 		return 0, fmt.Errorf("run ID %q is not 32 lowercase hex characters", req.RunID)
 	}
 	if req.Timeout <= 0 {
 		return 0, fmt.Errorf("run timeout %s must be positive", req.Timeout)
+	}
+	if req.Plan.WorkDir == "" {
+		return 0, errors.New("run work directory is required")
 	}
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return 0, fmt.Errorf("create runs directory: %w", err)
@@ -208,7 +217,6 @@ func Start(root string, req Request, command []string) (int, error) {
 	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		return 0, fmt.Errorf("lock run: %w", err)
 	}
-	req.Plan.WorkDir = filepath.Join(dir, workDir)
 	if err := writeJSON(dir, requestFile, req); err != nil {
 		return 0, err
 	}
@@ -239,8 +247,7 @@ func Start(root string, req Request, command []string) (int, error) {
 // run the supervisor stopped is always interrupted with the reason, canceled
 // or timed out: a report the suite saved while stopping is partial and would
 // read as failed scenarios, so its digest goes only to the supervisor log.
-// A run whose report passed has its work directory removed; any other run
-// keeps it as evidence. command is the argument list that runs this program.
+// command is the argument list that runs this program.
 func Supervise(dir string, command []string) error {
 	syscall.CloseOnExec(passedFD)
 	lock := os.NewFile(passedFD, lockFile)
@@ -302,17 +309,7 @@ func Supervise(dir string, command []string) error {
 		result = interrupted(reason)
 	default:
 	}
-	if err := writeJSON(dir, resultFile, result); err != nil {
-		return err
-	}
-	if result.Kind != ResultReport {
-		return nil
-	}
-	passed, err := reportPassed(req.Plan.ReportDir, result.ReportDigest)
-	if err != nil || !passed {
-		return err
-	}
-	return os.RemoveAll(filepath.Join(dir, workDir))
+	return writeJSON(dir, resultFile, result)
 }
 
 // Execute runs as `surla verify-run execute <dir>`, the leader of the run's
@@ -562,18 +559,4 @@ func stopOnRequest(pgid int, timeout time.Duration, signals <-chan os.Signal, ex
 	case <-grace.C:
 		stopGroup(pgid)
 	}
-}
-
-// reportPassed reports whether the saved report with digest passed.
-func reportPassed(reportDir, digest string) (bool, error) {
-	f, err := os.Open(filepath.Join(reportDir, digest+".json"))
-	if err != nil {
-		return false, fmt.Errorf("open verification report: %w", err)
-	}
-	defer f.Close()
-	report, err := verify.DecodeReport(f)
-	if err != nil {
-		return false, err
-	}
-	return report.Passed, nil
 }

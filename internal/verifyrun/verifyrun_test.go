@@ -63,6 +63,9 @@ func helper(role, dir string) int {
 func fakeRun(ctx context.Context, plan verify.Plan) (verify.Report, error) {
 	switch os.Getenv(fakeModeEnv) {
 	case "pass":
+		if err := os.MkdirAll(filepath.Join(plan.WorkDir, "candidate-bin"), 0o700); err != nil {
+			return verify.Report{}, err
+		}
 		return saveReport(plan, true)
 	case "failing":
 		return saveReport(plan, false)
@@ -147,6 +150,7 @@ func start(t *testing.T, mode string) (string, string, int) {
 		Plan: verify.Plan{
 			CandidateCommit: strings.Repeat("a", 40), RequestRevision: "rev-1",
 			SuiteCommit: strings.Repeat("b", 40), ReportDir: reports,
+			WorkDir: filepath.Join(root, runID, "work"),
 		},
 	}, []string{os.Args[0]})
 	require.NoError(t, err)
@@ -190,21 +194,19 @@ func TestRunThatProducesAReportReadsAsCompleted(t *testing.T) {
 	req, state, err := Read(root, runID)
 	require.NoError(t, err)
 	assert.Equal(t, "alice", req.Owner)
-	assert.Equal(t, filepath.Join(root, runID, "work"), req.Plan.WorkDir)
 	require.Equal(t, StateCompleted, state.Kind)
 	assert.True(t, state.Report.Passed)
-	assert.NoDirExists(t, filepath.Join(root, runID, "work"), "a run whose report passed releases its work directory")
+	assert.DirExists(t, filepath.Join(root, runID, "work", "candidate-bin"),
+		"the caller owns the work directory; its built binaries stay readable after the run")
 }
 
-func TestRunWhoseReportFailedKeepsItsEvidence(t *testing.T) {
+func TestRunWhoseReportFailedReadsAsCompleted(t *testing.T) {
 	root, runID, _ := start(t, "failing")
-	require.NoError(t, os.MkdirAll(filepath.Join(root, runID, "work"), 0o700))
 	require.NoError(t, Wait(root, runID))
 	_, state, err := Read(root, runID)
 	require.NoError(t, err)
 	require.Equal(t, StateCompleted, state.Kind)
 	assert.False(t, state.Report.Passed)
-	assert.DirExists(t, filepath.Join(root, runID, "work"), "a failed report keeps the logs needed to debug it")
 }
 
 func TestFailedStepReadsAsExecutionFailedWithoutItsOutput(t *testing.T) {
@@ -302,8 +304,10 @@ func TestReadAndStartRejectInvalidRuns(t *testing.T) {
 
 	runID := NewRunID()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, runID), 0o700))
-	_, err = Start(root, Request{RunID: runID, Timeout: time.Minute}, []string{os.Args[0]})
+	_, err = Start(root, Request{RunID: runID, Timeout: time.Minute, Plan: verify.Plan{WorkDir: "w"}}, []string{os.Args[0]})
 	assert.ErrorContains(t, err, "create run directory", "a run directory is never reused")
 	_, err = Start(root, Request{RunID: NewRunID()}, []string{os.Args[0]})
 	assert.ErrorContains(t, err, "must be positive")
+	_, err = Start(root, Request{RunID: NewRunID(), Timeout: time.Minute}, []string{os.Args[0]})
+	assert.ErrorContains(t, err, "work directory is required")
 }

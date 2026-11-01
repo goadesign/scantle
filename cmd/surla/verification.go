@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -66,13 +67,16 @@ func runVerifyRun(args []string) error {
 
 // runVerify builds the candidate commit in the OS sandbox and runs the
 // evaluator suite commit against it, through the same supervised processes
-// verify_change uses, with -work-dir as the runs directory. It waits for the
-// run and writes the JSON report to stdout: the full report, or its builder
-// view with -builder-view. The full report is also saved in -report-dir. A
-// report that did not pass is still printed, and the command then fails so
-// the exit status is 1. A run that ends without a report prints nothing and
-// fails with where it stopped; the full error is in the run's executor.log.
-// SIGINT, SIGTERM and SIGHUP cancel the run, and -timeout ends it.
+// verify_change uses. -work-dir keeps its meaning: it receives the clones,
+// the built binaries (candidate-bin/<name>) and the evidence, and is left in
+// place. The run's own bookkeeping lives in a temporary directory removed
+// when the command ends. It waits for the run and writes the JSON report to
+// stdout: the full report, or its builder view with -builder-view. The full
+// report is also saved in -report-dir. A report that did not pass is still
+// printed, and the command then fails so the exit status is 1. A run that
+// ends without a report prints nothing and fails with where it stopped and
+// the full error. SIGINT, SIGTERM and SIGHUP cancel the run, and -timeout
+// ends it.
 func runVerify(args []string) error {
 	plan, timeout, builderView, err := parseVerifyFlags(args)
 	if err != nil {
@@ -87,7 +91,11 @@ func runVerify(args []string) error {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer signal.Stop(signals)
-	root := plan.WorkDir
+	root, err := os.MkdirTemp("", "surla-verify-run-*")
+	if err != nil {
+		return fmt.Errorf("create run directory: %w", err)
+	}
+	defer os.RemoveAll(root)
 	runID := verifyrun.NewRunID()
 	supervisor, err := verifyrun.Start(root, verifyrun.Request{
 		RunID: runID, Owner: "cli", AcceptedAt: time.Now().UTC(), Timeout: timeout, Plan: plan,
@@ -104,8 +112,13 @@ func runVerify(args []string) error {
 		return err
 	}
 	if state.Kind != verifyrun.StateCompleted {
-		return fmt.Errorf("verification %s ended without a report at stage %s: %s (full output in %s)",
-			state.Result.Failure, state.Result.Stage, state.Result.Summary, filepath.Join(root, runID, "executor.log"))
+		// The CLI's caller is the operator, so the full error is shown.
+		detail, err := os.ReadFile(filepath.Join(root, runID, "executor.log"))
+		if err != nil {
+			return fmt.Errorf("read executor log: %w", err)
+		}
+		return fmt.Errorf("verification %s at stage %s: %s\n%s",
+			state.Result.Failure, state.Result.Stage, state.Result.Summary, strings.TrimSpace(string(detail)))
 	}
 	return writeVerifyReport(os.Stdout, state.Report, builderView)
 }

@@ -558,7 +558,7 @@ func parseVerifyFlags(args []string) (verify.Plan, time.Duration, bool, error) {
 	fs.StringVar(&p.SuiteModule, "suite-module", ".", "suite Go module directory inside -suite-repo")
 	fs.StringVar(&p.SuiteCommand, "suite-command", "", "suite command package inside -suite-module")
 	fs.StringVar(&p.RequestRevision, "request-revision", "", "request_revision of the confirmed change being verified")
-	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory that receives one directory per run (its request, result, logs and, for a run whose report did not pass, its clones, builds and evidence); keep it away from builders")
+	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds (candidate-bin/<name>) and evidence; it must be missing or empty and is kept after the run; keep it away from builders")
 	fs.StringVar(&p.ReportDir, "report-dir", "", "directory that receives the full report as <digest>.json")
 	timeout := fs.Duration("timeout", time.Hour, "how long the run may take before it is stopped")
 	builderView := fs.Bool("builder-view", false, "print the builder view, which hides holdout scenario details, instead of the full report")
