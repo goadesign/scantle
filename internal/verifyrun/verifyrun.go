@@ -157,8 +157,7 @@ const (
 	maxExecutorOutput = 64 << 10
 
 	// summaryExecutorDied, summarySupervisorDied, summaryCanceled and
-	// summaryTimedOut
-	// describe interrupted runs.
+	// summaryTimedOut describe interrupted runs.
 	summaryExecutorDied   = "The verification process ended before it finished."
 	summarySupervisorDied = "The process supervising the verification ended before it finished."
 	summaryCanceled       = "The verification was canceled."
