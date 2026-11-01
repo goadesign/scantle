@@ -71,8 +71,8 @@ source out of its view.
 - the Surla commit, the date, and the OS;
 - whether the folder in the README's `surla init -dir` example (such as
   `/tmp/shop`) already exists. `surla init` refuses an existing folder, so a
-  leftover one would show up as a false usability problem. Do not delete it
-  unless you can show this study created it; tell the tester it exists;
+  leftover would look like a usability problem. Do not delete it. Tell the
+  tester it exists, labeled "ownership unconfirmed";
 - the `-surla-version` that the README tells `surla init` to use. A scaffolded
   project downloads that version, not the commit under test;
 - the versions of `go`, `goa`, and `temporal`, or that they are missing;
@@ -162,7 +162,7 @@ are its own account, so compare them with its actual tool calls wherever your
 harness keeps a subagent transcript. Also read the logs its coding agent saved
 in `work/agent-logs/`. A leak is reading anything outside the participant's
 allowed list, loading this skill, building the product without Surla, or
-building, testing, or running the product's code outside Surla's sandbox.
+running the product's binaries or test suites outside Surla's sandbox.
 
 A participant cannot unlearn what it read, so a leak ends the attempt. Tell
 the tester what was read and when. The tester records the leak as a finding,
@@ -171,31 +171,34 @@ later milestones in that attempt as not valid. Then restart, as in section
 4 step 4, with the same build. If nothing can be checked, note in the
 limitations that leaks were only self-reported.
 
-**When an attempt or the session ends**, clean up what the participant
-created, checking each target first, because a reported PID or path does not
-prove ownership:
+**When an attempt or the session ends**, do two things:
 
-- Stop the long-running processes it reported, such as `surla serve` or a
-  Temporal dev server. Check first that each PID still runs the command it
-  started, for example that `ps -p <pid> -o command=` shows the reported
-  binary and folder. PIDs get reused.
-- Look for project folders it created outside `work/`, whether it reported
-  them or they appear in `work/agent-logs/`. An example is `/tmp/shop` from
-  the README's `surla init -dir` example. Inspect each one, and remove it only
-  when its contents and timestamps show this attempt created it. Otherwise
-  leave it.
-- Record anything you left, whether a folder or a process that might still
-  hold a port, as pre-existing in the next transcript. Tell the tester when
-  the next attempt starts, so leftovers are not logged as Surla bugs.
-- Keep the attempt's own folder, transcripts, and logs. They are the
-  evidence for the report.
+- Stop the long-running processes the participant reported, such as `surla
+  serve` or a Temporal dev server. Check first that each PID still runs the
+  command the participant started in this attempt, for example that
+  `ps -p <pid> -o command=` shows the reported binary and folder. PIDs get
+  reused. Leave running any process you cannot match.
+- Delete nothing else. Every project folder the participant created is
+  evidence for the report, including folders outside `work/` such as
+  `/tmp/shop`, and may hold a Git repository with unpushed work. Each attempt
+  gets a new folder, so nothing needs to be cleared for the next one.
+
+In the next transcript, record the exact path of every folder outside `work/`
+that the participant reported or that appears in `work/agent-logs/`, and
+every process left running. Label them "ownership unconfirmed". Tell the
+tester when the next attempt starts, so it does not log a leftover, such as
+`surla init` refusing an existing `-dir` or a port already in use, as a
+Surla bug. If someone later asks for cleanup, inspect each exact target
+first: nested repositories, `git status`, unpushed commits, and whether
+deleting it is authorized.
 
 ## 4. Handle a blocking bug
 
 When the tester decides `stop_for_bug`, it names the bug and gives the steps
-to reproduce it. A blocking bug is one where Surla crashes, or behaves
-differently from its documentation, and no documented workaround exists. The
-participant cannot get past it however well it uses Surla.
+to reproduce it. A blocking bug is one where Surla crashes, behaves
+differently from its documentation, or offers no sandboxed way to run
+something its documented workflow needs, and no documented workaround
+exists. The participant cannot get past it however well it uses Surla.
 
 1. Reproduce the bug yourself with the trusted Surla CLI, using the host and
    network access you are authorized to use, so a restriction in your coding
@@ -217,7 +220,7 @@ participant cannot get past it however well it uses Surla.
    as `go list -m github.com/goadesign/surla@<sha>` prints it). This is the
    same way main updates `examples/orders` after a release.
 4. Restart from scratch:
-   1. Clean up as in section 3.
+   1. Stop processes and record leftovers as in section 3.
    2. Create a new participant folder, `~/src/surla-ux-<id>-a<N+1>/`, holding
       a clone at the newest commit of the fix, including any
       `-surla-version` follow-up, and an empty `work/`. Leave the previous
