@@ -48,6 +48,9 @@ func New(mc model.Client) *Service {
 func (s *Service) Ask(ctx context.Context, p *gen[[.Pkg]].AskPayload) (*gen[[.Pkg]].AskResult, error) {
 	store := storageinmem.New()
 	rt := runtime.New(store)
+	if err := rt.PromptRegistry.Register(helper.SystemPrompt()); err != nil {
+		return nil, fmt.Errorf("register system prompt: %w", err)
+	}
 	if err := rt.RegisterModel(modelID, s.model); err != nil {
 		return nil, fmt.Errorf("register model: %w", err)
 	}
