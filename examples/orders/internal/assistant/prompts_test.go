@@ -4,21 +4,27 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	genordersclient "github.com/goadesign/surla/examples/orders/gen/http/orders/client"
+	genordersserver "github.com/goadesign/surla/examples/orders/gen/http/orders/server"
 	genorders "github.com/goadesign/surla/examples/orders/gen/orders"
 	genrefund "github.com/goadesign/surla/examples/orders/gen/orders/agents/refund"
 	genrefundorders "github.com/goadesign/surla/examples/orders/gen/orders/agents/refund/orders"
 	"github.com/goadesign/surla/examples/orders/internal/orders"
 	"github.com/goadesign/surla/examples/orders/internal/runstore"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/prompt"
 	"goa.design/goa-ai/runtime/agent/runtime"
+	goahttp "goa.design/goa/v3/http"
 )
 
 type (
@@ -54,26 +60,32 @@ type (
 	}
 )
 
-func TestOverrideChangesTheNextModelRequest(t *testing.T) {
+// TestOverridePromptChangesTheNextModelRequest calls override_prompt through
+// the generated HTTP server and client with an operator token, wired to the
+// agent's real prompt store, and reads the model request of the next turn.
+func TestOverridePromptChangesTheNextModelRequest(t *testing.T) {
 	svc := startService(t)
 	first := svc.turn(t)
 	assert.Equal(t, []prompt.PromptRef{{ID: SystemPromptID, Version: "v1"}}, first.PromptRefs)
 	assert.Equal(t, systemPrompt, systemText(t, first))
 
 	const draft = "You help customers with refunds. Answer in one sentence."
-	version, err := svc.prompts.Override(t.Context(), string(SystemPromptID), draft)
+	res, err := svc.overridePrompt(t, string(SystemPromptID), draft)
 	require.NoError(t, err)
-	assert.Equal(t, prompt.VersionFromTemplate(draft), version)
+	assert.Equal(t, &genorders.PromptVersion{PromptID: string(SystemPromptID), Version: prompt.VersionFromTemplate(draft)}, res)
 
 	second := svc.turn(t)
-	assert.Equal(t, []prompt.PromptRef{{ID: SystemPromptID, Version: version}}, second.PromptRefs,
-		"the next model request names the version Override returned")
+	assert.Equal(t, []prompt.PromptRef{{ID: SystemPromptID, Version: res.Version}}, second.PromptRefs,
+		"the next model request names the version override_prompt returned")
 	assert.Equal(t, draft, systemText(t, second))
 
-	restarted := startService(t)
-	third := restarted.turn(t)
+	// A second service built the same way, as a newly started process would
+	// be, has its own empty prompt store. This is an in-process stand-in for
+	// a restart, not a restart of a running orders process.
+	fresh := startService(t)
+	third := fresh.turn(t)
 	assert.Equal(t, []prompt.PromptRef{{ID: SystemPromptID, Version: "v1"}}, third.PromptRefs,
-		"a new process starts with the built-in prompt")
+		"a newly built service starts with the built-in prompt")
 	assert.Equal(t, systemPrompt, systemText(t, third))
 }
 
@@ -134,6 +146,31 @@ func startService(t *testing.T) *service {
 	))
 	require.NoError(t, rt.Seal(ctx))
 	return &service{agent: genrefund.NewClient(rt), store: store, prompts: NewPrompts(rt.PromptRegistry, promptStore), model: recorder}
+}
+
+// overridePrompt calls override_prompt on an orders service that uses s's
+// prompts, through the generated HTTP server and client, with an operator
+// token holding the "prompts:manage" scope.
+func (s *service) overridePrompt(t *testing.T, promptID, template string) (*genorders.PromptVersion, error) {
+	t.Helper()
+	signingKey := []byte("test-signing-key")
+	api := orders.New(nil, nil, nil, s.prompts, signingKey)
+	mux := goahttp.NewMuxer()
+	genordersserver.Mount(mux, genordersserver.New(genorders.NewEndpoints(api), mux, goahttp.RequestDecoder, goahttp.ResponseEncoder, nil, nil))
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+	client := genordersclient.NewClient(u.Scheme, u.Host, srv.Client(), goahttp.RequestEncoder, goahttp.ResponseDecoder, false)
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub": "op1", "tenant_id": "t1", "scope": "prompts:manage", "exp": time.Now().Add(time.Hour).Unix(),
+	}).SignedString(signingKey)
+	require.NoError(t, err)
+	res, err := client.OverridePrompt()(t.Context(), &genorders.OverridePromptPayload{Token: token, PromptID: promptID, Template: template})
+	if err != nil {
+		return nil, err
+	}
+	return res.(*genorders.PromptVersion), nil
 }
 
 // turn runs one customer message through the agent and returns the model
