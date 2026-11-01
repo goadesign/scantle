@@ -45,7 +45,7 @@ problem, 1 cosmetic, 2 minor, 3 major, 4 catastrophe (blocks the task).
 
 ### F1. <Problem as the user experiences it, in one line>
 
-- **Severity:** <0–4> · **Type:** Bug / Usability issue / Documentation gap
+- **Severity:** <0–4> · **Type:** Bug / Usability issue / Documentation gap / Missing capability
 - **Heuristic:** <violated heuristic, if one fits>
 - **Where:** <step, command, output, or README section>
 - **What happened:** <observed behavior with exact quotes and commands>

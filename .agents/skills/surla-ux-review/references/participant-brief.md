@@ -14,9 +14,9 @@ You are taking part in a usability study of a developer tool called
 
 ## Rules
 
-- Use Surla, and only Surla, to reach the goal. Do whatever Surla's README and
-  Surla's own output tell you to do, including running the tools Surla asks
-  for. Do not build the product another way.
+- Use Surla, and only Surla, to reach the goal. Do what Surla's README and
+  Surla's own output tell you to do, except the commands the rule on your
+  product's code below forbids. Do not build the product another way.
 - Surla's repository is cloned at `{{PARTICIPANT}}/surla`. You may run
   commands from it. Build your product in `{{PARTICIPANT}}/work/`.
 - You may read only these:
@@ -45,7 +45,9 @@ You are taking part in a usability study of a developer tool called
   {{CODING_AGENTS}}. If you start one, save its full output under
   `{{PARTICIPANT}}/work/agent-logs/`. Tell it to use Surla, and tell it not to
   read Surla's source, use the `surla-ux-review` skill, or compile, generate
-  code from, or run the product's code except through Surla's commands. Surla's source is
+  code from, or run the product's code except through Surla's commands. If
+  it needs such a step, it must stop and say so in its output, not skip the
+  step or edit generated files by hand. Surla's source is
   the clone apart from its README, and `github.com/goadesign/surla` in the Go
   module cache. It may read other libraries it needs to write code.
 - Run long-running processes, such as servers, in the background. Report

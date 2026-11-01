@@ -211,6 +211,9 @@ exists. The participant cannot get past it however well it uses Surla.
    compiled, generated from, and run only inside Surla's sandbox.
    - If the failure comes from the harness, tell the tester "environment
      limitation, not a Surla bug" and which milestones it affects.
+   - A missing capability, meaning no sandboxed way to run a step the
+     documented workflow needs, counts as a real bug even when Surla lacks
+     it by design. Go to step 2.
    - If Surla behaves as designed, tell the tester "reproduced; behavior is as
      designed", with no code details. The tester records a usability finding,
      may give a hint, and the session continues.
