@@ -50,8 +50,8 @@ type (
 )
 
 // stagingFile is the name, inside a cards directory, of the file each save
-// writes before renaming it over the card's file. Card files end in ".json",
-// so it is never read as a card.
+// writes before renaming it over the card's file. load opens only the hashed
+// path of the card it is asked for, so this file is never read.
 const stagingFile = "pending"
 
 // errCardsClosed reports a request that reached the card store after the
@@ -159,7 +159,9 @@ func (s *cardStore) save(record storedChangeCard) error {
 		return fmt.Errorf("encode change card %q: %w", record.card.ChangeID, err)
 	}
 	staging := filepath.Join(s.dir, stagingFile)
-	f, err := os.OpenFile(staging, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	// O_NOFOLLOW: a link planted at the staging name must not redirect the
+	// write to another file.
+	f, err := os.OpenFile(staging, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|syscall.O_NOFOLLOW, 0o600)
 	if err == nil {
 		_, err = f.Write(data)
 		if err == nil {

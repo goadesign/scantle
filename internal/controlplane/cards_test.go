@@ -278,7 +278,9 @@ func TestAnUnfinishedSaveIsHarmless(t *testing.T) {
 // TestCardsWithInvalidUTF8RoundTrip saves a card whose text holds invalid
 // UTF-8, which only a Go caller can supply, and checks it reads back under
 // the same request_revision: json.Marshal writes such bytes as U+FFFD, and so
-// does every later encoding of the decoded card.
+// does every later encoding of the decoded card. The change_id itself must be
+// valid (TestChangeIDsMustBeValidUTF8), and answer keys are code-owned
+// ambiguity IDs.
 func TestCardsWithInvalidUTF8RoundTrip(t *testing.T) {
 	cp := newControlPlane(t, Options{})
 	confirmedBy := "alice\xff"
@@ -291,4 +293,30 @@ func TestCardsWithInvalidUTF8RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, rev, saved.card.RequestRevision)
+}
+
+// TestStagingDoesNotFollowLinks plants a link at the staging name and checks
+// that a save fails instead of writing through it.
+func TestStagingDoesNotFollowLinks(t *testing.T) {
+	cp := newControlPlane(t, Options{})
+	victim := filepath.Join(t.TempDir(), "victim")
+	require.NoError(t, os.WriteFile(victim, []byte("keep"), 0o600))
+	require.NoError(t, os.Symlink(victim, filepath.Join(cp.cards.dir, stagingFile)))
+
+	confirmedBy := "alice@example.com"
+	card := &gensurla.ChangeCardResult{ChangeID: "chg", Status: StatusConfirmed, ConfirmedBy: &confirmedBy}
+	err := cp.cards.save(storedChangeCard{card: card, owner: "alice@example.com"})
+	assert.ErrorContains(t, err, "save change card")
+	data, err := os.ReadFile(victim)
+	require.NoError(t, err)
+	assert.Equal(t, "keep", string(data))
+}
+
+// TestChangeIDsMustBeValidUTF8 checks that propose_change rejects an ID that
+// could not be found again once saved.
+func TestChangeIDsMustBeValidUTF8(t *testing.T) {
+	cp := newControlPlane(t, Options{})
+	_, err := cp.ProposeChange(WithPrincipal(context.Background(), Principal{ID: "alice@example.com"}),
+		&gensurla.ProposeChangePayload{ChangeID: "chg\xff", Prompt: "Refunds up to $50 are instant."})
+	assert.ErrorContains(t, err, "change_id must be valid UTF-8")
 }

@@ -20,6 +20,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	gensurlahttp "github.com/goadesign/surla/gen/http/surla/server"
 	genmcpsurla "github.com/goadesign/surla/gen/jsonrpc/mcp_surla/server"
@@ -524,6 +525,12 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeCha
 	}
 	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.Prompt) == "" {
 		return nil, errors.New("change_id and prompt are required")
+	}
+	// A saved card is found by its change_id; invalid UTF-8 would be saved as
+	// U+FFFD and the card could not be found again. HTTP and MCP requests
+	// are already valid, so only Go callers can send such an ID.
+	if !utf8.ValidString(p.ChangeID) {
+		return nil, errors.New("change_id must be valid UTF-8")
 	}
 	if c.analyzer == nil {
 		return nil, errors.New("cp1 semantic analyzer is required")
