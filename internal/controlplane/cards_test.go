@@ -320,3 +320,18 @@ func TestChangeIDsMustBeValidUTF8(t *testing.T) {
 		&gensurla.ProposeChangePayload{ChangeID: "chg\xff", Prompt: "Refunds up to $50 are instant."})
 	assert.ErrorContains(t, err, "change_id must be valid UTF-8")
 }
+
+// TestPrincipalIDsMustBeValidUTF8 checks that a principal whose ID holds
+// invalid UTF-8, which only a Go authenticator can supply, is treated as
+// unauthenticated, so no card is saved under an owner it could not match.
+func TestPrincipalIDsMustBeValidUTF8(t *testing.T) {
+	cp := newControlPlane(t, Options{Analyzer: &heldAnalyzer{started: make(chan struct{}), release: make(chan struct{})}})
+	bad := WithPrincipal(context.Background(), Principal{ID: "alice\xff"})
+	_, err := cp.ProposeChange(bad, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	assert.ErrorContains(t, err, "authenticated principal is required")
+	_, err = cp.GetChange(bad, &gensurla.GetChangePayload{ChangeID: "chg"})
+	assert.ErrorContains(t, err, "authenticated principal is required")
+	_, saved, err := cp.cards.load("chg")
+	require.NoError(t, err)
+	assert.False(t, saved)
+}

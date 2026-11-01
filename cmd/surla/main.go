@@ -22,6 +22,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"goa.design/goa-ai/features/model/anthropic"
 	"goa.design/goa-ai/features/model/gateway"
@@ -195,6 +196,9 @@ func runServe(args []string) (err error) {
 	token := resolveAuthToken(*authToken, os.Getenv)
 	if strings.TrimSpace(*principalID) == "" || token == "" {
 		return errors.New("serve requires -principal and -auth-token (or SURLA_AUTH_TOKEN)")
+	}
+	if !utf8.ValidString(*principalID) {
+		return errors.New("-principal must be valid UTF-8")
 	}
 	opts, closeModel, err := serveOptions(cfg, os.Getenv)
 	if err != nil {

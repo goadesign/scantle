@@ -345,13 +345,16 @@ func WithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalContextKey{}, p)
 }
 
-// PrincipalFromContext extracts the authenticated Principal from ctx.
+// PrincipalFromContext extracts the authenticated Principal from ctx. It
+// reports none when the ID is empty or not valid UTF-8: the ID is saved as a
+// card's owner, and invalid bytes would be saved as U+FFFD, so the same
+// principal would no longer own its own card.
 func PrincipalFromContext(ctx context.Context) (Principal, bool) {
 	if ctx == nil {
 		return Principal{}, false
 	}
 	p, ok := ctx.Value(principalContextKey{}).(Principal)
-	if !ok || strings.TrimSpace(p.ID) == "" {
+	if !ok || strings.TrimSpace(p.ID) == "" || !utf8.ValidString(p.ID) {
 		return Principal{}, false
 	}
 	return Principal{ID: strings.TrimSpace(p.ID)}, true
