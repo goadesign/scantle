@@ -119,6 +119,7 @@ h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 
 h2 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 0.45rem 0; }
 h3 { font-size: 0.92rem; font-weight: 600; margin: 0.75rem 0 0.35rem 0; }
 p { margin: 0.25rem 0; }
+#surla-checkpoint-status { overflow-wrap: anywhere; }
 code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem; }
 code { background: var(--muted); padding: 0.1rem 0.35rem; border-radius: 4px; overflow-wrap: anywhere; word-break: break-word; }
 pre { background: var(--muted); padding: 0.65rem; border-radius: var(--radius); border: 1px solid var(--border); overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -137,6 +138,19 @@ li { margin-bottom: 0.35rem; }
 .shadcn-card-header { margin-bottom: 0.5rem; }
 .shadcn-card-title { font-size: 0.98rem; font-weight: 600; margin: 0; }
 .shadcn-card-desc { font-size: 0.83rem; color: var(--muted-foreground); margin-top: 0.15rem; }
+
+/* Verification counts wrap as ordinary reading text at narrow widths. */
+.surla-verification-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0;
+}
+.surla-verification-counts dt { font-size: 0.83rem; color: var(--muted-foreground); }
+.surla-verification-counts dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.surla-verification-details dt { font-weight: 600; margin-top: 0.5rem; }
+.surla-verification-details dd { margin: 0.1rem 0 0; }
+.surla-verification-scenarios > li { margin-bottom: 0.65rem; }
 
 .shadcn-badge, .surla-badge {
   display: inline-flex;

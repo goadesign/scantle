@@ -3,6 +3,8 @@
 // Package types declares the generated MCP tool result interfaces and
 // JSON-Schema-driven runtime validators for Surla Checkpoint Studio.
 
+import { z } from "zod";
+
 export interface AmbiguityQuestion {
   id: string;
   options: string[];
@@ -147,10 +149,66 @@ export interface DraftOverrideResult {
   requires_rebuild: boolean;
 }
 
+export interface BuilderVerificationReport {
+  counts: VerificationCounts;
+  passed: boolean;
+  report_digest: string;
+  scenarios: VerificationScenario[];
+  suite_failed: boolean;
+}
+
+export interface VerificationCheck {
+  diagnostic?: string;
+  name: string;
+  passed: boolean;
+}
+
+export interface VerificationCompleted {
+  environment: string;
+  report: BuilderVerificationReport;
+  suite_id: string;
+}
+
+export interface VerificationCounts {
+  failed: number;
+  harness_error: number;
+  not_run: number;
+  passed: number;
+  required: number;
+}
+
+export interface VerificationNotCompleted {
+  kind: "execution_failed" | "interrupted";
+  stage: "checkout" | "build" | "describe" | "suite" | "report" | "supervise";
+  summary: string;
+}
+
+export interface VerificationRunning {
+  started_at: string;
+}
+
+export interface VerificationScenario {
+  checks?: VerificationCheck[];
+  error?: string;
+  id: string;
+  outcome: "passed" | "failed" | "not_run" | "harness_error";
+}
+
+export interface VerificationStatusResult {
+  candidate_commit: string;
+  change_id: string;
+  request_revision: string;
+  run_id: string;
+  state: ({ "type": "running"; "value": VerificationRunning } | { "type": "completed"; "value": VerificationCompleted } | { "type": "not_completed"; "value": VerificationNotCompleted });
+  suite_commit: string;
+}
+
 interface JSONSchemaNode {
   type?: string;
   $ref?: string;
   enum?: string[];
+  format?: "date-time";
+  oneOf?: JSONSchemaNode[];
   required?: string[];
   additionalProperties?: boolean | JSONSchemaNode;
   items?: JSONSchemaNode;
@@ -756,8 +814,282 @@ const GENERATED_RESULT_SCHEMAS: Record<string, JSONSchemaNode> = {
         "type": "boolean"
       }
     }
+  },
+  "VerificationStatusResult": {
+    "type": "object",
+    "required": [
+      "run_id",
+      "change_id",
+      "request_revision",
+      "candidate_commit",
+      "suite_commit",
+      "state"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "candidate_commit": {
+        "type": "string"
+      },
+      "change_id": {
+        "type": "string"
+      },
+      "request_revision": {
+        "type": "string"
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "state": {
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "running"
+                ]
+              },
+              "value": {
+                "$ref": "#/$defs/VerificationRunning"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              },
+              "value": {
+                "$ref": "#/$defs/VerificationCompleted"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "value"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "not_completed"
+                ]
+              },
+              "value": {
+                "$ref": "#/$defs/VerificationNotCompleted"
+              }
+            }
+          }
+        ]
+      },
+      "suite_commit": {
+        "type": "string"
+      }
+    },
+    "$defs": {
+      "BuilderVerificationReport": {
+        "type": "object",
+        "required": [
+          "report_digest",
+          "counts",
+          "passed",
+          "suite_failed",
+          "scenarios"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "$ref": "#/$defs/VerificationCounts"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "report_digest": {
+            "type": "string"
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/VerificationScenario"
+            }
+          },
+          "suite_failed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VerificationCheck": {
+        "type": "object",
+        "required": [
+          "name",
+          "passed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "diagnostic": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VerificationCompleted": {
+        "type": "object",
+        "required": [
+          "suite_id",
+          "environment",
+          "report"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/$defs/BuilderVerificationReport"
+          },
+          "suite_id": {
+            "type": "string"
+          }
+        }
+      },
+      "VerificationCounts": {
+        "type": "object",
+        "required": [
+          "required",
+          "passed",
+          "failed",
+          "not_run",
+          "harness_error"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "failed": {
+            "type": "integer"
+          },
+          "harness_error": {
+            "type": "integer"
+          },
+          "not_run": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "integer"
+          },
+          "required": {
+            "type": "integer"
+          }
+        }
+      },
+      "VerificationNotCompleted": {
+        "type": "object",
+        "required": [
+          "kind",
+          "stage",
+          "summary"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "execution_failed",
+              "interrupted"
+            ]
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "checkout",
+              "build",
+              "describe",
+              "suite",
+              "report",
+              "supervise"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "VerificationRunning": {
+        "type": "object",
+        "required": [
+          "started_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VerificationScenario": {
+        "type": "object",
+        "required": [
+          "id",
+          "outcome"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/VerificationCheck"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "not_run",
+              "harness_error"
+            ]
+          }
+        }
+      }
+    }
   }
 };
+
+// dateTimeSchema checks the RFC3339 date/time values produced by Goa, including
+// calendar dates and explicit seconds and timezone. Date.parse also checks
+// numeric timezone offsets before the value is accepted.
+const dateTimeSchema = z.string().datetime({ offset: true }).regex(
+  /T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
+);
 
 // isPlainObject reports whether v is a non-null, non-array JavaScript object.
 export function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -771,6 +1103,17 @@ function matchesJSONSchema(
   schema: JSONSchemaNode,
   defs: Record<string, JSONSchemaNode>
 ): boolean {
+  if (schema.oneOf) {
+    let matches = 0;
+    for (const branch of schema.oneOf) {
+      if (matchesJSONSchema(value, branch, defs)) {
+        matches++;
+      }
+    }
+    if (matches !== 1) {
+      return false;
+    }
+  }
   if (typeof schema.$ref === "string") {
     const defName = schema.$ref.replace(/^#\/\$defs\//, "");
     const target = defs[defName];
@@ -778,6 +1121,12 @@ function matchesJSONSchema(
   }
   if (schema.type === "string") {
     if (typeof value !== "string") {
+      return false;
+    }
+    if (
+      schema.format === "date-time" &&
+      (!dateTimeSchema.safeParse(value).success || !Number.isFinite(Date.parse(value)))
+    ) {
       return false;
     }
     return !Array.isArray(schema.enum) || schema.enum.includes(value);
@@ -831,7 +1180,7 @@ function matchesJSONSchema(
     }
     return true;
   }
-  return false;
+  return Boolean(schema.oneOf);
 }
 
 function validateGeneratedRoot(name: string, value: unknown): boolean {
@@ -857,4 +1206,9 @@ export function isDiffResult(p: unknown): p is DiffResult {
 // isDraftOverrideResult validates that a payload conforms to the generated DraftOverrideResult schema.
 export function isDraftOverrideResult(p: unknown): p is DraftOverrideResult {
   return validateGeneratedRoot("DraftOverrideResult", p);
+}
+
+// isVerificationStatusResult validates the generated CP4 state and report.
+export function isVerificationStatusResult(p: unknown): p is VerificationStatusResult {
+  return validateGeneratedRoot("VerificationStatusResult", p);
 }
