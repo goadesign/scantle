@@ -21,8 +21,8 @@ You are taking part in a usability study of a developer tool called
   commands from it. Build your product in `{{PARTICIPANT}}/work/`.
 - You may read only these:
   - `{{PARTICIPANT}}/surla/README.md`;
-  - files under `{{PARTICIPANT}}/work/`, including files Surla generates
-    there;
+  - files under `{{PARTICIPANT}}/work/`, and any files Surla generates for
+    you, wherever you told it to write them;
   - the output of commands you run, including Surla's help text and errors.
 
   Read nothing else on this machine. In particular, do not load or read the

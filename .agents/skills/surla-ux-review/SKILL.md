@@ -72,6 +72,9 @@ source out of its view.
 - the versions of `go`, `goa`, and `temporal`, or that they are missing;
 - which credentials are set, such as `ANTHROPIC_API_KEY`. Record that each is
   set, never its value;
+- any personal instruction files your harness loads into every subagent, such
+  as a global `CLAUDE.md` or `AGENTS.md`. These can tell the participant
+  things the README does not, so the report lists them as a limitation;
 - whether commands run inside an agent sandbox and whether they have network
   access. `surla init` downloads modules, and Surla's verification uses macOS
   `sandbox-exec`, which usually cannot run inside another sandbox. Lift these
@@ -176,13 +179,17 @@ participant cannot get past it however well it uses Surla.
    the fix commit, the way main updates `examples/orders` after a release.
 4. Restart from scratch:
    1. Stop the participant's processes.
-   2. Replace `surla/` with a clone at the commit that carries the fix.
-   3. Clear `work/` and start `attempt-<N+1>/transcript.md` with the newly
+   2. Replace `surla/` with a clone at the newest commit of the fix,
+      including any `-surla-version` follow-up.
+   3. Copy the user docs from that commit into the tester's `docs/` again, so
+      the tester judges the participant against the docs it is reading.
+   4. Clear `work/` and start `attempt-<N+1>/transcript.md` with the newly
       recorded facts.
-   4. Start a **fresh** participant. One that remembers the failed attempt
+   5. Start a **fresh** participant. One that remembers the failed attempt
       would skip the steps that confused it.
-   5. Keep the same tester and tell it that a new attempt has begun on that
-      commit. Its earlier findings carry into the report.
+   6. Keep the same tester. Tell it that a new attempt has begun on that
+      commit and which docs changed. Its earlier findings carry into the
+      report.
 
 Fix and restart after every blocking bug. If the person invoking the skill
 set a limit on attempts, stop and report when it is reached.
