@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -65,7 +66,7 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, builderView, err := parseVerifyFlags(tc.args)
+			plan, timeout, builderView, err := parseVerifyFlags(tc.args)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -73,11 +74,12 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, wantPlan, plan)
+			assert.Equal(t, time.Hour, timeout, "a run may take an hour unless -timeout says otherwise")
 			assert.Equal(t, tc.wantBuilderView, builderView)
 		})
 	}
 	t.Run("module directories default to the repository root", func(t *testing.T) {
-		plan, _, err := parseVerifyFlags(without(without(complete, "-candidate-module"), "-suite-module"))
+		plan, _, _, err := parseVerifyFlags(without(without(complete, "-candidate-module"), "-suite-module"))
 		require.NoError(t, err)
 		want := wantPlan
 		want.CandidateModule, want.SuiteModule = ".", "."

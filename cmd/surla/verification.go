@@ -38,6 +38,8 @@ type verificationFile struct {
 	SuiteModule string `json:"suite_module"`
 	// SuiteCommand is the suite command's package path inside SuiteModule.
 	SuiteCommand string `json:"suite_command"`
+	// Timeout is how long a run may take, as a Go duration such as "30m".
+	Timeout string `json:"timeout"`
 }
 
 // runVerifyRun runs one internal role of a verification run started by
@@ -70,9 +72,9 @@ func runVerifyRun(args []string) error {
 // report that did not pass is still printed, and the command then fails so
 // the exit status is 1. A run that ends without a report prints nothing and
 // fails with where it stopped; the full error is in the run's executor.log.
-// SIGINT and SIGTERM cancel the run.
+// SIGINT, SIGTERM and SIGHUP cancel the run, and -timeout ends it.
 func runVerify(args []string) error {
-	plan, builderView, err := parseVerifyFlags(args)
+	plan, timeout, builderView, err := parseVerifyFlags(args)
 	if err != nil {
 		return err
 	}
@@ -80,17 +82,19 @@ func runVerify(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Signals are caught before the run starts so a Ctrl-C or a closed
+	// terminal always cancels it instead of leaving it running on its own.
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(signals)
 	root := plan.WorkDir
 	runID := verifyrun.NewRunID()
 	supervisor, err := verifyrun.Start(root, verifyrun.Request{
-		RunID: runID, Owner: "cli", AcceptedAt: time.Now().UTC(), Plan: plan,
+		RunID: runID, Owner: "cli", AcceptedAt: time.Now().UTC(), Timeout: timeout, Plan: plan,
 	}, self)
 	if err != nil {
 		return err
 	}
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(signals)
 	go forwardCancel(signals, supervisor)
 	if err := verifyrun.Wait(root, runID); err != nil {
 		return err
@@ -131,7 +135,7 @@ func loadVerificationConfig(path string) (*controlplane.VerificationConfig, erro
 	for name, v := range map[string]string{
 		"runs_dir": f.RunsDir, "report_dir": f.ReportDir, "candidate_repo": f.CandidateRepo,
 		"candidate_module": f.CandidateModule, "suite_repo": f.SuiteRepo, "suite_commit": f.SuiteCommit,
-		"suite_module": f.SuiteModule, "suite_command": f.SuiteCommand,
+		"suite_module": f.SuiteModule, "suite_command": f.SuiteCommand, "timeout": f.Timeout,
 	} {
 		if v == "" {
 			missing = append(missing, name)
@@ -143,11 +147,16 @@ func loadVerificationConfig(path string) (*controlplane.VerificationConfig, erro
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("-verification-config %s is missing %v", path, missing)
 	}
+	timeout, err := time.ParseDuration(f.Timeout)
+	if err != nil || timeout <= 0 {
+		return nil, fmt.Errorf("-verification-config %s: timeout %q must be a positive duration such as 30m", path, f.Timeout)
+	}
 	self, err := selfCommand()
 	if err != nil {
 		return nil, err
 	}
 	return &controlplane.VerificationConfig{
+		Timeout: timeout,
 		RunsDir: f.RunsDir,
 		Plan: verify.Plan{
 			CandidateRepo: f.CandidateRepo, CandidateModule: f.CandidateModule, Binaries: f.Binaries,

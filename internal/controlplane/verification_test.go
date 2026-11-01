@@ -183,6 +183,7 @@ func verificationSetup(t *testing.T) (*ControlPlane, *gensurla.ChangeCardResult,
 		// The supervisor exits at once; these tests cover acceptance and
 		// reading, and verifyrun's own tests run the real lifecycle.
 		Command: []string{"/bin/sh", "-c", "exit 0", "sh"},
+		Timeout: time.Hour,
 	}
 	cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis))), Verification: cfg})
 	card, err := cp.ProposeChange(WithPrincipal(context.Background(), Principal{ID: "alice@example.com"}),

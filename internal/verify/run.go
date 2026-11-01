@@ -155,6 +155,11 @@ func (e *StageError) Unwrap() error {
 // output goes to files under WorkDir/evidence; errors quote only a bounded
 // excerpt.
 //
+// Run starts its builds, the suite and the candidates the suite runs in the
+// caller's process group and does not stop processes they leave behind: its
+// caller must run it inside an owning group that it stops afterwards, as
+// `surla verify-run execute` does under its supervisor.
+//
 // Every error is a *StageError naming the step that failed and a summary
 // safe to show builders; its Err may quote command output and stays with the
 // evaluator. A suite that produces no decodable eval.Report is an error.

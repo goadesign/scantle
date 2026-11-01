@@ -21,10 +21,16 @@ import (
 	"github.com/goadesign/surla/internal/verify"
 )
 
-// fakeModeEnv selects what the test executor's verification does: "pass"
-// saves a passing report, "fail" fails at the build stage, and "hang" starts a
-// child process in the run's group, records both PIDs and never returns.
-const fakeModeEnv = "VERIFYRUN_TEST_FAKE"
+const (
+	// fakeModeEnv selects what the test executor's verification does: "pass"
+	// and "failing" save a report that passed or failed, "fail" fails at the
+	// build stage, and "hang" creates a store directory, starts a child
+	// process in the run's group, records both PIDs, and on cancellation
+	// removes the store, as a suite removes its pinned binaries.
+	fakeModeEnv = "VERIFYRUN_TEST_FAKE"
+	// fakeTimeoutEnv, when set, is the run timeout start uses.
+	fakeTimeoutEnv = "VERIFYRUN_TEST_TIMEOUT"
+)
 
 // TestMain lets the test binary act as `surla verify-run supervise|execute`
 // so the lifecycle runs in real processes.
@@ -54,15 +60,18 @@ func helper(role, dir string) int {
 }
 
 // fakeRun stands in for verify.Run according to fakeModeEnv.
-func fakeRun(_ context.Context, plan verify.Plan) (verify.Report, error) {
+func fakeRun(ctx context.Context, plan verify.Plan) (verify.Report, error) {
 	switch os.Getenv(fakeModeEnv) {
 	case "pass":
-		return savePassingReport(plan)
+		return saveReport(plan, true)
+	case "failing":
+		return saveReport(plan, false)
 	case "fail":
 		return verify.Report{}, &verify.StageError{Stage: verify.StageBuild, Summary: "The candidate did not build.",
 			Err: errors.New("compile error in /private/secret/path")}
 	case "hang":
-		if err := os.MkdirAll(plan.WorkDir, 0o700); err != nil {
+		store := filepath.Join(plan.WorkDir, "store")
+		if err := os.MkdirAll(store, 0o700); err != nil {
 			return verify.Report{}, err
 		}
 		child := exec.Command("sleep", "300")
@@ -73,24 +82,29 @@ func fakeRun(_ context.Context, plan verify.Plan) (verify.Report, error) {
 		if err := os.WriteFile(filepath.Join(filepath.Dir(plan.WorkDir), "pids"), []byte(pids), 0o600); err != nil {
 			return verify.Report{}, err
 		}
-		select {}
+		<-ctx.Done()
+		return verify.Report{}, errors.Join(ctx.Err(), os.RemoveAll(store))
 	}
 	return verify.Report{}, errors.New("no fake mode")
 }
 
-// savePassingReport assembles a passing report for plan and saves it where
-// verify.Run would.
-func savePassingReport(plan verify.Plan) (verify.Report, error) {
+// saveReport assembles a report for plan whose one scenario passed or failed
+// and saves it where verify.Run would.
+func saveReport(plan verify.Plan, passed bool) (verify.Report, error) {
 	binding := verify.Binding{
 		CandidateCommit: plan.CandidateCommit, RequestRevision: plan.RequestRevision,
 		SuiteID: "starter", SuiteCommit: plan.SuiteCommit, Environment: "sim",
 		Artifacts: map[string]string{"app": strings.Repeat("d", 64)},
 	}
 	suite := verify.Suite{ID: "starter", Environment: "sim", Scenarios: []verify.Scenario{{ID: "smoke"}}}
+	check := eval.Check{Name: "ok", Passed: true}
+	if !passed {
+		check = eval.Check{Name: "ok", Diagnostic: "wrong answer"}
+	}
 	evidence := eval.Report{SuiteID: "starter", Scenarios: []eval.ScenarioReport{{
-		ID: "smoke", StartedAt: time.Now(), Passed: true,
+		ID: "smoke", StartedAt: time.Now(), Passed: passed,
 		Result: &eval.Result{
-			Checks:    []eval.Check{{Name: "ok", Passed: true}},
+			Checks:    []eval.Check{check},
 			Artifacts: []eval.Artifact{{Name: "candidate:app", URI: "sha256:" + strings.Repeat("d", 64)}},
 		},
 	}}}
@@ -112,8 +126,14 @@ func start(t *testing.T, mode string) (string, string, int) {
 	t.Setenv(fakeModeEnv, mode)
 	root, reports := t.TempDir(), t.TempDir()
 	runID := NewRunID()
+	timeout := time.Hour
+	if v := os.Getenv(fakeTimeoutEnv); v != "" {
+		d, err := time.ParseDuration(v)
+		require.NoError(t, err)
+		timeout = d
+	}
 	pid, err := Start(root, Request{
-		RunID: runID, Owner: "alice", ChangeID: "chg", AcceptedAt: time.Now().UTC(),
+		RunID: runID, Owner: "alice", ChangeID: "chg", AcceptedAt: time.Now().UTC(), Timeout: timeout,
 		Plan: verify.Plan{
 			CandidateCommit: strings.Repeat("a", 40), RequestRevision: "rev-1",
 			SuiteCommit: strings.Repeat("b", 40), ReportDir: reports,
@@ -163,7 +183,18 @@ func TestRunThatProducesAReportReadsAsCompleted(t *testing.T) {
 	assert.Equal(t, filepath.Join(root, runID, "work"), req.Plan.WorkDir)
 	require.Equal(t, StateCompleted, state.Kind)
 	assert.True(t, state.Report.Passed)
-	assert.NoDirExists(t, filepath.Join(root, runID, "work"), "a run with a report releases its work directory")
+	assert.NoDirExists(t, filepath.Join(root, runID, "work"), "a run whose report passed releases its work directory")
+}
+
+func TestRunWhoseReportFailedKeepsItsEvidence(t *testing.T) {
+	root, runID, _ := start(t, "failing")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, runID, "work"), 0o700))
+	require.NoError(t, Wait(root, runID))
+	_, state, err := Read(root, runID)
+	require.NoError(t, err)
+	require.Equal(t, StateCompleted, state.Kind)
+	assert.False(t, state.Report.Passed)
+	assert.DirExists(t, filepath.Join(root, runID, "work"), "a failed report keeps the logs needed to debug it")
 }
 
 func TestFailedStepReadsAsExecutionFailedWithoutItsOutput(t *testing.T) {
@@ -211,7 +242,7 @@ func TestKilledSupervisorStopsTheRunAndLeavesNoProcesses(t *testing.T) {
 	assert.Equal(t, interrupted(summarySupervisorDied), state.Result)
 }
 
-func TestCanceledRunIsInterruptedAndLeavesNoProcesses(t *testing.T) {
+func TestCanceledRunStopsGracefullyAndLeavesNoProcesses(t *testing.T) {
 	root, runID, supervisor := start(t, "hang")
 	executor, child := hangingPIDs(t, root, runID)
 
@@ -219,9 +250,23 @@ func TestCanceledRunIsInterruptedAndLeavesNoProcesses(t *testing.T) {
 	require.NoError(t, Wait(root, runID))
 	assertGone(t, executor)
 	assertGone(t, child)
+	assert.NoDirExists(t, filepath.Join(root, runID, "work", "store"), "the executor got to clean up before the group was killed")
 	_, state, err := Read(root, runID)
 	require.NoError(t, err)
 	assert.Equal(t, interrupted(summaryCanceled), state.Result)
+}
+
+func TestRunPastItsTimeoutIsStopped(t *testing.T) {
+	t.Setenv(fakeTimeoutEnv, "2s")
+	root, runID, _ := start(t, "hang")
+	executor, child := hangingPIDs(t, root, runID)
+
+	require.NoError(t, Wait(root, runID))
+	assertGone(t, executor)
+	assertGone(t, child)
+	_, state, err := Read(root, runID)
+	require.NoError(t, err)
+	assert.Equal(t, interrupted(summaryTimedOut), state.Result)
 }
 
 func TestReadAndStartRejectInvalidRuns(t *testing.T) {
@@ -233,6 +278,8 @@ func TestReadAndStartRejectInvalidRuns(t *testing.T) {
 
 	runID := NewRunID()
 	require.NoError(t, os.MkdirAll(filepath.Join(root, runID), 0o700))
-	_, err = Start(root, Request{RunID: runID}, []string{os.Args[0]})
+	_, err = Start(root, Request{RunID: runID, Timeout: time.Minute}, []string{os.Args[0]})
 	assert.ErrorContains(t, err, "create run directory", "a run directory is never reused")
+	_, err = Start(root, Request{RunID: NewRunID()}, []string{os.Args[0]})
+	assert.ErrorContains(t, err, "must be positive")
 }

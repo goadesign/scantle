@@ -3,7 +3,9 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +18,7 @@ func TestLoadVerificationConfigReadsTheOperatorsPlanStrictly(t *testing.T) {
 
 	complete := `{"runs_dir":"/srv/runs","report_dir":"/srv/reports","candidate_repo":"/srv/app.git",
 		"candidate_module":".","binaries":{"app":"./cmd/app"},"suite_repo":"/srv/eval.git",
-		"suite_commit":"` + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" + `","suite_module":".","suite_command":"./cmd/app-evals"}`
+		"suite_commit":"` + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" + `","suite_module":".","suite_command":"./cmd/app-evals","timeout":"30m"}`
 	write := func(t *testing.T, content string) string {
 		t.Helper()
 		path := filepath.Join(t.TempDir(), "verification.json")
@@ -33,6 +35,7 @@ func TestLoadVerificationConfigReadsTheOperatorsPlanStrictly(t *testing.T) {
 	assert.Empty(t, cfg.Plan.CandidateCommit, "the candidate commit comes from each verify_change call")
 	assert.Empty(t, cfg.Plan.WorkDir, "each run gets its own work directory")
 	require.Len(t, cfg.Command, 1)
+	assert.Equal(t, 30*time.Minute, cfg.Timeout)
 
 	for _, tc := range []struct {
 		name, content, wantErr string
@@ -40,6 +43,7 @@ func TestLoadVerificationConfigReadsTheOperatorsPlanStrictly(t *testing.T) {
 		{"unknown field", `{"runs_dir":"x","suite":"y"}`, "unknown field"},
 		{"missing fields", `{"runs_dir":"/srv/runs"}`, "is missing"},
 		{"trailing data", complete + `{}`, "data after the configuration"},
+		{"bad timeout", strings.Replace(complete, `"30m"`, `"soon"`, 1), "must be a positive duration"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := loadVerificationConfig(write(t, tc.content))

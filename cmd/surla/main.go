@@ -540,12 +540,12 @@ func (b binaryFlags) Set(v string) error {
 	return nil
 }
 
-// parseVerifyFlags turns `surla verify` arguments into a verify.Plan and
-// reports whether the builder view was requested. -candidate-module and
+// parseVerifyFlags turns `surla verify` arguments into a verify.Plan, the
+// run's time limit, and whether the builder view was requested. -candidate-module and
 // -suite-module default to ".", the repository root; every other plan field is
 // required and must be given explicitly. Commit IDs and repositories are
 // checked by verify.Run.
-func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
+func parseVerifyFlags(args []string) (verify.Plan, time.Duration, bool, error) {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	binaries := binaryFlags{}
 	var p verify.Plan
@@ -558,14 +558,15 @@ func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 	fs.StringVar(&p.SuiteModule, "suite-module", ".", "suite Go module directory inside -suite-repo")
 	fs.StringVar(&p.SuiteCommand, "suite-command", "", "suite command package inside -suite-module")
 	fs.StringVar(&p.RequestRevision, "request-revision", "", "request_revision of the confirmed change being verified")
-	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds and evidence; keep it away from builders")
+	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory that receives one directory per run (its request, result, logs and, for a run whose report did not pass, its clones, builds and evidence); keep it away from builders")
 	fs.StringVar(&p.ReportDir, "report-dir", "", "directory that receives the full report as <digest>.json")
+	timeout := fs.Duration("timeout", time.Hour, "how long the run may take before it is stopped")
 	builderView := fs.Bool("builder-view", false, "print the builder view, which hides holdout scenario details, instead of the full report")
 	if err := fs.Parse(args); err != nil {
-		return verify.Plan{}, false, err
+		return verify.Plan{}, 0, false, err
 	}
 	if fs.NArg() > 0 {
-		return verify.Plan{}, false, fmt.Errorf("unexpected arguments %q", fs.Args())
+		return verify.Plan{}, 0, false, fmt.Errorf("unexpected arguments %q", fs.Args())
 	}
 	required := []struct {
 		flag  string
@@ -590,10 +591,10 @@ func parseVerifyFlags(args []string) (verify.Plan, bool, error) {
 		missing = append(missing, "-binary")
 	}
 	if len(missing) > 0 {
-		return verify.Plan{}, false, fmt.Errorf("verify requires %s", strings.Join(missing, ", "))
+		return verify.Plan{}, 0, false, fmt.Errorf("verify requires %s", strings.Join(missing, ", "))
 	}
 	p.Binaries = binaries
-	return p, *builderView, nil
+	return p, *timeout, *builderView, nil
 }
 
 // isSHA256Hex reports whether s is a lowercase hex SHA-256 digest.

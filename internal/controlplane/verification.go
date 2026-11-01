@@ -29,6 +29,9 @@ type VerificationConfig struct {
 	// Command is the argument list that runs this surla executable; runs
 	// start `<Command> verify-run supervise <dir>`.
 	Command []string
+	// Timeout is how long a run may take before it is stopped and recorded
+	// as interrupted.
+	Timeout time.Duration
 }
 
 // errVerificationUnavailable is returned by the CP4 verification methods of a
@@ -70,6 +73,7 @@ func (c *ControlPlane) VerifyChange(ctx context.Context, p *gensurla.VerifyChang
 		Owner:      principal.ID,
 		ChangeID:   p.ChangeID,
 		AcceptedAt: time.Now().UTC(),
+		Timeout:    c.verification.Timeout,
 		Plan:       plan,
 	}
 	if _, err := verifyrun.Start(c.verification.RunsDir, req, c.verification.Command); err != nil {
@@ -93,12 +97,14 @@ func (c *ControlPlane) GetVerification(ctx context.Context, p *gensurla.GetVerif
 	}
 	req, state, err := verifyrun.Read(c.verification.RunsDir, p.RunID)
 	switch {
-	case errors.Is(err, fs.ErrNotExist):
+	case req.Owner == "" && errors.Is(err, fs.ErrNotExist):
 		return nil, fmt.Errorf("unknown run_id %q", p.RunID)
+	case req.Owner != principal.ID && req.Owner != "":
+		// Checked before any later read error, whose text may name
+		// evaluator paths.
+		return nil, fmt.Errorf("principal %q is not the owner of run_id %q", principal.ID, p.RunID)
 	case err != nil:
 		return nil, fmt.Errorf("read verification %s: %w", p.RunID, err)
-	case req.Owner != principal.ID:
-		return nil, fmt.Errorf("principal %q is not the owner of run_id %q", principal.ID, p.RunID)
 	}
 	return statusResult(req, state), nil
 }

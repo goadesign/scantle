@@ -59,6 +59,9 @@ type (
 		ChangeID string `json:"change_id"`
 		// AcceptedAt is when the API accepted the run.
 		AcceptedAt time.Time `json:"accepted_at"`
+		// Timeout is how long the run may take before its supervisor stops it
+		// and records it as interrupted. It must be positive.
+		Timeout time.Duration `json:"timeout"`
 		// Plan is the complete verification plan: the operator's candidate
 		// and suite configuration, the caller's candidate commit, the Change
 		// Card revision, and the run's own work directory.
@@ -138,6 +141,10 @@ const (
 	// groupStopTimeout bounds how long the supervisor waits for the
 	// executor's process group to empty after killing it.
 	groupStopTimeout = 30 * time.Second
+	// stopGrace is how long a canceled or timed-out executor gets to stop
+	// its suite, which removes its pinned binaries, before the supervisor
+	// kills the whole group. It exceeds verify.Run's suite stop grace.
+	stopGrace = 45 * time.Second
 	// executorWaitDelay bounds how long the supervisor waits for the
 	// executor's output after it exits.
 	executorWaitDelay = 5 * time.Second
@@ -149,6 +156,7 @@ const (
 	summaryExecutorDied   = "The verification process ended before it finished."
 	summarySupervisorDied = "The process supervising the verification ended before it finished."
 	summaryCanceled       = "The verification was canceled."
+	summaryTimedOut       = "The verification did not finish within its time limit."
 )
 
 var (
@@ -175,6 +183,9 @@ func NewRunID() string {
 func Start(root string, req Request, command []string) (int, error) {
 	if !runIDPattern.MatchString(req.RunID) {
 		return 0, fmt.Errorf("run ID %q is not 32 lowercase hex characters", req.RunID)
+	}
+	if req.Timeout <= 0 {
+		return 0, fmt.Errorf("run timeout %s must be positive", req.Timeout)
 	}
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return 0, fmt.Errorf("create runs directory: %w", err)
@@ -217,16 +228,26 @@ func Start(root string, req Request, command []string) (int, error) {
 // Supervise runs as `surla verify-run supervise <dir>`. It holds the run lock
 // it inherited on descriptor 3, starts the executor as the leader of a new
 // process group with the read end of a control pipe on its descriptor 3, and
-// waits for it. SIGTERM or SIGINT cancels the run. When the executor ends, the
+// waits for it. SIGTERM, SIGINT or SIGHUP cancels the run, and the request's
+// Timeout ends it: either way the executor gets SIGTERM and stopGrace to stop
+// its suite before the whole group is killed. When the executor ends, the
 // group is killed and emptied before result.json is written: the executor's
-// own result when it reported one, and otherwise an interrupted outcome. A
-// run that produced a report has its work directory removed; any other run
+// own result when it reported one (a report is kept even if it arrives as the
+// run is being stopped), and otherwise an interrupted outcome that says why.
+// A run whose report passed has its work directory removed; any other run
 // keeps it as evidence. command is the argument list that runs this program.
 func Supervise(dir string, command []string) error {
 	syscall.CloseOnExec(passedFD)
 	lock := os.NewFile(passedFD, lockFile)
 	defer lock.Close()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+	defer signal.Stop(signals)
 
+	req, err := readRequest(dir)
+	if err != nil {
+		return errors.Join(err, writeJSON(dir, resultFile, interrupted(summaryExecutorDied)))
+	}
 	control, keep, err := os.Pipe()
 	if err != nil {
 		return fmt.Errorf("create control pipe: %w", err)
@@ -252,46 +273,47 @@ func Supervise(dir string, command []string) error {
 	control.Close()
 	pgid := cmd.Process.Pid
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
-	defer signal.Stop(signals)
-	canceled := make(chan struct{})
-	go func() {
-		if _, ok := <-signals; ok {
-			close(canceled)
-			stopGroup(pgid)
-		}
-	}()
-
+	// stopped receives why the supervisor stopped the run, at most once.
+	stopped := make(chan string, 1)
+	exited := make(chan struct{})
+	go stopOnRequest(pgid, req.Timeout, signals, exited, stopped)
 	waitErr := cmd.Wait()
+	close(exited)
 	// Whatever ended the executor, nothing it started may outlive the run.
 	if err := procgroup.Stop(pgid, groupStopTimeout); err != nil {
 		return fmt.Errorf("stop verification processes; result not written: %w", err)
 	}
 	result := interrupted(summaryExecutorDied)
-	select {
-	case <-canceled:
-		result = interrupted(summaryCanceled)
-	default:
-		if waitErr == nil {
-			if r, err := decodeResult(out.Bytes()); err == nil {
-				result = r
-			}
+	if waitErr == nil {
+		if r, err := decodeResult(out.Bytes()); err == nil {
+			result = r
 		}
+	}
+	select {
+	case reason := <-stopped:
+		if result.Kind != ResultReport {
+			result = interrupted(reason)
+		}
+	default:
 	}
 	if err := writeJSON(dir, resultFile, result); err != nil {
 		return err
 	}
-	if result.Kind == ResultReport {
-		return os.RemoveAll(filepath.Join(dir, workDir))
+	if result.Kind != ResultReport {
+		return nil
 	}
-	return nil
+	passed, err := reportPassed(req.Plan.ReportDir, result.ReportDigest)
+	if err != nil || !passed {
+		return err
+	}
+	return os.RemoveAll(filepath.Join(dir, workDir))
 }
 
 // Execute runs as `surla verify-run execute <dir>`, the leader of the run's
 // process group. It watches the control pipe on descriptor 3 and kills its
 // whole group when the supervisor dies; otherwise it runs the plan saved in
-// request.json with run and writes the run's Result as JSON to out. The full
+// request.json with run, canceling it on SIGTERM, and writes the run's Result
+// as JSON to out. The full
 // error of a failed step goes to errLog, which stays with the evaluator.
 func Execute(dir string, run func(context.Context, verify.Plan) (verify.Report, error), out, errLog io.Writer) error {
 	syscall.CloseOnExec(passedFD)
@@ -302,7 +324,11 @@ func Execute(dir string, run func(context.Context, verify.Plan) (verify.Report, 
 	if err != nil {
 		return err
 	}
-	report, err := run(context.Background(), req.Plan)
+	// The supervisor cancels or times out a run with SIGTERM, so the suite
+	// can stop its candidates and remove its pinned binaries.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	defer stop()
+	report, err := run(ctx, req.Plan)
 	result := Result{Kind: ResultReport, ReportDigest: report.Digest}
 	if err != nil {
 		var stage *verify.StageError
@@ -317,7 +343,9 @@ func Execute(dir string, run func(context.Context, verify.Plan) (verify.Report, 
 
 // Read returns the run's request and current state. It takes a shared lock on
 // the run before it looks for result.json, so a run that finishes meanwhile is
-// never reported as interrupted. A missing run is an error.
+// never reported as interrupted. A missing run is an error. Once request.json
+// is read, it is returned with any later error, so a caller can check who owns
+// the run before reporting that error.
 func Read(root, runID string) (Request, State, error) {
 	if !runIDPattern.MatchString(runID) {
 		return Request{}, State{}, fmt.Errorf("run ID %q is not 32 lowercase hex characters", runID)
@@ -329,40 +357,40 @@ func Read(root, runID string) (Request, State, error) {
 	}
 	lock, err := os.Open(filepath.Join(dir, lockFile))
 	if err != nil {
-		return Request{}, State{}, fmt.Errorf("open run lock: %w", err)
+		return req, State{}, fmt.Errorf("open run lock: %w", err)
 	}
 	defer lock.Close()
 	switch err := syscall.Flock(int(lock.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); {
 	case errors.Is(err, syscall.EWOULDBLOCK):
 		return req, State{Kind: StateRunning}, nil
 	case err != nil:
-		return Request{}, State{}, fmt.Errorf("lock run for reading: %w", err)
+		return req, State{}, fmt.Errorf("lock run for reading: %w", err)
 	}
 	raw, err := os.ReadFile(filepath.Join(dir, resultFile))
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return req, State{Kind: StateNotCompleted, Result: interrupted(summarySupervisorDied)}, nil
 	case err != nil:
-		return Request{}, State{}, fmt.Errorf("read run result: %w", err)
+		return req, State{}, fmt.Errorf("read run result: %w", err)
 	}
 	result, err := decodeResult(raw)
 	if err != nil {
-		return Request{}, State{}, err
+		return req, State{}, err
 	}
 	if result.Kind == ResultNoReport {
 		return req, State{Kind: StateNotCompleted, Result: result}, nil
 	}
 	f, err := os.Open(filepath.Join(req.Plan.ReportDir, result.ReportDigest+".json"))
 	if err != nil {
-		return Request{}, State{}, fmt.Errorf("open verification report: %w", err)
+		return req, State{}, fmt.Errorf("open verification report: %w", err)
 	}
 	defer f.Close()
 	report, err := verify.DecodeReport(f)
 	if err != nil {
-		return Request{}, State{}, err
+		return req, State{}, err
 	}
 	if report.Digest != result.ReportDigest {
-		return Request{}, State{}, fmt.Errorf("report %s has digest %s", result.ReportDigest, report.Digest)
+		return req, State{}, fmt.Errorf("report %s has digest %s", result.ReportDigest, report.Digest)
 	}
 	return req, State{Kind: StateCompleted, Report: report}, nil
 }
@@ -468,8 +496,8 @@ func writeJSON(dir, name string, v any) error {
 	return errors.Join(d.Sync(), d.Close())
 }
 
-// stopGroup kills the executor's process group to cancel the run; Supervise
-// then waits for it to empty.
+// stopGroup kills the executor's whole process group when it did not stop
+// within stopGrace; Supervise then waits for the group to empty.
 func stopGroup(pgid int) {
 	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
 		fmt.Fprintf(os.Stderr, "cancel verification: kill process group %d: %v\n", pgid, err)
@@ -494,4 +522,45 @@ func reap(cmd *exec.Cmd) {
 	if err := cmd.Wait(); err != nil {
 		fmt.Fprintf(os.Stderr, "verification supervisor %d: %v\n", cmd.Process.Pid, err)
 	}
+}
+
+// stopOnRequest waits for a cancel signal or the run's timeout, whichever
+// comes first, unless the executor exits before either. It records why in
+// stopped, sends the executor SIGTERM, and kills the whole group if the
+// executor has not exited after stopGrace.
+func stopOnRequest(pgid int, timeout time.Duration, signals <-chan os.Signal, exited <-chan struct{}, stopped chan<- string) {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	select {
+	case <-exited:
+		return
+	case <-signals:
+		stopped <- summaryCanceled
+	case <-deadline.C:
+		stopped <- summaryTimedOut
+	}
+	if err := syscall.Kill(pgid, syscall.SIGTERM); err != nil && !errors.Is(err, syscall.ESRCH) {
+		fmt.Fprintf(os.Stderr, "stop verification: signal executor %d: %v\n", pgid, err)
+	}
+	grace := time.NewTimer(stopGrace)
+	defer grace.Stop()
+	select {
+	case <-exited:
+	case <-grace.C:
+		stopGroup(pgid)
+	}
+}
+
+// reportPassed reports whether the saved report with digest passed.
+func reportPassed(reportDir, digest string) (bool, error) {
+	f, err := os.Open(filepath.Join(reportDir, digest+".json"))
+	if err != nil {
+		return false, fmt.Errorf("open verification report: %w", err)
+	}
+	defer f.Close()
+	report, err := verify.DecodeReport(f)
+	if err != nil {
+		return false, err
+	}
+	return report.Passed, nil
 }
