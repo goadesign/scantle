@@ -32,8 +32,8 @@ You are taking part in a usability study of a developer tool called
   this study measures. Documents the README links to are not available. If
   you want one, say so in your report, because that is useful evidence.
 - Run Surla itself the way the README shows. You may also run the code
-  generation and compile steps that Surla's README or the files Surla
-  generates tell you to run, such as `goa gen` or `go build`.
+  generation step that Surla's README or the files Surla generates tell you
+  to run, such as `goa gen`.
 - Run your product's binaries and test suites only through Surla's
   commands, such as `surla verify`, which run them inside Surla's sandbox.
   Do not run them directly, for example with `go run ./cmd/<service>` or

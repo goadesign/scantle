@@ -86,8 +86,11 @@ source out of its view.
   verification builds and runs the code under test inside its own macOS
   `sandbox-exec` sandbox (`verify/candidate`), which usually cannot start
   inside the agent's sandbox. Give the participant the host access you are
-  authorized to give. Never let anything build or run code under test outside
-  Surla's sandbox. If the access Surla needs is not available, that is an
+  authorized to give. The product's binaries and test suites run only inside
+  Surla's sandbox. The one exception is `goa gen`, which the scaffolded
+  project's README asks for. It runs the participant's design code outside
+  the sandbox, so the report lists it as a limitation. If the access Surla
+  needs is not available, that is an
   environment limitation: the tester marks the milestones it blocks as not
   supported;
 - **how the participant reaches Surla's MCP server.** The README tells a user
@@ -202,8 +205,8 @@ exists. The participant cannot get past it however well it uses Surla.
 
 1. Reproduce the bug yourself with the trusted Surla CLI, using the host and
    network access you are authorized to use, so a restriction in your coding
-   agent is not mistaken for a Surla bug. Code under test still builds and
-   runs only through Surla's own sandbox.
+   agent is not mistaken for a Surla bug. The product's binaries and test
+   suites still run only through Surla's sandbox.
    - If the failure comes from the harness, tell the tester "environment
      limitation, not a Surla bug" and which milestones it affects.
    - If Surla behaves as designed, tell the tester "reproduced; behavior is as
