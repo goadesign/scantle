@@ -99,6 +99,7 @@ func TestOverrideRejectsWithoutChangingThePrompt(t *testing.T) {
 		{"unregistered prompt", "orders.refund.other", "Hello.", orders.ErrPromptNotFound},
 		{"template does not parse", string(SystemPromptID), "Hello {{ .Name", orders.ErrInvalidPrompt},
 		{"template does not execute", string(SystemPromptID), `Hello {{ template "missing" }}.`, orders.ErrInvalidPrompt},
+		{"template reads data the planner does not pass", string(SystemPromptID), "Hello {{ .Customer }}.", orders.ErrInvalidPrompt},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

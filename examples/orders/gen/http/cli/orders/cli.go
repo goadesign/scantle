@@ -369,7 +369,7 @@ func ordersUsage() {
 	fmt.Fprintln(os.Stderr, `    chat: Send a message to the refund assistant and start a run.`)
 	fmt.Fprintln(os.Stderr, `    run-status: Read the state of a run the caller started.`)
 	fmt.Fprintln(os.Stderr, `    approve-refund: Approve or deny a refund that is waiting for a manager.`)
-	fmt.Fprintln(os.Stderr, `    override-prompt: Replace the text of a registered prompt for every tenant. The agent's next model request uses the new text. The change lasts until the service restarts, which restores the built-in text.`)
+	fmt.Fprintln(os.Stderr, `    override-prompt: Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s orders COMMAND --help\n", os.Args[0])
@@ -446,7 +446,7 @@ func ordersOverridePromptUsage() {
 
 	// Description
 	fmt.Fprintln(os.Stderr)
-	fmt.Fprintln(os.Stderr, `Replace the text of a registered prompt for every tenant. The agent's next model request uses the new text. The change lasts until the service restarts, which restores the built-in text.`)
+	fmt.Fprintln(os.Stderr, `Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.`)
 
 	// Flags list
 	fmt.Fprintln(os.Stderr, `    -body JSON: `)

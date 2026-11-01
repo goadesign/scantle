@@ -63,7 +63,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run, approval or prompt does not exist.'
+                    description: 'not_found: The run or approval does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -76,7 +76,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_prompt: The prompt template does not render.'
+                    description: 'invalid_refund: The refund breaks a business rule.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -85,7 +85,7 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_prompt
+                                name: invalid_refund
                                 temporary: false
                                 timeout: false
             security:
@@ -95,7 +95,7 @@ paths:
             tags:
                 - orders
             summary: override_prompt orders
-            description: Replace the text of a registered prompt for every tenant. The agent's next model request uses the new text. The change lasts until the service restarts, which restores the built-in text.
+            description: Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.
             operationId: orders#override_prompt
             parameters:
                 - name: prompt_id
@@ -154,7 +154,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run, approval or prompt does not exist.'
+                    description: 'not_found: The run or approval does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -167,7 +167,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_prompt: The prompt template does not render.'
+                    description: 'invalid_refund: The refund breaks a business rule.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -176,7 +176,7 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_prompt
+                                name: invalid_refund
                                 temporary: false
                                 timeout: false
             security:
@@ -239,7 +239,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run, approval or prompt does not exist.'
+                    description: 'not_found: The run or approval does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -252,7 +252,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_prompt: The prompt template does not render.'
+                    description: 'invalid_refund: The refund breaks a business rule.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -261,7 +261,7 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_prompt
+                                name: invalid_refund
                                 temporary: false
                                 timeout: false
             security:
@@ -334,7 +334,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "404":
-                    description: 'not_found: The run, approval or prompt does not exist.'
+                    description: 'not_found: The run or approval does not exist.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -347,7 +347,7 @@ paths:
                                 temporary: false
                                 timeout: false
                 "422":
-                    description: 'invalid_prompt: The prompt template does not render.'
+                    description: 'invalid_refund: The refund breaks a business rule.'
                     content:
                         application/vnd.goa.error:
                             schema:
@@ -356,7 +356,7 @@ paths:
                                 fault: false
                                 id: 123abc
                                 message: parameter 'p' must be an integer
-                                name: invalid_prompt
+                                name: invalid_refund
                                 temporary: false
                                 timeout: false
             security:
@@ -787,7 +787,7 @@ components:
                     example: At id autem tenetur rem aut.
                 version:
                     type: string
-                    description: 'Version of the accepted text: "sha256:" followed by the hex SHA-256 of the template. Model requests that use it carry this version.'
+                    description: 'Version of the accepted text: "sha256:" followed by the hex SHA-256 of the template. Model requests that use this text carry this version.'
                     example: Fuga quos quia.
             example:
                 prompt_id: At id autem tenetur rem aut.

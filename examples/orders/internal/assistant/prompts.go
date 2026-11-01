@@ -39,7 +39,6 @@ func (p *Prompts) Override(ctx context.Context, promptID, template string) (stri
 		return "", fmt.Errorf("%w: %s", orders.ErrPromptNotFound, promptID)
 	}
 	spec.Template = template
-	spec.Version = ""
 	check := prompt.NewRegistry(nil)
 	if err := check.Register(spec); err != nil {
 		return "", fmt.Errorf("%w: %w", orders.ErrInvalidPrompt, err)

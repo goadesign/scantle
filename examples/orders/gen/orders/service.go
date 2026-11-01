@@ -30,9 +30,10 @@ type Service interface {
 	RunStatus(context.Context, *RunStatusPayload) (res *RunView, err error)
 	// Approve or deny a refund that is waiting for a manager.
 	ApproveRefund(context.Context, *ApproveRefundPayload) (res *RunView, err error)
-	// Replace the text of a registered prompt for every tenant. The agent's next
-	// model request uses the new text. The change lasts until the service
-	// restarts, which restores the built-in text.
+	// Replace the text of a registered prompt for every tenant served by this
+	// orders process. The agent's next model request planned by this process uses
+	// the new text. The change lasts until the process restarts, which restores
+	// the built-in text; other running orders processes keep their own prompts.
 	OverridePrompt(context.Context, *OverridePromptPayload) (res *PromptVersion, err error)
 	// List one page of the customer's orders.
 	ListOrders(context.Context, *ListOrdersPayload) (res *ListOrdersResult, err error)
@@ -144,7 +145,7 @@ type PromptVersion struct {
 	// Prompt that was replaced.
 	PromptID string
 	// Version of the accepted text: "sha256:" followed by the hex SHA-256 of the
-	// template. Model requests that use it carry this version.
+	// template. Model requests that use this text carry this version.
 	Version string
 }
 
@@ -214,6 +215,11 @@ func MakeNotFound(err error) *goa.ServiceError {
 // MakeInvalidRefund builds a goa.ServiceError from an error.
 func MakeInvalidRefund(err error) *goa.ServiceError {
 	return goa.NewServiceError(err, "invalid_refund", false, false, false)
+}
+
+// MakeUnknownPrompt builds a goa.ServiceError from an error.
+func MakeUnknownPrompt(err error) *goa.ServiceError {
+	return goa.NewServiceError(err, "unknown_prompt", false, false, false)
 }
 
 // MakeInvalidPrompt builds a goa.ServiceError from an error.
@@ -296,7 +302,7 @@ type jsonPromptVersionTransport struct {
 	// Prompt that was replaced.
 	PromptID *string `json:"prompt_id"`
 	// Version of the accepted text: "sha256:" followed by the hex SHA-256 of the
-	// template. Model requests that use it carry this version.
+	// template. Model requests that use this text carry this version.
 	Version *string `json:"version"`
 }
 
@@ -1135,7 +1141,7 @@ func validatePromptVersionJSONValue(path string, value any, description string) 
 		case "version":
 			if err := validateOrderJSONValue2(
 				generatedJSONChildPath(path, key, false),
-				typed[key], "Version of the accepted text: \"sha256:\" followed by the hex SHA-256 of the template. Model requests that use it carry this version.",
+				typed[key], "Version of the accepted text: \"sha256:\" followed by the hex SHA-256 of the template. Model requests that use this text carry this version.",
 			); err != nil {
 				return err
 			}

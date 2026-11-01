@@ -144,7 +144,7 @@ func (s *Service) OverridePrompt(ctx context.Context, p *genorders.OverridePromp
 	version, err := s.prompts.Override(ctx, p.PromptID, p.Template)
 	switch {
 	case errors.Is(err, ErrPromptNotFound):
-		return nil, genorders.MakeNotFound(err)
+		return nil, genorders.MakeUnknownPrompt(err)
 	case errors.Is(err, ErrInvalidPrompt):
 		return nil, genorders.MakeInvalidPrompt(err)
 	case err != nil:

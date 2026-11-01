@@ -86,7 +86,7 @@ type OverridePromptResponseBody struct {
 	// Prompt that was replaced.
 	PromptID *string `form:"prompt_id,omitempty" json:"prompt_id,omitempty" xml:"prompt_id,omitempty"`
 	// Version of the accepted text: "sha256:" followed by the hex SHA-256 of the
-	// template. Model requests that use it carry this version.
+	// template. Model requests that use this text carry this version.
 	Version *string `form:"version,omitempty" json:"version,omitempty" xml:"version,omitempty"`
 }
 
@@ -147,24 +147,6 @@ type ChatNotFoundResponseBody struct {
 // ChatInvalidRefundResponseBody is the type of the "orders" service "chat"
 // endpoint HTTP response body for the "invalid_refund" error.
 type ChatInvalidRefundResponseBody struct {
-	// Name is the name of this class of errors.
-	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// ID is a unique identifier for this particular occurrence of the problem.
-	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
-	// Message is a human-readable explanation specific to this occurrence of the
-	// problem.
-	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
-	// Is the error temporary?
-	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
-	// Is the error a timeout?
-	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
-	// Is the error a server-side fault?
-	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
-}
-
-// ChatInvalidPromptResponseBody is the type of the "orders" service "chat"
-// endpoint HTTP response body for the "invalid_prompt" error.
-type ChatInvalidPromptResponseBody struct {
 	// Name is the name of this class of errors.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
 	// ID is a unique identifier for this particular occurrence of the problem.
@@ -252,24 +234,6 @@ type RunStatusInvalidRefundResponseBody struct {
 	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
 }
 
-// RunStatusInvalidPromptResponseBody is the type of the "orders" service
-// "run_status" endpoint HTTP response body for the "invalid_prompt" error.
-type RunStatusInvalidPromptResponseBody struct {
-	// Name is the name of this class of errors.
-	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// ID is a unique identifier for this particular occurrence of the problem.
-	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
-	// Message is a human-readable explanation specific to this occurrence of the
-	// problem.
-	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
-	// Is the error temporary?
-	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
-	// Is the error a timeout?
-	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
-	// Is the error a server-side fault?
-	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
-}
-
 // ApproveRefundUnauthorizedResponseBody is the type of the "orders" service
 // "approve_refund" endpoint HTTP response body for the "unauthorized" error.
 type ApproveRefundUnauthorizedResponseBody struct {
@@ -342,9 +306,63 @@ type ApproveRefundInvalidRefundResponseBody struct {
 	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
 }
 
-// ApproveRefundInvalidPromptResponseBody is the type of the "orders" service
-// "approve_refund" endpoint HTTP response body for the "invalid_prompt" error.
-type ApproveRefundInvalidPromptResponseBody struct {
+// OverridePromptUnknownPromptResponseBody is the type of the "orders" service
+// "override_prompt" endpoint HTTP response body for the "unknown_prompt" error.
+type OverridePromptUnknownPromptResponseBody struct {
+	// Name is the name of this class of errors.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+	// Is the error temporary?
+	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
+	// Is the error a timeout?
+	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
+	// Is the error a server-side fault?
+	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
+}
+
+// OverridePromptNotFoundResponseBody is the type of the "orders" service
+// "override_prompt" endpoint HTTP response body for the "not_found" error.
+type OverridePromptNotFoundResponseBody struct {
+	// Name is the name of this class of errors.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+	// Is the error temporary?
+	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
+	// Is the error a timeout?
+	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
+	// Is the error a server-side fault?
+	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
+}
+
+// OverridePromptInvalidPromptResponseBody is the type of the "orders" service
+// "override_prompt" endpoint HTTP response body for the "invalid_prompt" error.
+type OverridePromptInvalidPromptResponseBody struct {
+	// Name is the name of this class of errors.
+	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
+	// ID is a unique identifier for this particular occurrence of the problem.
+	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
+	// Message is a human-readable explanation specific to this occurrence of the
+	// problem.
+	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
+	// Is the error temporary?
+	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
+	// Is the error a timeout?
+	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
+	// Is the error a server-side fault?
+	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
+}
+
+// OverridePromptInvalidRefundResponseBody is the type of the "orders" service
+// "override_prompt" endpoint HTTP response body for the "invalid_refund" error.
+type OverridePromptInvalidRefundResponseBody struct {
 	// Name is the name of this class of errors.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
 	// ID is a unique identifier for this particular occurrence of the problem.
@@ -381,60 +399,6 @@ type OverridePromptUnauthorizedResponseBody struct {
 // OverridePromptForbiddenResponseBody is the type of the "orders" service
 // "override_prompt" endpoint HTTP response body for the "forbidden" error.
 type OverridePromptForbiddenResponseBody struct {
-	// Name is the name of this class of errors.
-	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// ID is a unique identifier for this particular occurrence of the problem.
-	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
-	// Message is a human-readable explanation specific to this occurrence of the
-	// problem.
-	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
-	// Is the error temporary?
-	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
-	// Is the error a timeout?
-	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
-	// Is the error a server-side fault?
-	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
-}
-
-// OverridePromptNotFoundResponseBody is the type of the "orders" service
-// "override_prompt" endpoint HTTP response body for the "not_found" error.
-type OverridePromptNotFoundResponseBody struct {
-	// Name is the name of this class of errors.
-	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// ID is a unique identifier for this particular occurrence of the problem.
-	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
-	// Message is a human-readable explanation specific to this occurrence of the
-	// problem.
-	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
-	// Is the error temporary?
-	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
-	// Is the error a timeout?
-	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
-	// Is the error a server-side fault?
-	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
-}
-
-// OverridePromptInvalidRefundResponseBody is the type of the "orders" service
-// "override_prompt" endpoint HTTP response body for the "invalid_refund" error.
-type OverridePromptInvalidRefundResponseBody struct {
-	// Name is the name of this class of errors.
-	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
-	// ID is a unique identifier for this particular occurrence of the problem.
-	ID *string `form:"id,omitempty" json:"id,omitempty" xml:"id,omitempty"`
-	// Message is a human-readable explanation specific to this occurrence of the
-	// problem.
-	Message *string `form:"message,omitempty" json:"message,omitempty" xml:"message,omitempty"`
-	// Is the error temporary?
-	Temporary *bool `form:"temporary,omitempty" json:"temporary,omitempty" xml:"temporary,omitempty"`
-	// Is the error a timeout?
-	Timeout *bool `form:"timeout,omitempty" json:"timeout,omitempty" xml:"timeout,omitempty"`
-	// Is the error a server-side fault?
-	Fault *bool `form:"fault,omitempty" json:"fault,omitempty" xml:"fault,omitempty"`
-}
-
-// OverridePromptInvalidPromptResponseBody is the type of the "orders" service
-// "override_prompt" endpoint HTTP response body for the "invalid_prompt" error.
-type OverridePromptInvalidPromptResponseBody struct {
 	// Name is the name of this class of errors.
 	Name *string `form:"name,omitempty" json:"name,omitempty" xml:"name,omitempty"`
 	// ID is a unique identifier for this particular occurrence of the problem.
@@ -549,21 +513,6 @@ func NewChatInvalidRefund(body *ChatInvalidRefundResponseBody) *goa.ServiceError
 	return v
 }
 
-// NewChatInvalidPrompt builds a orders service chat endpoint invalid_prompt
-// error.
-func NewChatInvalidPrompt(body *ChatInvalidPromptResponseBody) *goa.ServiceError {
-	v := &goa.ServiceError{
-		Name:      *body.Name,
-		ID:        *body.ID,
-		Message:   *body.Message,
-		Temporary: *body.Temporary,
-		Timeout:   *body.Timeout,
-		Fault:     *body.Fault,
-	}
-
-	return v
-}
-
 // NewRunStatusRunViewOK builds a "orders" service "run_status" endpoint result
 // from a HTTP "OK" response.
 func NewRunStatusRunViewOK(body *RunStatusResponseBody) *orders.RunView {
@@ -626,21 +575,6 @@ func NewRunStatusNotFound(body *RunStatusNotFoundResponseBody) *goa.ServiceError
 // NewRunStatusInvalidRefund builds a orders service run_status endpoint
 // invalid_refund error.
 func NewRunStatusInvalidRefund(body *RunStatusInvalidRefundResponseBody) *goa.ServiceError {
-	v := &goa.ServiceError{
-		Name:      *body.Name,
-		ID:        *body.ID,
-		Message:   *body.Message,
-		Temporary: *body.Temporary,
-		Timeout:   *body.Timeout,
-		Fault:     *body.Fault,
-	}
-
-	return v
-}
-
-// NewRunStatusInvalidPrompt builds a orders service run_status endpoint
-// invalid_prompt error.
-func NewRunStatusInvalidPrompt(body *RunStatusInvalidPromptResponseBody) *goa.ServiceError {
 	v := &goa.ServiceError{
 		Name:      *body.Name,
 		ID:        *body.ID,
@@ -727,21 +661,6 @@ func NewApproveRefundInvalidRefund(body *ApproveRefundInvalidRefundResponseBody)
 	return v
 }
 
-// NewApproveRefundInvalidPrompt builds a orders service approve_refund
-// endpoint invalid_prompt error.
-func NewApproveRefundInvalidPrompt(body *ApproveRefundInvalidPromptResponseBody) *goa.ServiceError {
-	v := &goa.ServiceError{
-		Name:      *body.Name,
-		ID:        *body.ID,
-		Message:   *body.Message,
-		Temporary: *body.Temporary,
-		Timeout:   *body.Timeout,
-		Fault:     *body.Fault,
-	}
-
-	return v
-}
-
 // NewOverridePromptPromptVersionOK builds a "orders" service "override_prompt"
 // endpoint result from a HTTP "OK" response.
 func NewOverridePromptPromptVersionOK(body *OverridePromptResponseBody) *orders.PromptVersion {
@@ -753,24 +672,9 @@ func NewOverridePromptPromptVersionOK(body *OverridePromptResponseBody) *orders.
 	return v
 }
 
-// NewOverridePromptUnauthorized builds a orders service override_prompt
-// endpoint unauthorized error.
-func NewOverridePromptUnauthorized(body *OverridePromptUnauthorizedResponseBody) *goa.ServiceError {
-	v := &goa.ServiceError{
-		Name:      *body.Name,
-		ID:        *body.ID,
-		Message:   *body.Message,
-		Temporary: *body.Temporary,
-		Timeout:   *body.Timeout,
-		Fault:     *body.Fault,
-	}
-
-	return v
-}
-
-// NewOverridePromptForbidden builds a orders service override_prompt endpoint
-// forbidden error.
-func NewOverridePromptForbidden(body *OverridePromptForbiddenResponseBody) *goa.ServiceError {
+// NewOverridePromptUnknownPrompt builds a orders service override_prompt
+// endpoint unknown_prompt error.
+func NewOverridePromptUnknownPrompt(body *OverridePromptUnknownPromptResponseBody) *goa.ServiceError {
 	v := &goa.ServiceError{
 		Name:      *body.Name,
 		ID:        *body.ID,
@@ -798,6 +702,21 @@ func NewOverridePromptNotFound(body *OverridePromptNotFoundResponseBody) *goa.Se
 	return v
 }
 
+// NewOverridePromptInvalidPrompt builds a orders service override_prompt
+// endpoint invalid_prompt error.
+func NewOverridePromptInvalidPrompt(body *OverridePromptInvalidPromptResponseBody) *goa.ServiceError {
+	v := &goa.ServiceError{
+		Name:      *body.Name,
+		ID:        *body.ID,
+		Message:   *body.Message,
+		Temporary: *body.Temporary,
+		Timeout:   *body.Timeout,
+		Fault:     *body.Fault,
+	}
+
+	return v
+}
+
 // NewOverridePromptInvalidRefund builds a orders service override_prompt
 // endpoint invalid_refund error.
 func NewOverridePromptInvalidRefund(body *OverridePromptInvalidRefundResponseBody) *goa.ServiceError {
@@ -813,9 +732,24 @@ func NewOverridePromptInvalidRefund(body *OverridePromptInvalidRefundResponseBod
 	return v
 }
 
-// NewOverridePromptInvalidPrompt builds a orders service override_prompt
-// endpoint invalid_prompt error.
-func NewOverridePromptInvalidPrompt(body *OverridePromptInvalidPromptResponseBody) *goa.ServiceError {
+// NewOverridePromptUnauthorized builds a orders service override_prompt
+// endpoint unauthorized error.
+func NewOverridePromptUnauthorized(body *OverridePromptUnauthorizedResponseBody) *goa.ServiceError {
+	v := &goa.ServiceError{
+		Name:      *body.Name,
+		ID:        *body.ID,
+		Message:   *body.Message,
+		Temporary: *body.Temporary,
+		Timeout:   *body.Timeout,
+		Fault:     *body.Fault,
+	}
+
+	return v
+}
+
+// NewOverridePromptForbidden builds a orders service override_prompt endpoint
+// forbidden error.
+func NewOverridePromptForbidden(body *OverridePromptForbiddenResponseBody) *goa.ServiceError {
 	v := &goa.ServiceError{
 		Name:      *body.Name,
 		ID:        *body.ID,
@@ -986,30 +920,6 @@ func ValidateChatInvalidRefundResponseBody(body *ChatInvalidRefundResponseBody) 
 	return
 }
 
-// ValidateChatInvalidPromptResponseBody runs the validations defined on
-// ChatInvalidPromptResponseBody
-func ValidateChatInvalidPromptResponseBody(body *ChatInvalidPromptResponseBody) (err error) {
-	if body.Name == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
-	}
-	if body.ID == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
-	}
-	if body.Message == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
-	}
-	if body.Temporary == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
-	}
-	if body.Timeout == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
-	}
-	if body.Fault == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
-	}
-	return
-}
-
 // ValidateRunStatusUnauthorizedResponseBody runs the validations defined on
 // RunStatusUnauthorizedResponseBody
 func ValidateRunStatusUnauthorizedResponseBody(body *RunStatusUnauthorizedResponseBody) (err error) {
@@ -1085,30 +995,6 @@ func ValidateRunStatusNotFoundResponseBody(body *RunStatusNotFoundResponseBody) 
 // ValidateRunStatusInvalidRefundResponseBody runs the validations defined on
 // RunStatusInvalidRefundResponseBody
 func ValidateRunStatusInvalidRefundResponseBody(body *RunStatusInvalidRefundResponseBody) (err error) {
-	if body.Name == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
-	}
-	if body.ID == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
-	}
-	if body.Message == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
-	}
-	if body.Temporary == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
-	}
-	if body.Timeout == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
-	}
-	if body.Fault == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
-	}
-	return
-}
-
-// ValidateRunStatusInvalidPromptResponseBody runs the validations defined on
-// RunStatusInvalidPromptResponseBody
-func ValidateRunStatusInvalidPromptResponseBody(body *RunStatusInvalidPromptResponseBody) (err error) {
 	if body.Name == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
 	}
@@ -1226,9 +1112,81 @@ func ValidateApproveRefundInvalidRefundResponseBody(body *ApproveRefundInvalidRe
 	return
 }
 
-// ValidateApproveRefundInvalidPromptResponseBody runs the validations defined
-// on ApproveRefundInvalidPromptResponseBody
-func ValidateApproveRefundInvalidPromptResponseBody(body *ApproveRefundInvalidPromptResponseBody) (err error) {
+// ValidateOverridePromptUnknownPromptResponseBody runs the validations defined
+// on OverridePromptUnknownPromptResponseBody
+func ValidateOverridePromptUnknownPromptResponseBody(body *OverridePromptUnknownPromptResponseBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Message == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	if body.Temporary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
+	}
+	if body.Timeout == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
+	}
+	if body.Fault == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
+	}
+	return
+}
+
+// ValidateOverridePromptNotFoundResponseBody runs the validations defined on
+// OverridePromptNotFoundResponseBody
+func ValidateOverridePromptNotFoundResponseBody(body *OverridePromptNotFoundResponseBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Message == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	if body.Temporary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
+	}
+	if body.Timeout == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
+	}
+	if body.Fault == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
+	}
+	return
+}
+
+// ValidateOverridePromptInvalidPromptResponseBody runs the validations defined
+// on OverridePromptInvalidPromptResponseBody
+func ValidateOverridePromptInvalidPromptResponseBody(body *OverridePromptInvalidPromptResponseBody) (err error) {
+	if body.Name == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
+	}
+	if body.ID == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
+	}
+	if body.Message == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
+	}
+	if body.Temporary == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
+	}
+	if body.Timeout == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
+	}
+	if body.Fault == nil {
+		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
+	}
+	return
+}
+
+// ValidateOverridePromptInvalidRefundResponseBody runs the validations defined
+// on OverridePromptInvalidRefundResponseBody
+func ValidateOverridePromptInvalidRefundResponseBody(body *OverridePromptInvalidRefundResponseBody) (err error) {
 	if body.Name == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
 	}
@@ -1277,78 +1235,6 @@ func ValidateOverridePromptUnauthorizedResponseBody(body *OverridePromptUnauthor
 // ValidateOverridePromptForbiddenResponseBody runs the validations defined on
 // OverridePromptForbiddenResponseBody
 func ValidateOverridePromptForbiddenResponseBody(body *OverridePromptForbiddenResponseBody) (err error) {
-	if body.Name == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
-	}
-	if body.ID == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
-	}
-	if body.Message == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
-	}
-	if body.Temporary == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
-	}
-	if body.Timeout == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
-	}
-	if body.Fault == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
-	}
-	return
-}
-
-// ValidateOverridePromptNotFoundResponseBody runs the validations defined on
-// OverridePromptNotFoundResponseBody
-func ValidateOverridePromptNotFoundResponseBody(body *OverridePromptNotFoundResponseBody) (err error) {
-	if body.Name == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
-	}
-	if body.ID == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
-	}
-	if body.Message == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
-	}
-	if body.Temporary == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
-	}
-	if body.Timeout == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
-	}
-	if body.Fault == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
-	}
-	return
-}
-
-// ValidateOverridePromptInvalidRefundResponseBody runs the validations defined
-// on OverridePromptInvalidRefundResponseBody
-func ValidateOverridePromptInvalidRefundResponseBody(body *OverridePromptInvalidRefundResponseBody) (err error) {
-	if body.Name == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
-	}
-	if body.ID == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("id", "body"))
-	}
-	if body.Message == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("message", "body"))
-	}
-	if body.Temporary == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("temporary", "body"))
-	}
-	if body.Timeout == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("timeout", "body"))
-	}
-	if body.Fault == nil {
-		err = goa.MergeErrors(err, goa.MissingFieldError("fault", "body"))
-	}
-	return
-}
-
-// ValidateOverridePromptInvalidPromptResponseBody runs the validations defined
-// on OverridePromptInvalidPromptResponseBody
-func ValidateOverridePromptInvalidPromptResponseBody(body *OverridePromptInvalidPromptResponseBody) (err error) {
 	if body.Name == nil {
 		err = goa.MergeErrors(err, goa.MissingFieldError("name", "body"))
 	}

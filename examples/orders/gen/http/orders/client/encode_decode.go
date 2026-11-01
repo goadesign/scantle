@@ -68,7 +68,6 @@ func EncodeChatRequest(encoder func(*http.Request) goahttp.Encoder) func(*http.R
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
 //   - "not_found" (type *goa.ServiceError): http.StatusNotFound
 //   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
-//   - "invalid_prompt" (type *goa.ServiceError): http.StatusUnprocessableEntity
 //   - error: internal error
 func DecodeChatResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
 	return func(resp *http.Response) (result any, decodeErr error) {
@@ -149,43 +148,19 @@ func DecodeChatResponse(decoder func(*http.Response) goahttp.Decoder, restoreBod
 			}
 			return nil, NewChatNotFound(&body)
 		case http.StatusUnprocessableEntity:
-			en := resp.Header.Get("goa-error")
-			switch en {
-			case "invalid_refund":
-				var (
-					body ChatInvalidRefundResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "chat", err)
-				}
-				err = ValidateChatInvalidRefundResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "chat", err)
-				}
-				return nil, NewChatInvalidRefund(&body)
-			case "invalid_prompt":
-				var (
-					body ChatInvalidPromptResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "chat", err)
-				}
-				err = ValidateChatInvalidPromptResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "chat", err)
-				}
-				return nil, NewChatInvalidPrompt(&body)
-			default:
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "chat", err)
-				}
-				return nil, goahttp.ErrInvalidResponse("orders", "chat", resp.StatusCode, string(body))
+			var (
+				body ChatInvalidRefundResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("orders", "chat", err)
 			}
+			err = ValidateChatInvalidRefundResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("orders", "chat", err)
+			}
+			return nil, NewChatInvalidRefund(&body)
 		default:
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -251,7 +226,6 @@ func EncodeRunStatusRequest(encoder func(*http.Request) goahttp.Encoder) func(*h
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
 //   - "not_found" (type *goa.ServiceError): http.StatusNotFound
 //   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
-//   - "invalid_prompt" (type *goa.ServiceError): http.StatusUnprocessableEntity
 //   - error: internal error
 func DecodeRunStatusResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
 	return func(resp *http.Response) (result any, decodeErr error) {
@@ -332,43 +306,19 @@ func DecodeRunStatusResponse(decoder func(*http.Response) goahttp.Decoder, resto
 			}
 			return nil, NewRunStatusNotFound(&body)
 		case http.StatusUnprocessableEntity:
-			en := resp.Header.Get("goa-error")
-			switch en {
-			case "invalid_refund":
-				var (
-					body RunStatusInvalidRefundResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "run_status", err)
-				}
-				err = ValidateRunStatusInvalidRefundResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "run_status", err)
-				}
-				return nil, NewRunStatusInvalidRefund(&body)
-			case "invalid_prompt":
-				var (
-					body RunStatusInvalidPromptResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "run_status", err)
-				}
-				err = ValidateRunStatusInvalidPromptResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "run_status", err)
-				}
-				return nil, NewRunStatusInvalidPrompt(&body)
-			default:
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "run_status", err)
-				}
-				return nil, goahttp.ErrInvalidResponse("orders", "run_status", resp.StatusCode, string(body))
+			var (
+				body RunStatusInvalidRefundResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("orders", "run_status", err)
 			}
+			err = ValidateRunStatusInvalidRefundResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("orders", "run_status", err)
+			}
+			return nil, NewRunStatusInvalidRefund(&body)
 		default:
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -438,7 +388,6 @@ func EncodeApproveRefundRequest(encoder func(*http.Request) goahttp.Encoder) fun
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
 //   - "not_found" (type *goa.ServiceError): http.StatusNotFound
 //   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
-//   - "invalid_prompt" (type *goa.ServiceError): http.StatusUnprocessableEntity
 //   - error: internal error
 func DecodeApproveRefundResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
 	return func(resp *http.Response) (result any, decodeErr error) {
@@ -519,43 +468,19 @@ func DecodeApproveRefundResponse(decoder func(*http.Response) goahttp.Decoder, r
 			}
 			return nil, NewApproveRefundNotFound(&body)
 		case http.StatusUnprocessableEntity:
-			en := resp.Header.Get("goa-error")
-			switch en {
-			case "invalid_refund":
-				var (
-					body ApproveRefundInvalidRefundResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "approve_refund", err)
-				}
-				err = ValidateApproveRefundInvalidRefundResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "approve_refund", err)
-				}
-				return nil, NewApproveRefundInvalidRefund(&body)
-			case "invalid_prompt":
-				var (
-					body ApproveRefundInvalidPromptResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "approve_refund", err)
-				}
-				err = ValidateApproveRefundInvalidPromptResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "approve_refund", err)
-				}
-				return nil, NewApproveRefundInvalidPrompt(&body)
-			default:
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "approve_refund", err)
-				}
-				return nil, goahttp.ErrInvalidResponse("orders", "approve_refund", resp.StatusCode, string(body))
+			var (
+				body ApproveRefundInvalidRefundResponseBody
+				err  error
+			)
+			err = decoder(resp).Decode(&body)
+			if err != nil {
+				return nil, goahttp.ErrDecodingError("orders", "approve_refund", err)
 			}
+			err = ValidateApproveRefundInvalidRefundResponseBody(&body)
+			if err != nil {
+				return nil, goahttp.ErrValidationError("orders", "approve_refund", err)
+			}
+			return nil, NewApproveRefundInvalidRefund(&body)
 		default:
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
@@ -621,11 +546,12 @@ func EncodeOverridePromptRequest(encoder func(*http.Request) goahttp.Encoder) fu
 // orders override_prompt endpoint. restoreBody controls whether the response
 // body should be restored after having been read.
 // DecodeOverridePromptResponse may return the following errors:
+//   - "unknown_prompt" (type *goa.ServiceError): http.StatusNotFound
+//   - "not_found" (type *goa.ServiceError): http.StatusNotFound
+//   - "invalid_prompt" (type *goa.ServiceError): http.StatusUnprocessableEntity
+//   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
 //   - "unauthorized" (type *goa.ServiceError): http.StatusUnauthorized
 //   - "forbidden" (type *goa.ServiceError): http.StatusForbidden
-//   - "not_found" (type *goa.ServiceError): http.StatusNotFound
-//   - "invalid_refund" (type *goa.ServiceError): http.StatusUnprocessableEntity
-//   - "invalid_prompt" (type *goa.ServiceError): http.StatusUnprocessableEntity
 //   - error: internal error
 func DecodeOverridePromptResponse(decoder func(*http.Response) goahttp.Decoder, restoreBody bool) func(*http.Response) (any, error) {
 	return func(resp *http.Response) (result any, decodeErr error) {
@@ -663,6 +589,82 @@ func DecodeOverridePromptResponse(decoder func(*http.Response) goahttp.Decoder, 
 			}
 			res := NewOverridePromptPromptVersionOK(&body)
 			return res, nil
+		case http.StatusNotFound:
+			en := resp.Header.Get("goa-error")
+			switch en {
+			case "unknown_prompt":
+				var (
+					body OverridePromptUnknownPromptResponseBody
+					err  error
+				)
+				err = decoder(resp).Decode(&body)
+				if err != nil {
+					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
+				}
+				err = ValidateOverridePromptUnknownPromptResponseBody(&body)
+				if err != nil {
+					return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
+				}
+				return nil, NewOverridePromptUnknownPrompt(&body)
+			case "not_found":
+				var (
+					body OverridePromptNotFoundResponseBody
+					err  error
+				)
+				err = decoder(resp).Decode(&body)
+				if err != nil {
+					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
+				}
+				err = ValidateOverridePromptNotFoundResponseBody(&body)
+				if err != nil {
+					return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
+				}
+				return nil, NewOverridePromptNotFound(&body)
+			default:
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
+				}
+				return nil, goahttp.ErrInvalidResponse("orders", "override_prompt", resp.StatusCode, string(body))
+			}
+		case http.StatusUnprocessableEntity:
+			en := resp.Header.Get("goa-error")
+			switch en {
+			case "invalid_prompt":
+				var (
+					body OverridePromptInvalidPromptResponseBody
+					err  error
+				)
+				err = decoder(resp).Decode(&body)
+				if err != nil {
+					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
+				}
+				err = ValidateOverridePromptInvalidPromptResponseBody(&body)
+				if err != nil {
+					return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
+				}
+				return nil, NewOverridePromptInvalidPrompt(&body)
+			case "invalid_refund":
+				var (
+					body OverridePromptInvalidRefundResponseBody
+					err  error
+				)
+				err = decoder(resp).Decode(&body)
+				if err != nil {
+					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
+				}
+				err = ValidateOverridePromptInvalidRefundResponseBody(&body)
+				if err != nil {
+					return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
+				}
+				return nil, NewOverridePromptInvalidRefund(&body)
+			default:
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
+				}
+				return nil, goahttp.ErrInvalidResponse("orders", "override_prompt", resp.StatusCode, string(body))
+			}
 		case http.StatusUnauthorized:
 			var (
 				body OverridePromptUnauthorizedResponseBody
@@ -691,58 +693,6 @@ func DecodeOverridePromptResponse(decoder func(*http.Response) goahttp.Decoder, 
 				return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
 			}
 			return nil, NewOverridePromptForbidden(&body)
-		case http.StatusNotFound:
-			var (
-				body OverridePromptNotFoundResponseBody
-				err  error
-			)
-			err = decoder(resp).Decode(&body)
-			if err != nil {
-				return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
-			}
-			err = ValidateOverridePromptNotFoundResponseBody(&body)
-			if err != nil {
-				return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
-			}
-			return nil, NewOverridePromptNotFound(&body)
-		case http.StatusUnprocessableEntity:
-			en := resp.Header.Get("goa-error")
-			switch en {
-			case "invalid_refund":
-				var (
-					body OverridePromptInvalidRefundResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
-				}
-				err = ValidateOverridePromptInvalidRefundResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
-				}
-				return nil, NewOverridePromptInvalidRefund(&body)
-			case "invalid_prompt":
-				var (
-					body OverridePromptInvalidPromptResponseBody
-					err  error
-				)
-				err = decoder(resp).Decode(&body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
-				}
-				err = ValidateOverridePromptInvalidPromptResponseBody(&body)
-				if err != nil {
-					return nil, goahttp.ErrValidationError("orders", "override_prompt", err)
-				}
-				return nil, NewOverridePromptInvalidPrompt(&body)
-			default:
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					return nil, goahttp.ErrDecodingError("orders", "override_prompt", err)
-				}
-				return nil, goahttp.ErrInvalidResponse("orders", "override_prompt", resp.StatusCode, string(body))
-			}
 		default:
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {

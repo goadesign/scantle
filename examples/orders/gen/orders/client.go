@@ -41,9 +41,8 @@ func NewClient(chat, runStatus, approveRefund, overridePrompt, listOrders, issue
 // Chat may return the following errors:
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) Chat(ctx context.Context, p *ChatPayload) (res *RunView, err error) {
 	var ires any
@@ -58,9 +57,8 @@ func (c *Client) Chat(ctx context.Context, p *ChatPayload) (res *RunView, err er
 // RunStatus may return the following errors:
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) RunStatus(ctx context.Context, p *RunStatusPayload) (res *RunView, err error) {
 	var ires any
@@ -75,9 +73,8 @@ func (c *Client) RunStatus(ctx context.Context, p *RunStatusPayload) (res *RunVi
 // ApproveRefund may return the following errors:
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) ApproveRefund(ctx context.Context, p *ApproveRefundPayload) (res *RunView, err error) {
 	var ires any
@@ -90,11 +87,12 @@ func (c *Client) ApproveRefund(ctx context.Context, p *ApproveRefundPayload) (re
 
 // OverridePrompt calls the "override_prompt" endpoint of the "orders" service.
 // OverridePrompt may return the following errors:
+//   - "unknown_prompt" (type *goa.ServiceError): No prompt with this ID is registered.
+//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) OverridePrompt(ctx context.Context, p *OverridePromptPayload) (res *PromptVersion, err error) {
 	var ires any
@@ -109,9 +107,8 @@ func (c *Client) OverridePrompt(ctx context.Context, p *OverridePromptPayload) (
 // ListOrders may return the following errors:
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) ListOrders(ctx context.Context, p *ListOrdersPayload) (res *ListOrdersResult, err error) {
 	var ires any
@@ -127,9 +124,8 @@ func (c *Client) ListOrders(ctx context.Context, p *ListOrdersPayload) (res *Lis
 // IssueStoreCredit may return the following errors:
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) IssueStoreCredit(ctx context.Context, p *RefundCommand) (res *RefundOutcome, err error) {
 	var ires any
@@ -144,9 +140,8 @@ func (c *Client) IssueStoreCredit(ctx context.Context, p *RefundCommand) (res *R
 // RequestRefund may return the following errors:
 //   - "unauthorized" (type *goa.ServiceError): The bearer token is missing or invalid.
 //   - "forbidden" (type *goa.ServiceError): The caller may not perform this action.
-//   - "not_found" (type *goa.ServiceError): The run, approval or prompt does not exist.
+//   - "not_found" (type *goa.ServiceError): The run or approval does not exist.
 //   - "invalid_refund" (type *goa.ServiceError): The refund breaks a business rule.
-//   - "invalid_prompt" (type *goa.ServiceError): The prompt template does not render.
 //   - error: internal error
 func (c *Client) RequestRefund(ctx context.Context, p *RefundCommand) (res *RefundOutcome, err error) {
 	var ires any

@@ -117,10 +117,10 @@ var RunView = Type("RunView", func() {
 	Required("run_id", "status")
 })
 
-// PromptVersion identifies the prompt text now in use.
+// PromptVersion identifies the prompt text override_prompt accepted.
 var PromptVersion = Type("PromptVersion", func() {
 	Attribute("prompt_id", String, "Prompt that was replaced.")
-	Attribute("version", String, "Version of the accepted text: \"sha256:\" followed by the hex SHA-256 of the template. Model requests that use it carry this version.")
+	Attribute("version", String, "Version of the accepted text: \"sha256:\" followed by the hex SHA-256 of the template. Model requests that use this text carry this version.")
 	Required("prompt_id", "version")
 })
 
@@ -129,16 +129,14 @@ var _ = Service("orders", func() {
 	Security(JWTAuth, func() { Scope("orders:chat") })
 	Error("unauthorized", ErrorResult, "The bearer token is missing or invalid.")
 	Error("forbidden", ErrorResult, "The caller may not perform this action.")
-	Error("not_found", ErrorResult, "The run, approval or prompt does not exist.")
+	Error("not_found", ErrorResult, "The run or approval does not exist.")
 	Error("invalid_refund", ErrorResult, "The refund breaks a business rule.")
-	Error("invalid_prompt", ErrorResult, "The prompt template does not render.")
 
 	HTTP(func() {
 		Response("unauthorized", StatusUnauthorized)
 		Response("forbidden", StatusForbidden)
 		Response("not_found", StatusNotFound)
 		Response("invalid_refund", StatusUnprocessableEntity)
-		Response("invalid_prompt", StatusUnprocessableEntity)
 	})
 
 	Method("chat", func() {
@@ -187,8 +185,10 @@ var _ = Service("orders", func() {
 	})
 
 	Method("override_prompt", func() {
-		Description("Replace the text of a registered prompt for every tenant. The agent's next model request uses the new text. The change lasts until the service restarts, which restores the built-in text.")
+		Description("Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.")
 		Security(JWTAuth, func() { Scope("prompts:manage") })
+		Error("unknown_prompt", ErrorResult, "No prompt with this ID is registered.")
+		Error("invalid_prompt", ErrorResult, "The prompt template does not render.")
 		Payload(func() {
 			Token("token", String, "Operator bearer token.")
 			Attribute("prompt_id", String, "Registered prompt to replace.", func() {
@@ -202,6 +202,8 @@ var _ = Service("orders", func() {
 		HTTP(func() {
 			PUT("/prompts/{prompt_id}")
 			Response(StatusOK)
+			Response("unknown_prompt", StatusNotFound)
+			Response("invalid_prompt", StatusUnprocessableEntity)
 		})
 	})
 

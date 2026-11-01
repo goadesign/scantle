@@ -31,12 +31,13 @@ func TestOverridePromptOverHTTP(t *testing.T) {
 		promptID   string
 		template   string
 		wantStatus int
+		wantError  string
 		wantSet    []string
 	}{
-		{"operator", "prompts:manage", "known", "New text.", http.StatusOK, []string{"New text."}},
-		{"manager without the prompt scope", "orders:chat refunds:approve", "known", "New text.", http.StatusForbidden, nil},
-		{"unregistered prompt", "prompts:manage", "other", "New text.", http.StatusNotFound, nil},
-		{"template does not render", "prompts:manage", "known", "bad", http.StatusUnprocessableEntity, nil},
+		{"operator", "prompts:manage", "known", "New text.", http.StatusOK, "", []string{"New text."}},
+		{"manager without the prompt scope", "orders:chat refunds:approve", "known", "New text.", http.StatusForbidden, "forbidden", nil},
+		{"unregistered prompt", "prompts:manage", "other", "New text.", http.StatusNotFound, "unknown_prompt", nil},
+		{"template does not render", "prompts:manage", "known", "bad", http.StatusUnprocessableEntity, "invalid_prompt", nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -52,6 +53,7 @@ func TestOverridePromptOverHTTP(t *testing.T) {
 			defer resp.Body.Close()
 
 			assert.Equal(t, c.wantStatus, resp.StatusCode)
+			assert.Equal(t, c.wantError, resp.Header.Get("goa-error"), "the error name tells clients which failure it was")
 			assert.Equal(t, c.wantSet, prompts.set)
 			if c.wantStatus == http.StatusOK {
 				var got genordersserver.OverridePromptResponseBody
