@@ -1530,7 +1530,7 @@ var getVerificationResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
 		JSONType:    "object",
-		Description: "The run ended without a report. Full evidence stays with the evaluator; this states only where it stopped.",
+		Description: "The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.",
 		Branches: []tools.UnionBranch{
 			tools.TaggedUnionBranch{
 				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},
@@ -2529,7 +2529,7 @@ var verifyChangeResultFields = []tools.FieldMetadata{
 	{
 		Path:        []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("value")},
 		JSONType:    "object",
-		Description: "The run ended without a report. Full evidence stays with the evaluator; this states only where it stopped.",
+		Description: "The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.",
 		Branches: []tools.UnionBranch{
 			tools.TaggedUnionBranch{
 				Discriminator: []tools.FieldPathSegment{tools.FixedField("state"), tools.FixedField("type")},

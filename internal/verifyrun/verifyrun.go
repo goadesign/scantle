@@ -65,7 +65,9 @@ type (
 		// AcceptedAt is when the API accepted the run.
 		AcceptedAt time.Time `json:"accepted_at"`
 		// Timeout is how long the run may take before its supervisor stops it
-		// and records it as interrupted. It must be positive.
+		// and records it as interrupted. Zero means the run has no time limit,
+		// as for surla verify unless -timeout is given; verify_change always
+		// sets the operator's limit.
 		Timeout time.Duration `json:"timeout"`
 		// Plan is the complete verification plan: the operator's candidate
 		// and suite configuration, the caller's candidate commit, the Change
@@ -88,6 +90,11 @@ type (
 		// Summary describes how a run without a report ended, without command
 		// output.
 		Summary string `json:"summary,omitempty"`
+		// PartialReportDigest names, for an interrupted run, the report the
+		// suite saved while it was being stopped, if it saved one. Such a
+		// report never passes; surla verify prints it as evidence, and
+		// get_verification never returns it.
+		PartialReportDigest string `json:"partial_report_digest,omitempty"`
 	}
 
 	// ResultKind says whether a run produced a report.
@@ -192,8 +199,8 @@ func Start(root string, req Request, command []string) (int, error) {
 	if !runIDPattern.MatchString(req.RunID) {
 		return 0, fmt.Errorf("run ID %q is not 32 lowercase hex characters", req.RunID)
 	}
-	if req.Timeout <= 0 {
-		return 0, fmt.Errorf("run timeout %s must be positive", req.Timeout)
+	if req.Timeout < 0 {
+		return 0, fmt.Errorf("run timeout %s must not be negative", req.Timeout)
 	}
 	if req.Plan.WorkDir == "" {
 		return 0, errors.New("run work directory is required")
@@ -245,7 +252,8 @@ func Start(root string, req Request, command []string) (int, error) {
 // own result when it reported one, and otherwise an interrupted outcome. A
 // run the supervisor stopped is always interrupted with the reason, canceled
 // or timed out: a report the suite saved while stopping is partial and would
-// read as failed scenarios, so its digest goes only to the supervisor log.
+// read as failed scenarios, so it is kept only as the outcome's
+// PartialReportDigest.
 // command is the argument list that runs this program.
 func Supervise(dir string, command []string) error {
 	syscall.CloseOnExec(passedFD)
@@ -302,10 +310,12 @@ func Supervise(dir string, command []string) error {
 	}
 	select {
 	case reason := <-stopped:
+		partial := ""
 		if result.Kind == ResultReport {
-			fmt.Fprintf(os.Stderr, "run stopped (%s); partial report %s kept for the operator\n", reason, result.ReportDigest)
+			partial = result.ReportDigest
 		}
 		result = interrupted(reason)
+		result.PartialReportDigest = partial
 	default:
 	}
 	return writeJSON(dir, resultFile, result)
@@ -382,19 +392,30 @@ func Read(root, runID string) (Request, State, error) {
 	if result.Kind == ResultNoReport {
 		return req, State{Kind: StateNotCompleted, Result: result}, nil
 	}
-	f, err := os.Open(filepath.Join(req.Plan.ReportDir, result.ReportDigest+".json"))
+	report, err := LoadReport(req.Plan.ReportDir, result.ReportDigest)
 	if err != nil {
-		return req, State{}, fmt.Errorf("open verification report: %w", err)
+		return req, State{}, err
+	}
+	return req, State{Kind: StateCompleted, Report: report}, nil
+}
+
+// LoadReport reads the report saved under reportDir with digest, such as a
+// completed run's report or an interrupted run's PartialReportDigest, and
+// checks that it is the report that digest names.
+func LoadReport(reportDir, digest string) (verify.Report, error) {
+	f, err := os.Open(filepath.Join(reportDir, digest+".json"))
+	if err != nil {
+		return verify.Report{}, fmt.Errorf("open verification report: %w", err)
 	}
 	defer f.Close()
 	report, err := verify.DecodeReport(f)
 	if err != nil {
-		return req, State{}, err
+		return verify.Report{}, err
 	}
-	if report.Digest != result.ReportDigest {
-		return req, State{}, fmt.Errorf("report %s has digest %s", result.ReportDigest, report.Digest)
+	if report.Digest != digest {
+		return verify.Report{}, fmt.Errorf("report %s has digest %s", digest, report.Digest)
 	}
-	return req, State{Kind: StateCompleted, Report: report}, nil
+	return report, nil
 }
 
 // Wait blocks until the run's supervisor has finished, by taking a shared
@@ -447,10 +468,14 @@ func decodeResult(raw []byte) (Result, error) {
 	}
 	switch {
 	case r.Kind == ResultReport && digestPattern.MatchString(r.ReportDigest) &&
-		r.Failure == "" && r.Stage == "" && r.Summary == "":
+		r.Failure == "" && r.Stage == "" && r.Summary == "" && r.PartialReportDigest == "":
 		return r, nil
-	case r.Kind == ResultNoReport && r.ReportDigest == "" &&
-		(r.Failure == FailureExecution || r.Failure == FailureInterrupted) && r.Stage != "" && r.Summary != "":
+	case r.Kind == ResultNoReport && r.ReportDigest == "" && r.Failure == FailureExecution &&
+		r.Stage != "" && r.Summary != "" && r.PartialReportDigest == "":
+		return r, nil
+	case r.Kind == ResultNoReport && r.ReportDigest == "" && r.Failure == FailureInterrupted &&
+		r.Stage != "" && r.Summary != "" &&
+		(r.PartialReportDigest == "" || digestPattern.MatchString(r.PartialReportDigest)):
 		return r, nil
 	}
 	return Result{}, fmt.Errorf("run result %s is inconsistent", raw)
@@ -526,19 +551,25 @@ func reap(cmd *exec.Cmd) {
 	}
 }
 
-// stopOnRequest waits for a cancel signal or the run's timeout, whichever
-// comes first, unless the executor exits before either. It records why in
+// stopOnRequest waits for a cancel signal or the run's timeout, if it has
+// one, whichever comes first, unless the executor exits before either. It records why in
 // stopped, sends the executor SIGTERM, and kills the whole group if the
 // executor has not exited after stopGrace.
 func stopOnRequest(pgid int, timeout time.Duration, signals <-chan os.Signal, exited <-chan struct{}, stopped chan<- string) {
-	deadline := time.NewTimer(timeout)
-	defer deadline.Stop()
+	// A zero timeout leaves expired nil, so only a signal or the executor's
+	// exit can end the wait.
+	var expired <-chan time.Time
+	if timeout > 0 {
+		deadline := time.NewTimer(timeout)
+		defer deadline.Stop()
+		expired = deadline.C
+	}
 	select {
 	case <-exited:
 		return
 	case <-signals:
 		stopped <- summaryCanceled
-	case <-deadline.C:
+	case <-expired:
 		stopped <- summaryTimedOut
 	}
 	select {

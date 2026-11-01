@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -74,7 +73,7 @@ func TestParseVerifyFlagsBuildsTheExplicitPlan(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, wantPlan, plan)
-			assert.Equal(t, time.Hour, timeout, "a run may take an hour unless -timeout says otherwise")
+			assert.Zero(t, timeout, "surla verify imposes no time limit unless -timeout is given")
 			assert.Equal(t, tc.wantBuilderView, builderView)
 		})
 	}

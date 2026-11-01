@@ -275,11 +275,14 @@ func TestRunStoppedWhileItsSuiteReportsIsInterruptedNotFailed(t *testing.T) {
 	require.NoError(t, Wait(root, runID))
 	_, state, err := Read(root, runID)
 	require.NoError(t, err)
-	assert.Equal(t, interrupted(summaryTimedOut), state.Result,
+	assert.Equal(t, FailureInterrupted, state.Result.Failure,
 		"a partial report from a stopped suite would read as failed scenarios")
-	log, err := os.ReadFile(filepath.Join(root, runID, "supervisor.log"))
+	assert.Equal(t, summaryTimedOut, state.Result.Summary)
+	req, _, err := Read(root, runID)
 	require.NoError(t, err)
-	assert.Contains(t, string(log), "partial report", "the operator can still find the partial report")
+	partial, err := LoadReport(req.Plan.ReportDir, state.Result.PartialReportDigest)
+	require.NoError(t, err, "the stopped outcome names the partial report")
+	assert.False(t, partial.Passed)
 }
 
 func TestRunPastItsTimeoutIsStopped(t *testing.T) {
@@ -306,8 +309,8 @@ func TestReadAndStartRejectInvalidRuns(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(root, runID), 0o700))
 	_, err = Start(root, Request{RunID: runID, Timeout: time.Minute, Plan: verify.Plan{WorkDir: "w"}}, []string{os.Args[0]})
 	assert.ErrorContains(t, err, "create run directory", "a run directory is never reused")
-	_, err = Start(root, Request{RunID: NewRunID()}, []string{os.Args[0]})
-	assert.ErrorContains(t, err, "must be positive")
+	_, err = Start(root, Request{RunID: NewRunID(), Timeout: -time.Second}, []string{os.Args[0]})
+	assert.ErrorContains(t, err, "must not be negative")
 	_, err = Start(root, Request{RunID: NewRunID(), Timeout: time.Minute}, []string{os.Args[0]})
 	assert.ErrorContains(t, err, "work directory is required")
 }

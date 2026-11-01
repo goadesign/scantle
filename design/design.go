@@ -430,7 +430,7 @@ var VerificationCompleted = Type("VerificationCompleted", func() {
 
 // VerificationNotCompleted is the state of a run that produced no report.
 var VerificationNotCompleted = Type("VerificationNotCompleted", func() {
-	Description("The run ended without a report. Full evidence stays with the evaluator; this states only where it stopped.")
+	Description("The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.")
 	Attribute("kind", String, "execution_failed when a step failed; interrupted when the run's process ended before it finished.", func() {
 		Enum("execution_failed", "interrupted")
 	})

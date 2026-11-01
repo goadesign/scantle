@@ -552,8 +552,10 @@ type VerificationCounts struct {
 	HarnessError int
 }
 
-// The run ended without a report. Full evidence stays with the evaluator; this
-// states only where it stopped.
+// The run was accepted but did not complete: a step failed, or its processes
+// ended or were canceled or timed out before it finished. The summary states
+// where it stopped, without command output; full evidence, including any
+// partial report saved while it was being stopped, stays with the evaluator.
 type VerificationNotCompleted struct {
 	// execution_failed when a step failed; interrupted when the run's process
 	// ended before it finished.

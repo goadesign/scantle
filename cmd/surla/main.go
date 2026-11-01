@@ -560,7 +560,7 @@ func parseVerifyFlags(args []string) (verify.Plan, time.Duration, bool, error) {
 	fs.StringVar(&p.RequestRevision, "request-revision", "", "request_revision of the confirmed change being verified")
 	fs.StringVar(&p.WorkDir, "work-dir", "", "private directory for clones, builds (candidate-bin/<name>) and evidence; it must be missing or empty and is kept after the run; keep it away from builders")
 	fs.StringVar(&p.ReportDir, "report-dir", "", "directory that receives the full report as <digest>.json")
-	timeout := fs.Duration("timeout", time.Hour, "how long the run may take before it is stopped")
+	timeout := fs.Duration("timeout", 0, "how long the run may take before it is stopped; 0, the default, means no limit")
 	builderView := fs.Bool("builder-view", false, "print the builder view, which hides holdout scenario details, instead of the full report")
 	if err := fs.Parse(args); err != nil {
 		return verify.Plan{}, 0, false, err

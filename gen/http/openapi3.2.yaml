@@ -2680,7 +2680,7 @@ components:
                     type: string
                     description: Builder-safe description of what stopped the run; never command output.
                     example: Est quisquam eos quis.
-            description: The run ended without a report. Full evidence stays with the evaluator; this states only where it stopped.
+            description: 'The run was accepted but did not complete: a step failed, or its processes ended or were canceled or timed out before it finished. The summary states where it stopped, without command output; full evidence, including any partial report saved while it was being stopped, stays with the evaluator.'
             example:
                 kind: interrupted
                 stage: suite

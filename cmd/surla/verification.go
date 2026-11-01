@@ -73,10 +73,11 @@ func runVerifyRun(args []string) error {
 // when the command ends. It waits for the run and writes the JSON report to
 // stdout: the full report, or its builder view with -builder-view. The full
 // report is also saved in -report-dir. A report that did not pass is still
-// printed, and the command then fails so the exit status is 1. A run that
-// ends without a report prints nothing and fails with where it stopped and
-// the full error. SIGINT, SIGTERM and SIGHUP cancel the run, and -timeout
-// ends it.
+// printed, and the command then fails so the exit status is 1. A canceled or
+// timed-out run prints the partial report its suite saved while stopping, if
+// any, and fails with the reason. Any other run that ends without a report
+// prints nothing and fails with where it stopped and the full error. SIGINT,
+// SIGTERM and SIGHUP cancel the run, and -timeout, when given, ends it.
 func runVerify(args []string) error {
 	plan, timeout, builderView, err := parseVerifyFlags(args)
 	if err != nil {
@@ -110,6 +111,15 @@ func runVerify(args []string) error {
 	_, state, err := verifyrun.Read(root, runID)
 	if err != nil {
 		return err
+	}
+	if state.Kind == verifyrun.StateNotCompleted && state.Result.PartialReportDigest != "" {
+		partial, err := verifyrun.LoadReport(plan.ReportDir, state.Result.PartialReportDigest)
+		if err != nil {
+			return err
+		}
+		if err := writeVerifyReport(os.Stdout, partial, builderView); err != nil {
+			return fmt.Errorf("verification %s: %s (%w)", state.Result.Failure, state.Result.Summary, err)
+		}
 	}
 	if state.Kind != verifyrun.StateCompleted {
 		// The CLI's caller is the operator, so the full error is shown.
