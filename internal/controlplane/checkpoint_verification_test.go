@@ -64,12 +64,14 @@ async function main() {
   // Refreshing a run preserves the exact editable draft and produces no poller.
   {
     const h=open(); await turn(); h.edit("Unsaved CP4 draft"); h.notify(input.running);
+    const card = () => h.doc.querySelector("#surla-cp4-verification");
     expect(h.doc.querySelector("#surla-cp4-title").textContent === "Verification in progress", "running state is missing");
+    expect(card().getAttribute("aria-busy") === null, "idle run card marked aria-busy");
     expect(h.calls.length===0, "showing a run dispatched an automatic request");
-    h.button().click(); readRequest(h.calls[0]); expect(h.button().disabled, "status request was not disabled");
+    h.button().click(); readRequest(h.calls[0]); expect(h.button().disabled && card().getAttribute("aria-busy") === "true", "status request was not disabled or marked aria-busy");
     expect(!h.field().disabled, "status read disabled independent CP1 editing");
     h.edit("Edited while checking status"); h.reply(h.calls[0],input.passed); await turn();
-    expect(h.text().includes("Verification passed") && !h.button(), "completed report is not final");
+    expect(h.text().includes("Verification passed") && !h.button() && card().getAttribute("aria-busy") === null, "completed report is not final or remained aria-busy");
     expect(h.text().includes("2 of 2 required scenarios passed") && h.text().includes("holdout-1"), "report denominator or anonymous outcome is missing");
     expect(h.text().includes("Not tested") && h.text().includes(input.passed.candidate_commit), "coverage or verified inputs are missing");
     expect(h.field().value === "Edited while checking status", "status reply erased a draft");

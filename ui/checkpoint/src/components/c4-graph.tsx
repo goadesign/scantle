@@ -69,7 +69,12 @@ export function C4GraphSVG({
   const pairCounts: Record<string, number> = {};
 
   return (
-    <div className="surla-graph-wrap">
+    <div
+      className="surla-graph-wrap"
+      role="region"
+      aria-label="C4 architecture diagram"
+      tabIndex={0}
+    >
       <svg
         id="surla-c4-svg"
         role="img"
