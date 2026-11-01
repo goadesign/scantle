@@ -88,7 +88,7 @@ export ORDERS_PROMPTS_TOKEN="<jwt-with-prompts:manage>"
   -orders-url http://127.0.0.1:8080)
 ```
 
-`orders-surla` is a single-operator `CP3` reference host: it saves Change Cards in `-cards-dir` (default `.surla/orders-surla-cards`, locked exclusively by that `orders-surla` process and reported on startup as `orders-surla: saving Change Cards in <dir>`), and any authenticated MCP caller on that host can call `draft_override` (`target_kind: "prompt_template"`, `prompt_id: "orders.refund.system"`) to update the target `orders` process's in-memory prompt store and receive the accepted text's `sha256:...` version (`compiled_rule` edits are still rejected with `requires_rebuild: true` without calling `orders`). It leaves `CP1` model analysis, `CP4` verification, and `CP5` `PromotionTarget` (`approve_merge`) unconfigured, and it consumes the pinned `github.com/goadesign/surla` version in [`examples/orders/go.mod`](go.mod) (`v0.0.0-20261101022642-44db328a2549`), so later `internal/controlplane` changes reach `orders-surla` after bumping that pinned module version.
+`orders-surla` is a single-operator `CP3` reference host: it saves Change Cards in `-cards-dir` (default `.surla/orders-surla-cards`, locked exclusively by that `orders-surla` process and reported on startup as `orders-surla: saving Change Cards in <dir>`), and any authenticated MCP caller on that host can call `draft_override` (`target_kind: "prompt_template"`, `prompt_id: "orders.refund.system"`) to update the target `orders` process's in-memory prompt store and receive the accepted text's `sha256:...` version (`compiled_rule` edits are still rejected with `requires_rebuild: true` without calling `orders`). It leaves `CP1` model analysis, `CP4` verification, and `CP5` `PromotionTarget` (`approve_merge`) unconfigured, and it consumes the pinned `github.com/goadesign/surla` version in [`examples/orders/go.mod`](go.mod) (`v0.0.0-20261101025008-db54dfe9b994`), so later `internal/controlplane` changes reach `orders-surla` after bumping that pinned module version.
 
 ---
 
@@ -163,6 +163,39 @@ go run ./cmd/surla approve \
   -environment sim \
   -artifact "orders=$ORDERS_SHA" \
   -artifact "orders-worker=$WORKER_SHA"
+```
+
+To expose `CP4` (`verify_change` / `get_verification`) and `CP5` (`approve_merge`) over MCP on `surla serve`, pass `-verification-config` and `-promotion-config` pointing to JSON files with the repository root, `orders_acceptance` suite commit, report/run directories, and staged release directory (`<release_dir>/<candidate_commit>/{orders,orders-worker}`):
+
+```bash
+cat > "$WORK_DIR/verification.json" <<EOF
+{
+  "runs_dir": "$WORK_DIR/runs",
+  "report_dir": "$WORK_DIR/reports",
+  "candidate_repo": "$(pwd)",
+  "candidate_module": "examples/orders",
+  "binaries": {
+    "orders": "./cmd/orders",
+    "orders-worker": "./cmd/orders-worker"
+  },
+  "suite_repo": "$(pwd)",
+  "suite_commit": "$COMMIT",
+  "suite_module": "examples/orders-eval",
+  "suite_command": "./cmd/orders_acceptance-evals",
+  "timeout": "30m"
+}
+EOF
+
+cat > "$WORK_DIR/promotion.json" <<EOF
+{
+  "report_dir": "$WORK_DIR/reports",
+  "release_dir": "$WORK_DIR/releases",
+  "suite_id": "orders_acceptance",
+  "suite_commit": "$COMMIT",
+  "environment": "sim",
+  "binaries": ["orders", "orders-worker"]
+}
+EOF
 ```
 
 ---

@@ -565,14 +565,17 @@ submitBtns[0].dispatch("click");
 // Duplicate click or input edits while in flight must be ignored and all edit controls disabled.
 submitBtns[0].dispatch("click");
 const inFlightPills = findAll(viewEl, (n) => n.attributes["data-ambiguity-id"] === "chg-ui-test-ambiguity-01");
+const inFlightFormCards = findAll(viewEl, (n) => n.attributes["id"] === "surla-cp1-form-card");
 outcomeInputs[0].value = "typed while saving";
 outcomeInputs[0].dispatch("input", { target: outcomeInputs[0] });
 if (hostMessages.length !== msgCountBeforeConfirm + 1 ||
+    inFlightFormCards.length !== 1 ||
+    inFlightFormCards[0].attributes["aria-busy"] !== "true" ||
     submitBtns[0].disabled !== true ||
     outcomeInputs[0].disabled !== true ||
     !inFlightPills.every((p) => p.disabled === true) ||
     outcomeInputs[0].value !== "  Instant store credit\nup to $50.00  ") {
-  throw new Error("expected single tools/call request and all edit controls disabled while in flight");
+  throw new Error("expected single tools/call request, aria-busy=true on #surla-cp1-form-card, and all edit controls disabled while in flight");
 }
 const confirmReq = hostMessages[msgCountBeforeConfirm].msg;
 if (confirmReq.method !== "tools/call" ||
@@ -590,8 +593,10 @@ if (root.dataset.state !== "cp1-change-card" || outcomeInputs[0].disabled !== tr
 }
 // Host replies with confirmed ChangeCardResult -> guest transitions to confirmed revision.
 messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: confirmReq.id, result: { content: [], structuredContent: input.cp1ConfirmedStructured } } });
-if (root.dataset.state !== "cp1-change-card" || editorRegion.dataset.requestRevision !== input.wantCP2Revision) {
-  throw new Error("expected confirmed CP1 revision after tools/call reply, got: " + JSON.stringify(editorRegion.dataset));
+if (root.dataset.state !== "cp1-change-card" ||
+    editorRegion.dataset.requestRevision !== input.wantCP2Revision ||
+    findAll(viewEl, (n) => n.attributes["id"] === "surla-cp1-form-card")[0].attributes["aria-busy"] !== undefined) {
+  throw new Error("expected confirmed CP1 revision and cleared aria-busy after tools/call reply, got: " + JSON.stringify(editorRegion.dataset));
 }
 // Typing into confirmed card and receiving a late tool-result notification must NOT overwrite post-reply edits.
 const postConfirmInputs = findAll(viewEl, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
@@ -728,6 +733,37 @@ messageListener({ source: parentWindow, data: { jsonrpc: "2.0", id: getChangeReq
 if (!renderText(editorRegion).includes("Edited outcome preserved across stale error")) {
   throw new Error("repeated get_change recovery lost prior preserved draft");
 }
+// Switching to an incoming card while the editor has both prior preserved draft lines and new dirty edits must preserve both in #surla-preserved-draft and initialize the form from the incoming card's own saved values.
+const dirtyBeforeSwitchInputs = findAll(editorRegion, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
+dirtyBeforeSwitchInputs[0].value = "Dirty edit on confirmed card before incoming switch";
+dirtyBeforeSwitchInputs[0].dispatch("input", { target: dirtyBeforeSwitchInputs[0] });
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1Structured } } });
+const incomingSwitchBtns = findAll(resultRegion, (n) => n.attributes["id"] === "surla-replace-incoming-card");
+if (incomingSwitchBtns.length !== 1 || !renderText(incomingSwitchBtns[0]).includes("Keep Unsaved Edits")) {
+  throw new Error("expected #surla-replace-incoming-card button with Keep Unsaved Edits label");
+}
+incomingSwitchBtns[0].dispatch("click");
+const switchedOutcomeInputs = findAll(editorRegion, (n) => n.attributes["data-example-id"] === "chg-ui-test-check-01" && n.attributes["data-field"] === "expected_outcome");
+const switchedPreservedPanels = findAll(editorRegion, (n) => n.attributes["id"] === "surla-preserved-draft");
+const switchedPreservedText = switchedPreservedPanels.length === 1 ? renderText(switchedPreservedPanels[0]) : "";
+if (editorRegion.dataset.requestRevision !== input.wantCP1Revision ||
+    editorRegion.dataset.changeId !== "chg-ui-test" ||
+    resultRegion.dataset.state !== undefined ||
+    findAll(resultRegion, (n) => n.attributes["id"] === "surla-replace-incoming-card").length !== 0 ||
+    switchedPreservedPanels.length !== 1 ||
+    !switchedPreservedText.includes("Edited outcome preserved across stale error") ||
+    !switchedPreservedText.includes("Dirty edit on confirmed card before incoming switch") ||
+    !switchedPreservedText.includes(input.wantCP2Revision) ||
+    switchedOutcomeInputs[0].value !== input.cp1Structured.examples[0].expected_outcome) {
+  throw new Error("switching to incoming card did not preserve prior+dirty draft lines or initialize incoming card form values: " + switchedPreservedText);
+}
+// Clicking Discard Unsaved Edits after switching clears #surla-preserved-draft while keeping the switched card mounted.
+findAll(editorRegion, (n) => n.attributes["id"] === "surla-discard-draft")[0].dispatch("click");
+if (editorRegion.dataset.requestRevision !== input.wantCP1Revision ||
+    findAll(editorRegion, (n) => n.attributes["id"] === "surla-preserved-draft").length !== 0) {
+  throw new Error("Discard Unsaved Edits after incoming switch did not clear #surla-preserved-draft");
+}
+messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/notifications/tool-result", params: { structuredContent: input.cp1ConfirmedStructured } } });
 // Submitting confirm_intent while an incoming card B arrives in flight retains B and its switch button after A's reply completes.
 findAll(viewEl, (n) => n.attributes["id"] === "surla-confirm-submit")[0].dispatch("click");
 const pendingIncomingConfirmReq = hostMessages[hostMessages.length - 1].msg;
@@ -811,7 +847,10 @@ const cyclicEdges = [
 ];
 const largePreview = Object.assign({}, input.cp2Structured, {
   containers: largeContainers,
-  edges: cyclicEdges
+  edges: cyclicEdges,
+  swarm: Object.assign({}, input.cp2Structured.swarm, {
+    manifest: "# Chorus Collaboration Manifest\n@architect -> claude"
+  })
 });
 messageListener({
   source: parentWindow,
@@ -824,6 +863,7 @@ messageListener({
 const largeSvg = findAll(viewEl, (n) => n.attributes["id"] === "surla-c4-svg");
 const largeSvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "surla-svg-node");
 const largeSvgEdges = findAll(viewEl, (n) => n.attributes["class"] === "surla-svg-edge");
+const swarmManifestDetails = findAll(viewEl, (n) => n.attributes["id"] === "surla-cp2-swarm-manifest" && n.tagName === "DETAILS");
 const largeText = renderText(viewEl);
 const edge23Path = largeSvgEdges[1].children[0].attributes["d"];
 const edge32Path = largeSvgEdges[2].children[0].attributes["d"];
@@ -831,12 +871,15 @@ if (largeSvg.length !== 1 ||
     largeSvg[0].attributes["width"] !== "840" ||
     largeSvgNodes.length !== 15 ||
     largeSvgEdges.length !== 5 ||
+    swarmManifestDetails.length !== 1 ||
+    !renderText(swarmManifestDetails[0]).includes("Chorus collaboration manifest") ||
+    !renderText(swarmManifestDetails[0]).includes("# Chorus Collaboration Manifest") ||
     edge23Path === edge32Path ||
     !edge23Path.includes("Q 526") ||
     !edge32Path.includes("Q 544") ||
     !largeText.includes("node-15") ||
     !largeText.includes("Self Loop")) {
-  throw new Error("expected 840px SVG with 15 nodes and distinct intra-column cyclic/self-loop edges, got width=" + (largeSvg[0] && largeSvg[0].attributes["width"]) + " e23=" + edge23Path + " e32=" + edge32Path);
+  throw new Error("expected 840px SVG with 15 nodes, #surla-cp2-swarm-manifest details, and distinct intra-column cyclic/self-loop edges, got width=" + (largeSvg[0] && largeSvg[0].attributes["width"]) + " e23=" + edge23Path + " e32=" + edge32Path);
 }
 
 // 4b. Deliver CP2 DiffResult from MCP diff codec -> renders unbound structural diff and clears CP1/CP2 dataset keys.

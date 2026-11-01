@@ -307,7 +307,11 @@ export function CP1EditorView({
 
       {openUINode}
 
-      <Card className="surla-card">
+      <Card
+        id="surla-cp1-form-card"
+        className="surla-card"
+        aria-busy={rpcInFlight ? "true" : undefined}
+      >
         <h3>{"Open Questions (" + ambiguities.length + ")"}</h3>
         {ambiguities.length > 0 ? (
           <ul>

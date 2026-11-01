@@ -332,7 +332,14 @@ export function ArchitecturePreviewView({ preview }: { preview: ArchitecturePrev
             ))}
           </ul>
         ) : null}
-        {preview.swarm.manifest ? <pre>{preview.swarm.manifest}</pre> : null}
+        {preview.swarm.manifest ? (
+          <details className="surla-details" id="surla-cp2-swarm-manifest">
+            <summary>Chorus collaboration manifest</summary>
+            <pre tabIndex={0}>
+              <code>{preview.swarm.manifest}</code>
+            </pre>
+          </details>
+        ) : null}
       </Card>
     </>
   );
@@ -451,7 +458,7 @@ export function IncomingChangeCardView({
       <p>{incomingCard.summary}</p>
       <div className="surla-field-row">
         <Button id="surla-replace-incoming-card" onClick={onSwitch}>
-          Switch to Incoming Card (Discard Unsaved Edits)
+          Switch to Incoming Card (Keep Unsaved Edits)
         </Button>
       </div>
       <details className="surla-details">
