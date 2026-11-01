@@ -1,7 +1,7 @@
 # UX tester brief
 
-Fill in the `{{...}}` placeholders and send the text below as the tester's
-prompt. `{{TESTER}}` is the tester's run folder.
+Fill in the placeholders listed in `SKILL.md` and send the text below as the
+tester's prompt.
 
 ---
 
@@ -35,7 +35,8 @@ excuse things a real user cannot see.
 - **Environment:** {{ENVIRONMENT_FACTS}}
 - **Setup given to the participant:** a plain clone of the Surla repository,
   of which it may read only `README.md`, an empty project folder, and this
-  route to Surla's MCP server: {{MCP_ROUTE}}
+  permission to run these coding-agent CLIs to reach Surla's MCP server:
+  {{CODING_AGENTS}}
 
 ## Before the session
 
@@ -103,7 +104,7 @@ match with the real world, error recovery, or help and documentation.
 
 After each milestone, ask the Single Ease Question: "Overall, how easy or
 difficult was that, from 1 (very difficult) to 7 (very easy)?" Record the
-answer and the time on task the facilitator reports.
+answer and the elapsed time the facilitator reports.
 
 **Decide:**
 

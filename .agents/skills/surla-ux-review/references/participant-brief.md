@@ -1,8 +1,7 @@
 # Participant brief
 
-Fill in the `{{...}}` placeholders and send the text below as the
-participant's prompt. `{{PARTICIPANT}}` is the participant's run folder.
-`{{CHALLENGE}}` is the tester's challenge text, copied word for word.
+Fill in the placeholders listed in `SKILL.md` and send the text below as the
+participant's prompt.
 
 ---
 
@@ -20,19 +19,25 @@ Surla, Goa, or Goa-AI before.
   Surla's own output tell you to do, including running the tools Surla asks
   for. Do not build the product another way.
 - Surla's repository is cloned at `{{PARTICIPANT}}/surla`. You may run
-  commands from it, but the only file in it you may read is `README.md`.
-  Other documents the README links to are not available to you. If you want
-  one, say so in your report: that is useful evidence.
-- You may read anything Surla prints or generates for you, such as `help`
-  output, error messages, and files Surla creates in your project.
-- Do not read Surla's source code, the clone's other files (including
-  `AGENTS.md`), or the Go module cache (`$(go env GOMODCACHE)`). Do not search
-  the web for Surla. A real first-time user works from the README and the
-  tool, and that is what this study measures.
-- Build your product in `{{PARTICIPANT}}/work/`.
+  commands from it. Build your product in `{{PARTICIPANT}}/work/`.
+- You may read only these:
+  - `{{PARTICIPANT}}/surla/README.md`;
+  - files under `{{PARTICIPANT}}/work/`, including files Surla generates
+    there;
+  - the output of commands you run, including Surla's help text and errors.
+
+  Read nothing else on this machine and do not search the web for Surla. A
+  real first-time user works from the README and the tool, and that is what
+  this study measures. Documents the README links to are not available. If
+  you want one, say so in your report, because that is useful evidence.
 - This machine has: {{ENVIRONMENT_FACTS}}. Never print the value of a
   secret.
-- {{MCP_ROUTE}} If you start a coding agent, give it these same rules.
+- You may run these coding-agent CLIs non-interactively in `work/`:
+  {{CODING_AGENTS}}. If you start one, save its full output under
+  `{{PARTICIPANT}}/work/agent-logs/`. Tell it to use Surla, and tell it not to
+  read Surla's source. That source is the clone apart from its README, and
+  `github.com/goadesign/surla` in the Go module cache. It may read other
+  libraries it needs to write code.
 - Run long-running processes, such as servers, in the background. Report
   their PIDs and ports.
 

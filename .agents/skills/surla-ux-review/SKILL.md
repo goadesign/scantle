@@ -23,25 +23,33 @@ facts this skill lists. A facilitator who explains or coaches ends up
 measuring itself, not Surla. When you are tempted to explain something, write
 it in your own notes for the report's limitations section instead.
 
-The default task is to build an agentic platform that lets end users buy and
-sell houses. The person invoking the skill may give a different task or
-participant profile. If they do, use theirs.
+Use the person's own task and participant profile when they give them.
+Otherwise use the defaults:
+
+- **Task:** build an agentic platform that lets end users buy and sell houses.
+- **Participant profile:** a software developer who is comfortable with Go
+  and the command line and uses coding agents daily, but has never used
+  Surla, Goa, or Goa-AI.
 
 ## 1. Set up the run
 
-Start this session from outside the Surla checkout, for example from the run
-folders below. Coding-agent harnesses may load the working directory's
-`AGENTS.md` into every subagent, and Surla's `AGENTS.md` describes Surla's
-internals.
+**Where to start.** Run this skill from a folder with no Surla `AGENTS.md` in
+it or above it. Coding-agent harnesses load that file into every subagent,
+and it describes Surla's internals. The skill lives in Surla's
+`.agents/skills/surla-ux-review/`. To start it from elsewhere, link that
+folder into your personal skills folder once:
 
-Create two separate folders, so neither subagent finds the other's material
-by browsing nearby. With `<id>` as a timestamp such as `20261101-0900`:
+- `~/.agents/skills/`, read by Codex and Gemini CLI;
+- `~/.claude/skills/`, read by Claude Code.
+
+**Folders.** With `<id>` as a timestamp such as `20261101-0900`, create the
+participant's folder and, apart from it, the tester's folder:
 
 ```text
-~/src/surla-ux-<id>-participant/
+~/src/surla-ux-<id>/
   surla/       # git clone of github.com/goadesign/surla at the commit under test
   work/        # empty; the participant builds its product here
-~/src/surla-ux-<id>-tester/
+~/surla-ux-reports/<id>/
   docs/        # copies of README.md, PROPOSAL.md, PRESS_RELEASE.md, docs/
                # (with img/), and examples/*/README.md from that commit
   observations.md   # the tester's notes, which it writes
@@ -49,89 +57,98 @@ by browsing nearby. With `<id>` as a timestamp such as `20261101-0900`:
   report.md    # the final report
 ```
 
-The participant gets a plain clone, as if it had followed the GitHub link. It
-may run commands from the clone, as the README does, but may read only
-`README.md` in it. Do not install or prebuild Surla for it: working out how to
-get Surla running is part of the experience being tested.
+The participant gets a plain clone, as if it had followed the GitHub link. Do
+not install or prebuild Surla for it: working out how to get Surla running is
+part of what this study tests. Its brief lists exactly what it may read. That
+list, not the folder layout, is what keeps the tester's notes and Surla's
+source out of its view.
 
-Before starting the subagents, record these facts at the top of
+**Facts to record.** Before starting the subagents, write these at the top of
 `transcript.md`:
 
 - the Surla commit, the date, and the OS;
+- the `-surla-version` that the README tells `surla init` to use. A scaffolded
+  project downloads that version, not the commit under test;
 - the versions of `go`, `goa`, and `temporal`, or that they are missing;
 - which credentials are set, such as `ANTHROPIC_API_KEY`. Record that each is
   set, never its value;
 - whether commands run inside an agent sandbox and whether they have network
   access. `surla init` downloads modules, and Surla's verification uses macOS
-  `sandbox-exec`, which usually cannot run inside another sandbox. If these
-  are restricted, either lift the restriction for the participant or mark the
-  affected milestones as not supported;
-- **how the participant reaches Surla's MCP server.** The README tells the
-  user to point a coding agent at `http://<addr>/mcp`. A subagent cannot add
-  an MCP server to its own session. Choose the route that matches the docs
-  most closely, in this order:
-  1. The participant runs its own coding-agent CLI non-interactively in
-     `work/` with an MCP configuration it writes, such as `claude -p`,
-     `codex exec`, or `gemini -p`.
-  2. The participant calls the HTTP API directly.
-
-  Record which route it is and what it cannot reach.
-
-The participant receives the machine facts a real developer would know: which
-tools are installed, which keys are set, which coding-agent CLIs it may use.
-It gets no instructions.
+  `sandbox-exec`, which usually cannot run inside another sandbox. Either lift
+  these restrictions for the participant or mark the affected milestones as
+  not supported;
+- **how the participant reaches Surla's MCP server.** The README tells a user
+  to point a coding agent at `http://<addr>/mcp`. A subagent cannot add an MCP
+  server to its own session. The participant therefore runs its own
+  coding-agent CLI non-interactively in `work/`, with an MCP configuration it
+  writes itself, for example `claude -p`, `codex exec`, or `gemini -p`.
+  Record which CLIs it may use. If none can run here, mark the milestones
+  that need MCP as not supported. Do not hand it an undocumented HTTP route,
+  because working that out from outside the README is coaching.
 
 ## 2. Start the two subagents
 
 Read `references/tester-brief.md` and `references/participant-brief.md` and
-fill in the placeholders. Start each as its own subagent. Your harness's
-subagent tool must let you send follow-up messages to a subagent that is
-still running, because the session runs over many turns. In Claude Code,
-that is the Agent tool followed by SendMessage. If your harness cannot do
-this, stop and say so. Do not fake the dialogue yourself.
+fill in every placeholder:
 
-Set the model explicitly to your harness's frontier reasoning model, such as
-Opus in Claude Code or the high-reasoning model in Codex or Gemini CLI. Both
-roles need judgment, and a weaker model turns its own confusion into false
-usability findings.
+| Placeholder | Value |
+| --- | --- |
+| `{{TASK}}` | the task |
+| `{{PARTICIPANT_PROFILE}}` | the participant profile |
+| `{{ENVIRONMENT_FACTS}}` | the recorded facts that matter to a user: installed tools, credentials set, network and sandbox limits |
+| `{{CODING_AGENTS}}` | the coding-agent CLIs the participant may run, or "none" |
+| `{{PARTICIPANT}}` | the participant's folder |
+| `{{TESTER}}` | the tester's folder |
+| `{{CHALLENGE}}` | the tester's challenge text, word for word |
+
+Start each role as its own subagent, with the model set explicitly to your
+harness's frontier reasoning model, such as Opus in Claude Code or the
+high-reasoning model in Codex or Gemini CLI. Both roles need judgment, and a
+weaker model turns its own confusion into false usability findings.
+
+The session runs over many turns, so you need to send each subagent more
+messages while it is still running. In Claude Code, start it with the Agent
+tool and continue it with SendMessage. If your harness cannot continue a
+running subagent, start a fresh one each round instead. Give it its brief,
+plus every message it has sent and received so far. The tester also picks up
+from `observations.md`. Note the fallback in the limitations, because a
+participant restarted every round loses whatever it had not written down.
 
 Start the tester first. It writes its private success criteria to
-`observations.md` and replies with the challenge text for the participant.
-Then start the participant, with that challenge pasted into its brief.
+`observations.md` and replies with the challenge text. Then start the
+participant.
 
 ## 3. Run the session loop
 
 Each round trip works like this:
 
-1. The participant works until a natural pause. It might have finished a
-   milestone, be blocked, or be choosing between ways to use Surla. It also
-   pauses before the first run of each new `surla` command, or after about
-   ten actions. It then replies with a step report, in the format its brief
-   defines.
+1. The participant works until a natural pause and replies with a step
+   report. Its brief lists when it pauses, including before the first run of
+   each new `surla` command.
 2. Append the report to the transcript and send it unchanged to the tester,
-   together with the wall-clock time since the previous report.
+   together with the elapsed time since the previous report.
 3. The tester replies with up to three questions, an optional hint, and a
    decision: `continue`, `stop_for_bug`, or `end_session`.
 4. Append the reply to the transcript. On `continue`, send the participant
    only the questions and the hint, word for word.
 
-A level-2 hint names a doc section, and the participant cannot open other
-docs. Copy that one document into `work/` and say where it is. Record the
+A level-2 hint names a doc section that the participant cannot otherwise
+open. Copy that one document into `work/` and say where it is. Record the
 copy as part of the hint.
 
-Watch for scope leaks. The participant's report is its own account, so
-whenever your harness keeps a subagent transcript, check its actual tool
-calls as well. A scope leak is reading outside the README, `work/`, and
-Surla's own output: Surla source files, `AGENTS.md`, or the module cache.
-Building the product without Surla is one too. If you find a leak, tell the
-tester. It records the leak as a finding, because reaching for the source
+**Check for scope leaks** after every few rounds. The participant's reports
+are its own account, so compare them with its actual tool calls wherever your
+harness keeps a subagent transcript. Also read the logs its coding agent saved
+in `work/agent-logs/`. A leak is reading anything outside the participant's
+allowed list, or building the product without Surla. Tell the tester about
+any leak. It records the leak as a finding, because reaching for the source
 usually means the docs failed, and it reminds the participant of the rules.
-If your harness keeps no transcripts, note in the limitations that leaks
-were self-reported.
+If nothing can be checked, note in the limitations that leaks were only
+self-reported.
 
 The participant reports the PIDs and ports of any long-running processes it
-starts, such as `surla serve` or a Temporal dev server. Stop those processes
-when an attempt ends.
+starts, such as `surla serve` or a Temporal dev server. Stop them when an
+attempt ends.
 
 ## 4. Handle a blocking bug
 
@@ -143,36 +160,37 @@ participant cannot get past it however well it uses Surla.
 1. Reproduce the bug yourself, outside any agent sandbox and with network
    access, so a harness restriction is not mistaken for a Surla bug.
    - If the failure comes from the harness, tell the tester "environment
-     limitation, not a Surla bug" and how it affects the milestones.
+     limitation, not a Surla bug" and which milestones it affects.
    - If Surla behaves as designed, tell the tester "reproduced; behavior is as
      designed", with no code details. The tester records a usability finding,
      may give a hint, and the session continues.
 2. If it is a real bug, fix it following the repository's `AGENTS.md`: a
-   separate clone and branch, the design gate, tests, and an independent
-   review. Fix the cause, not the symptom the participant happened to hit.
-   Push the branch, because a scaffolded project downloads Surla by its
-   commit.
-3. Restart from scratch:
+   separate clone and branch, the design gate, tests, an independent review,
+   and a pull request. Fix the cause, not the symptom the participant
+   happened to hit.
+3. If the fix is in code that a scaffolded project downloads, the participant
+   would still get the old version through the README's `-surla-version`.
+   Push the fix. Then add a follow-up commit that points `-surla-version` at
+   the fix commit, the way main updates `examples/orders` after a release.
+4. Restart from scratch:
    1. Stop the participant's processes.
-   2. Replace `participant/surla` with a clone at the pushed fix commit.
-   3. Clear `work/` and start `attempt-<N+1>/transcript.md`, recording the
-      new commit.
+   2. Replace `surla/` with a clone at the commit that carries the fix.
+   3. Clear `work/` and start `attempt-<N+1>/transcript.md` with the newly
+      recorded facts.
    4. Start a **fresh** participant. One that remembers the failed attempt
       would skip the steps that confused it.
-   5. Keep the same tester, and tell it that a new attempt has begun on that
+   5. Keep the same tester and tell it that a new attempt has begun on that
       commit. Its earlier findings carry into the report.
 
-If a third blocking bug appears, stop and report instead of restarting
-again. With that many blockers, the report and the fixes are worth more than
-another attempt.
+By default, stop and report instead of restarting after the third blocking
+bug. With that many blockers, the report and the fixes are worth more than
+another attempt. The person invoking the skill may ask for a different limit.
 
 ## 5. Debrief and report
 
-When the tester decides `end_session`, it sends the participant debrief
-questions: how easy it was overall, the hardest moment, and what it would
-change. Relay the questions and the answers. Then send the tester the text of
-`references/report-template.md` and ask it to write `report.md` from its
-observations.
+When the tester decides `end_session`, it sends the participant its debrief
+questions. Relay the questions and the answers. Then send the tester the text
+of `references/report-template.md` and ask it to write `report.md`.
 
 Before handing the report over, check it against the transcripts:
 

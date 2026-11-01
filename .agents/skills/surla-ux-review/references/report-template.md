@@ -29,7 +29,7 @@ the most important problems, and what to fix first.>
 
 ## Results
 
-| Milestone | Outcome | Time on task | Hints (level) | Errors | SEQ (1–7) |
+| Milestone | Outcome | Elapsed time | Hints (level) | Errors | SEQ (1–7) |
 | --- | --- | --- | --- | --- | --- |
 | <milestone> | Completed / Completed with help / Failed / Not reached / Not supported on this machine | <mm:ss> | <n (levels)> | <n> | <score> |
 
