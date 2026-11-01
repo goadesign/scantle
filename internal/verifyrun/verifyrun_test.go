@@ -81,8 +81,7 @@ func fakeRun(ctx context.Context, plan verify.Plan) (verify.Report, error) {
 		if err := child.Start(); err != nil {
 			return verify.Report{}, err
 		}
-		pids := fmt.Sprintf("%d %d", os.Getpid(), child.Process.Pid)
-		if err := os.WriteFile(filepath.Join(filepath.Dir(plan.WorkDir), "pids"), []byte(pids), 0o600); err != nil {
+		if err := writePIDs(plan, os.Getpid(), child.Process.Pid); err != nil {
 			return verify.Report{}, err
 		}
 		<-ctx.Done()
@@ -92,7 +91,7 @@ func fakeRun(ctx context.Context, plan verify.Plan) (verify.Report, error) {
 		return verify.Report{}, &verify.StageError{Stage: verify.StageSuite, Summary: "The evaluator suite ended without a report.", Err: ctx.Err()}
 	case "stop-with-report":
 		// Like a suite that saves a partial report when it is stopped.
-		if err := os.WriteFile(filepath.Join(filepath.Dir(plan.WorkDir), "pids"), []byte(fmt.Sprintf("%d %d", os.Getpid(), os.Getpid())), 0o600); err != nil {
+		if err := writePIDs(plan, os.Getpid(), os.Getpid()); err != nil {
 			return verify.Report{}, err
 		}
 		<-ctx.Done()
@@ -155,6 +154,17 @@ func start(t *testing.T, mode string) (string, string, int) {
 	}, []string{os.Args[0]})
 	require.NoError(t, err)
 	return root, runID, pid
+}
+
+// writePIDs records the executor and child PIDs of a fake run in the run's
+// "pids" file. It writes a temporary file and renames it, so hangingPIDs never
+// reads a file that exists but is not yet written.
+func writePIDs(plan verify.Plan, executor, child int) error {
+	path := filepath.Join(filepath.Dir(plan.WorkDir), "pids")
+	if err := os.WriteFile(path+".tmp", []byte(fmt.Sprintf("%d %d", executor, child)), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(path+".tmp", path)
 }
 
 // hangingPIDs waits up to 30s for a hanging run to record its executor and
