@@ -115,6 +115,14 @@ type (
 
 	// StateKind is one of the three run states.
 	StateKind string
+
+	// limitedWriter keeps at most n bytes written to it and drops the rest.
+	limitedWriter struct {
+		// w receives the kept bytes.
+		w io.Writer
+		// n is how many more bytes may be kept.
+		n int
+	}
 )
 
 const (
@@ -430,14 +438,6 @@ func Wait(root, runID string) error {
 		return fmt.Errorf("wait for run: %w", err)
 	}
 	return nil
-}
-
-// limitedWriter keeps at most n bytes written to it and drops the rest.
-type limitedWriter struct {
-	// w receives the kept bytes.
-	w io.Writer
-	// n is how many more bytes may be kept.
-	n int
 }
 
 // Write keeps what fits and reports every byte as written, so the writer

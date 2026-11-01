@@ -71,14 +71,52 @@ type (
 		// ReportDir receives the report, named by its digest.
 		ReportDir string
 	}
+
+	// Stage names the step of Run that stopped a verification.
+	Stage string
+
+	// StageError is every error Run returns: the step that failed, a summary
+	// that is safe to show builders, and the full error. Err may quote command
+	// output and must stay with the evaluator.
+	StageError struct {
+		// Stage is the step that failed.
+		Stage Stage
+		// Summary describes the failure in one sentence without command output.
+		Summary string
+		// Err is the full error.
+		Err error
+	}
+
+	// runner runs the verifier's commands with file-backed output.
+	runner struct {
+		// evidenceDir receives every command's stdout and stderr.
+		evidenceDir string
+	}
+
+	// buildToolchain is what a sandboxed candidate build runs with.
+	buildToolchain struct {
+		// goroot is the resolved toolchain the candidate module selects.
+		goroot string
+		// modCache is the module cache holding the candidate's dependencies.
+		modCache string
+		// workDir is the build's private HOME, TMPDIR and GOCACHE.
+		workDir string
+	}
 )
 
-// commitID matches a full commit ID in either Git object format: 40 hex digits
-// for SHA-1 repositories, 64 for SHA-256 ones. The checkout then requires HEAD
-// to equal it, which only the full ID in the repository's own format can.
-var commitID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
-
 const (
+	// StageCheckout covers the plan, the work directory and the candidate and
+	// suite checkouts.
+	StageCheckout Stage = "checkout"
+	// StageBuild covers preparing and building the candidate and the suite.
+	StageBuild Stage = "build"
+	// StageDescribe is the suite's --describe.
+	StageDescribe Stage = "describe"
+	// StageSuite is running the suite against the candidate.
+	StageSuite Stage = "suite"
+	// StageReport is assembling and saving the report.
+	StageReport Stage = "report"
+
 	// holdoutTag marks a scenario whose details builders must never see.
 	holdoutTag = "holdout"
 	// maxErrorExcerpt bounds how much of a failed command's output an error
@@ -98,44 +136,10 @@ const (
 	summarySuiteBuild = "The evaluator suite did not build."
 )
 
-// Stage names the step of Run that stopped a verification.
-type Stage string
-
-const (
-	// StageCheckout covers the plan, the work directory and the candidate and
-	// suite checkouts.
-	StageCheckout Stage = "checkout"
-	// StageBuild covers preparing and building the candidate and the suite.
-	StageBuild Stage = "build"
-	// StageDescribe is the suite's --describe.
-	StageDescribe Stage = "describe"
-	// StageSuite is running the suite against the candidate.
-	StageSuite Stage = "suite"
-	// StageReport is assembling and saving the report.
-	StageReport Stage = "report"
-)
-
-// StageError is every error Run returns: the step that failed, a summary
-// that is safe to show builders, and the full error. Err may quote command
-// output and must stay with the evaluator.
-type StageError struct {
-	// Stage is the step that failed.
-	Stage Stage
-	// Summary describes the failure in one sentence without command output.
-	Summary string
-	// Err is the full error.
-	Err error
-}
-
-// Error returns the step, the summary and the full error.
-func (e *StageError) Error() string {
-	return fmt.Sprintf("%s: %s %v", e.Stage, e.Summary, e.Err)
-}
-
-// Unwrap returns the full error.
-func (e *StageError) Unwrap() error {
-	return e.Err
-}
+// commitID matches a full commit ID in either Git object format: 40 hex digits
+// for SHA-1 repositories, 64 for SHA-256 ones. The checkout then requires HEAD
+// to equal it, which only the full ID in the repository's own format can.
+var commitID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 
 // Run clones the candidate at its exact commit and builds its binaries into
 // WorkDir/candidate-bin, then clones the suite at its exact commit, builds it
@@ -294,6 +298,16 @@ func Run(ctx context.Context, p Plan) (Report, error) {
 	return report, nil
 }
 
+// Error returns the step, the summary and the full error.
+func (e *StageError) Error() string {
+	return fmt.Sprintf("%s: %s %v", e.Stage, e.Summary, e.Err)
+}
+
+// Unwrap returns the full error.
+func (e *StageError) Unwrap() error {
+	return e.Err
+}
+
 // resolveInside resolves rel, a path relative to the directory root, following
 // every symbolic link in root and rel, and returns the resolved path. It fails
 // when the path does not exist or is not root itself or inside it, so a
@@ -336,12 +350,6 @@ func validateArtifactName(name string) error {
 		return fmt.Errorf("binary name %q must not contain /, \\, = or NUL", name)
 	}
 	return nil
-}
-
-// runner runs the verifier's commands with file-backed output.
-type runner struct {
-	// evidenceDir receives every command's stdout and stderr.
-	evidenceDir string
 }
 
 // checkout clones repo into dir and checks out commit, detached. The source
@@ -482,16 +490,6 @@ func (r *runner) excerpt(label string) string {
 		note = " (last " + strconv.Itoa(maxErrorExcerpt) + " bytes)"
 	}
 	return "\nstderr" + note + ", full output in " + path + ":\n" + strings.TrimSpace(string(b))
-}
-
-// buildToolchain is what a sandboxed candidate build runs with.
-type buildToolchain struct {
-	// goroot is the resolved toolchain the candidate module selects.
-	goroot string
-	// modCache is the module cache holding the candidate's dependencies.
-	modCache string
-	// workDir is the build's private HOME, TMPDIR and GOCACHE.
-	workDir string
 }
 
 // prepareBuild resolves the toolchain the module at moduleDir selects and
