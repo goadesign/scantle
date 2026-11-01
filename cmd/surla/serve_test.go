@@ -202,13 +202,16 @@ func TestServeGatewayModeAnswersProposeChangeOverHTTP(t *testing.T) {
 	provider := &scriptedCP1Provider{analysis: string(analysis)}
 	gatewayAddr := startModelGateway(t, provider)
 
-	opts, closeModel, err := serveOptions(serveConfig{gatewayAddr: gatewayAddr}, func(string) string { return "" })
+	opts, closeModel, err := serveOptions(serveConfig{gatewayAddr: gatewayAddr, cardsDir: t.TempDir()}, func(string) string { return "" })
 	require.NoError(t, err)
 	t.Cleanup(func() { assert.NoError(t, closeModel()) })
+	cp, err := controlplane.New(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, cp.Close()) })
 	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{
 		"test-token": {ID: "operator@example.com"},
 	})
-	srv := httptest.NewServer(controlplane.NewHTTPHandler(controlplane.New(opts), auth))
+	srv := httptest.NewServer(controlplane.NewHTTPHandler(cp, auth))
 	t.Cleanup(srv.Close)
 
 	req, err := http.NewRequest(http.MethodPost, srv.URL+"/changes/propose",
@@ -282,25 +285,30 @@ func TestWriteServeStatusNamesTheBoundAddressAndOffFeatures(t *testing.T) {
 		{
 			name: "loopback without a model",
 			addr: &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 51234},
+			opts: controlplane.Options{CardsDir: ".surla/cards"},
 			want: `surla: serving on http://127.0.0.1:51234
 surla: connect MCP clients to http://127.0.0.1:51234/mcp with the bearer token
+surla: saving Change Cards in .surla/cards
 surla: propose_change is off: no model is configured to analyze change requests (set -model-provider and -model-name, or -model-gateway-addr)
 `,
 		},
 		{
 			name: "all IPv4 interfaces without a model",
 			addr: &net.TCPAddr{IP: net.IPv4zero, Port: 8090},
+			opts: controlplane.Options{CardsDir: ".surla/cards"},
 			want: `surla: serving on http://localhost:8090
 surla: connect MCP clients to http://localhost:8090/mcp with the bearer token
+surla: saving Change Cards in .surla/cards
 surla: propose_change is off: no model is configured to analyze change requests (set -model-provider and -model-name, or -model-gateway-addr)
 `,
 		},
 		{
 			name: "all interfaces with a model",
 			addr: &net.TCPAddr{IP: net.IPv6unspecified, Port: 8090},
-			opts: controlplane.Options{Analyzer: controlplane.NewModelCP1Analyzer(nil)},
+			opts: controlplane.Options{CardsDir: "/var/lib/surla/cards", Analyzer: controlplane.NewModelCP1Analyzer(nil)},
 			want: `surla: serving on http://localhost:8090
 surla: connect MCP clients to http://localhost:8090/mcp with the bearer token
+surla: saving Change Cards in /var/lib/surla/cards
 `,
 		},
 	}

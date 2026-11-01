@@ -228,7 +228,7 @@ func TestServeHelpNeverPrintsTheEnvironmentToken(t *testing.T) {
 	}
 	// The environment token still satisfies serve's credential check, so
 	// serve gets past it and fails later, on the invalid listen address.
-	err := run([]string{"serve", "-addr", "256.0.0.1:0", "-principal", "op"}, &bytes.Buffer{})
+	err := run([]string{"serve", "-addr", "256.0.0.1:0", "-principal", "op", "-cards-dir", t.TempDir()}, &bytes.Buffer{})
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "requires -principal and -auth-token")
 }

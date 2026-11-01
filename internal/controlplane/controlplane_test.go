@@ -107,7 +107,7 @@ func TestCP1AmbiguityResolutionStrictValidationOwnershipAndRevisionLock(t *testi
 		t.Fatalf("marshal analysis: %v", err)
 	}
 
-	cp := New(Options{
+	cp := newControlPlane(t, Options{
 		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(rawBytes))),
 	})
 
@@ -230,7 +230,7 @@ func TestCP1RejectsMalformedOrUnknownFieldsViaStructuredOutput(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cp := New(Options{
+			cp := newControlPlane(t, Options{
 				Analyzer: NewModelCP1Analyzer(newStubModelClient(t, tc.raw)),
 			})
 			if _, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{
@@ -267,7 +267,7 @@ func TestCP2EvaluatedArchitecturePreviewCP3FastDraftAndTokenAuthenticator(t *tes
 	}
 
 	targetStore := prompt.NewInMemoryStore()
-	cp := New(Options{
+	cp := newControlPlane(t, Options{
 		Analyzer:      NewModelCP1Analyzer(newStubModelClient(t, string(rawBytes))),
 		TargetUpdater: &boundTargetPromptUpdater{store: targetStore},
 	})
@@ -446,7 +446,7 @@ var _ = Service("orders", func() {
 	}
 
 	// CP2 with server-configured multi-family provider profiles proposes cross-family swarm roster.
-	cpWithSwarm := New(Options{
+	cpWithSwarm := newControlPlane(t, Options{
 		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(rawBytes))),
 		SwarmProfiles: []swarm.ProviderProfile{
 			{
@@ -555,7 +555,7 @@ func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
 			if err != nil {
 				t.Fatalf("anthropic.New: %v", err)
 			}
-			cp := New(Options{Analyzer: NewModelCP1Analyzer(client)})
+			cp := newControlPlane(t, Options{Analyzer: NewModelCP1Analyzer(client)})
 
 			card, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{ChangeID: "vip", Prompt: "VIP refunds up to $150."})
 			if msgs.calls != 1 {
@@ -576,9 +576,8 @@ func TestCP1AnalyzerSendsOutputAllowanceThroughAnthropicAdapter(t *testing.T) {
 			if err == nil {
 				t.Fatal("ProposeChange succeeded on a cut-off response")
 			}
-			cp.mu.RLock()
-			_, stored := cp.cards["vip"]
-			cp.mu.RUnlock()
+			_, stored, err := cp.cards.load("vip")
+			require.NoError(t, err)
 			if stored {
 				t.Fatal("cut-off response stored a Change Card")
 			}
@@ -701,7 +700,7 @@ func TestConfirmIntentRefinesNeedsConfirmationAndConfirmedCards(t *testing.T) {
 	}
 	propose := func(t *testing.T, analysis []byte) (*ControlPlane, *gensurla.ChangeCardResult) {
 		t.Helper()
-		cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
+		cp := newControlPlane(t, Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
 		card, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 		if err != nil {
 			t.Fatalf("ProposeChange: %v", err)
@@ -812,7 +811,7 @@ func TestGetChangeLetsAStaleEditorRecover(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal analysis: %v", err)
 	}
-	cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
+	cp := newControlPlane(t, Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis)))})
 	start, err := cp.ProposeChange(aliceCtx, &gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
 	if err != nil {
 		t.Fatalf("ProposeChange: %v", err)
@@ -912,7 +911,7 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 	setup := func(t *testing.T) (*ControlPlane, *promotionTargetStub, *gensurla.ChangeCardResult) {
 		t.Helper()
 		target := &promotionTargetStub{inputs: inputs}
-		cp := New(Options{
+		cp := newControlPlane(t, Options{
 			Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(analysis))),
 			PromotionTarget: target,
 		})
@@ -1139,7 +1138,7 @@ func TestApproveMergeRecordsApprovalOnlyForTheCheckedRevision(t *testing.T) {
 			PreservedBehaviors: []string{},
 		})
 		require.NoError(t, err)
-		cp := New(Options{
+		cp := newControlPlane(t, Options{
 			Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(ambiguous))),
 			PromotionTarget: &promotionTargetStub{inputs: inputs},
 		})
@@ -1294,4 +1293,18 @@ func assembleReport(t *testing.T, revision, commit string, inputs PromotionInput
 	}}, 0)
 	require.NoError(t, err)
 	return r
+}
+
+// newControlPlane returns a control plane that saves its cards in a fresh
+// temporary directory, or in opts.CardsDir when set, and closes it when the
+// test ends.
+func newControlPlane(t *testing.T, opts Options) *ControlPlane {
+	t.Helper()
+	if opts.CardsDir == "" {
+		opts.CardsDir = t.TempDir()
+	}
+	cp, err := New(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, cp.Close()) })
+	return cp
 }

@@ -45,7 +45,7 @@ func TestVerifyChangeAcceptsOnlyTheOwnersCurrentConfirmedRevision(t *testing.T) 
 		assert.ErrorContains(t, err, `unknown change_id "nope"`)
 	})
 	t.Run("no verification configured", func(t *testing.T) {
-		unconfigured := New(Options{})
+		unconfigured := newControlPlane(t, Options{})
 		_, err := unconfigured.VerifyChange(alice, &gensurla.VerifyChangePayload{ChangeID: "chg", RequestRevision: "r", CandidateCommit: commit})
 		assert.ErrorIs(t, err, errVerificationUnavailable)
 		_, err = unconfigured.GetVerification(alice, &gensurla.GetVerificationPayload{RunID: verifyrun.NewRunID()})
@@ -146,9 +146,9 @@ func TestGetVerificationReadsTheRunFromDiskInEveryState(t *testing.T) {
 
 	t.Run("a new control plane reads runs started by an earlier one", func(t *testing.T) {
 		runID := writeRun(t, `{"kind":"no_report","failure":"interrupted","stage":"supervise","summary":"The verification was canceled."}`)
-		restarted := New(Options{Verification: cfg})
+		restarted := newControlPlane(t, Options{Verification: cfg})
 		res, err := restarted.GetVerification(alice, &gensurla.GetVerificationPayload{RunID: runID})
-		require.NoError(t, err, "the run does not depend on the in-memory Change Card")
+		require.NoError(t, err, "the run does not depend on the saved Change Card")
 		assert.Equal(t, "chg", res.ChangeID)
 	})
 
@@ -173,7 +173,20 @@ func verificationSetup(t *testing.T) (*ControlPlane, *gensurla.ChangeCardResult,
 		PreservedBehaviors: []string{},
 	})
 	require.NoError(t, err)
-	cfg := &VerificationConfig{
+	cfg := verificationConfig(t)
+	cp := newControlPlane(t, Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis))), Verification: cfg})
+	card, err := cp.ProposeChange(WithPrincipal(context.Background(), Principal{ID: "alice@example.com"}),
+		&gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
+	require.NoError(t, err)
+	require.Equal(t, StatusConfirmed, card.Status)
+	return cp, card, cfg
+}
+
+// verificationConfig returns a verification configuration whose runs are
+// supervised by a command that exits at once.
+func verificationConfig(t *testing.T) *VerificationConfig {
+	t.Helper()
+	return &VerificationConfig{
 		RunsDir: t.TempDir(),
 		Plan: verify.Plan{
 			CandidateRepo: "/repos/candidate", CandidateModule: ".", Binaries: map[string]string{"orders": "./cmd/orders"},
@@ -185,10 +198,4 @@ func verificationSetup(t *testing.T) (*ControlPlane, *gensurla.ChangeCardResult,
 		Command: []string{"/bin/sh", "-c", "exit 0", "sh"},
 		Timeout: time.Hour,
 	}
-	cp := New(Options{Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis))), Verification: cfg})
-	card, err := cp.ProposeChange(WithPrincipal(context.Background(), Principal{ID: "alice@example.com"}),
-		&gensurla.ProposeChangePayload{ChangeID: "chg", Prompt: "Refunds up to $50 are instant."})
-	require.NoError(t, err)
-	require.Equal(t, StatusConfirmed, card.Status)
-	return cp, card, cfg
 }

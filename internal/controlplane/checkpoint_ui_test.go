@@ -56,7 +56,7 @@ func TestCheckpointUIMCPAppsHandshakeAndToolResultRendering(t *testing.T) {
 			Artifacts:   map[string]string{"orders": strings.Repeat("a", 64)},
 		},
 	}
-	cp := New(Options{
+	cp := newControlPlane(t, Options{
 		Analyzer:        NewModelCP1Analyzer(newStubModelClient(t, string(analysisJSON))),
 		TargetUpdater:   &boundTargetPromptUpdater{store: targetStore},
 		PromotionTarget: promotionTarget,

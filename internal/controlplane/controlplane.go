@@ -20,6 +20,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	gensurlahttp "github.com/goadesign/surla/gen/http/surla/server"
 	genmcpsurla "github.com/goadesign/surla/gen/jsonrpc/mcp_surla/server"
@@ -152,6 +153,10 @@ type (
 
 	// Options configures a ControlPlane instance.
 	Options struct {
+		// CardsDir is the directory where the control plane saves its CP1
+		// Change Cards, one file per card. It is required, and one process at
+		// a time may use it.
+		CardsDir string
 		// Analyzer performs CP1 semantic analysis via a model call.
 		Analyzer CP1Analyzer
 		// TargetUpdater applies CP3 Fast Draft Mode prompt overrides to the bound target platform.
@@ -215,10 +220,11 @@ type (
 
 	// ControlPlane implements gensurla.Service.
 	ControlPlane struct {
-		// mu guards cards.
+		// mu serializes every read-check-write of a saved card in this
+		// process; the cards directory lock keeps other processes out.
 		mu sync.RWMutex
-		// cards stores pending and confirmed CP1 Change Cards by change_id.
-		cards map[string]storedChangeCard
+		// cards saves pending and confirmed CP1 Change Cards by change_id.
+		cards *cardStore
 		// analyzer performs semantic CP1 analysis.
 		analyzer CP1Analyzer
 		// targetUpdater applies CP3 Fast Draft Mode prompt overrides to the target platform.
@@ -339,13 +345,16 @@ func WithPrincipal(ctx context.Context, p Principal) context.Context {
 	return context.WithValue(ctx, principalContextKey{}, p)
 }
 
-// PrincipalFromContext extracts the authenticated Principal from ctx.
+// PrincipalFromContext extracts the authenticated Principal from ctx. It
+// reports none when the ID is empty or not valid UTF-8: the ID is saved as a
+// card's owner, and invalid bytes would be saved as U+FFFD, so the same
+// principal would no longer own its own card.
 func PrincipalFromContext(ctx context.Context) (Principal, bool) {
 	if ctx == nil {
 		return Principal{}, false
 	}
 	p, ok := ctx.Value(principalContextKey{}).(Principal)
-	if !ok || strings.TrimSpace(p.ID) == "" {
+	if !ok || strings.TrimSpace(p.ID) == "" || !utf8.ValidString(p.ID) {
 		return Principal{}, false
 	}
 	return Principal{ID: strings.TrimSpace(p.ID)}, true
@@ -378,16 +387,23 @@ func NewTokenAuthenticator(tokens map[string]Principal) RequestAuthenticator {
 	}
 }
 
-// New constructs a ControlPlane with the provided Options.
-func New(opts Options) *ControlPlane {
+// New constructs a ControlPlane that saves its Change Cards under
+// opts.CardsDir, so cards written by an earlier process are served again. It
+// creates the directory when missing and holds its lock until Close; it fails
+// when CardsDir is empty or another process holds the lock.
+func New(opts Options) (*ControlPlane, error) {
+	cards, err := openCardStore(opts.CardsDir)
+	if err != nil {
+		return nil, err
+	}
 	return &ControlPlane{
-		cards:           make(map[string]storedChangeCard),
+		cards:           cards,
 		analyzer:        opts.Analyzer,
 		targetUpdater:   opts.TargetUpdater,
 		swarmProfiles:   opts.SwarmProfiles,
 		promotionTarget: opts.PromotionTarget,
 		verification:    opts.Verification,
-	}
+	}, nil
 }
 
 // NewHTTPHandler mounts both the Goa HTTP endpoints and the MCP JSON-RPC
@@ -513,6 +529,12 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeCha
 	if p == nil || strings.TrimSpace(p.ChangeID) == "" || strings.TrimSpace(p.Prompt) == "" {
 		return nil, errors.New("change_id and prompt are required")
 	}
+	// A saved card is found by its change_id; invalid UTF-8 would be saved as
+	// U+FFFD and the card could not be found again. HTTP and MCP requests
+	// are already valid, so only Go callers can send such an ID.
+	if !utf8.ValidString(p.ChangeID) {
+		return nil, errors.New("change_id must be valid UTF-8")
+	}
 	if c.analyzer == nil {
 		return nil, errors.New("cp1 semantic analyzer is required")
 	}
@@ -522,8 +544,11 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeCha
 	}
 
 	c.mu.RLock()
-	_, alreadyExists := c.cards[p.ChangeID]
+	_, alreadyExists, err := c.cards.load(p.ChangeID)
 	c.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
 	if alreadyExists {
 		return nil, fmt.Errorf("change_id %q already exists", p.ChangeID)
 	}
@@ -575,18 +600,28 @@ func (c *ControlPlane) ProposeChange(ctx context.Context, p *gensurla.ProposeCha
 	}
 
 	c.mu.Lock()
-	if _, exists := c.cards[p.ChangeID]; exists {
-		c.mu.Unlock()
+	defer c.mu.Unlock()
+	_, exists, err := c.cards.load(p.ChangeID)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
 		return nil, fmt.Errorf("change_id %q already exists", p.ChangeID)
 	}
-	c.cards[p.ChangeID] = storedChangeCard{
-		card:         card,
-		owner:        principal.ID,
-		designSource: designSrc,
+	if err := c.cards.save(storedChangeCard{card: card, owner: principal.ID, designSource: designSrc}); err != nil {
+		return nil, err
 	}
-	c.mu.Unlock()
-
 	return card, nil
+}
+
+// Close releases the cards directory so another process can use it. It
+// waits for a card read or save in progress; requests that reach the cards
+// afterwards, such as one still waiting on a model or promotion target, fail
+// without writing. Closing twice does nothing.
+func (c *ControlPlane) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cards.close()
 }
 
 // GetChange returns the current Change Card for change_id to its owner. It
@@ -600,8 +635,11 @@ func (c *ControlPlane) GetChange(ctx context.Context, p *gensurla.GetChangePaylo
 		return nil, errors.New("authenticated principal is required")
 	}
 	c.mu.RLock()
-	record, ok := c.cards[p.ChangeID]
+	record, ok, err := c.cards.load(p.ChangeID)
 	c.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
 	if !ok {
 		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
 	}
@@ -655,8 +693,11 @@ func (c *ControlPlane) PreviewArchitecture(ctx context.Context, p *gensurla.Prev
 	}
 
 	c.mu.RLock()
-	record, exists := c.cards[p.ChangeID]
+	record, exists, err := c.cards.load(p.ChangeID)
 	c.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
 	if !exists {
 		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
 	}
@@ -784,8 +825,11 @@ func (c *ControlPlane) ApproveMerge(ctx context.Context, p *gensurla.ApproveMerg
 	}
 
 	c.mu.RLock()
-	record, exists := c.cards[p.ChangeID]
+	record, exists, err := c.cards.load(p.ChangeID)
 	c.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
 	if !exists {
 		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
 	}
@@ -828,7 +872,13 @@ func (c *ControlPlane) ApproveMerge(ctx context.Context, p *gensurla.ApproveMerg
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	record = c.cards[p.ChangeID]
+	record, exists, err = c.cards.load(p.ChangeID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, fmt.Errorf("change card %q is no longer saved", p.ChangeID)
+	}
 	if record.card.RequestRevision != p.RequestRevision {
 		return nil, fmt.Errorf("request_revision mismatch for %q: got %q, want %q", p.ChangeID, p.RequestRevision, record.card.RequestRevision)
 	}
@@ -844,7 +894,9 @@ func (c *ControlPlane) ApproveMerge(ctx context.Context, p *gensurla.ApproveMerg
 		ScenarioCount:   report.Counts.Required,
 	}
 	record.card = &approved
-	c.cards[p.ChangeID] = record
+	if err := c.cards.save(record); err != nil {
+		return nil, err
+	}
 	return &approved, nil
 }
 
@@ -1018,7 +1070,10 @@ func (c *ControlPlane) confirm(principal Principal, p *gensurla.ConfirmIntentPay
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	record, ok := c.cards[p.ChangeID]
+	record, ok, err := c.cards.load(p.ChangeID)
+	if err != nil {
+		return nil, false, err
+	}
 	if !ok {
 		return nil, false, fmt.Errorf("unknown change_id %q", p.ChangeID)
 	}
@@ -1062,10 +1117,8 @@ func (c *ControlPlane) confirm(principal Principal, p *gensurla.ConfirmIntentPay
 		return existing, false, nil
 	}
 	confirmed.RequestRevision = rev
-	c.cards[p.ChangeID] = storedChangeCard{
-		card:         confirmed,
-		owner:        record.owner,
-		designSource: record.designSource,
+	if err := c.cards.save(storedChangeCard{card: confirmed, owner: record.owner, designSource: record.designSource}); err != nil {
+		return nil, false, err
 	}
 	return confirmed, true, nil
 }
@@ -1085,8 +1138,14 @@ func (c *ControlPlane) currentCard(ctx context.Context, card *gensurla.ChangeCar
 	if a == nil {
 		return card, nil
 	}
-	// Only approve_merge records approvals, and it requires the promotion
-	// target, which is fixed when the control plane is built.
+	// Saved cards outlive the control plane that approved them, so this one
+	// may have no promotion target. An approval is reported only while it is
+	// checked against current inputs, so without a target it is left out.
+	if c.promotionTarget == nil {
+		unapproved := *card
+		unapproved.Approval = nil
+		return &unapproved, nil
+	}
 	inputs, err := c.promotionTarget.CurrentInputs(ctx, a.CandidateCommit)
 	if err != nil {
 		return nil, fmt.Errorf("check approval of %q against current promotion inputs for %s: %w", card.ChangeID, a.CandidateCommit, err)
