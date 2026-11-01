@@ -95,9 +95,10 @@ one gets the step where it happened, what the participant did or said
   output, or docs were unclear.
 - **Documentation gap:** the participant needed something the README does
   not say or only links to.
-- **Missing capability:** the participant needed to run something, such as
-  its product's binary or tests, and Surla offers no sandboxed way to do it.
-  If that blocks the goal, decide `stop_for_bug`.
+- **Missing capability:** the participant needed a step that compiles,
+  generates code from, or runs its product's code, such as `goa gen` after a
+  design change, and Surla offers no way to do it in its sandbox. If that
+  blocks the goal, decide `stop_for_bug`.
 - **Positive:** something that worked well and should be kept.
 
 Give each issue a severity on Nielsen's scale: 0 not a problem, 1 cosmetic,

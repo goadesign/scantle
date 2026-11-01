@@ -86,11 +86,12 @@ source out of its view.
   verification builds and runs the code under test inside its own macOS
   `sandbox-exec` sandbox (`verify/candidate`), which usually cannot start
   inside the agent's sandbox. Give the participant the host access you are
-  authorized to give. The product's binaries and test suites run only inside
-  Surla's sandbox. The one exception is `goa gen`, which the scaffolded
-  project's README asks for. It runs the participant's design code outside
-  the sandbox, so the report lists it as a limitation. If the access Surla
-  needs is not available, that is an
+  authorized to give. Trusted Surla commands run as the docs show, but the
+  product's own code is never compiled, generated from, or run outside
+  Surla's sandbox. That includes `goa gen` on its design, which runs that
+  design code. If the documented workflow needs a step Surla cannot run in
+  its sandbox, the study reports it as a missing capability. If the access
+  Surla needs is not available, that is an
   environment limitation: the tester marks the milestones it blocks as not
   supported;
 - **how the participant reaches Surla's MCP server.** The README tells a user
@@ -165,7 +166,8 @@ are its own account, so compare them with its actual tool calls wherever your
 harness keeps a subagent transcript. Also read the logs its coding agent saved
 in `work/agent-logs/`. A leak is reading anything outside the participant's
 allowed list, loading this skill, building the product without Surla, or
-running the product's binaries or test suites outside Surla's sandbox.
+compiling, generating from, or running the product's code outside Surla's
+sandbox.
 
 A participant cannot unlearn what it read, so a leak ends the attempt. Tell
 the tester what was read and when. The tester records the leak as a finding,
@@ -205,8 +207,8 @@ exists. The participant cannot get past it however well it uses Surla.
 
 1. Reproduce the bug yourself with the trusted Surla CLI, using the host and
    network access you are authorized to use, so a restriction in your coding
-   agent is not mistaken for a Surla bug. The product's binaries and test
-   suites still run only through Surla's sandbox.
+   agent is not mistaken for a Surla bug. The product's code is still
+   compiled, generated from, and run only inside Surla's sandbox.
    - If the failure comes from the harness, tell the tester "environment
      limitation, not a Surla bug" and which milestones it affects.
    - If Surla behaves as designed, tell the tester "reproduced; behavior is as

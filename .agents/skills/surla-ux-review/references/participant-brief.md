@@ -31,21 +31,21 @@ You are taking part in a usability study of a developer tool called
   real first-time user works from the README and the tool, and that is what
   this study measures. Documents the README links to are not available. If
   you want one, say so in your report, because that is useful evidence.
-- Run Surla itself the way the README shows. You may also run the code
-  generation step that Surla's README or the files Surla generates tell you
-  to run, such as `goa gen`.
-- Run your product's binaries and test suites only through Surla's
-  commands, such as `surla verify`, which run them inside Surla's sandbox.
-  Do not run them directly, for example with `go run ./cmd/<service>` or
-  `go test` in `work/`. If you need to run something and Surla gives you no
-  way to do it, say so in your report instead of running it.
+- Run Surla itself the way the README shows.
+- Do not compile, generate code from, or run your product's code yourself,
+  for example with `goa gen`, `go build`, `go run`, or `go test` in your
+  project. Your product's code runs only through Surla's commands, such as
+  `surla verify`, which run it inside Surla's sandbox. If Surla's README or
+  generated files tell you to run one of those commands yourself, or you
+  need a step Surla gives you no way to run, do not run it. Say so in your
+  report instead.
 - This machine has: {{ENVIRONMENT_FACTS}}. Never print the value of a
   secret.
 - You may run these coding-agent CLIs non-interactively in `work/`:
   {{CODING_AGENTS}}. If you start one, save its full output under
   `{{PARTICIPANT}}/work/agent-logs/`. Tell it to use Surla, and tell it not to
-  read Surla's source, use the `surla-ux-review` skill, or run the product's
-  binaries or test suites except through Surla's commands. Surla's source is
+  read Surla's source, use the `surla-ux-review` skill, or compile, generate
+  code from, or run the product's code except through Surla's commands. Surla's source is
   the clone apart from its README, and `github.com/goadesign/surla` in the Go
   module cache. It may read other libraries it needs to write code.
 - Run long-running processes, such as servers, in the background. Report
