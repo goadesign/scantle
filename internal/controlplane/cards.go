@@ -14,7 +14,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	gensurla "github.com/goadesign/surla/gen/surla"
@@ -57,7 +56,7 @@ var errCardsClosed = errors.New("control plane is closed")
 // openCardStore creates dir (0700) when missing and takes its lock. It fails
 // when another process already holds the lock.
 func openCardStore(dir string) (*cardStore, error) {
-	if strings.TrimSpace(dir) == "" {
+	if dir == "" {
 		return nil, errors.New("cards directory is required")
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {

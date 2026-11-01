@@ -90,10 +90,8 @@ func TestCardsDirectoryIsHeldByOneControlPlane(t *testing.T) {
 	_, err := New(Options{CardsDir: dir})
 	assert.ErrorContains(t, err, "is in use by another process")
 
-	for _, missing := range []string{"", "   "} {
-		_, err = New(Options{CardsDir: missing})
-		assert.ErrorContains(t, err, "cards directory is required")
-	}
+	_, err = New(Options{})
+	assert.ErrorContains(t, err, "cards directory is required")
 }
 
 // TestUnreadableCardsAreErrors checks that a saved card file that is not a
