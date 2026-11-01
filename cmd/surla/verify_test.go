@@ -160,6 +160,8 @@ func TestRunPrintsHelpAndDispatchesCommands(t *testing.T) {
 		{name: "help for init", args: []string{"help", "init"}},
 		{name: "init with a mutable version", args: []string{"init", "-dir", "x", "-module", "example.com/x", "-surla-version", "latest"}, wantErr: "not an exact module version"},
 		{name: "serve without credentials", args: []string{"serve"}, wantErr: "serve requires -principal and -auth-token"},
+		{name: "serve with a stray argument before a flag", args: []string{"serve", "-principal", "op", "x", "-promotion-config", "p.json"}, wantErr: `unexpected arguments ["x" "-promotion-config" "p.json"]`},
+		{name: "diff with a stray argument", args: []string{"diff", "-old-dir", "a", "-new-dir", "b", "c"}, wantErr: `unexpected arguments ["c"]`},
 		{name: "preview with a bad flag", args: []string{"preview", "-nope"}, wantErr: "flag provided but not defined"},
 	}
 	for _, tc := range cases {

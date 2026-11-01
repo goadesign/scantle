@@ -41,7 +41,7 @@ func TestLoadVerificationConfigReadsTheOperatorsPlanStrictly(t *testing.T) {
 		name, content, wantErr string
 	}{
 		{"unknown field", `{"runs_dir":"x","suite":"y"}`, "unknown field"},
-		{"missing fields", `{"runs_dir":"/srv/runs"}`, "is missing"},
+		{"missing fields", `{"runs_dir":"/srv/runs"}`, "is missing report_dir, candidate_repo, candidate_module, suite_repo, suite_commit, suite_module, suite_command, timeout, binaries"},
 		{"trailing data", complete + `{}`, "data after the configuration"},
 		{"bad timeout", strings.Replace(complete, `"30m"`, `"soon"`, 1), "must be a positive duration"},
 	} {

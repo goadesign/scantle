@@ -155,20 +155,20 @@ func loadVerificationConfig(path string) (*controlplane.VerificationConfig, erro
 		return nil, fmt.Errorf("decode -verification-config %s: data after the configuration", path)
 	}
 	var missing []string
-	for name, v := range map[string]string{
-		"runs_dir": f.RunsDir, "report_dir": f.ReportDir, "candidate_repo": f.CandidateRepo,
-		"candidate_module": f.CandidateModule, "suite_repo": f.SuiteRepo, "suite_commit": f.SuiteCommit,
-		"suite_module": f.SuiteModule, "suite_command": f.SuiteCommand, "timeout": f.Timeout,
+	for _, field := range []struct{ name, value string }{
+		{"runs_dir", f.RunsDir}, {"report_dir", f.ReportDir}, {"candidate_repo", f.CandidateRepo},
+		{"candidate_module", f.CandidateModule}, {"suite_repo", f.SuiteRepo}, {"suite_commit", f.SuiteCommit},
+		{"suite_module", f.SuiteModule}, {"suite_command", f.SuiteCommand}, {"timeout", f.Timeout},
 	} {
-		if v == "" {
-			missing = append(missing, name)
+		if field.value == "" {
+			missing = append(missing, field.name)
 		}
 	}
 	if len(f.Binaries) == 0 {
 		missing = append(missing, "binaries")
 	}
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("-verification-config %s is missing %v", path, missing)
+		return nil, fmt.Errorf("-verification-config %s is missing %s", path, strings.Join(missing, ", "))
 	}
 	timeout, err := time.ParseDuration(f.Timeout)
 	if err != nil || timeout <= 0 {

@@ -198,6 +198,11 @@ func runServe(args []string) (err error) {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	// Flag parsing stops at the first non-flag argument, so anything left over
+	// would silently drop the flags after it.
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected arguments %q", fs.Args())
+	}
 	token := resolveAuthToken(*authToken, os.Getenv)
 	if strings.TrimSpace(*principalID) == "" || token == "" {
 		return errors.New("serve requires -principal and -auth-token (or SURLA_AUTH_TOKEN)")
@@ -386,6 +391,9 @@ func runDiff(args []string) error {
 	newDir := fs.String("new-dir", "", "root directory of the candidate design module (holding go.mod and design/)")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if fs.NArg() > 0 {
+		return fmt.Errorf("unexpected arguments %q", fs.Args())
 	}
 	if *oldDir == "" || *newDir == "" {
 		return errors.New("--old-dir and --new-dir are required")
