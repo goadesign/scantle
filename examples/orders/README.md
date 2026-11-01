@@ -37,6 +37,7 @@ flowchart LR
 | [`internal/assistant/`](internal/assistant/) & [`internal/refundflow/`](internal/refundflow/) | Refund agent planner, runtime prompt override validation and store updates (`assistant.Prompts`), and Temporal refund workflow execution. |
 | [`internal/runstore/`](internal/runstore/) | SQLite-backed durable run, transcript, and pending-approval store owned by the Orders API. |
 | [`cmd/orders/`](cmd/orders/main.go) & [`cmd/orders-worker/`](cmd/orders-worker/main.go) | Public Orders API server and Refund worker binaries verified by `surla verify`. |
+| [`cmd/orders-surla/`](cmd/orders-surla/main.go) | Separate reference `CP3` MCP/HTTP host that binds `controlplane.Options.TargetUpdater` to a running `orders` API's `override_prompt` (`PUT /prompts/{prompt_id}`) endpoint using the pinned `github.com/goadesign/surla` module version in `go.mod`. |
 
 ---
 
@@ -74,6 +75,20 @@ go run ./cmd/surla serve \
 ```
 
 When an MCP Apps-capable client calls `propose_change`, `confirm_intent`, `get_change`, `preview_architecture`, `diff`, or `draft_override`, Surla pairs the structured tool result with the stateless `ui://surla/checkpoint` (`text/html;profile=mcp-app`) viewer read over MCP `resources/read` (`POST /mcp`; the companion HTTP route `GET /ui/checkpoint` returns the HTML document as a JSON-encoded string). The viewer completes the MCP Apps `ui/initialize` → `ui/notifications/initialized` handshake with the host frame and renders an interactive CP1 Change Card form (`confirm_intent` and `get_change` via host `tools/call` with unsaved-draft preservation on stale `request_revision` conflicts), an inline scrollable C4 SVG directed graph above the inspectable containers/edges, tool guardrails (`Inject`, `BoundedResult`, `Confirmation`), and cross-family Chorus swarm manifest (`design_digest`), or an unbound structural `DiffResult` view (`diff`).
+
+Standalone `surla serve` leaves `controlplane.Options.TargetUpdater` unbound and rejects `prompt_template` overrides. To exercise live `CP3` prompt edits (`draft_override`) against a running `orders` API process (`cmd/orders`) without rebuilding, run the reference `CP3` host [`cmd/orders-surla`](cmd/orders-surla/main.go). Prefer the `SURLA_AUTH_TOKEN` (MCP caller bearer token) and `ORDERS_PROMPTS_TOKEN` (an HS256 JWT signed with the same `ORDERS_JWT_KEY` the `orders` API was started with, carrying `sub`, `tenant_id`, `exp`, and `scope: "prompts:manage"`) environment variables over `-auth-token` and `-orders-token` flags so credentials stay out of command-line arguments:
+
+```bash
+export SURLA_AUTH_TOKEN="dev-mcp-secret"
+export ORDERS_PROMPTS_TOKEN="<jwt-with-prompts:manage>"
+
+(cd examples/orders && go run ./cmd/orders-surla \
+  -listen 127.0.0.1:8091 \
+  -principal operator@example.com \
+  -orders-url http://127.0.0.1:8080)
+```
+
+`orders-surla` is a single-operator `CP3` reference host: any authenticated MCP caller on that host can call `draft_override` (`target_kind: "prompt_template"`, `prompt_id: "orders.refund.system"`) to update the target `orders` process's in-memory prompt store and receive the accepted text's `sha256:...` version (`compiled_rule` edits are still rejected with `requires_rebuild: true` without calling `orders`). It leaves `CP1` model analysis, `CP4` verification, and `CP5` `PromotionTarget` (`approve_merge`) unconfigured, and it consumes the pinned `github.com/goadesign/surla` version in [`examples/orders/go.mod`](go.mod) (`v0.0.0-20261101011908-b9e28a6662b2`), so later `internal/controlplane` changes reach `orders-surla` after bumping that pinned module version.
 
 ---
 
