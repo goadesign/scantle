@@ -37,6 +37,12 @@ excuse things a real user cannot see.
   of which it may read only `README.md`, an empty project folder, and this
   permission to run these coding-agent CLIs to reach Surla's MCP server:
   {{CODING_AGENTS}}
+- **A rule the participant must follow:** it never compiles, generates code
+  from, or runs its product's code itself (`goa gen`, `go build`, `go run`,
+  `go test`). It does those only through Surla's commands, which use Surla's
+  sandbox, even where the docs show the direct command. Never hint such a
+  step. A participant who needs one has found a missing capability, not made
+  a wrong turn.
 
 ## Before the session
 
