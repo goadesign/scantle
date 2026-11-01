@@ -27,6 +27,9 @@ comments, tests, fixtures, docs, commits, branches, issues, or pull requests.
    before editing files or running commands that change state.
 5. **Report honestly.** Say what you verified, how, and what remains
    unverified. If a test fails or a step was skipped, say so.
+6. **Run tools non-interactively.** Close standard input and set `CI=true`
+   for package runners and CLIs (`node`, `npx`, `gh`), so a hidden prompt
+   never blocks a command.
 
 Example of the plain-English standard used in every reply, comment, doc, and
 pull request (state the input, what happens, and what the caller sees before
@@ -54,8 +57,9 @@ stated in writing before the first edit:
    Optional fields, modes, presence-dependent behavior, and wider enums
    weaken a contract; two honest functions beat one function with a mode.
 3. **Owning layer.** The component that owns the concern. Validate input
-   where it enters the system (Goa design, HTTP or MCP ingress, a file read
-   from disk) and trust it afterwards.
+   where it enters the system and trust it afterwards: Goa design for HTTP
+   and MCP payloads, and strict decoding (unknown fields and trailing data
+   rejected) for files read from disk.
 4. **Delete first.** Ask which caller breaks if the state, copy, hop, or
    check that causes the problem is deleted outright. Compare the result with
    a from-scratch design. Reject a proposal that adds any of these:
@@ -116,6 +120,9 @@ review, until a review finds none. Set each subagent's model explicitly.
 - **Keep holdouts hidden.** Builder-facing output goes through
   `Report.ForBuilders()`; never expose holdout scenario names, checks, or
   logs to a coding agent.
+- **Treat candidate code as untrusted.** Build and run a candidate only
+  through `verify/candidate`, which jails each process in an OS sandbox.
+  Never run candidate binaries or its test suite outside it.
 
 ## 5. Code
 
@@ -137,7 +144,9 @@ review, until a review finds none. Set each subagent's model explicitly.
 
 ### Goa and generated code
 
-- Never edit `gen/`. After changing `design/`, run
+- Never edit generated files by hand: `gen/`,
+  `internal/controlplane/checkpoint.html`, and
+  `internal/goldenpath/decision_catalog.md`. After changing `design/`, run
   `goa gen github.com/goadesign/surla/design`, then
   `CI=true node ui/checkpoint/build.mjs --check </dev/null`. The examples
   under `examples/` are separate Go modules with their own `design/` and
@@ -169,12 +178,20 @@ spans to quiet an alert; fix the alert instead.
 ### TypeScript (`ui/checkpoint/`)
 
 Use explicit types that match the generated contracts. Avoid `any`, and use
-`unknown` only for untyped external input that you narrow immediately. Build
-semantic, accessible, keyboard-navigable components, and design the empty,
-loading, and error states as carefully as success.
+`unknown` only for untyped external input that you narrow immediately. Design
+for a first-time user, applying Google's UX principles:
+
+- One clear primary action per view, and clarity before density.
+- Visible state instead of hidden modes; IDs and digests go in expandable
+  details, not headings.
+- Never lose the user's unsaved edits on a conflict or refresh.
+- Semantic, accessible (WCAG AA), keyboard-navigable components, with empty,
+  loading, and error states designed as carefully as success.
 
 ## 6. Documentation and pull requests
 
+- When behavior changes, update `README.md`, `docs/HOW_IT_WORKS.md`,
+  `docs/REFERENCE.md`, and the affected `examples/*/README.md` together.
 - Write docs in active voice using Google technical writing style. Name the
   exact actor, command, and file at each step. Describe the current state;
   never write changelogs, rollout diaries, or completed migration phases into
