@@ -124,6 +124,39 @@ func TestOverrideRejectsWithoutChangingThePrompt(t *testing.T) {
 	}
 }
 
+// Complete is not used by the planner.
+func (p *recordingProvider) Complete(context.Context, *model.Request) (*model.Response, error) {
+	return nil, errors.New("the planner only streams")
+}
+
+// Stream records req and replies with one final text message.
+func (p *recordingProvider) Stream(_ context.Context, req *model.Request) (model.Streamer, error) {
+	p.mu.Lock()
+	p.requests = append(p.requests, req)
+	p.mu.Unlock()
+	reply := model.Message{Role: model.ConversationRoleAssistant, Parts: []model.Part{model.TextPart{Text: "It is on its way."}}}
+	return &replyStream{
+		chunks:   []model.Chunk{model.TextChunk{Message: reply}, model.StopChunk{Reason: "end_turn"}},
+		response: &model.Response{StopReason: "end_turn", Content: []model.Message{reply}},
+	}, nil
+}
+
+// Recv returns the next chunk, then io.EOF.
+func (s *replyStream) Recv() (model.Chunk, error) {
+	if len(s.chunks) == 0 {
+		return nil, io.EOF
+	}
+	c := s.chunks[0]
+	s.chunks = s.chunks[1:]
+	return c, nil
+}
+
+// Response returns the canonical response.
+func (s *replyStream) Response() *model.Response { return s.response }
+
+// Close releases nothing.
+func (s *replyStream) Close() error { return nil }
+
 // startService builds the refund agent the way cmd/orders does, with its own
 // runtime store and its own in-memory prompt store.
 func startService(t *testing.T) *service {
@@ -147,6 +180,14 @@ func startService(t *testing.T) *service {
 	))
 	require.NoError(t, rt.Seal(ctx))
 	return &service{agent: genrefund.NewClient(rt), store: store, prompts: NewPrompts(rt.PromptRegistry, promptStore), model: recorder}
+}
+
+// systemText returns the system message text of req.
+func systemText(t *testing.T, req *model.Request) string {
+	t.Helper()
+	require.NotEmpty(t, req.Messages)
+	require.Equal(t, model.ConversationRoleSystem, req.Messages[0].Role)
+	return req.Messages[0].Text()
 }
 
 // overridePrompt calls override_prompt on an orders service that uses s's
@@ -191,31 +232,6 @@ func (s *service) turn(t *testing.T) *model.Request {
 	return s.model.since(t, before)
 }
 
-// systemText returns the system message text of req.
-func systemText(t *testing.T, req *model.Request) string {
-	t.Helper()
-	require.NotEmpty(t, req.Messages)
-	require.Equal(t, model.ConversationRoleSystem, req.Messages[0].Role)
-	return req.Messages[0].Text()
-}
-
-// Complete is not used by the planner.
-func (p *recordingProvider) Complete(context.Context, *model.Request) (*model.Response, error) {
-	return nil, errors.New("the planner only streams")
-}
-
-// Stream records req and replies with one final text message.
-func (p *recordingProvider) Stream(_ context.Context, req *model.Request) (model.Streamer, error) {
-	p.mu.Lock()
-	p.requests = append(p.requests, req)
-	p.mu.Unlock()
-	reply := model.Message{Role: model.ConversationRoleAssistant, Parts: []model.Part{model.TextPart{Text: "It is on its way."}}}
-	return &replyStream{
-		chunks:   []model.Chunk{model.TextChunk{Message: reply}, model.StopChunk{Reason: "end_turn"}},
-		response: &model.Response{StopReason: "end_turn", Content: []model.Message{reply}},
-	}, nil
-}
-
 // count returns how many requests were recorded.
 func (p *recordingProvider) count() int {
 	p.mu.Lock()
@@ -231,19 +247,3 @@ func (p *recordingProvider) since(t *testing.T, n int) *model.Request {
 	require.Len(t, p.requests, n+1, "one model request per turn")
 	return p.requests[n]
 }
-
-// Recv returns the next chunk, then io.EOF.
-func (s *replyStream) Recv() (model.Chunk, error) {
-	if len(s.chunks) == 0 {
-		return nil, io.EOF
-	}
-	c := s.chunks[0]
-	s.chunks = s.chunks[1:]
-	return c, nil
-}
-
-// Response returns the canonical response.
-func (s *replyStream) Response() *model.Response { return s.response }
-
-// Close releases nothing.
-func (s *replyStream) Close() error { return nil }
