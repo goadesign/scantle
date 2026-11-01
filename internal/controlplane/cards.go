@@ -20,12 +20,15 @@ type (
 	// directory, so cards outlive the process that wrote them. The files are
 	// the only copy: each read decodes the file and each change replaces it.
 	// One process at a time may use a directory; openCardStore holds an
-	// exclusive lock on it until close. Callers serialize read-check-write
-	// sequences with ControlPlane.mu.
+	// exclusive lock on it until close. Callers serialize every call,
+	// including close, with ControlPlane.mu.
 	cardStore struct {
 		// dir holds one <hex sha256(change_id)>.json file per card.
 		dir string
 		// lock is the open lock file whose flock keeps other processes out.
+		// close sets it to nil; the store then refuses to read or write, so
+		// a request still running when the lock is released cannot write to
+		// a directory another process may now hold.
 		lock *os.File
 	}
 
@@ -41,6 +44,10 @@ type (
 		DesignSource string `json:"design_source"`
 	}
 )
+
+// errCardsClosed reports a request that reached the card store after the
+// control plane was closed.
+var errCardsClosed = errors.New("control plane is closed")
 
 // openCardStore creates dir (0700) when missing and takes its lock. It fails
 // when another process already holds the lock.
@@ -65,14 +72,22 @@ func openCardStore(dir string) (*cardStore, error) {
 	return &cardStore{dir: dir, lock: lock}, nil
 }
 
-// close releases the directory lock.
+// close releases the directory lock. Closing a closed store does nothing.
 func (s *cardStore) close() error {
-	return s.lock.Close()
+	if s.lock == nil {
+		return nil
+	}
+	err := s.lock.Close()
+	s.lock = nil
+	return err
 }
 
 // load returns the saved card for changeID, or false when none was saved. A
 // card file that cannot be read or decoded is an error.
 func (s *cardStore) load(changeID string) (storedChangeCard, bool, error) {
+	if s.lock == nil {
+		return storedChangeCard{}, false, errCardsClosed
+	}
 	data, err := os.ReadFile(s.path(changeID))
 	if errors.Is(err, fs.ErrNotExist) {
 		return storedChangeCard{}, false, nil
@@ -99,6 +114,9 @@ func (s *cardStore) load(changeID string) (storedChangeCard, bool, error) {
 // a temporary file in the same directory and renames it over the old one, so
 // a failed save leaves the previous card in place.
 func (s *cardStore) save(record storedChangeCard) error {
+	if s.lock == nil {
+		return errCardsClosed
+	}
 	data, err := json.Marshal(cardFile{Card: record.card, Owner: record.owner, DesignSource: record.designSource})
 	if err != nil {
 		return fmt.Errorf("encode change card %q: %w", record.card.ChangeID, err)

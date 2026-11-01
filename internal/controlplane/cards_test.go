@@ -12,6 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// heldAnalyzer answers once release is closed, so a test can close the
+// control plane while ProposeChange waits on the model.
+type heldAnalyzer struct {
+	// started is closed when Analyze is called.
+	started chan struct{}
+	// release lets Analyze return.
+	release chan struct{}
+}
+
 func TestCardsSurviveANewControlPlane(t *testing.T) {
 	dir := t.TempDir()
 	cfg := verificationConfig(t)
@@ -105,4 +114,40 @@ func TestCardFilesStayInsideTheDirectory(t *testing.T) {
 	path := cp.cards.path("../../etc/passwd")
 	assert.Equal(t, cp.cards.dir, filepath.Dir(path))
 	assert.NotEqual(t, cp.cards.path("Req-1"), cp.cards.path("req-1"), "IDs differing only in case get different files")
+}
+
+func TestRequestsFinishingAfterCloseDoNotWrite(t *testing.T) {
+	dir := t.TempDir()
+	model := &heldAnalyzer{started: make(chan struct{}), release: make(chan struct{})}
+	cp, err := New(Options{CardsDir: dir, Analyzer: model})
+	require.NoError(t, err)
+	alice := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
+	proposed := make(chan error, 1)
+	go func() {
+		_, err := cp.ProposeChange(alice, &gensurla.ProposeChangePayload{ChangeID: "late", Prompt: "Refunds up to $50 are instant."})
+		proposed <- err
+	}()
+	<-model.started
+	require.NoError(t, cp.Close())
+	next := newControlPlane(t, Options{CardsDir: dir})
+	close(model.release)
+
+	assert.ErrorIs(t, <-proposed, errCardsClosed, "the request that outlived Close fails")
+	_, saved, err := next.cards.load("late")
+	require.NoError(t, err)
+	assert.False(t, saved, "and writes nothing to the directory the next control plane holds")
+	assert.NoError(t, cp.Close(), "closing twice does nothing")
+}
+
+// Analyze waits for release, then returns a card with no open questions.
+func (a *heldAnalyzer) Analyze(context.Context, string, string) (CP1SemanticAnalysis, error) {
+	close(a.started)
+	<-a.release
+	return CP1SemanticAnalysis{
+		Summary: "Refunds up to $50 are instant.",
+		Examples: []CP1ModelExample{{
+			Scenario: "Refund at the limit", InputSummary: "Order total $50.00",
+			ExpectedOutcome: "Instant store credit", VerificationKind: "deterministic",
+		}},
+	}, nil
 }

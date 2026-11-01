@@ -402,9 +402,13 @@ func New(opts Options) (*ControlPlane, error) {
 	}, nil
 }
 
-// Close releases the cards directory so another process can use it. The
-// ControlPlane must not be used afterwards.
+// Close releases the cards directory so another process can use it. It
+// waits for a card read or save in progress; requests that reach the cards
+// afterwards, such as one still waiting on a model or promotion target, fail
+// without writing. Closing twice does nothing.
 func (c *ControlPlane) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.cards.close()
 }
 
