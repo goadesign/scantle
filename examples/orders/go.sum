@@ -86,6 +86,8 @@ github.com/go-openapi/jsonpointer v1.0.2 h1:NbW7xT2b+l7x+JefiPGDsZWsrLk1ogrz4AHK
 github.com/go-openapi/jsonpointer v1.0.2/go.mod h1:N0rI4MbNKD7xAFTiHtB+5Nhrg2j/wwYg7m7Fmb4/jk8=
 github.com/goadesign/surla v0.0.0-20261101011908-b9e28a6662b2 h1:3nAGFnK0NGfwUADvThPjRhFITmF07Yi6T3rsv+UCOJY=
 github.com/goadesign/surla v0.0.0-20261101011908-b9e28a6662b2/go.mod h1:K1Fykkw/oRXmS6ONMXuQB3DeaK6P/sXgAxK1WVZ/Vcg=
+github.com/goadesign/surla v0.0.0-20261101022642-44db328a2549 h1:jaw9VjsVyNMNcn8CFGM4Dw7W5Ot7Wcfdcz0Qs/X7JQ4=
+github.com/goadesign/surla v0.0.0-20261101022642-44db328a2549/go.mod h1:K1Fykkw/oRXmS6ONMXuQB3DeaK6P/sXgAxK1WVZ/Vcg=
 github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/gohugoio/hashstructure v1.1.0 h1:38yUfZBca6qXSbUpteLhjDGLNskclHaguFBYpjaRjf4=

@@ -141,6 +141,12 @@ const (
 // to equal it, which only the full ID in the repository's own format can.
 var commitID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 
+// IsCommitID reports whether commit is a full commit ID in either Git object
+// format: 40 lowercase hex digits for SHA-1 repositories, 64 for SHA-256 ones.
+func IsCommitID(commit string) bool {
+	return commitID.MatchString(commit)
+}
+
 // Run clones the candidate at its exact commit and builds its binaries into
 // WorkDir/candidate-bin, then clones the suite at its exact commit, builds it
 // into WorkDir/suite-bin, asks it for its declaration, runs it against the
@@ -172,12 +178,12 @@ var commitID = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
 // results, yields a report that does not pass.
 func Run(ctx context.Context, p Plan) (Report, error) {
 	for name, commit := range map[string]string{"candidate": p.CandidateCommit, "suite": p.SuiteCommit} {
-		if !commitID.MatchString(commit) {
+		if !IsCommitID(commit) {
 			return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("%s commit %q is not a full commit ID", name, commit))
 		}
 	}
 	for name, pkg := range p.Binaries {
-		if err := validateArtifactName(name); err != nil {
+		if err := ValidateArtifactName(name); err != nil {
 			return Report{}, stageError(StageCheckout, summaryPlan, err)
 		}
 		if err := validatePackagePath(pkg); err != nil {
@@ -339,10 +345,11 @@ func validatePackagePath(pkg string) error {
 	return nil
 }
 
-// validateArtifactName rejects a binary name that cannot serve both as the
+// ValidateArtifactName returns an error unless name can serve both as the
 // artifact ID passed to the suite as --artifact name=path and as one file name
-// inside WorkDir/candidate-bin and WorkDir/evidence.
-func validateArtifactName(name string) error {
+// inside WorkDir/candidate-bin and WorkDir/evidence: non-empty, not . or ..,
+// and free of /, \, = and NUL.
+func ValidateArtifactName(name string) error {
 	switch {
 	case name == "", name == ".", name == "..":
 		return fmt.Errorf("binary name %q is not a valid artifact name", name)

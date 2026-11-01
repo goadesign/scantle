@@ -56,6 +56,10 @@ type serveConfig struct {
 	// configuration (see loadVerificationConfig); empty disables
 	// verify_change and get_verification.
 	verificationPath string
+	// promotionPath is the path of the operator's CP5 promotion
+	// configuration (see loadPromotionConfig); empty leaves approve_merge
+	// unavailable.
+	promotionPath string
 	// cardsDir is the directory where CP1 Change Cards are saved, so a
 	// restarted serve returns them.
 	cardsDir string
@@ -189,6 +193,7 @@ func runServe(args []string) (err error) {
 	fs.StringVar(&cfg.modelName, "model-name", "", "CP1 model name for -model-provider")
 	fs.StringVar(&cfg.swarmProfilesPath, "swarm-profiles", "", "JSON file listing the coding-agent provider profiles used for CP2 swarm plans")
 	fs.StringVar(&cfg.cardsDir, "cards-dir", ".surla/cards", "directory where CP1 Change Cards are saved so they survive restarts; one surla serve at a time may use it")
+	fs.StringVar(&cfg.promotionPath, "promotion-config", "", "JSON file with the CP5 report directory, required suite and environment, and release directory of staged binaries that approve_merge checks; it approves staged binaries for a fresh launch, never a running service")
 	fs.StringVar(&cfg.verificationPath, "verification-config", "", "JSON file with the CP4 candidate, evaluator suite, runs and reports configuration used by verify_change")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -698,11 +703,18 @@ func serveOptions(cfg serveConfig, getenv func(string) string) (controlplane.Opt
 	if err != nil {
 		return controlplane.Options{}, nil, err
 	}
+	promotion, err := loadPromotionConfig(cfg.promotionPath)
+	if err != nil {
+		return controlplane.Options{}, nil, err
+	}
 	analyzer, closeModel, err := newCP1Analyzer(cfg, getenv)
 	if err != nil {
 		return controlplane.Options{}, nil, err
 	}
-	return controlplane.Options{CardsDir: cfg.cardsDir, Analyzer: analyzer, SwarmProfiles: profiles, Verification: verification}, closeModel, nil
+	return controlplane.Options{
+		CardsDir: cfg.cardsDir, Analyzer: analyzer, SwarmProfiles: profiles, Verification: verification,
+		PromotionTarget: promotion,
+	}, closeModel, nil
 }
 
 // newCP1Analyzer returns the CP1 analyzer selected by cfg: a model gateway

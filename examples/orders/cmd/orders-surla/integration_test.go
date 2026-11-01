@@ -248,11 +248,14 @@ func newTarget(t *testing.T) *targetFixture {
 // distinct credentials and a real target URL.
 func newHost(t *testing.T, targetURL, token string) *httptest.Server {
 	t.Helper()
-	cfg, err := parseConfig([]string{"-principal", "operator", "-orders-url", targetURL}, func(key string) string {
+	cfg, err := parseConfig([]string{"-principal", "operator", "-orders-url", targetURL, "-cards-dir", t.TempDir()}, func(key string) string {
 		return map[string]string{"SURLA_AUTH_TOKEN": "test-mcp-token", "ORDERS_PROMPTS_TOKEN": token}[key]
 	}, io.Discard)
 	require.NoError(t, err)
-	host := httptest.NewServer(newHandler(cfg))
+	handler, closeCP, err := newHandler(cfg)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, closeCP()) })
+	host := httptest.NewServer(handler)
 	t.Cleanup(host.Close)
 	return host
 }
