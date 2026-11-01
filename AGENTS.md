@@ -14,8 +14,13 @@ comments, tests, fixtures, docs, commits, branches, issues, or pull requests.
 
 ## 1. How to work
 
-1. **Read before you edit.** Search the code instead of guessing. Fix the
-   root cause, not the place the symptom showed up.
+1. **Read before you edit or propose.** Search the code instead of guessing,
+   even when answering a question with no file edits. Treat compacted
+   session summaries, trackers, and pull request notes as progress pointers,
+   never as evidence of how a component works or why a boundary exists; read
+   the owning files (`main.go`, `design/`, and service interfaces) before
+   describing limitations or proposing changes. Fix the root cause, not the
+   place the symptom showed up.
 2. **Trace the whole flow first.** Before changing behavior, follow one
    concrete request from where it enters (an MCP tool call, an HTTP route, or
    a `surla` CLI command) through the component that owns each step to what
@@ -23,8 +28,12 @@ comments, tests, fixtures, docs, commits, branches, issues, or pull requests.
    plan to change.
 3. **Explain plans for larger changes.** Before changing three or more files,
    state the intended outcome, the steps, and the main risks, then proceed.
-4. **Answer questions before acting.** When the user asks a question, reply
-   before editing files or running commands that change state.
+4. **Answer questions before acting, and test your own premise when
+   questioned.** When the user asks a question, reply before editing files
+   or running commands that change state. When the user probes a proposal or
+   asks why *not* to do it, try to falsify your claim from the source code
+   and Section 3 (`Ownership and state`) instead of defending an earlier
+   reply.
 5. **Report honestly.** Say what you verified, how, and what remains
    unverified. If a test fails or a step was skipped, say so.
 6. **Run tools non-interactively and bounded.** Close standard input and set
@@ -52,8 +61,9 @@ directory) on first use, and avoid session-coined shorthand.
 Fix mechanical issues directly: formatting, declaration order, a missing
 test of existing behavior, or a doc that no longer matches the code. Every
 other change (a Goa design, an auth or trust rule, an error contract, a
-lifecycle, storage, or a new flag, field, or dependency) must pass this gate,
-stated in writing before the first edit:
+lifecycle, storage, or a new flag, field, or dependency)—and every
+architectural or UX proposal in prose—must pass this gate, stated in writing
+before the first edit or recommendation:
 
 1. **Current behavior and callers.** A concrete example, the evidence, and
    every caller on `origin/main` that depends on the affected code.
@@ -61,10 +71,10 @@ stated in writing before the first edit:
    or unchanged, and whether the contract becomes stronger or weaker.
    Optional fields, modes, presence-dependent behavior, and wider enums
    weaken a contract; two honest functions beat one function with a mode.
-3. **Owning layer.** The component that owns the concern. Validate input
-   where it enters the system and trust it afterwards: Goa design for HTTP
-   and MCP payloads, and strict decoding (unknown fields and trailing data
-   rejected) for files read from disk.
+3. **Owning layer.** The component that owns the concern, state, Goa design,
+   and generated client. Validate input where it enters the system and trust
+   it afterwards: Goa design for HTTP and MCP payloads, and strict decoding
+   (unknown fields and trailing data rejected) for files read from disk.
 4. **Delete first.** Ask which caller breaks if the state, copy, hop, or
    check that causes the problem is deleted outright. Compare the result with
    a from-scratch design. Reject a proposal that adds any of these:
