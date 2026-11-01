@@ -9,6 +9,7 @@ package designeval
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -56,6 +57,14 @@ type (
 		// workDir is the private writable directory for GOCACHE, HOME, and TMPDIR.
 		workDir string
 	}
+
+	// stuckBuildError reports an evaluator build whose process group did not
+	// empty after the build ended. Its processes may still use the evaluation's
+	// temporary directory, so Evaluate keeps it.
+	stuckBuildError struct {
+		// err is procgroup.Run's stop error.
+		err error
+	}
 )
 
 // buildStopGrace bounds how long the evaluator build gets to exit after it
@@ -96,7 +105,7 @@ var (
 // prepareHarnessModule). The evaluator program is then compiled with
 // candidate.Build and run with candidate.Exec, so neither compiling nor
 // running the design can read evaluator files or reach the network.
-func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
+func Evaluate(ctx context.Context, files map[string]string) (_ Result, err error) {
 	target, err := validateSnapshot(files)
 	if err != nil {
 		return Result{}, err
@@ -114,11 +123,11 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	storeDir := filepath.Join(tmpDir, "store")
+	defer func() { err = releaseTemp(tmpDir, storeDir, err) }()
 
 	buildDir := filepath.Join(tmpDir, "build")
 	outDir := filepath.Join(tmpDir, "out")
-	storeDir := filepath.Join(tmpDir, "store")
 	stateDir := filepath.Join(tmpDir, "state")
 	logDir := filepath.Join(tmpDir, "logs")
 	for _, d := range []string{buildDir, outDir, storeDir, stateDir, logDir} {
@@ -152,6 +161,10 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 		WorkDir:   tc.workDir,
 		LogFile:   buildLog,
 	}, runBuild); err != nil {
+		// A stuck build's processes may still be writing its log.
+		if stuck := (*stuckBuildError)(nil); errors.As(err, &stuck) {
+			return Result{}, fmt.Errorf("compile Goa design: %w", err)
+		}
 		logBytes, readErr := os.ReadFile(buildLog)
 		if readErr != nil {
 			return Result{}, fmt.Errorf("compile Goa design: %w", err)
@@ -163,11 +176,6 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("pin design evaluator binary: %w", err)
 	}
-	defer func() {
-		if rmErr := candidate.RemoveStore(storeDir); rmErr != nil {
-			return
-		}
-	}()
 
 	outFile := filepath.Join(stateDir, "evaluated.json")
 	logFile := filepath.Join(tmpDir, "designeval.log")
@@ -198,6 +206,16 @@ func Evaluate(ctx context.Context, files map[string]string) (Result, error) {
 	return res, nil
 }
 
+// Error describes the build processes left running.
+func (e *stuckBuildError) Error() string {
+	return "build processes did not exit: " + e.err.Error()
+}
+
+// Unwrap returns procgroup.Run's stop error.
+func (e *stuckBuildError) Unwrap() error {
+	return e.err
+}
+
 // evaluatorGoMod returns the go.mod Surla was built from (surla.GoMod), which
 // supplies the generator versions a target that does not require them is
 // evaluated with. It is compiled into the binary, so the result is the same
@@ -212,11 +230,26 @@ func evaluatorGoMod() (*modfile.File, error) {
 
 // runBuild runs the evaluator build in its own process group, the owning
 // boundary of this build: whatever ends it, the compiler, assembler and
-// linker it started are killed and waited for before Evaluate continues.
+// linker it started are killed and waited for before Evaluate continues. A
+// group that does not empty is a *stuckBuildError, reported together with
+// the build's own error.
 func runBuild(cmd *exec.Cmd) error {
 	runErr, stopErr := procgroup.Run(cmd, syscall.SIGKILL, buildStopGrace, buildStopGrace)
 	if stopErr != nil {
-		return fmt.Errorf("stop build: %w", stopErr)
+		return errors.Join(&stuckBuildError{err: stopErr}, runErr)
 	}
 	return runErr
+}
+
+// releaseTemp owns the evaluation's temporary directory once Evaluate ends
+// with err. It removes the artifact store and then the whole directory and
+// reports their removal errors with err, unless err contains a
+// *stuckBuildError: build processes may then still use the directory, so it
+// is kept and err names it. The sandboxed evaluator needs no such check: its
+// sandbox forbids child processes and Evaluate waits for it before returning.
+func releaseTemp(tmpDir, storeDir string, err error) error {
+	if stuck := (*stuckBuildError)(nil); errors.As(err, &stuck) {
+		return fmt.Errorf("%w; the temporary directory %s is kept because build processes may still use it", err, tmpDir)
+	}
+	return errors.Join(err, candidate.RemoveStore(storeDir), os.RemoveAll(tmpDir))
 }
