@@ -161,7 +161,8 @@ copy as part of the hint.
 are its own account, so compare them with its actual tool calls wherever your
 harness keeps a subagent transcript. Also read the logs its coding agent saved
 in `work/agent-logs/`. A leak is reading anything outside the participant's
-allowed list, loading this skill, or building the product without Surla.
+allowed list, loading this skill, building the product without Surla, or
+building, testing, or running the product's code outside Surla's sandbox.
 
 A participant cannot unlearn what it read, so a leak ends the attempt. Tell
 the tester what was read and when. The tester records the leak as a finding,
@@ -182,7 +183,10 @@ prove ownership:
   them or they appear in `work/agent-logs/`. An example is `/tmp/shop` from
   the README's `surla init -dir` example. Inspect each one, and remove it only
   when its contents and timestamps show this attempt created it. Otherwise
-  leave it, and record it as a pre-existing path in the next transcript.
+  leave it.
+- Record anything you left, whether a folder or a process that might still
+  hold a port, as pre-existing in the next transcript. Tell the tester when
+  the next attempt starts, so leftovers are not logged as Surla bugs.
 - Keep the attempt's own folder, transcripts, and logs. They are the
   evidence for the report.
 
@@ -221,8 +225,9 @@ participant cannot get past it however well it uses Surla.
    3. Copy the user docs from that commit into the tester's `docs/` again, so
       the tester judges the participant against the docs it is reading.
    4. Start `attempt-<N+1>/transcript.md` with the newly recorded facts.
-   5. Start a **fresh** participant. One that remembers the failed attempt
-      would skip the steps that confused it.
+   5. Start a **fresh** participant, with its brief filled in again for the
+      new folder. One that remembers the failed attempt would skip the steps
+      that confused it.
    6. Keep the same tester. Tell it that a new attempt has begun on that
       commit and which docs changed. Its earlier findings carry into the
       report.

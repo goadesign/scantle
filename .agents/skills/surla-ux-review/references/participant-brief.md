@@ -31,12 +31,17 @@ You are taking part in a usability study of a developer tool called
   real first-time user works from the README and the tool, and that is what
   this study measures. Documents the README links to are not available. If
   you want one, say so in your report, because that is useful evidence.
+- Build, test, and run your product's code only through Surla's own
+  commands, which run it inside Surla's sandbox. If the README or Surla's
+  output tells you to run it some other way, such as `go run` or `go test`,
+  do not run it. Report that instruction instead.
 - This machine has: {{ENVIRONMENT_FACTS}}. Never print the value of a
   secret.
 - You may run these coding-agent CLIs non-interactively in `work/`:
   {{CODING_AGENTS}}. If you start one, save its full output under
   `{{PARTICIPANT}}/work/agent-logs/`. Tell it to use Surla, and tell it not to
-  read Surla's source or use the `surla-ux-review` skill. Surla's source is
+  read Surla's source, use the `surla-ux-review` skill, or build, test, or
+  run the product's code except through Surla's commands. Surla's source is
   the clone apart from its README, and `github.com/goadesign/surla` in the Go
   module cache. It may read other libraries it needs to write code.
 - Run long-running processes, such as servers, in the background. Report
