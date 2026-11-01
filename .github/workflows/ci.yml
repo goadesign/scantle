@@ -1,0 +1,100 @@
+# CI runs every test suite, type-checks the checkpoint viewer, and checks
+# that generated files match their sources, on each pull request and each
+# push to main. All jobs run on macOS:
+# Surla's candidate sandbox uses sandbox-exec, so its tests skip elsewhere.
+# The jobs use no secrets; the suites drive scripted models, not real ones.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  # Temporal CLI the orders acceptance suite starts as its dev server.
+  TEMPORAL_CLI_VERSION: 1.7.2
+  TEMPORAL_CLI_SHA256: 561ac68bdb6c16c8e8cbbd49f12578218ff1776007c3f3ae0d0196c8c9a73e79
+
+jobs:
+  # tests formats, vets and runs the race-enabled unit tests of all three Go
+  # modules, then regenerates code and fails if anything differs from what
+  # is committed.
+  tests:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 26.0.0
+          cache: npm
+          cache-dependency-path: ui/checkpoint/package-lock.json
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"; echo "$unformatted"; exit 1
+          fi
+      - name: Vet and test
+        run: |
+          for module in . examples/orders examples/orders-eval; do
+            echo "::group::$module"
+            (cd "$module" && go vet ./... && go test -race ./...) </dev/null
+            echo "::endgroup::"
+          done
+      - name: Type-check the viewer and check generated files
+        run: |
+          npm ci --prefix ui/checkpoint --no-audit --no-fund </dev/null
+          # esbuild strips TypeScript types without checking them.
+          npm --prefix ui/checkpoint run typecheck </dev/null
+          go run goa.design/goa/v3/cmd/goa gen github.com/goadesign/surla/design </dev/null
+          (cd examples/orders && go run goa.design/goa/v3/cmd/goa gen github.com/goadesign/surla/examples/orders/design) </dev/null
+          (cd examples/orders-eval && go run goa.design/goa/v3/cmd/goa gen github.com/goadesign/surla/examples/orders-eval/design) </dev/null
+          node ui/checkpoint/build.mjs --check </dev/null
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Generated files differ from the committed ones; run goa gen and node ui/checkpoint/build.mjs:"
+            git status --porcelain; git diff --stat; exit 1
+          fi
+
+  # e2e runs the end-to-end suites: the verifier building and running the
+  # orders platform in the sandbox, surla init generating a starter project
+  # whose candidate and evaluator build and pass in the sandbox, and the
+  # orders acceptance suite against real orders processes and a Temporal dev
+  # server.
+  e2e:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+      - name: Install the Temporal CLI
+        run: |
+          archive="temporal_cli_${TEMPORAL_CLI_VERSION}_darwin_arm64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/temporalio/cli/releases/download/v${TEMPORAL_CLI_VERSION}/$archive"
+          echo "${TEMPORAL_CLI_SHA256}  $RUNNER_TEMP/$archive" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/bin" temporal
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Verifier end to end
+        run: go test -race -tags e2e ./internal/verify </dev/null
+      - name: Starter project end to end
+        run: go test -race -tags scaffold ./internal/scaffold </dev/null
+      - name: Orders acceptance end to end
+        working-directory: examples/orders-eval
+        run: go test -race -tags e2e ./acceptance </dev/null

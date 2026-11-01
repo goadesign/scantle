@@ -39,9 +39,13 @@ func Run(cmd *exec.Cmd, sig syscall.Signal, grace, stopTimeout time.Duration) (r
 // Stop kills every process remaining in the group led by pgid and waits, up to
 // timeout, until the group no longer exists. A group that does not empty in
 // time is an error; the caller must then not release resources its remaining
-// processes may use.
+// processes may use. EPERM does not mean the group is gone: on macOS,
+// signaling a group whose remaining members have exited but are not yet
+// reaped can fail with EPERM, and EPERM also reports a real permission
+// denial. So EPERM from the kill, as from the checks that follow, means
+// waiting, and Stop succeeds only once the group no longer exists (ESRCH).
 func Stop(pgid int, timeout time.Duration) error {
-	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+	if err := syscall.Kill(-pgid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) && !errors.Is(err, syscall.EPERM) {
 		return fmt.Errorf("kill process group %d: %w", pgid, err)
 	}
 	deadline := time.Now().Add(timeout)
