@@ -1,3 +1,6 @@
+// This file holds the control plane's Change Card store: one file per card
+// under a directory that one process at a time may use.
+
 package controlplane
 
 import (
@@ -7,9 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	gensurla "github.com/goadesign/surla/gen/surla"
@@ -52,7 +57,7 @@ var errCardsClosed = errors.New("control plane is closed")
 // openCardStore creates dir (0700) when missing and takes its lock. It fails
 // when another process already holds the lock.
 func openCardStore(dir string) (*cardStore, error) {
-	if dir == "" {
+	if strings.TrimSpace(dir) == "" {
 		return nil, errors.New("cards directory is required")
 	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -63,13 +68,35 @@ func openCardStore(dir string) (*cardStore, error) {
 		return nil, fmt.Errorf("open cards directory lock: %w", err)
 	}
 	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		_ = lock.Close()
 		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil, fmt.Errorf("cards directory %s is in use by another process", dir)
+			err = fmt.Errorf("cards directory %s is in use by another process", dir)
+		} else {
+			err = fmt.Errorf("lock cards directory: %w", err)
 		}
-		return nil, fmt.Errorf("lock cards directory: %w", err)
+		return nil, errors.Join(err, lock.Close())
+	}
+	// A save that crashed before its rename left its temporary file; the
+	// lock guarantees no other process is writing one now.
+	leftovers, err := filepath.Glob(filepath.Join(dir, "card-*.tmp"))
+	if err == nil {
+		for _, name := range leftovers {
+			err = errors.Join(err, os.Remove(name))
+		}
+	}
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("remove unfinished card saves: %w", err), lock.Close())
 	}
 	return &cardStore{dir: dir, lock: lock}, nil
+}
+
+// syncDir flushes dir's entries so a completed rename survives a crash.
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	err = d.Sync()
+	return errors.Join(err, d.Close())
 }
 
 // close releases the directory lock. Closing a closed store does nothing.
@@ -101,19 +128,33 @@ func (s *cardStore) load(changeID string) (storedChangeCard, bool, error) {
 	if err := dec.Decode(&f); err != nil {
 		return storedChangeCard{}, false, fmt.Errorf("decode change card %q: %w", changeID, err)
 	}
-	if dec.More() {
+	if err := dec.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return storedChangeCard{}, false, fmt.Errorf("decode change card %q: trailing data", changeID)
 	}
 	if f.Card == nil || f.Card.ChangeID != changeID || f.Owner == "" {
 		return storedChangeCard{}, false, fmt.Errorf("change card file for %q does not hold that card", changeID)
 	}
+	// request_revision is the digest of the card's content, owner and design
+	// source, so recomputing it checks every field it covers.
+	if f.Card.Status != StatusNeedsConfirmation && f.Card.Status != StatusConfirmed {
+		return storedChangeCard{}, false, fmt.Errorf("change card %q has unknown status %q", changeID, f.Card.Status)
+	}
+	rev, err := computeCanonicalRevision(f.Card, f.Owner, f.DesignSource)
+	if err != nil {
+		return storedChangeCard{}, false, err
+	}
+	if rev != f.Card.RequestRevision {
+		return storedChangeCard{}, false, fmt.Errorf("change card %q does not match its request_revision", changeID)
+	}
 	return storedChangeCard{card: f.Card, owner: f.Owner, designSource: f.DesignSource}, true, nil
 }
 
 // save replaces the saved card for record.card.ChangeID. It writes and syncs
-// a temporary file in the same directory and renames it over the old one, so
-// a failed save leaves the previous card in place.
-func (s *cardStore) save(record storedChangeCard) error {
+// a temporary file in the same directory and renames it over the old one.
+// An error before the rename leaves the previous card in place. The rename
+// publishes the new card; an error syncing the directory after it means the
+// new card is in place but may not survive a crash, and the error says so.
+func (s *cardStore) save(record storedChangeCard) (err error) {
 	if s.lock == nil {
 		return errCardsClosed
 	}
@@ -125,7 +166,13 @@ func (s *cardStore) save(record storedChangeCard) error {
 	if err != nil {
 		return fmt.Errorf("save change card %q: %w", record.card.ChangeID, err)
 	}
-	defer func() { _ = os.Remove(tmp.Name()) }()
+	renamed := false
+	defer func() {
+		// After a successful rename the temporary name no longer exists.
+		if removeErr := os.Remove(tmp.Name()); removeErr != nil && !(renamed && errors.Is(removeErr, fs.ErrNotExist)) {
+			err = errors.Join(err, fmt.Errorf("remove unfinished save of change card %q: %w", record.card.ChangeID, removeErr))
+		}
+	}()
 	_, err = tmp.Write(data)
 	if err == nil {
 		err = tmp.Sync()
@@ -136,11 +183,12 @@ func (s *cardStore) save(record storedChangeCard) error {
 	if err == nil {
 		err = os.Rename(tmp.Name(), s.path(record.card.ChangeID))
 	}
-	if err == nil {
-		err = syncDir(s.dir)
-	}
 	if err != nil {
 		return fmt.Errorf("save change card %q: %w", record.card.ChangeID, err)
+	}
+	renamed = true
+	if err := syncDir(s.dir); err != nil {
+		return fmt.Errorf("change card %q is saved but may not survive a crash: %w", record.card.ChangeID, err)
 	}
 	return nil
 }
@@ -150,14 +198,4 @@ func (s *cardStore) save(record storedChangeCard) error {
 func (s *cardStore) path(changeID string) string {
 	sum := sha256.Sum256([]byte(changeID))
 	return filepath.Join(s.dir, hex.EncodeToString(sum[:])+".json")
-}
-
-// syncDir flushes dir's entries so a completed rename survives a crash.
-func syncDir(dir string) error {
-	d, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	err = d.Sync()
-	return errors.Join(err, d.Close())
 }

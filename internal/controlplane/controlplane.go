@@ -1128,8 +1128,14 @@ func (c *ControlPlane) currentCard(ctx context.Context, card *gensurla.ChangeCar
 	if a == nil {
 		return card, nil
 	}
-	// Only approve_merge records approvals, and it requires the promotion
-	// target, which is fixed when the control plane is built.
+	// Saved cards outlive the control plane that approved them, so this one
+	// may have no promotion target. An approval is reported only while it is
+	// checked against current inputs, so without a target it is left out.
+	if c.promotionTarget == nil {
+		unapproved := *card
+		unapproved.Approval = nil
+		return &unapproved, nil
+	}
 	inputs, err := c.promotionTarget.CurrentInputs(ctx, a.CandidateCommit)
 	if err != nil {
 		return nil, fmt.Errorf("check approval of %q against current promotion inputs for %s: %w", card.ChangeID, a.CandidateCommit, err)
