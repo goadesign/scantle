@@ -344,9 +344,11 @@ export function bootstrapCheckpointApp() {
                   "Wait for the pending CP1 Change Card request to finish before switching cards.";
                 return;
               }
+              const preserved =
+                activeEditor && hasUnsavedEditorState() ? snapshotDraft(activeEditor) : null;
               activeResult = null;
               syncResultRegion();
-              mountChangeCard(res.card, null);
+              mountChangeCard(res.card, preserved);
             }}
           />
         );
