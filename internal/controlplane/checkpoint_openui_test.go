@@ -144,6 +144,11 @@ func TestCheckpointUIOpenUIDecisionStudioAndStreaming(t *testing.T) {
 		t.Fatalf("unexpected ResourcesRead outcome: %+v", resRead)
 	}
 	htmlDoc := *completeRes.Contents[0].Text
+	for _, legacyV3Marker := range []string{"ZodEffects", "ZodParsedType"} {
+		if strings.Contains(htmlDoc, legacyV3Marker) {
+			t.Fatalf("checkpointUIHTML still bundles legacy Zod v3 marker %q", legacyV3Marker)
+		}
+	}
 	scriptBody := extractCheckpointScript(t, htmlDoc)
 
 	proposeArgs, err := json.Marshal(map[string]any{

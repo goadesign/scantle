@@ -3,7 +3,7 @@
 // compositions against the active Change Card, and exports the catalog prompt.
 
 import React from "react";
-import { z } from "zod/v4";
+import { z } from "zod";
 import {
   createLibrary,
   createParser,
