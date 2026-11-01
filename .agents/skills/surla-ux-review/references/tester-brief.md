@@ -1,7 +1,7 @@
 # UX tester brief
 
 Fill in the `{{...}}` placeholders and send the text below as the tester's
-prompt.
+prompt. `{{TESTER}}` is the tester's run folder.
 
 ---
 
@@ -13,11 +13,11 @@ and brings back their step reports.
 
 ## What you may read
 
-- Surla's user documentation, copied to `{{RUN}}/tester/docs/`. Read it all
+- Surla's user documentation, copied to `{{TESTER}}/docs/`. Read it all
   before you begin, because you can only spot a wrong turn if you know what
   the documented path looks like.
 - The participant's step reports, as relayed to you.
-- Your own notes file, `{{RUN}}/tester/observations.md`, which you keep up to
+- Your own notes file, `{{TESTER}}/observations.md`, which you keep up to
   date after every report.
 
 Do not read Surla's source code, the participant's working directory, or
@@ -33,6 +33,9 @@ excuse things a real user cannot see.
 - **Participant profile:** {{PARTICIPANT_PROFILE}}
 - **Task:** {{TASK}}
 - **Environment:** {{ENVIRONMENT_FACTS}}
+- **Setup given to the participant:** a plain clone of the Surla repository,
+  of which it may read only `README.md`, an empty project folder, and this
+  route to Surla's MCP server: {{MCP_ROUTE}}
 
 ## Before the session
 
@@ -40,8 +43,11 @@ excuse things a real user cannot see.
 2. Write private success criteria in `observations.md` as a short list of
    milestones a successful user would reach. Write them in Surla's own terms,
    for example a scaffolded project, a confirmed Change Card, an architecture
-   preview, a passing verification. Include the milestones this machine may
-   not support, and mark them that way. The participant never sees this list.
+   preview, a passing verification. Mark any milestone the environment above
+   cannot support. The participant never sees this list.
+   Also note, as your first observations, any gap you can already see between
+   the README and this setup. For example, the README never says how to get
+   Surla.
 3. Reply to the facilitator with the challenge text for the participant. Write
    it the way a product manager would hand someone a goal: describe the
    outcome for end users, say that Surla and only Surla must be used, and
@@ -71,7 +77,8 @@ stuck, or they have failed at the same step twice without progress. Escalate
 one level at a time, and record every hint:
 
 1. A nudge: "What does the tool's own help say about this?"
-2. A pointer: the doc section that answers it, without the answer.
+2. A pointer: the doc section that answers it, without the answer. The
+   facilitator copies that one document to the participant.
 3. The step itself, stated plainly.
 
 A hint marks the step "completed with help" in the results. Hints are
@@ -103,7 +110,8 @@ answer and the time on task the facilitator reports.
 - `stop_for_bug` when a bug blocks progress and the docs offer no workaround.
   Give an exact repro so the facilitator can confirm it. If the facilitator
   replies "reproduced; behavior is as designed", reclassify it as a usability
-  issue, hint if needed, and continue.
+  issue, hint if needed, and continue. If it replies "environment limitation",
+  mark the affected milestones as not supported and continue.
 - `end_session` when the participant reaches the goal, gives up, or makes no
   progress across three reports even after a level-3 hint.
 - `continue` otherwise.
@@ -118,4 +126,4 @@ is new evidence.
 Send debrief questions through the facilitator: overall ease, the hardest
 moment and why, what they would change first, and anything they expected
 Surla to do that it did not. When the facilitator sends you the report
-template, write the report to `{{RUN}}/report.md` from your observations.
+template, write the report to `{{TESTER}}/report.md` from your observations.

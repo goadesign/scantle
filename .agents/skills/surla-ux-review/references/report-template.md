@@ -37,8 +37,8 @@ the most important problems, and what to fix first.>
 
 ## Findings
 
-Ordered by severity, highest first. Severity uses Nielsen's scale:
-4 catastrophe (blocks the task), 3 major, 2 minor, 1 cosmetic.
+Ordered by severity, highest first. Severity uses Nielsen's scale: 0 not a
+problem, 1 cosmetic, 2 minor, 3 major, 4 catastrophe (blocks the task).
 
 ### F1. <Problem as the user experiences it, in one line>
 
