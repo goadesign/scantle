@@ -21,6 +21,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	genordersclient "github.com/goadesign/surla/examples/orders/gen/http/orders/client"
 	genorders "github.com/goadesign/surla/examples/orders/gen/orders"
@@ -48,6 +49,9 @@ type (
 		ordersScheme, ordersHost string
 		// ordersToken grants prompts:manage at that target API.
 		ordersToken string
+		// cardsDir is the directory where Change Cards are saved so they
+		// survive restarts; one host at a time may use it.
+		cardsDir string
 	}
 
 	// ordersPrompts implements Surla's prompt updater by calling the orders
@@ -108,6 +112,7 @@ func parseConfig(args []string, getenv func(string) string, output io.Writer) (c
 	fs.StringVar(&cfg.authToken, "auth-token", "", "MCP bearer token (default: $SURLA_AUTH_TOKEN)")
 	fs.StringVar(&ordersURL, "orders-url", "", "Orders API origin, such as http://127.0.0.1:8080 (required)")
 	fs.StringVar(&cfg.ordersToken, "orders-token", "", "Target prompts:manage bearer token (default: $ORDERS_PROMPTS_TOKEN)")
+	fs.StringVar(&cfg.cardsDir, "cards-dir", ".surla/orders-surla-cards", "Directory where Change Cards are saved so they survive restarts; one host at a time may use it")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -126,6 +131,9 @@ func parseConfig(args []string, getenv func(string) string, output io.Writer) (c
 	if cfg.principal == "" || cfg.authToken == "" || cfg.ordersToken == "" {
 		return config{}, errors.New("-principal, MCP bearer token, and target prompts:manage bearer token are required")
 	}
+	if !utf8.ValidString(cfg.principal) {
+		return config{}, errors.New("-principal must be valid UTF-8")
+	}
 	origin, err := parseOrdersURL(ordersURL)
 	if err != nil {
 		return config{}, err
@@ -135,15 +143,21 @@ func parseConfig(args []string, getenv func(string) string, output io.Writer) (c
 }
 
 // serve constructs the target client and control plane, then owns the HTTP
-// listener until ctx ends. Shutting down this host does not stop orders.
-func serve(ctx context.Context, cfg config, output io.Writer) error {
-	handler := newHandler(cfg)
+// listener and cards directory lock until ctx ends. Shutting down this host
+// does not stop orders.
+func serve(ctx context.Context, cfg config, output io.Writer) (err error) {
+	handler, closeCP, err := newHandler(cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, closeCP()) }()
 	listener, err := net.Listen("tcp", cfg.listen)
 	if err != nil {
 		return err
 	}
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	fmt.Fprintf(output, "orders-surla: CP3 reference host on http://%s/mcp\n", listener.Addr())
+	fmt.Fprintf(output, "orders-surla: saving Change Cards in %s\n", cfg.cardsDir)
 	fmt.Fprintln(output, "orders-surla: CP1 analysis, CP4 verification, and CP5 promotion are not configured")
 	finished := make(chan error, 1)
 	go func() { finished <- srv.Serve(listener) }()
@@ -167,15 +181,22 @@ func serve(ctx context.Context, cfg config, output io.Writer) error {
 
 // newHandler constructs the generated target client at the command's
 // composition root and binds its updater to the existing Surla HTTP/MCP
-// handler. The target token is never supplied by a tool argument.
-func newHandler(cfg config) http.Handler {
+// handler. The target token is never supplied by a tool argument, and the
+// returned close function releases the cards directory lock.
+func newHandler(cfg config) (http.Handler, func() error, error) {
 	clientHTTP := &http.Client{CheckRedirect: rejectTargetRedirect}
 	transport := genordersclient.NewClient(cfg.ordersScheme, cfg.ordersHost, clientHTTP,
 		goahttp.RequestEncoder, goahttp.ResponseDecoder, false)
 	client := genorders.NewClient(nil, nil, nil, transport.OverridePrompt(), nil, nil, nil)
-	cp := controlplane.New(controlplane.Options{TargetUpdater: &ordersPrompts{client: client, token: cfg.ordersToken}})
+	cp, err := controlplane.New(controlplane.Options{
+		CardsDir:      cfg.cardsDir,
+		TargetUpdater: &ordersPrompts{client: client, token: cfg.ordersToken},
+	})
+	if err != nil {
+		return nil, nil, err
+	}
 	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{cfg.authToken: {ID: cfg.principal}})
-	return otelhttp.NewHandler(controlplane.NewHTTPHandler(cp, auth), "orders-surla")
+	return otelhttp.NewHandler(controlplane.NewHTTPHandler(cp, auth), "orders-surla"), cp.Close, nil
 }
 
 // rejectTargetRedirect keeps the operation and its bearer token at the

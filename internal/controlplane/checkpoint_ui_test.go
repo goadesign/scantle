@@ -618,12 +618,15 @@ messageListener({ source: parentWindow, data: { jsonrpc: "2.0", method: "ui/noti
 const approvalPanels = findAll(viewEl, (n) => n.attributes["id"] === "surla-cp5-approval");
 const approvalText = approvalPanels.length === 1 ? renderText(approvalPanels[0]) : "";
 if (approvalPanels.length !== 1 ||
-    !approvalText.includes("In-memory approval recorded") ||
+    !approvalText.includes("Approval recorded") ||
+    approvalText.includes("In-memory approval") ||
+    approvalText.includes("in control-plane memory") ||
     !approvalText.includes("No merge or deploy side effect") ||
     !approvalText.includes("alice@example.com") ||
     !approvalText.includes(input.wantCandidateCommit) ||
     !approvalText.includes(input.wantReportDigest) ||
     !approvalText.includes("orders_acceptance") ||
+    findAll(approvalPanels[0], (n) => n.attributes["id"] === "surla-cp5-approval-details").length !== 1 ||
     findAll(viewEl, (n) => n.attributes["id"] === "surla-cp5-approval-dirty-warning").length !== 0) {
   throw new Error("expected #surla-cp5-approval panel without dirty warning on clean approved card, got: " + approvalText);
 }

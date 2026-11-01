@@ -222,14 +222,14 @@ export function CP1EditorView({
         >
           <div className="surla-field-row">
             <h3>Checkpoint 5 Promotion Approval</h3>
-            <Badge variant="accent">In-memory approval recorded</Badge>
+            <Badge variant="accent">Approval recorded</Badge>
             <Badge>No merge or deploy side effect</Badge>
           </div>
           <p>
             Approval recorded by bearer principal <code>{card.approval.approved_by}</code> for this
-            confirmed <code>request_revision</code> in control-plane memory. Recording approval does
-            not merge branches or deploy binaries. This record describes the inputs below;
-            check the current approval to see whether they still match the service.
+            confirmed <code>request_revision</code> on the saved Change Card. Recording approval
+            does not merge branches or deploy binaries. This record describes the verified inputs
+            below; check the current approval to see whether they still match the promotion target.
           </p>
           <Button
             id="surla-cp5-refresh-approval"
@@ -248,29 +248,35 @@ export function CP1EditorView({
           <p>
             <strong>Approved by: </strong>
             <code>{card.approval.approved_by}</code> · <strong>Environment: </strong>
-            <code>{card.approval.environment}</code> · <strong>Scenarios passed: </strong>
-            <code>{String(card.approval.scenario_count)}</code>
+            <code>{card.approval.environment}</code> · <strong>Evaluator suite: </strong>
+            <code>{card.approval.suite_id}</code> · <strong>Scenarios passed: </strong>
+            <code>{String(card.approval.scenario_count)}</code> ·{" "}
+            <strong>Verified artifacts: </strong>
+            <code>{String(artifactNames.length)}</code>
           </p>
-          <p>
-            <strong>Candidate commit: </strong>
-            <code>{card.approval.candidate_commit}</code>
-          </p>
-          <p>
-            <strong>Verification report digest: </strong>
-            <code>{card.approval.report_digest}</code>
-          </p>
-          <p>
-            <strong>Evaluator suite: </strong>
-            <code>{card.approval.suite_id}</code> @ <code>{card.approval.suite_commit}</code>
-          </p>
-          <h4>{"Verified Candidate Artifacts (" + artifactNames.length + ")"}</h4>
-          <ul>
-            {artifactNames.map((name) => (
-              <li key={name}>
-                <code>{name}</code>: <code>{card.approval!.artifacts[name]}</code>
-              </li>
-            ))}
-          </ul>
+          <details className="surla-details" id="surla-cp5-approval-details">
+            <summary>Verified inputs and digests</summary>
+            <p>
+              <strong>Candidate commit: </strong>
+              <code>{card.approval.candidate_commit}</code>
+            </p>
+            <p>
+              <strong>Verification report digest: </strong>
+              <code>{card.approval.report_digest}</code>
+            </p>
+            <p>
+              <strong>Evaluator suite commit: </strong>
+              <code>{card.approval.suite_id}</code> @ <code>{card.approval.suite_commit}</code>
+            </p>
+            <h4>{"Verified Candidate Artifacts (" + artifactNames.length + ")"}</h4>
+            <ul>
+              {artifactNames.map((name) => (
+                <li key={name}>
+                  <code>{name}</code>: <code>{card.approval!.artifacts[name]}</code>
+                </li>
+              ))}
+            </ul>
+          </details>
         </Card>
       ) : null}
 
