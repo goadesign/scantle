@@ -8,11 +8,13 @@ import (
 )
 
 // JWTAuth secures the public orders API. Customers hold the "orders:chat"
-// scope; managers additionally hold "refunds:approve".
+// scope; managers additionally hold "refunds:approve". Operators who may change
+// the refund agent's prompts for every tenant hold "prompts:manage".
 var JWTAuth = JWTSecurity("jwt", func() {
 	Description("Bearer token issued by the merchant's identity provider.")
 	Scope("orders:chat", "Talk to the refund assistant about your own orders.")
 	Scope("refunds:approve", "Approve or deny refunds that need a manager.")
+	Scope("prompts:manage", "Change the refund agent's prompts for every tenant.")
 })
 
 var _ = API("orders", func() {
@@ -115,6 +117,13 @@ var RunView = Type("RunView", func() {
 	Required("run_id", "status")
 })
 
+// PromptVersion identifies the prompt text override_prompt accepted.
+var PromptVersion = Type("PromptVersion", func() {
+	Attribute("prompt_id", String, "Prompt that was replaced.")
+	Attribute("version", String, "Version of the accepted text: \"sha256:\" followed by the hex SHA-256 of the template. Model requests that use this text carry this version.")
+	Required("prompt_id", "version")
+})
+
 var _ = Service("orders", func() {
 	Description("Refund assistant for a merchant's customers.")
 	Security(JWTAuth, func() { Scope("orders:chat") })
@@ -172,6 +181,29 @@ var _ = Service("orders", func() {
 		HTTP(func() {
 			POST("/runs/{run_id}/approval")
 			Response(StatusAccepted)
+		})
+	})
+
+	Method("override_prompt", func() {
+		Description("Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.")
+		Security(JWTAuth, func() { Scope("prompts:manage") })
+		Error("unknown_prompt", ErrorResult, "No prompt with this ID is registered.")
+		Error("invalid_prompt", ErrorResult, "The prompt template does not render.")
+		Payload(func() {
+			Token("token", String, "Operator bearer token.")
+			Attribute("prompt_id", String, "Registered prompt to replace.", func() {
+				MinLength(1)
+				Example("orders.refund.system")
+			})
+			Attribute("template", String, "New prompt text, as a Go text/template. It must render with no template data.", func() { MinLength(1) })
+			Required("token", "prompt_id", "template")
+		})
+		Result(PromptVersion)
+		HTTP(func() {
+			PUT("/prompts/{prompt_id}")
+			Response(StatusOK)
+			Response("unknown_prompt", StatusNotFound)
+			Response("invalid_prompt", StatusUnprocessableEntity)
 		})
 	})
 

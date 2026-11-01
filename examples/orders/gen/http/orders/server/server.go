@@ -18,10 +18,11 @@ import (
 
 // Server lists the orders service endpoint HTTP handlers.
 type Server struct {
-	Mounts        []*MountPoint
-	Chat          http.Handler
-	RunStatus     http.Handler
-	ApproveRefund http.Handler
+	Mounts         []*MountPoint
+	Chat           http.Handler
+	RunStatus      http.Handler
+	ApproveRefund  http.Handler
+	OverridePrompt http.Handler
 }
 
 // MountPoint holds information about the mounted endpoints.
@@ -54,10 +55,12 @@ func New(
 			{"Chat", "POST", "/chat"},
 			{"RunStatus", "GET", "/runs/{run_id}"},
 			{"ApproveRefund", "POST", "/runs/{run_id}/approval"},
+			{"OverridePrompt", "PUT", "/prompts/{prompt_id}"},
 		},
-		Chat:          NewChatHandler(e.Chat, mux, decoder, encoder, errhandler, formatter),
-		RunStatus:     NewRunStatusHandler(e.RunStatus, mux, decoder, encoder, errhandler, formatter),
-		ApproveRefund: NewApproveRefundHandler(e.ApproveRefund, mux, decoder, encoder, errhandler, formatter),
+		Chat:           NewChatHandler(e.Chat, mux, decoder, encoder, errhandler, formatter),
+		RunStatus:      NewRunStatusHandler(e.RunStatus, mux, decoder, encoder, errhandler, formatter),
+		ApproveRefund:  NewApproveRefundHandler(e.ApproveRefund, mux, decoder, encoder, errhandler, formatter),
+		OverridePrompt: NewOverridePromptHandler(e.OverridePrompt, mux, decoder, encoder, errhandler, formatter),
 	}
 }
 
@@ -69,6 +72,7 @@ func (s *Server) Use(m func(http.Handler) http.Handler) {
 	s.Chat = m(s.Chat)
 	s.RunStatus = m(s.RunStatus)
 	s.ApproveRefund = m(s.ApproveRefund)
+	s.OverridePrompt = m(s.OverridePrompt)
 }
 
 // MethodNames returns the methods served.
@@ -79,6 +83,7 @@ func Mount(mux goahttp.Muxer, h *Server) {
 	MountChatHandler(mux, h.Chat)
 	MountRunStatusHandler(mux, h.RunStatus)
 	MountApproveRefundHandler(mux, h.ApproveRefund)
+	MountOverridePromptHandler(mux, h.OverridePrompt)
 }
 
 // Mount configures the mux to serve the orders endpoints.
@@ -222,6 +227,59 @@ func NewApproveRefundHandler(
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
 		ctx = context.WithValue(ctx, goa.MethodKey, "approve_refund")
+		ctx = context.WithValue(ctx, goa.ServiceKey, "orders")
+		payload, err := decodeRequest(r)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		res, err := endpoint(ctx, payload)
+		if err != nil {
+			if err := encodeError(ctx, w, err); err != nil && errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+			return
+		}
+		if err := encodeResponse(ctx, w, res); err != nil {
+			if errhandler != nil {
+				errhandler(ctx, w, err)
+			}
+		}
+	})
+}
+
+// MountOverridePromptHandler configures the mux to serve the "orders" service
+// "override_prompt" endpoint.
+func MountOverridePromptHandler(mux goahttp.Muxer, h http.Handler) {
+	f, ok := h.(http.HandlerFunc)
+	if !ok {
+		f = func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+	mux.Handle("PUT", "/prompts/{prompt_id}", f)
+}
+
+// NewOverridePromptHandler creates a HTTP handler which loads the HTTP request
+// and calls the "orders" service "override_prompt" endpoint.
+func NewOverridePromptHandler(
+	endpoint goa.Endpoint,
+	mux goahttp.Muxer,
+	decoder func(*http.Request) goahttp.Decoder,
+	encoder func(context.Context, http.ResponseWriter) goahttp.Encoder,
+	errhandler func(context.Context, http.ResponseWriter, error),
+	formatter func(ctx context.Context, err error) goahttp.Statuser,
+) http.Handler {
+	var (
+		decodeRequest  = DecodeOverridePromptRequest(mux, decoder)
+		encodeResponse = EncodeOverridePromptResponse(encoder)
+		encodeError    = EncodeOverridePromptError(encoder, formatter)
+	)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := context.WithValue(r.Context(), goahttp.AcceptTypeKey, r.Header.Get("Accept"))
+		ctx = context.WithValue(ctx, goa.MethodKey, "override_prompt")
 		ctx = context.WithValue(ctx, goa.ServiceKey, "orders")
 		payload, err := decodeRequest(r)
 		if err != nil {

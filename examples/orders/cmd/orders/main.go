@@ -39,6 +39,7 @@ import (
 	"goa.design/goa-ai/features/model/gateway"
 	temporalengine "goa.design/goa-ai/runtime/agent/engine/temporal"
 	"goa.design/goa-ai/runtime/agent/model"
+	"goa.design/goa-ai/runtime/agent/prompt"
 	"goa.design/goa-ai/runtime/agent/runtime"
 	goahttp "goa.design/goa/v3/http"
 	"google.golang.org/grpc"
@@ -125,7 +126,10 @@ func run(ctx context.Context, cfg config) (err error) {
 	}
 	defer func() { _ = eng.Close() }()
 
-	rt := runtime.New(store, runtime.WithEngine(eng))
+	// prompts holds prompt overrides set through override_prompt. It lives in
+	// memory only, so restarting the service restores the built-in prompts.
+	prompts := prompt.NewInMemoryStore()
+	rt := runtime.New(store, runtime.WithEngine(eng), runtime.WithPromptStore(prompts))
 	if err := rt.PromptRegistry.Register(assistant.SystemPrompt()); err != nil {
 		return fmt.Errorf("register system prompt: %w", err)
 	}
@@ -138,14 +142,15 @@ func run(ctx context.Context, cfg config) (err error) {
 	}
 
 	conversations := assistant.NewConversations(rt, genrefund.NewClient(rt), store)
-	svc := orders.New(commerce, refundflow.NewRunner(temporal, cfg.refundQueue), conversations, cfg.signingKey)
+	svc := orders.New(commerce, refundflow.NewRunner(temporal, cfg.refundQueue), conversations,
+		assistant.NewPrompts(rt.PromptRegistry, prompts), cfg.signingKey)
 	endpoints := genorders.NewEndpoints(svc)
 
 	if err := genrefund.RegisterRefundAgent(ctx, rt, genrefund.RefundAgentConfig{Planner: assistant.NewPlanner(modelID)}); err != nil {
 		return fmt.Errorf("register refund agent: %w", err)
 	}
 	toolClient := genorders.NewClient(endpoints.Chat, endpoints.RunStatus, endpoints.ApproveRefund,
-		endpoints.ListOrders, endpoints.IssueStoreCredit, endpoints.RequestRefund)
+		endpoints.OverridePrompt, endpoints.ListOrders, endpoints.IssueStoreCredit, endpoints.RequestRefund)
 	if err := genrefund.RegisterUsedToolsets(ctx, rt,
 		genrefund.WithOrdersExecutor(genrefundorders.NewRefundOrdersExec(genrefundorders.WithClient(toolClient))),
 	); err != nil {

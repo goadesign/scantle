@@ -17,6 +17,8 @@ type (
 		refunds RefundRunner
 		// conversations runs the refund agent.
 		conversations Conversations
+		// prompts changes the refund agent's prompts.
+		prompts Prompts
 		// signingKey verifies HS256 bearer tokens.
 		signingKey []byte
 	}
@@ -32,6 +34,18 @@ type (
 		// Decide continues a run waiting for approval with the manager's
 		// decision and returns the continued run's state.
 		Decide(ctx context.Context, run RunState, approved bool, decidedBy string) (RunState, error)
+	}
+
+	// Prompts changes the refund agent's prompts while the service runs. The
+	// agent wiring in package assistant implements it on top of the Goa-AI
+	// prompt registry and the service's own prompt store.
+	Prompts interface {
+		// Override makes template the text of the registered prompt promptID
+		// for every tenant and returns the version of the accepted text. It
+		// fails with ErrPromptNotFound when no prompt promptID is registered
+		// and with ErrInvalidPrompt when template does not render; the text
+		// in use is then unchanged.
+		Override(ctx context.Context, promptID, template string) (version string, err error)
 	}
 
 	// RunState is the state of one refund agent run.
@@ -61,13 +75,19 @@ const (
 	statusAwaitingApproval = "awaiting_approval"
 )
 
-// ErrRunNotFound reports a run that does not exist.
-var ErrRunNotFound = errors.New("run not found")
+var (
+	// ErrRunNotFound reports a run that does not exist.
+	ErrRunNotFound = errors.New("run not found")
+	// ErrPromptNotFound reports a prompt ID that is not registered.
+	ErrPromptNotFound = errors.New("prompt not found")
+	// ErrInvalidPrompt reports a prompt template that does not render.
+	ErrInvalidPrompt = errors.New("invalid prompt template")
+)
 
 // New returns the orders service. signingKey verifies the HS256 bearer tokens
 // issued by the merchant's identity provider.
-func New(orders OrderSource, refunds RefundRunner, conversations Conversations, signingKey []byte) *Service {
-	return &Service{orders: orders, refunds: refunds, conversations: conversations, signingKey: signingKey}
+func New(orders OrderSource, refunds RefundRunner, conversations Conversations, prompts Prompts, signingKey []byte) *Service {
+	return &Service{orders: orders, refunds: refunds, conversations: conversations, prompts: prompts, signingKey: signingKey}
 }
 
 // Chat starts a refund agent run for the authenticated customer.
@@ -117,16 +137,20 @@ func (s *Service) ApproveRefund(ctx context.Context, p *genorders.ApproveRefundP
 	return runView(next), nil
 }
 
-// loadRun loads a run and maps a missing run to the not_found error.
-func (s *Service) loadRun(ctx context.Context, runID string) (RunState, error) {
-	run, err := s.conversations.Status(ctx, runID)
-	if errors.Is(err, ErrRunNotFound) {
-		return RunState{}, genorders.MakeNotFound(fmt.Errorf("run %s not found", runID))
+// OverridePrompt replaces the text of a registered prompt for every tenant.
+// JWTAuth has already checked the "prompts:manage" scope. The new text lasts
+// until the service restarts.
+func (s *Service) OverridePrompt(ctx context.Context, p *genorders.OverridePromptPayload) (*genorders.PromptVersion, error) {
+	version, err := s.prompts.Override(ctx, p.PromptID, p.Template)
+	switch {
+	case errors.Is(err, ErrPromptNotFound):
+		return nil, genorders.MakeUnknownPrompt(err)
+	case errors.Is(err, ErrInvalidPrompt):
+		return nil, genorders.MakeInvalidPrompt(err)
+	case err != nil:
+		return nil, fmt.Errorf("override prompt %s: %w", p.PromptID, err)
 	}
-	if err != nil {
-		return RunState{}, fmt.Errorf("load run %s: %w", runID, err)
-	}
-	return run, nil
+	return &genorders.PromptVersion{PromptID: p.PromptID, Version: version}, nil
 }
 
 // runView converts a run state into the API's run view.
@@ -140,4 +164,16 @@ func runView(r RunState) *genorders.RunView {
 		v.ApprovalPrompt = &r.ApprovalPrompt
 	}
 	return v
+}
+
+// loadRun loads a run and maps a missing run to the not_found error.
+func (s *Service) loadRun(ctx context.Context, runID string) (RunState, error) {
+	run, err := s.conversations.Status(ctx, runID)
+	if errors.Is(err, ErrRunNotFound) {
+		return RunState{}, genorders.MakeNotFound(fmt.Errorf("run %s not found", runID))
+	}
+	if err != nil {
+		return RunState{}, fmt.Errorf("load run %s: %w", runID, err)
+	}
+	return run, nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"goa.design/goa-ai/runtime/agent/model"
 	"goa.design/goa-ai/runtime/agent/planner"
+	"goa.design/goa-ai/runtime/agent/prompt"
 )
 
 // Planner asks the model registered under modelID for the helper agent's next
@@ -19,11 +20,31 @@ type Planner struct {
 	modelID string
 }
 
-// systemPrompt tells the model how to answer. Prices come only from the
-// lookup_price tool, never from the model.
-const systemPrompt = `You answer questions about item prices.
+const (
+	// systemPromptID identifies the helper's instructions in its runtime
+	// prompt registry and on the model requests that use those instructions.
+	systemPromptID prompt.Ident = "[[.Name]].helper.system"
+
+	// systemPrompt tells the model how to answer. Prices come only from the
+	// lookup_price tool, never from the model.
+	systemPrompt = `You answer questions about item prices.
 Call lookup_price with the item the customer asks about, then answer with the price it returns, formatted in dollars.
 If the tool reports known=false, say that you could not find a price for it.`
+)
+
+// SystemPrompt supplies the helper's baseline instructions. Service.Ask
+// registers it before starting the agent, so rendered instructions carry the
+// declared baseline version on every model request.
+func SystemPrompt() prompt.PromptSpec {
+	return prompt.PromptSpec{
+		ID: systemPromptID,
+		AgentID: "[[.Name]].helper",
+		Role: prompt.PromptRoleSystem,
+		Description: "Instructions for answering item price questions.",
+		Template: systemPrompt,
+		Version: "v1",
+	}
+}
 
 // NewPlanner returns a planner that uses the runtime model client registered
 // under modelID.
@@ -42,18 +63,24 @@ func (p *Planner) PlanResume(ctx context.Context, in *planner.PlanResumeInput) (
 	return p.plan(ctx, in.Agent, in.Messages, in.Finalize != nil)
 }
 
-// plan sends the system prompt, the conversation and the advertised tools to
-// the model and returns the tool calls it requested or its final answer.
+// plan renders the registered system prompt, sends it with its version, the
+// conversation and the advertised tools to the model, and returns the tool
+// calls it requested or its final answer.
 func (p *Planner) plan(ctx context.Context, agent planner.PlannerContext, messages []*model.Message, finalize bool) (*planner.PlanResult, error) {
+	system, err := agent.RenderPrompt(ctx, systemPromptID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("render system prompt: %w", err)
+	}
 	client, ok := agent.PlannerModelClient(p.modelID)
 	if !ok {
 		return nil, fmt.Errorf("model %q is not configured", p.modelID)
 	}
 	req := &model.Request{
 		ModelClass: model.ModelClassDefault,
+		PromptRefs: []prompt.PromptRef{system.Ref},
 		Messages: append([]*model.Message{{
 			Role:  model.ConversationRoleSystem,
-			Parts: []model.Part{model.TextPart{Text: systemPrompt}},
+			Parts: []model.Part{model.TextPart{Text: system.Text}},
 		}}, messages...),
 		Stream: true,
 	}

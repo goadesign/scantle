@@ -27,7 +27,7 @@ func UsageCommands() []string {
 	return []string{
 		"commerce (list-orders|get-order)",
 		"payments refund",
-		"orders (chat|run-status|approve-refund)",
+		"orders (chat|run-status|approve-refund|override-prompt)",
 	}
 }
 
@@ -102,6 +102,11 @@ func ParseEndpoint(
 		ordersApproveRefundBodyFlag  = new(cliStringFlag)
 		ordersApproveRefundRunIDFlag = new(cliStringFlag)
 		ordersApproveRefundTokenFlag = new(cliStringFlag)
+
+		ordersOverridePromptFlags        = flag.NewFlagSet("override-prompt", flag.ExitOnError)
+		ordersOverridePromptBodyFlag     = new(cliStringFlag)
+		ordersOverridePromptPromptIDFlag = new(cliStringFlag)
+		ordersOverridePromptTokenFlag    = new(cliStringFlag)
 	)
 	commerceListOrdersFlags.Var(commerceListOrdersTenantIDFlag, "tenant-id", "Merchant tenant.")
 	commerceListOrdersFlags.Var(commerceListOrdersCustomerIDFlag, "customer-id", "Customer whose orders to list.")
@@ -119,6 +124,9 @@ func ParseEndpoint(
 	ordersApproveRefundFlags.Var(ordersApproveRefundBodyFlag, "body", "")
 	ordersApproveRefundFlags.Var(ordersApproveRefundRunIDFlag, "run-id", "Run waiting for approval.")
 	ordersApproveRefundFlags.Var(ordersApproveRefundTokenFlag, "token", "")
+	ordersOverridePromptFlags.Var(ordersOverridePromptBodyFlag, "body", "")
+	ordersOverridePromptFlags.Var(ordersOverridePromptPromptIDFlag, "prompt-id", "Registered prompt to replace.")
+	ordersOverridePromptFlags.Var(ordersOverridePromptTokenFlag, "token", "")
 
 	commerceFlags.Usage = commerceUsage
 	commerceListOrdersFlags.Usage = commerceListOrdersUsage
@@ -131,6 +139,7 @@ func ParseEndpoint(
 	ordersChatFlags.Usage = ordersChatUsage
 	ordersRunStatusFlags.Usage = ordersRunStatusUsage
 	ordersApproveRefundFlags.Usage = ordersApproveRefundUsage
+	ordersOverridePromptFlags.Usage = ordersOverridePromptUsage
 
 	if err := flag.CommandLine.Parse(os.Args[1:]); err != nil {
 		return nil, nil, err
@@ -196,6 +205,9 @@ func ParseEndpoint(
 			case "approve-refund":
 				epf = ordersApproveRefundFlags
 
+			case "override-prompt":
+				epf = ordersOverridePromptFlags
+
 			}
 
 		}
@@ -247,6 +259,9 @@ func ParseEndpoint(
 			case "approve-refund":
 				endpoint = c.ApproveRefund()
 				data, err = ordersc.BuildApproveRefundPayload(ordersApproveRefundBodyFlag.value, ordersApproveRefundRunIDFlag.value, ordersApproveRefundTokenFlag.value)
+			case "override-prompt":
+				endpoint = c.OverridePrompt()
+				data, err = ordersc.BuildOverridePromptPayload(ordersOverridePromptBodyFlag.value, ordersOverridePromptPromptIDFlag.value, ordersOverridePromptTokenFlag.value)
 			}
 		}
 	}
@@ -354,6 +369,7 @@ func ordersUsage() {
 	fmt.Fprintln(os.Stderr, `    chat: Send a message to the refund assistant and start a run.`)
 	fmt.Fprintln(os.Stderr, `    run-status: Read the state of a run the caller started.`)
 	fmt.Fprintln(os.Stderr, `    approve-refund: Approve or deny a refund that is waiting for a manager.`)
+	fmt.Fprintln(os.Stderr, `    override-prompt: Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.`)
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Additional help:")
 	fmt.Fprintf(os.Stderr, "    %s orders COMMAND --help\n", os.Args[0])
@@ -418,4 +434,26 @@ func ordersApproveRefundUsage() {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintln(os.Stderr, "Example:")
 	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "orders approve-refund --body '{\n      \"approval_id\": \"2lg\",\n      \"approved\": true\n   }' --run-id \"mq8\" --token \"Quos esse.\"")
+}
+
+func ordersOverridePromptUsage() {
+	// Header with flags
+	fmt.Fprintf(os.Stderr, "%s [flags] orders override-prompt", os.Args[0])
+	fmt.Fprint(os.Stderr, " -body JSON")
+	fmt.Fprint(os.Stderr, " -prompt-id STRING")
+	fmt.Fprint(os.Stderr, " -token STRING")
+	fmt.Fprintln(os.Stderr)
+
+	// Description
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, `Replace the text of a registered prompt for every tenant served by this orders process. The agent's next model request planned by this process uses the new text. The change lasts until the process restarts, which restores the built-in text; other running orders processes keep their own prompts.`)
+
+	// Flags list
+	fmt.Fprintln(os.Stderr, `    -body JSON: `)
+	fmt.Fprintln(os.Stderr, `    -prompt-id STRING: Registered prompt to replace.`)
+	fmt.Fprintln(os.Stderr, `    -token STRING: `)
+
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintln(os.Stderr, "Example:")
+	fmt.Fprintf(os.Stderr, "    %s %s\n", os.Args[0], "orders override-prompt --body '{\n      \"template\": \"n\"\n   }' --prompt-id \"orders.refund.system\" --token \"Eos repellat.\"")
 }
