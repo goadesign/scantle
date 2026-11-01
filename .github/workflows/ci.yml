@@ -66,8 +66,10 @@ jobs:
           fi
 
   # e2e runs the end-to-end suites: the verifier building and running the
-  # orders platform in the sandbox, and the orders acceptance suite against
-  # real orders processes and a Temporal dev server.
+  # orders platform in the sandbox, surla init generating a starter project
+  # whose candidate and evaluator build and pass in the sandbox, and the
+  # orders acceptance suite against real orders processes and a Temporal dev
+  # server.
   e2e:
     runs-on: macos-latest
     timeout-minutes: 45
@@ -88,6 +90,8 @@ jobs:
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Verifier end to end
         run: go test -race -tags e2e ./internal/verify </dev/null
+      - name: Starter project end to end
+        run: go test -race -tags scaffold ./internal/scaffold </dev/null
       - name: Orders acceptance end to end
         working-directory: examples/orders-eval
         run: go test -race -tags e2e ./acceptance </dev/null
