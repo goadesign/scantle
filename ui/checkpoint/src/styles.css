@@ -187,7 +187,7 @@ li { margin-bottom: 0.35rem; }
   font-size: 0.84rem;
   font-weight: 500;
 }
-.shadcn-btn:focus-visible, .surla-pill:focus-visible, .surla-input:focus-visible, .surla-table-wrap:focus-visible {
+.shadcn-btn:focus-visible, .surla-pill:focus-visible, .surla-input:focus-visible, .surla-table-wrap:focus-visible, .surla-graph-wrap:focus-visible, summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -280,8 +280,7 @@ li { margin-bottom: 0.35rem; }
 .shadcn-timeline, .surla-timeline { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0; padding-left: 0; list-style: none; }
 .shadcn-timeline-step, .surla-timeline-step { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.65rem; border-left: 3px solid var(--accent); background: var(--muted); border-radius: 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px) 0; }
 .surla-details { margin-top: 0.35rem; font-size: 0.8rem; color: var(--muted-foreground); }
-.surla-details summary { cursor: pointer; font-weight: 500; user-select: none; }
-.surla-details summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+summary { cursor: pointer; font-weight: 500; user-select: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

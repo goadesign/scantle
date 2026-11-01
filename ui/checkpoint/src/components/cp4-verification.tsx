@@ -64,7 +64,11 @@ export function VerificationView({
     : "Verification could not finish";
 
   return (
-    <Card id="surla-cp4-verification" aria-labelledby="surla-cp4-title">
+    <Card
+      id="surla-cp4-verification"
+      aria-labelledby="surla-cp4-title"
+      aria-busy={checking ? "true" : undefined}
+    >
       <h2 id="surla-cp4-title">{title}</h2>
       {displayedCardRevision !== null && displayedCardRevision !== run.request_revision ? (
         <Alert variant="warning" role="status" id="surla-cp4-different-revision">

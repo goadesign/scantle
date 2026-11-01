@@ -818,14 +818,19 @@ if (!cp2Text.includes(input.wantCP2Revision) ||
     !cp2Text.includes("Confirmation")) {
   throw new Error("CP2 view missing expected digests or guardrails: " + cp2Text);
 }
+const cp2GraphWrap = findAll(viewEl, (n) => n.attributes["class"] === "surla-graph-wrap");
 const cp2Svg = findAll(viewEl, (n) => n.attributes["id"] === "surla-c4-svg");
 const cp2SvgNodes = findAll(viewEl, (n) => n.attributes["class"] === "surla-svg-node" && n.className && n.className.baseVal === "surla-svg-node");
 const cp2SvgTexts = findAll(viewEl, (n) => n.tagName === "TEXT" && n.namespaceURI === "http://www.w3.org/2000/svg");
-if (cp2Svg.length !== 1 ||
+if (cp2GraphWrap.length !== 1 ||
+    cp2GraphWrap[0].attributes["role"] !== "region" ||
+    cp2GraphWrap[0].attributes["aria-label"] !== "C4 architecture diagram" ||
+    cp2GraphWrap[0].attributes["tabindex"] !== "0" ||
+    cp2Svg.length !== 1 ||
     cp2SvgNodes.length !== input.cp2Structured.containers.length ||
     cp2SvgTexts.length === 0 ||
     !cp2SvgTexts.every((t) => t.attributes["fill"] === "currentColor")) {
-  throw new Error("expected CP2 SVG graph with all containers and fill=currentColor on all SVG text, got svg=" + cp2Svg.length + " nodes=" + cp2SvgNodes.length);
+  throw new Error("expected focusable CP2 SVG graph region with all containers and fill=currentColor on all SVG text, got svg=" + cp2Svg.length + " nodes=" + cp2SvgNodes.length);
 }
 
 // 4a. Deliver 15-node cyclic + colliding-name + self-loop CP2 fixture -> no node cutoff, all 15 nodes and cyclic/self-loop edges rendered alongside inspectable list.
