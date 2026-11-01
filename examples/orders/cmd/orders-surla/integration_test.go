@@ -273,7 +273,8 @@ func draftPayload(t *testing.T, kind, text string) json.RawMessage {
 // host serves and checks it is the build from the pinned Surla version: it
 // describes a saved approval with its digests in expandable details, keeps
 // unsaved edits when switching to an incoming card, shows the swarm manifest
-// in expandable details, and bundles only the patched Zod 4 runtime.
+// in expandable details, exposes the C4 diagram as a keyboard-focusable
+// region, and bundles only the patched Zod 4 runtime.
 func TestHostServesTheCurrentCheckpointViewer(t *testing.T) {
 	target := newTarget(t)
 	host := newHost(t, target.server.URL, targetToken(t, "prompts:manage"))
@@ -290,11 +291,18 @@ func TestHostServesTheCurrentCheckpointViewer(t *testing.T) {
 		"surla-cp5-approval-details",
 		"surla-cp2-swarm-manifest",
 		"Switch to Incoming Card (Keep Unsaved Edits)",
+		"C4 architecture diagram",
+		".surla-graph-wrap:focus-visible, summary:focus-visible",
 		"major:4,minor:6,patch:7",
 	} {
 		assert.Contains(t, html, want)
 	}
-	for _, stale := range []string{"In-memory approval recorded", "ZodEffects", "ZodParsedType"} {
+	for _, stale := range []string{
+		"In-memory approval recorded",
+		"ZodEffects",
+		"ZodParsedType",
+		".surla-details summary:focus-visible",
+	} {
 		assert.NotContains(t, html, stale)
 	}
 }
