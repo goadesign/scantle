@@ -281,11 +281,12 @@ go test -race ./...
 (cd examples/orders-eval && go test -race ./...)
 ```
 
-The end-to-end tests require the `e2e` build tag, macOS, and the Temporal CLI. Run the five acceptance scenarios and the seeded token-budget regression, then the verifier's complete `Run` → report → `Approve` test:
+The end-to-end and starter-project integration tests require macOS (`sandbox-exec`); `examples/orders-eval/acceptance` also requires the Temporal CLI. Run the five acceptance scenarios and the seeded token-budget regression, the verifier's complete `Run` → report → `Approve` test, and the `surla init` starter-project build and sandboxed evaluator test (all run automatically on GitHub Actions in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)):
 
 ```bash
 (cd examples/orders-eval && go test -race -tags e2e ./acceptance)
 go test -race -tags e2e ./internal/verify
+go test -race -tags scaffold ./internal/scaffold
 ```
 
 See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-step walkthrough including `surla verify` (full operator report vs. `-builder-view`).
@@ -296,6 +297,9 @@ See [`examples/orders/README.md`](../examples/orders/README.md) for a step-by-st
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # macOS GitHub Actions CI (`tests` unit/typecheck/codegen-drift job and `e2e` verifier/scaffold/acceptance job)
 ├── design/
 │   └── design.go                 # Surla Goa & Goa-AI MCP 1.0.0 DSL contract
 ├── cmd/
