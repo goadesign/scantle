@@ -270,8 +270,10 @@ func draftPayload(t *testing.T, kind, text string) json.RawMessage {
 }
 
 // TestHostServesTheCurrentCheckpointViewer reads the checkpoint viewer the
-// host serves and checks it is the build from the pinned Surla version, which
-// describes a saved approval and keeps its digests in expandable details.
+// host serves and checks it is the build from the pinned Surla version: it
+// describes a saved approval with its digests in expandable details, keeps
+// unsaved edits when switching to an incoming card, shows the swarm manifest
+// in expandable details, and bundles only the patched Zod 4 runtime.
 func TestHostServesTheCurrentCheckpointViewer(t *testing.T) {
 	target := newTarget(t)
 	host := newHost(t, target.server.URL, targetToken(t, "prompts:manage"))
@@ -284,8 +286,17 @@ func TestHostServesTheCurrentCheckpointViewer(t *testing.T) {
 	require.Equal(t, http.StatusOK, response.StatusCode)
 	var html string
 	require.NoError(t, json.NewDecoder(response.Body).Decode(&html))
-	assert.Contains(t, html, "surla-cp5-approval-details")
-	assert.NotContains(t, html, "In-memory approval recorded")
+	for _, want := range []string{
+		"surla-cp5-approval-details",
+		"surla-cp2-swarm-manifest",
+		"Switch to Incoming Card (Keep Unsaved Edits)",
+		"major:4,minor:6,patch:7",
+	} {
+		assert.Contains(t, html, want)
+	}
+	for _, stale := range []string{"In-memory approval recorded", "ZodEffects", "ZodParsedType"} {
+		assert.NotContains(t, html, stale)
+	}
 }
 
 // callTool checks the complete JSON-RPC response before decoding the MCP
