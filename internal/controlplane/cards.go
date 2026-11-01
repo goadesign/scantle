@@ -49,6 +49,11 @@ type (
 	}
 )
 
+// stagingFile is the name, inside a cards directory, of the file each save
+// writes before renaming it over the card's file. Card files end in ".json",
+// so it is never read as a card.
+const stagingFile = "pending"
+
 // errCardsClosed reports a request that reached the card store after the
 // control plane was closed.
 var errCardsClosed = errors.New("control plane is closed")
@@ -73,17 +78,6 @@ func openCardStore(dir string) (*cardStore, error) {
 			err = fmt.Errorf("lock cards directory: %w", err)
 		}
 		return nil, errors.Join(err, lock.Close())
-	}
-	// A save that crashed before its rename left its temporary file; the
-	// lock guarantees no other process is writing one now.
-	leftovers, err := filepath.Glob(filepath.Join(dir, "card-*.tmp"))
-	if err == nil {
-		for _, name := range leftovers {
-			err = errors.Join(err, os.Remove(name))
-		}
-	}
-	if err != nil {
-		return nil, errors.Join(fmt.Errorf("remove unfinished card saves: %w", err), lock.Close())
 	}
 	return &cardStore{dir: dir, lock: lock}, nil
 }
@@ -149,11 +143,14 @@ func (s *cardStore) load(changeID string) (storedChangeCard, bool, error) {
 }
 
 // save replaces the saved card for record.card.ChangeID. It writes and syncs
-// a temporary file in the same directory and renames it over the old one.
-// An error before the rename leaves the previous card in place. The rename
+// the card to the directory's one staging file, then renames that over the
+// card's file. Only one save runs at a time in a directory (the directory
+// lock and ControlPlane.mu), so one staging file suffices; a save that
+// crashed leaves it behind, unread, and the next save overwrites it. An
+// error before the rename leaves the previous card in place. The rename
 // publishes the new card; an error syncing the directory after it means the
 // new card is in place but may not survive a crash, and the error says so.
-func (s *cardStore) save(record storedChangeCard) (err error) {
+func (s *cardStore) save(record storedChangeCard) error {
 	if s.lock == nil {
 		return errCardsClosed
 	}
@@ -161,31 +158,21 @@ func (s *cardStore) save(record storedChangeCard) (err error) {
 	if err != nil {
 		return fmt.Errorf("encode change card %q: %w", record.card.ChangeID, err)
 	}
-	tmp, err := os.CreateTemp(s.dir, "card-*.tmp")
-	if err != nil {
-		return fmt.Errorf("save change card %q: %w", record.card.ChangeID, err)
-	}
-	renamed := false
-	defer func() {
-		// After a successful rename the temporary name no longer exists.
-		if removeErr := os.Remove(tmp.Name()); removeErr != nil && !(renamed && errors.Is(removeErr, fs.ErrNotExist)) {
-			err = errors.Join(err, fmt.Errorf("remove unfinished save of change card %q: %w", record.card.ChangeID, removeErr))
+	staging := filepath.Join(s.dir, stagingFile)
+	f, err := os.OpenFile(staging, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err == nil {
+		_, err = f.Write(data)
+		if err == nil {
+			err = f.Sync()
 		}
-	}()
-	_, err = tmp.Write(data)
-	if err == nil {
-		err = tmp.Sync()
-	}
-	if closeErr := tmp.Close(); err == nil {
-		err = closeErr
+		err = errors.Join(err, f.Close())
 	}
 	if err == nil {
-		err = os.Rename(tmp.Name(), s.path(record.card.ChangeID))
+		err = os.Rename(staging, s.path(record.card.ChangeID))
 	}
 	if err != nil {
 		return fmt.Errorf("save change card %q: %w", record.card.ChangeID, err)
 	}
-	renamed = true
 	if err := syncDir(s.dir); err != nil {
 		return fmt.Errorf("change card %q is saved but may not survive a crash: %w", record.card.ChangeID, err)
 	}

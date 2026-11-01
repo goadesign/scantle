@@ -245,23 +245,34 @@ func confirmedCardFile(t *testing.T) string {
 	return string(data)
 }
 
-// TestOpeningRemovesUnfinishedSaves checks that a temporary file left by a
-// save that crashed before its rename is removed when the directory is
-// opened again, and that saved cards are kept.
-func TestOpeningRemovesUnfinishedSaves(t *testing.T) {
+// TestAnUnfinishedSaveIsHarmless leaves a partly written staging file, as a
+// save that crashed before its rename would, and checks that a new control
+// plane still serves the saved card and that the next save succeeds.
+func TestAnUnfinishedSaveIsHarmless(t *testing.T) {
 	dir := t.TempDir()
 	first, err := New(Options{CardsDir: dir})
 	require.NoError(t, err)
 	card := saveCard(t, first, nil)
 	require.NoError(t, first.Close())
-	leftover := filepath.Join(dir, "card-123.tmp")
-	require.NoError(t, os.WriteFile(leftover, []byte("{"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, stagingFile), []byte(`{"card":`), 0o600))
 
 	next := newControlPlane(t, Options{CardsDir: dir})
-	assert.NoFileExists(t, leftover)
-	got, err := next.GetChange(WithPrincipal(context.Background(), Principal{ID: "alice@example.com"}), &gensurla.GetChangePayload{ChangeID: "chg"})
+	alice := WithPrincipal(context.Background(), Principal{ID: "alice@example.com"})
+	got, err := next.GetChange(alice, &gensurla.GetChangePayload{ChangeID: "chg"})
 	require.NoError(t, err)
-	assert.Equal(t, card, got)
+	assert.Equal(t, card, got, "the saved card is untouched")
+
+	updated, err := next.ConfirmIntent(alice, &gensurla.ConfirmIntentPayload{
+		ChangeID: "chg", RequestRevision: card.RequestRevision, Examples: []*gensurla.ExampleItem{{
+			ID: "chg-check-02", Scenario: "Another refund", InputSummary: "Order total $10.00",
+			ExpectedOutcome: "Instant store credit", VerificationKind: "deterministic",
+		}},
+	})
+	require.NoError(t, err)
+	got, err = next.GetChange(alice, &gensurla.GetChangePayload{ChangeID: "chg"})
+	require.NoError(t, err)
+	assert.Equal(t, updated, got, "the next save overwrites the staging file and publishes")
+	assert.NoFileExists(t, filepath.Join(dir, stagingFile), "the rename consumed it")
 }
 
 // TestCardsWithInvalidUTF8RoundTrip saves a card whose text holds invalid
