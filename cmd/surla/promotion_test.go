@@ -71,6 +71,21 @@ func TestLoadPromotionConfig(t *testing.T) {
 	target, err := loadPromotionConfig("")
 	require.NoError(t, err)
 	assert.Nil(t, target, "no file leaves approve_merge unavailable")
+
+	// Relative directories are resolved against the working directory once,
+	// at load, so a later change of directory cannot move them.
+	work := t.TempDir()
+	t.Chdir(work)
+	path := filepath.Join(t.TempDir(), "promotion.json")
+	relative := strings.Replace(strings.Replace(valid, `"/r"`, `"reports"`, 1), `"/rel"`, `"release"`, 1)
+	require.NoError(t, os.WriteFile(path, []byte(relative), 0o600))
+	target, err = loadPromotionConfig(path)
+	require.NoError(t, err)
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+	cfg := target.(*releaseTarget).cfg
+	assert.Equal(t, filepath.Join(wd, "reports"), cfg.ReportDir)
+	assert.Equal(t, filepath.Join(wd, "release"), cfg.ReleaseDir)
 }
 
 // TestReleaseTargetMeasuresStagedBinaries checks that CurrentInputs hashes

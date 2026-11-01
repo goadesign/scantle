@@ -178,7 +178,7 @@ func IsCommitID(commit string) bool {
 // results, yields a report that does not pass.
 func Run(ctx context.Context, p Plan) (Report, error) {
 	for name, commit := range map[string]string{"candidate": p.CandidateCommit, "suite": p.SuiteCommit} {
-		if !commitID.MatchString(commit) {
+		if !IsCommitID(commit) {
 			return Report{}, stageError(StageCheckout, summaryPlan, fmt.Errorf("%s commit %q is not a full commit ID", name, commit))
 		}
 	}
@@ -345,11 +345,10 @@ func validatePackagePath(pkg string) error {
 	return nil
 }
 
-// validateArtifactName rejects a binary name that cannot serve both as the
+// ValidateArtifactName returns an error unless name can serve both as the
 // artifact ID passed to the suite as --artifact name=path and as one file name
-// inside WorkDir/candidate-bin and WorkDir/evidence.
-// ValidateArtifactName reports whether name can name a candidate binary: a
-// single file name that holds no /, \, = or NUL.
+// inside WorkDir/candidate-bin and WorkDir/evidence: non-empty, not . or ..,
+// and free of /, \, = and NUL.
 func ValidateArtifactName(name string) error {
 	switch {
 	case name == "", name == ".", name == "..":
