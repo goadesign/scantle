@@ -55,9 +55,11 @@ func (c *ControlPlane) VerifyChange(ctx context.Context, p *gensurla.VerifyChang
 		return nil, errVerificationUnavailable
 	}
 	c.mu.RLock()
-	record, exists := c.cards[p.ChangeID]
+	record, exists, err := c.cards.load(p.ChangeID)
 	c.mu.RUnlock()
 	switch {
+	case err != nil:
+		return nil, err
 	case !exists:
 		return nil, fmt.Errorf("unknown change_id %q", p.ChangeID)
 	case record.owner != principal.ID:

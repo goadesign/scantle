@@ -130,7 +130,7 @@ func TestCheckpointUIOpenUIDecisionStudioAndStreaming(t *testing.T) {
 		t.Fatalf("marshal analysisJSON: %v", err)
 	}
 
-	cp := New(Options{
+	cp := newControlPlane(t, Options{
 		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysisJSON))),
 	})
 	adapter := genmcpadapter.NewMCPAdapter(gensurla.NewEndpoints(cp), nil)

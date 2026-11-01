@@ -55,6 +55,9 @@ type serveConfig struct {
 	// configuration (see loadVerificationConfig); empty disables
 	// verify_change and get_verification.
 	verificationPath string
+	// cardsDir is the directory where CP1 Change Cards are saved, so a
+	// restarted serve returns them.
+	cardsDir string
 }
 
 // binaryFlags collects repeated `-binary name=pkg` flags for `surla verify`
@@ -184,6 +187,7 @@ func runServe(args []string) (err error) {
 	fs.StringVar(&cfg.provider, "model-provider", "", "CP1 model provider: anthropic or openai (key from ANTHROPIC_API_KEY or OPENAI_API_KEY)")
 	fs.StringVar(&cfg.modelName, "model-name", "", "CP1 model name for -model-provider")
 	fs.StringVar(&cfg.swarmProfilesPath, "swarm-profiles", "", "JSON file listing the coding-agent provider profiles used for CP2 swarm plans")
+	fs.StringVar(&cfg.cardsDir, "cards-dir", ".surla/cards", "directory where CP1 Change Cards are saved so they survive restarts; one surla serve at a time may use it")
 	fs.StringVar(&cfg.verificationPath, "verification-config", "", "JSON file with the CP4 candidate, evaluator suite, runs and reports configuration used by verify_change")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -200,7 +204,11 @@ func runServe(args []string) (err error) {
 	auth := controlplane.NewTokenAuthenticator(map[string]controlplane.Principal{
 		token: {ID: strings.TrimSpace(*principalID)},
 	})
-	cp := controlplane.New(opts)
+	cp, err := controlplane.New(opts)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, cp.Close()) }()
 	srv := &http.Server{
 		Handler:           controlplane.NewHTTPHandler(cp, auth),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -257,6 +265,7 @@ func writeServeStatus(w io.Writer, addr *net.TCPAddr, opts controlplane.Options)
 	}
 	fmt.Fprintf(w, "surla: serving on http://%s\n", host)
 	fmt.Fprintf(w, "surla: connect MCP clients to http://%s/mcp with the bearer token\n", host)
+	fmt.Fprintf(w, "surla: saving Change Cards in %s\n", opts.CardsDir)
 	if opts.Analyzer == nil {
 		fmt.Fprintln(w, "surla: propose_change is off: no model is configured to analyze change requests"+
 			" (set -model-provider and -model-name, or -model-gateway-addr)")
@@ -689,7 +698,7 @@ func serveOptions(cfg serveConfig, getenv func(string) string) (controlplane.Opt
 	if err != nil {
 		return controlplane.Options{}, nil, err
 	}
-	return controlplane.Options{Analyzer: analyzer, SwarmProfiles: profiles, Verification: verification}, closeModel, nil
+	return controlplane.Options{CardsDir: cfg.cardsDir, Analyzer: analyzer, SwarmProfiles: profiles, Verification: verification}, closeModel, nil
 }
 
 // newCP1Analyzer returns the CP1 analyzer selected by cfg: a model gateway

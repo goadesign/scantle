@@ -296,7 +296,7 @@ func (s *checkpointVerificationService) GetVerification(
 // preserving Goa's tagged-union representation rather than hand-authoring it.
 func checkpointVerificationWire(t *testing.T, result *gensurla.VerificationStatusResult) json.RawMessage {
 	t.Helper()
-	svc := &checkpointVerificationService{ControlPlane: New(Options{}), result: result}
+	svc := &checkpointVerificationService{ControlPlane: newControlPlane(t, Options{}), result: result}
 	adapter := genmcpadapter.NewMCPAdapter(gensurla.NewEndpoints(svc), nil)
 	args, err := json.Marshal(map[string]string{"run_id": result.RunID})
 	require.NoError(t, err)

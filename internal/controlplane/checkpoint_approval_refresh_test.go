@@ -184,7 +184,7 @@ func approvalRefreshCards(t *testing.T) (json.RawMessage, json.RawMessage) {
 		Environment: "sim", Artifacts: map[string]string{"orders": strings.Repeat("a", 64)},
 	}
 	target := &promotionTargetStub{inputs: inputs}
-	cp := New(Options{
+	cp := newControlPlane(t, Options{
 		Analyzer: NewModelCP1Analyzer(newStubModelClient(t, string(analysis))), PromotionTarget: target,
 	})
 	card, err := cp.ProposeChange(ctx, &gensurla.ProposeChangePayload{

@@ -293,5 +293,5 @@ func newCompositionControlPlane(t *testing.T, provider model.Provider) *ControlP
 	t.Helper()
 	client, err := model.NewClient(provider)
 	require.NoError(t, err)
-	return New(Options{Analyzer: NewModelCP1Analyzer(client)})
+	return newControlPlane(t, Options{Analyzer: NewModelCP1Analyzer(client)})
 }
